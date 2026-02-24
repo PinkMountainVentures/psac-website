@@ -1,1 +1,1229 @@
-404: Not Found
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palm Springs Adventure Club</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --mountain-pink: #E27396;
+            --desert-green: #7ABD91;
+            --sunset-red: #E76F51;
+            --sand-beige: #F8F1E9;
+            --dark-pine: #2A4747;
+            --joshua-sage: #8FA888;
+            --desert-rose: #C4687A;
+            --canyon-clay: #C4763A;
+            --morning-mist: #E8EDE8;
+            --granite-shadow: #4A5E5E;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--sand-beige);
+            color: var(--dark-pine);
+            font-family: 'Montserrat', sans-serif;
+            line-height: 1.6;
+        }
+
+        /* ── NAVIGATION ── */
+        header {
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            background-color: rgba(42, 71, 71, 0.96);
+            backdrop-filter: blur(8px);
+            padding: 1rem 0;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+        }
+
+        .logo-top {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 300;
+            color: var(--mountain-pink);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .logo-bottom {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.55rem;
+            font-weight: 600;
+            color: var(--desert-green);
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            line-height: 1;
+            margin-top: 3px;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2.5rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: rgba(255,255,255,0.85);
+            text-decoration: none;
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--mountain-pink);
+        }
+
+        .nav-cta {
+            background-color: var(--mountain-pink) !important;
+            color: white !important;
+            padding: 0.5rem 1.2rem;
+            border-radius: 2px;
+        }
+
+        .nav-cta:hover {
+            background-color: var(--desert-rose) !important;
+            color: white !important;
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* ── HERO ── */
+        .hero {
+            height: 100vh;
+            min-height: 700px;
+            background: linear-gradient(to bottom, rgba(42,71,71,0.5) 0%, rgba(42,71,71,0.2) 50%, rgba(42,71,71,0.6) 100%),
+                        url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=1920&auto=format&fit=crop') no-repeat center center / cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            padding-top: 70px;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            padding: 2rem;
+        }
+
+        .hero-eyebrow {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--desert-green);
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(3rem, 7vw, 5.5rem);
+            font-weight: 300;
+            line-height: 1.05;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+        }
+
+        .hero h1 em {
+            font-style: italic;
+            color: var(--mountain-pink);
+        }
+
+        .hero-sub {
+            font-size: 0.95rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+            color: rgba(255,255,255,0.9);
+            max-width: 540px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            display: inline-block;
+            background-color: var(--mountain-pink);
+            color: white;
+            padding: 0.9rem 2.2rem;
+            text-decoration: none;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            border-radius: 2px;
+            transition: all 0.3s;
+            border: 2px solid var(--mountain-pink);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--desert-rose);
+            border-color: var(--desert-rose);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            display: inline-block;
+            background-color: transparent;
+            color: white;
+            padding: 0.9rem 2.2rem;
+            text-decoration: none;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            border-radius: 2px;
+            border: 2px solid rgba(255,255,255,0.6);
+            transition: all 0.3s;
+        }
+
+        .btn-outline:hover {
+            border-color: white;
+            background-color: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+
+        /* ── INTRO STRIP ── */
+        .intro-strip {
+            background-color: var(--dark-pine);
+            color: white;
+            padding: 1.5rem 2rem;
+            text-align: center;
+        }
+
+        .intro-strip p {
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .intro-strip span {
+            color: var(--mountain-pink);
+        }
+
+        /* ── SECTION SHARED ── */
+        section {
+            padding: 6rem 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-label {
+            font-size: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .section-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 300;
+            color: var(--dark-pine);
+            text-align: center;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .section-sub {
+            font-size: 0.9rem;
+            color: var(--granite-shadow);
+            text-align: center;
+            max-width: 560px;
+            margin: 0 auto 4rem;
+            line-height: 1.8;
+        }
+
+        /* ── ABOUT ── */
+        .about {
+            background-color: white;
+        }
+
+        .about-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5rem;
+            align-items: center;
+        }
+
+        .about-image {
+            height: 520px;
+            background: url('https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=800&auto=format&fit=crop') no-repeat center center / cover;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .about-image::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            right: -20px;
+            width: 60%;
+            height: 60%;
+            border: 2px solid var(--mountain-pink);
+            border-radius: 2px;
+            z-index: -1;
+        }
+
+        .about-text .section-label,
+        .about-text .section-title {
+            text-align: left;
+        }
+
+        .about-text p {
+            font-size: 0.9rem;
+            color: var(--granite-shadow);
+            line-height: 1.9;
+            margin-bottom: 1.5rem;
+        }
+
+        .about-stats {
+            display: flex;
+            gap: 2.5rem;
+            margin-top: 2.5rem;
+            padding-top: 2.5rem;
+            border-top: 1px solid var(--morning-mist);
+        }
+
+        .stat-item {
+            text-align: left;
+        }
+
+        .stat-number {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: var(--mountain-pink);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--granite-shadow);
+            margin-top: 0.3rem;
+        }
+
+        /* ── SERVICES ── */
+        .services {
+            background-color: var(--sand-beige);
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .service-card {
+            background-color: white;
+            padding: 2.5rem 2rem;
+            border-radius: 2px;
+            box-shadow: 0 4px 30px rgba(42,71,71,0.06);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-top: 3px solid transparent;
+        }
+
+        .service-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(42,71,71,0.12);
+        }
+
+        .service-card.primary { border-top-color: var(--mountain-pink); }
+        .service-card.secondary { border-top-color: var(--desert-green); }
+        .service-card.tertiary { border-top-color: var(--sunset-red); }
+
+        .service-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1.5rem;
+        }
+
+        .service-card h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            color: var(--dark-pine);
+            margin-bottom: 0.75rem;
+        }
+
+        .service-card p {
+            font-size: 0.85rem;
+            color: var(--granite-shadow);
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .service-price {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            color: var(--mountain-pink);
+            text-transform: uppercase;
+        }
+
+        .service-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--dark-pine);
+            text-decoration: none;
+            border-bottom: 1px solid var(--mountain-pink);
+            padding-bottom: 2px;
+            transition: color 0.3s;
+        }
+
+        .service-link:hover { color: var(--mountain-pink); }
+
+        /* ── PEAKS TO POOLS ── */
+        .peaks-to-pools {
+            background-color: var(--dark-pine);
+            color: white;
+            padding: 7rem 2rem;
+        }
+
+        .peaks-to-pools .section-title {
+            color: white;
+        }
+
+        .peaks-to-pools .section-sub {
+            color: rgba(255,255,255,0.65);
+        }
+
+        .p2p-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5px;
+            background-color: rgba(255,255,255,0.1);
+            margin-top: 3rem;
+        }
+
+        .p2p-item {
+            background-color: var(--dark-pine);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+
+        .p2p-item:hover {
+            background-color: var(--granite-shadow);
+        }
+
+        .p2p-item h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            font-weight: 300;
+            color: var(--mountain-pink);
+            margin-bottom: 0.5rem;
+        }
+
+        .p2p-item p {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            line-height: 1.7;
+        }
+
+        .p2p-divider {
+            text-align: center;
+            margin: 3rem 0 0;
+            font-size: 0.65rem;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.3);
+        }
+
+        /* ── GEAR RENTAL ── */
+        .gear {
+            background-color: white;
+        }
+
+        .gear-packages {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .gear-card {
+            border: 1px solid var(--morning-mist);
+            border-radius: 2px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .gear-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(42,71,71,0.1);
+        }
+
+        .gear-card-header {
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .gear-card.essentials .gear-card-header { background-color: var(--morning-mist); }
+        .gear-card.premium .gear-card-header { background-color: var(--dark-pine); color: white; }
+        .gear-card.custom .gear-card-header { background-color: var(--mountain-pink); color: white; }
+
+        .gear-card h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+
+        .gear-card .price {
+            font-size: 2rem;
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .gear-card .price span {
+            font-size: 0.8rem;
+            font-family: 'Montserrat', sans-serif;
+            opacity: 0.7;
+        }
+
+        .gear-card-body {
+            padding: 2rem;
+        }
+
+        .gear-card-body ul {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .gear-card-body li {
+            font-size: 0.85rem;
+            color: var(--granite-shadow);
+            padding: 0.4rem 0;
+            border-bottom: 1px solid var(--morning-mist);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .gear-card-body li::before {
+            content: '—';
+            color: var(--mountain-pink);
+            font-size: 0.7rem;
+        }
+
+        /* ── TRAILS ── */
+        .trails {
+            background-color: var(--sand-beige);
+        }
+
+        .trails-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .trail-card {
+            border-radius: 2px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(42,71,71,0.08);
+            background-color: white;
+            transition: transform 0.3s;
+        }
+
+        .trail-card:hover { transform: translateY(-5px); }
+
+        .trail-img {
+            height: 220px;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+
+        .trail-difficulty {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background-color: var(--dark-pine);
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            padding: 0.3rem 0.7rem;
+            border-radius: 2px;
+        }
+
+        .trail-difficulty.moderate { background-color: var(--desert-green); }
+        .trail-difficulty.challenging { background-color: var(--sunset-red); }
+        .trail-difficulty.strenuous { background-color: var(--dark-pine); }
+
+        .trail-info {
+            padding: 1.5rem;
+        }
+
+        .trail-info h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            font-weight: 400;
+            color: var(--dark-pine);
+            margin-bottom: 0.4rem;
+        }
+
+        .trail-meta {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .trail-meta span {
+            font-size: 0.7rem;
+            color: var(--granite-shadow);
+            letter-spacing: 0.05em;
+        }
+
+        .trail-info p {
+            font-size: 0.82rem;
+            color: var(--granite-shadow);
+            line-height: 1.7;
+        }
+
+        /* ── TESTIMONIALS ── */
+        .testimonials {
+            background-color: var(--mountain-pink);
+            color: white;
+            padding: 7rem 2rem;
+            text-align: center;
+        }
+
+        .testimonials .section-label { color: rgba(255,255,255,0.7); }
+        .testimonials .section-title { color: white; }
+
+        .testimonial-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .testimonial-card {
+            background-color: rgba(255,255,255,0.12);
+            padding: 2rem;
+            border-radius: 2px;
+            text-align: left;
+        }
+
+        .testimonial-text {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.15rem;
+            font-style: italic;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+            color: rgba(255,255,255,0.95);
+        }
+
+        .testimonial-author {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.65);
+        }
+
+        /* ── CONSULTATION CTA ── */
+        .consultation-cta {
+            background-color: var(--sand-beige);
+            text-align: center;
+            padding: 7rem 2rem;
+        }
+
+        .cta-box {
+            max-width: 700px;
+            margin: 0 auto;
+            background-color: var(--dark-pine);
+            padding: 4rem;
+            border-radius: 2px;
+            color: white;
+        }
+
+        .cta-box .section-label { color: var(--desert-green); }
+        .cta-box .section-title { color: white; font-size: 2.2rem; }
+
+        .cta-box p {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.7);
+            line-height: 1.8;
+            margin-bottom: 2rem;
+        }
+
+        /* ── NEWSLETTER ── */
+        .newsletter {
+            background-color: var(--morning-mist);
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .newsletter h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: var(--dark-pine);
+            margin-bottom: 0.5rem;
+        }
+
+        .newsletter p {
+            font-size: 0.85rem;
+            color: var(--granite-shadow);
+            margin-bottom: 2rem;
+        }
+
+        .newsletter-form {
+            display: flex;
+            max-width: 460px;
+            margin: 0 auto;
+            gap: 0;
+        }
+
+        .newsletter-form input {
+            flex: 1;
+            padding: 0.9rem 1.2rem;
+            border: 1px solid rgba(42,71,71,0.2);
+            border-right: none;
+            border-radius: 2px 0 0 2px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.8rem;
+            outline: none;
+            background-color: white;
+        }
+
+        .newsletter-form button {
+            background-color: var(--mountain-pink);
+            color: white;
+            border: none;
+            padding: 0 1.5rem;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            border-radius: 0 2px 2px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .newsletter-form button:hover { background-color: var(--desert-rose); }
+
+        /* ── FOOTER ── */
+        footer {
+            background-color: var(--dark-pine);
+            color: white;
+            padding: 4rem 2rem 2rem;
+        }
+
+        .footer-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        .footer-brand .logo-top { font-size: 1.2rem; margin-bottom: 0.3rem; display: block; }
+        .footer-brand .logo-bottom { display: block; margin-bottom: 1.5rem; }
+
+        .footer-brand p {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.5);
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-col h4 {
+            font-size: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--desert-green);
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-col ul { list-style: none; }
+
+        .footer-col li {
+            margin-bottom: 0.7rem;
+        }
+
+        .footer-col a {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.55);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-col a:hover { color: var(--mountain-pink); }
+
+        .footer-col address {
+            font-style: normal;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.55);
+            line-height: 1.9;
+        }
+
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.3);
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 900px) {
+            .about-grid,
+            .services-grid,
+            .gear-packages,
+            .trails-grid,
+            .testimonial-grid,
+            .p2p-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .about-image { height: 340px; }
+            .about-image::after { display: none; }
+
+            .nav-links { display: none; }
+            .hamburger { display: block; }
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 { font-size: 2.5rem; }
+            .footer-grid { grid-template-columns: 1fr; }
+            .footer-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+            .cta-box { padding: 2.5rem 1.5rem; }
+        }
+
+        /* ── SCROLL ANIMATION ── */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+
+        .fade-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <nav>
+            <a href="#" class="logo">
+                <span class="logo-top">Palm Springs</span>
+                <span class="logo-bottom">Adventure Club</span>
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#about">About</a></li>
+                <li><a href="#services">Consultations</a></li>
+                <li><a href="#gear">Gear Rental</a></li>
+                <li><a href="#trails">Trails</a></li>
+                <li><a href="#contact" class="nav-cta">Book a Consultation</a></li>
+            </ul>
+            <button class="hamburger" id="hamburger">☰</button>
+        </nav>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-content">
+            <p class="hero-eyebrow">Palm Springs Adventure Club &nbsp;·&nbsp; Peaks to Pools</p>
+            <h1>Desert Adventures,<br><em>Expertly Curated</em></h1>
+            <p class="hero-sub">Personalized hiking consultations and guided experiences in the Coachella Valley — from San Jacinto's summit to Palm Springs' finest pools.</p>
+            <div class="hero-buttons">
+                <a href="#services" class="btn-primary">Book a Consultation</a>
+                <a href="#trails" class="btn-outline">Explore Trails</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- INTRO STRIP -->
+    <div class="intro-strip">
+        <p>Operated by <span>Pink Mountain Ventures LLC</span> &nbsp;·&nbsp; Palm Springs, California &nbsp;·&nbsp; Est. 2024</p>
+    </div>
+
+    <!-- ABOUT -->
+    <section class="about" id="about">
+        <div class="container">
+            <div class="about-grid">
+                <div class="about-image"></div>
+                <div class="about-text">
+                    <p class="section-label">Our Story</p>
+                    <h2 class="section-title">Insider Knowledge,<br>Luxury Standards</h2>
+                    <p>Palm Springs Adventure Club was born from a simple belief: the best desert experiences come from insider knowledge, not generic guidebooks. We curate every trail, every moment, every pairing with the same care a sommelier brings to a perfect wine list.</p>
+                    <p>Based in Palm Springs and deeply embedded in the Coachella Valley's outdoor community, we offer personalized consultations that match your fitness level, aesthetic preferences, and luxury expectations — then connect you with the finest recovery experiences the desert has to offer.</p>
+                    <div class="about-stats">
+                        <div class="stat-item">
+                            <div class="stat-number">50+</div>
+                            <div class="stat-label">Curated Trails</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">100%</div>
+                            <div class="stat-label">Personalized</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">10k+</div>
+                            <div class="stat-label">Miles Logged</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="services" id="services">
+        <div class="container">
+            <p class="section-label fade-up">What We Offer</p>
+            <h2 class="section-title fade-up">Adventure Consultations</h2>
+            <p class="section-sub fade-up">Every consultation is a custom experience — we match you to the perfect trail, the right gear, and the ideal recovery. No two adventures are alike.</p>
+            <div class="services-grid">
+                <div class="service-card primary fade-up">
+                    <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M24 4L44 40H4L24 4Z" stroke="#E27396" stroke-width="2" fill="none"/>
+                        <path d="M24 20V32" stroke="#E27396" stroke-width="2"/>
+                        <circle cx="24" cy="36" r="1.5" fill="#E27396"/>
+                    </svg>
+                    <h3>Trail Consultation</h3>
+                    <p>A focused session to find your perfect trail match. We assess your fitness level, experience, and goals, then deliver a detailed route guide with everything you need for a flawless adventure.</p>
+                    <p class="service-price">From $75</p>
+                    <a href="#contact" class="service-link">Book Now →</a>
+                </div>
+                <div class="service-card secondary fade-up">
+                    <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="24" cy="24" r="18" stroke="#7ABD91" stroke-width="2" fill="none"/>
+                        <path d="M16 24l6 6 10-12" stroke="#7ABD91" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <h3>Peaks to Pools</h3>
+                    <p>Our signature full-day experience. A morning summit paired with curated afternoon luxury — the perfect pool, spa treatment, or dining reservation to complete your desert day.</p>
+                    <p class="service-price">From $150</p>
+                    <a href="#contact" class="service-link">Book Now →</a>
+                </div>
+                <div class="service-card tertiary fade-up">
+                    <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="8" y="8" width="32" height="32" rx="2" stroke="#E76F51" stroke-width="2" fill="none"/>
+                        <path d="M16 24h16M24 16v16" stroke="#E76F51" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <h3>Custom Adventure</h3>
+                    <p>Multi-day itineraries, group adventures, or special occasion experiences designed entirely around your vision. Full white-glove planning from trail to table.</p>
+                    <p class="service-price">Custom Pricing</p>
+                    <a href="#contact" class="service-link">Inquire →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PEAKS TO POOLS -->
+    <section class="peaks-to-pools">
+        <div class="container">
+            <p class="section-label fade-up">The PSAC Philosophy</p>
+            <h2 class="section-title fade-up">Peaks to Pools</h2>
+            <p class="section-sub fade-up">The desert offers two perfect gifts: its wild, silent peaks and its warm, restorative pools. We connect them into a single unforgettable experience.</p>
+            <div class="p2p-grid">
+                <div class="p2p-item fade-up">
+                    <h4>The Ascent</h4>
+                    <p>Expert trail selection matched to your level, from gentle canyon walks to the 10,834 ft summit of San Jacinto.</p>
+                </div>
+                <div class="p2p-item fade-up">
+                    <h4>The Partnership</h4>
+                    <p>Curated pairings with Villa Royale, Miro's, Pharos, and Palm Springs' finest hospitality venues.</p>
+                </div>
+                <div class="p2p-item fade-up">
+                    <h4>The Recovery</h4>
+                    <p>A perfectly matched pool, spa, or dining experience waiting for you when you return from the mountain.</p>
+                </div>
+            </div>
+            <p class="p2p-divider">Connecting desert wilderness with Palm Springs luxury since 2024</p>
+        </div>
+    </section>
+
+    <!-- GEAR RENTAL -->
+    <section class="gear" id="gear">
+        <div class="container">
+            <p class="section-label fade-up">Gear Rental</p>
+            <h2 class="section-title fade-up">Adventure-Ready Equipment</h2>
+            <p class="section-sub fade-up">Travel light. We provide everything you need for a safe, comfortable desert adventure — curated gear packages delivered ready to use.</p>
+            <div class="gear-packages">
+                <div class="gear-card essentials fade-up">
+                    <div class="gear-card-header">
+                        <h3>Desert Essentials</h3>
+                        <div class="price">$45<span>/day</span></div>
+                    </div>
+                    <div class="gear-card-body">
+                        <ul>
+                            <li>Trekking poles</li>
+                            <li>Hydration pack (3L)</li>
+                            <li>Trail map & compass</li>
+                            <li>Basic first aid kit</li>
+                            <li>Sun protection kit</li>
+                        </ul>
+                        <a href="#contact" class="btn-primary" style="width:100%;text-align:center;display:block;">Reserve</a>
+                    </div>
+                </div>
+                <div class="gear-card premium fade-up">
+                    <div class="gear-card-header">
+                        <h3>Premium Package</h3>
+                        <div class="price">$65<span>/day</span></div>
+                    </div>
+                    <div class="gear-card-body">
+                        <ul>
+                            <li>Everything in Essentials</li>
+                            <li>GPS device (Garmin)</li>
+                            <li>Satellite communicator</li>
+                            <li>Lightweight daypack</li>
+                            <li>Trail snack selection</li>
+                            <li>Microspikes (seasonal)</li>
+                        </ul>
+                        <a href="#contact" class="btn-primary" style="width:100%;text-align:center;display:block;">Reserve</a>
+                    </div>
+                </div>
+                <div class="gear-card custom fade-up">
+                    <div class="gear-card-header">
+                        <h3>Custom Package</h3>
+                        <div class="price" style="font-size:1.4rem;padding-top:0.3rem;">Let's Talk</div>
+                    </div>
+                    <div class="gear-card-body">
+                        <ul>
+                            <li>Group gear outfitting</li>
+                            <li>Multi-day expeditions</li>
+                            <li>Specialty equipment</li>
+                            <li>Photography gear</li>
+                            <li>Custom packing lists</li>
+                        </ul>
+                        <a href="#contact" class="btn-primary" style="width:100%;text-align:center;display:block;background-color:var(--dark-pine);">Inquire</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TRAILS -->
+    <section class="trails" id="trails">
+        <div class="container">
+            <p class="section-label fade-up">Insider Trails</p>
+            <h2 class="section-title fade-up">Curated Desert Routes</h2>
+            <p class="section-sub fade-up">Hand-selected trails from thousands of miles of personal experience in the Coachella Valley. These are the routes worth knowing.</p>
+            <div class="trails-grid">
+                <div class="trail-card fade-up">
+                    <div class="trail-img" style="background-image:url('https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=800&auto=format&fit=crop')">
+                        <span class="trail-difficulty strenuous">Strenuous</span>
+                    </div>
+                    <div class="trail-info">
+                        <h3>San Jacinto Peak</h3>
+                        <div class="trail-meta">
+                            <span>11.6 mi</span>
+                            <span>5,700 ft gain</span>
+                            <span>7–10 hrs</span>
+                        </div>
+                        <p>Southern California's most dramatic summit. Take the Palm Springs Aerial Tramway to 8,516 ft, then hike through alpine wilderness to the 10,834 ft peak.</p>
+                    </div>
+                </div>
+                <div class="trail-card fade-up">
+                    <div class="trail-img" style="background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=800&auto=format&fit=crop')">
+                        <span class="trail-difficulty moderate">Moderate</span>
+                    </div>
+                    <div class="trail-info">
+                        <h3>Palm Canyon Trail</h3>
+                        <div class="trail-meta">
+                            <span>4.2 mi</span>
+                            <span>450 ft gain</span>
+                            <span>2–3 hrs</span>
+                        </div>
+                        <p>Wind through the world's largest California fan palm oasis. Ancient palms, seasonal stream crossings, and stunning canyon walls at every turn.</p>
+                    </div>
+                </div>
+                <div class="trail-card fade-up">
+                    <div class="trail-img" style="background-image:url('https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=800&auto=format&fit=crop')">
+                        <span class="trail-difficulty moderate">Moderate</span>
+                    </div>
+                    <div class="trail-info">
+                        <h3>Tahquitz Canyon</h3>
+                        <div class="trail-meta">
+                            <span>3.2 mi</span>
+                            <span>360 ft gain</span>
+                            <span>2 hrs</span>
+                        </div>
+                        <p>A sacred Agua Caliente Cahuilla site leading to a spectacular 60-foot waterfall. One of Palm Springs' most rewarding short hikes, hidden in plain sight.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TESTIMONIALS -->
+    <section class="testimonials">
+        <div class="container">
+            <p class="section-label">Client Experiences</p>
+            <h2 class="section-title">What Our Clients Say</h2>
+            <div class="testimonial-grid">
+                <div class="testimonial-card fade-up">
+                    <p class="testimonial-text">"We had no idea where to start with hiking in Palm Springs. The consultation mapped out a perfect day — summit in the morning, Villa Royale pool in the afternoon. Absolute perfection."</p>
+                    <p class="testimonial-author">Sarah M. &nbsp;·&nbsp; Los Angeles</p>
+                </div>
+                <div class="testimonial-card fade-up">
+                    <p class="testimonial-text">"The gear package meant we could fly in with carry-on only and still have everything we needed for San Jacinto. The trail briefing was more detailed than anything I'd found online."</p>
+                    <p class="testimonial-author">James & Kelly T. &nbsp;·&nbsp; San Francisco</p>
+                </div>
+                <div class="testimonial-card fade-up">
+                    <p class="testimonial-text">"PSAC found us a trail we never would have discovered ourselves. Quiet, beautiful, and completely off the tourist path. Then dinner at Miro's to finish the day. Incredible."</p>
+                    <p class="testimonial-author">Daniel R. &nbsp;·&nbsp; New York</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONSULTATION CTA -->
+    <section class="consultation-cta" id="contact">
+        <div class="cta-box fade-up">
+            <p class="section-label">Ready to Explore?</p>
+            <h2 class="section-title">Book Your Consultation</h2>
+            <p>Tell us about your fitness level, your travel dates, and what kind of experience you're after. We'll handle everything else — trail selection, gear, and the perfect recovery pairing.</p>
+            <a href="mailto:airey@palmspringsadventureclub.com?subject=Adventure Consultation Request" class="btn-primary">Start Planning Your Adventure</a>
+        </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="newsletter">
+        <div class="container" style="max-width:600px;">
+            <h3>Desert Intelligence</h3>
+            <p>Seasonal trail conditions, hidden routes, and Peaks to Pools pairings — delivered to your inbox monthly.</p>
+            <form class="newsletter-form" onsubmit="return false;">
+                <input type="email" placeholder="your@email.com">
+                <button type="submit">Subscribe</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <span class="logo-top">Palm Springs</span>
+                <span class="logo-bottom">Adventure Club</span>
+                <p>Curated desert adventures and luxury pairings in the Coachella Valley. Operated by Pink Mountain Ventures LLC.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Explore</h4>
+                <ul>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#services">Consultations</a></li>
+                    <li><a href="#gear">Gear Rental</a></li>
+                    <li><a href="#trails">Trails</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Experiences</h4>
+                <ul>
+                    <li><a href="#services">Trail Consultation</a></li>
+                    <li><a href="#services">Peaks to Pools</a></li>
+                    <li><a href="#services">Custom Adventure</a></li>
+                    <li><a href="#gear">Gear Packages</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Contact</h4>
+                <address>
+                    Palm Springs, CA 92262<br><br>
+                    <a href="mailto:airey@palmspringsadventureclub.com">airey@palmspringsadventureclub.com</a><br><br>
+                    <a href="https://instagram.com/psadventureclub">@psadventureclub</a>
+                </address>
+            </div>
+        </div>
+        <div class="footer-bottom" style="max-width:1200px;margin:0 auto;">
+            <span>© 2025 Palm Springs Adventure Club · Pink Mountain Ventures LLC</span>
+            <span>Palm Springs, California</span>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu
+        const hamburger = document.getElementById('hamburger');
+        const navLinks = document.getElementById('navLinks');
+        hamburger.addEventListener('click', () => {
+            navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        // Scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+    </script>
+
+</body>
+</html>
