@@ -60,7 +60,7 @@
         }
 
         .logo img {
-            height: 52px;
+            height: 60px;
             width: auto;
         }
 
@@ -560,7 +560,7 @@
         <div class="container">
             <nav>
                 <a href="#" class="logo">
-                    <img src="images/logo.svg" alt="Palm Springs Adventure Club">
+                    <img src="images/logo_stacked.svg" alt="Palm Springs Adventure Club">
                 </a>
                 <ul class="nav-links" id="navLinks">
                     <li><a href="#membership">Membership</a></li>
@@ -576,8 +576,8 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="hero-content">
-            <h1>Where the Desert Meets the Sky</h1>
-            <p>Expert-curated adventures in the San Jacinto mountains and Indian Canyons — the hidden trails Palm Springs insiders know by heart.</p>
+            <h1>Desert Adventures, Expertly Curated</h1>
+            <p>Personalized hiking recommendations, gear rental, and guided experiences in the Coachella Valley — from San Jacinto's summit to Palm Springs' finest pools.</p>
             <div class="btn-group">
                 <a href="#membership" class="btn">Book a Consultation</a>
                 <a href="#events" class="btn btn-secondary">Upcoming Adventures</a>
@@ -757,7 +757,7 @@
                         <a href="#">FB</a>
                         <a href="#">YT</a>
                     </div>
-                    <p>Email: hello@palmspringsadventureclub.com</p>
+                    <p>Email: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="325a575e5e5d7242535e5f4142405b5c5541535644575c46474057515e47501c515d5f">[email&#160;protected]</a></p>
                 </div>
             </div>
             <div class="footer-bottom">
@@ -766,20 +766,9 @@
         </div>
     </footer>
 
-    <script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
         const hamburger = document.getElementById('hamburger');
         const navLinks = document.getElementById('navLinks');
 
         hamburger.addEventListener('click', () => {
             navLinks.classList.toggle('active');
-        });
-
-        document.querySelectorAll('.nav-links a').forEach(link => {
-            link.addEventListener('click', () => {
-                navLinks.classList.remove('active');
-            });
-        });
-    </script>
-
-</body>
-</html>
