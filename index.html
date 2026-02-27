@@ -192,6 +192,304 @@
             line-height: 1.7;
         }
 
+        /* Our Story Section */
+        .our-story {
+            padding: 6rem 0;
+            background-color: white;
+        }
+
+        .our-story .story-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5rem;
+            align-items: center;
+        }
+
+        .story-img {
+            width: 100%;
+            height: 520px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .story-content .eyebrow {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .story-content h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 3rem;
+            font-weight: 600;
+            line-height: 1.15;
+            color: var(--dark-pine);
+            margin-bottom: 1.5rem;
+        }
+
+        .story-content p {
+            color: #555;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+
+        .story-stats {
+            display: flex;
+            gap: 2.5rem;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e8e0d8;
+        }
+
+        .stat-item .stat-number {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--mountain-pink);
+            display: block;
+            line-height: 1;
+        }
+
+        .stat-item .stat-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: #888;
+            margin-top: 0.35rem;
+            display: block;
+        }
+
+        /* Peaks to Pools Section */
+        .peaks-to-pools {
+            padding: 6rem 0;
+            background-color: var(--dark-pine);
+            color: white;
+            text-align: center;
+        }
+
+        .peaks-to-pools .eyebrow {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .peaks-to-pools h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 3.5rem;
+            font-weight: 400;
+            color: white;
+            margin-bottom: 1.25rem;
+        }
+
+        .peaks-to-pools .intro {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.7);
+            max-width: 600px;
+            margin: 0 auto 4rem;
+            line-height: 1.8;
+        }
+
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0;
+            max-width: 900px;
+            margin: 0 auto 4rem;
+        }
+
+        .pillar {
+            padding: 2rem 2.5rem;
+            border-right: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .pillar:last-child {
+            border-right: none;
+        }
+
+        .pillar h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+        }
+
+        .pillar p {
+            font-size: 0.88rem;
+            color: rgba(255,255,255,0.65);
+            line-height: 1.8;
+        }
+
+        .peaks-tagline {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.35);
+        }
+
+        /* Gear Rental Section */
+        .gear-rental {
+            padding: 6rem 0;
+            background-color: var(--sand-beige);
+        }
+
+        .gear-rental .eyebrow {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+            display: block;
+            text-align: center;
+        }
+
+        .gear-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .gear-card {
+            background-color: white;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gear-card-header {
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .gear-card-header.light {
+            background-color: #eef3ef;
+            color: var(--dark-pine);
+        }
+
+        .gear-card-header.dark {
+            background-color: var(--dark-pine);
+            color: white;
+        }
+
+        .gear-card-header.pink {
+            background-color: var(--mountain-pink);
+            color: white;
+        }
+
+        .gear-card-header h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .gear-price {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .gear-price span {
+            font-size: 1rem;
+            font-weight: 400;
+            opacity: 0.8;
+        }
+
+        .gear-card-body {
+            padding: 1.75rem 2rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gear-card-body ul {
+            list-style: none;
+            flex: 1;
+        }
+
+        .gear-card-body ul li {
+            padding: 0.65rem 0;
+            border-bottom: 1px solid #f0ebe4;
+            font-size: 0.88rem;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .gear-card-body ul li::before {
+            content: "—";
+            color: var(--mountain-pink);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .gear-card-footer {
+            padding: 1.5rem 2rem;
+        }
+
+        .btn-full {
+            display: block;
+            width: 100%;
+            text-align: center;
+            padding: 0.9rem;
+            border-radius: 2px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-full.pink {
+            background-color: var(--mountain-pink);
+            color: white;
+        }
+
+        .btn-full.pink:hover {
+            background-color: #d4617f;
+        }
+
+        .btn-full.dark {
+            background-color: var(--dark-pine);
+            color: white;
+        }
+
+        .btn-full.dark:hover {
+            background-color: #1a3535;
+        }
+
+        @media (max-width: 768px) {
+            .our-story .story-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            .pillars-grid,
+            .gear-grid {
+                grid-template-columns: 1fr;
+            }
+            .pillar {
+                border-right: none;
+                border-bottom: 1px solid rgba(255,255,255,0.15);
+            }
+        }
+
         /* Membership Section */
         .membership {
             padding: 6rem 0;
@@ -563,6 +861,8 @@
                     <img src="images/logo.svg" alt="Palm Springs Adventure Club">
                 </a>
                 <ul class="nav-links" id="navLinks">
+                    <li><a href="#about">Our Story</a></li>
+                    <li><a href="#gear">Gear</a></li>
                     <li><a href="#membership">Membership</a></li>
                     <li><a href="#events">Events</a></li>
                     <li><a href="#gallery">Gallery</a></li>
@@ -581,6 +881,134 @@
             <div class="btn-group">
                 <a href="#membership" class="btn">Book a Consultation</a>
                 <a href="#events" class="btn btn-secondary">Upcoming Adventures</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Our Story Section -->
+    <section class="our-story" id="about">
+        <div class="container">
+            <div class="story-grid">
+                <div class="story-img-wrap">
+                    <img src="images/gallery4.jpg" alt="Hiking in the desert" class="story-img">
+                </div>
+                <div class="story-content">
+                    <span class="eyebrow">Our Story</span>
+                    <h2>Insider Knowledge, Luxury Standards</h2>
+                    <p>Palm Springs Adventure Club was born from a simple belief: the best desert experiences come from insider knowledge, not generic guidebooks. We curate every trail, every moment, every pairing with the same care a sommelier brings to a perfect wine list.</p>
+                    <p>Based in Palm Springs and deeply embedded in the Coachella Valley's outdoor community, we offer personalized consultations that match your fitness level, aesthetic preferences, and luxury expectations — then connect you with the finest recovery experiences the desert has to offer.</p>
+                    <div class="story-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">50+</span>
+                            <span class="stat-label">Curated Trails</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">100%</span>
+                            <span class="stat-label">Personalized</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">10k+</span>
+                            <span class="stat-label">Miles Logged</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Peaks to Pools Section -->
+    <section class="peaks-to-pools" id="philosophy">
+        <div class="container">
+            <span class="eyebrow">The PSAC Philosophy</span>
+            <h2>Peaks to Pools</h2>
+            <p class="intro">The desert offers two perfect gifts: its wild, silent peaks and its warm, restorative pools. We connect them into a single unforgettable experience.</p>
+            <div class="pillars-grid">
+                <div class="pillar">
+                    <h3>The Ascent</h3>
+                    <p>Expert trail selection matched to your level, from gentle canyon walks to the 10,834 ft summit of San Jacinto.</p>
+                </div>
+                <div class="pillar">
+                    <h3>The Partnership</h3>
+                    <p>Curated pairings with Villa Royale, Miro's, Pharos, and Palm Springs' finest hospitality venues.</p>
+                </div>
+                <div class="pillar">
+                    <h3>The Recovery</h3>
+                    <p>A perfectly matched pool, spa, or dining experience waiting for you when you return from the mountain.</p>
+                </div>
+            </div>
+            <p class="peaks-tagline">Connecting Desert Wilderness with Palm Springs Luxury Since 2024</p>
+        </div>
+    </section>
+
+    <!-- Gear Rental Section -->
+    <section class="gear-rental" id="gear">
+        <div class="container">
+            <span class="eyebrow">Gear Rental</span>
+            <div class="section-title">
+                <h2>Adventure-Ready Equipment</h2>
+                <p>Travel light. We provide everything you need for a safe, comfortable desert adventure — curated gear packages delivered ready to use.</p>
+            </div>
+            <div class="gear-grid">
+                <!-- Desert Essentials -->
+                <div class="gear-card">
+                    <div class="gear-card-header light">
+                        <h3>Desert Essentials</h3>
+                        <div class="gear-price">$45<span>/day</span></div>
+                    </div>
+                    <div class="gear-card-body">
+                        <ul>
+                            <li>Trekking poles</li>
+                            <li>Hydration pack (3L)</li>
+                            <li>Trail map &amp; compass</li>
+                            <li>Basic first aid kit</li>
+                            <li>Sun protection kit</li>
+                        </ul>
+                    </div>
+                    <div class="gear-card-footer">
+                        <a href="#contact" class="btn-full pink">Reserve</a>
+                    </div>
+                </div>
+
+                <!-- Premium Package -->
+                <div class="gear-card">
+                    <div class="gear-card-header dark">
+                        <h3>Premium Package</h3>
+                        <div class="gear-price">$65<span>/day</span></div>
+                    </div>
+                    <div class="gear-card-body">
+                        <ul>
+                            <li>Everything in Essentials</li>
+                            <li>GPS device (Garmin)</li>
+                            <li>Satellite communicator</li>
+                            <li>Lightweight daypack</li>
+                            <li>Trail snack selection</li>
+                            <li>Microspikes (seasonal)</li>
+                        </ul>
+                    </div>
+                    <div class="gear-card-footer">
+                        <a href="#contact" class="btn-full pink">Reserve</a>
+                    </div>
+                </div>
+
+                <!-- Custom Package -->
+                <div class="gear-card">
+                    <div class="gear-card-header pink">
+                        <h3>Custom Package</h3>
+                        <div class="gear-price">Let's Talk</div>
+                    </div>
+                    <div class="gear-card-body">
+                        <ul>
+                            <li>Group gear outfitting</li>
+                            <li>Multi-day expeditions</li>
+                            <li>Specialty equipment</li>
+                            <li>Photography gear</li>
+                            <li>Custom packing lists</li>
+                        </ul>
+                    </div>
+                    <div class="gear-card-footer">
+                        <a href="#contact" class="btn-full dark">Inquire</a>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
