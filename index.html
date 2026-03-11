@@ -4,1199 +4,880 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Palm Springs Adventure Club</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --mountain-pink: #f58170;
+            --mountain-pink: #E27396;
             --desert-green: #7ABD91;
             --sunset-red: #E76F51;
             --sand-beige: #F8F1E9;
             --dark-pine: #2A4747;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background-color: var(--dark-pine);
+            background-color: var(--sand-beige);
             color: var(--dark-pine);
             line-height: 1.6;
             font-family: 'Montserrat', sans-serif;
         }
 
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
+        .container { width: 100%; max-width: 1160px; margin: 0 auto; padding: 0 28px; }
 
-        /* Navigation */
+
+
+        /* ── HEADER ── */
         header {
             background-color: var(--dark-pine);
-            padding: 0.75rem 0;
-            position: fixed;
-            width: 100%;
+            padding: 1rem 0;
+            position: sticky;
             top: 0;
+            width: 100%;
             z-index: 1000;
-            box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 16px rgba(0,0,0,0.18);
         }
 
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        nav { display: flex; justify-content: space-between; align-items: center; }
 
         .logo {
+            text-decoration: none;
             display: flex;
             align-items: center;
-            text-decoration: none;
         }
 
-        .logo img {
-            height: 58px;
-            width: auto;
-        }
-
-        .nav-links {
-            display: flex;
-            list-style: none;
-            gap: 2rem;
-        }
+        .nav-links { display: flex; list-style: none; gap: 2rem; align-items: center; }
 
         .nav-links a {
-            color: rgba(255,255,255,0.85);
+            color: rgba(255,255,255,0.82);
             text-decoration: none;
             font-weight: 500;
-            font-size: 0.85rem;
-            letter-spacing: 0.08em;
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            transition: color 0.3s;
+            transition: color 0.2s;
+            white-space: nowrap;
         }
 
-        .nav-links a:hover {
-            color: var(--mountain-pink);
-        }
+        .nav-links a:hover { color: var(--desert-green); }
 
-        .hamburger {
-            display: none;
-            cursor: pointer;
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        /* Hero Section */
+        /* ── HERO ── */
         .hero {
-            height: 100vh;
-            background: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.5)), url('images/hero.jpg') no-repeat center center/cover;
+            min-height: 94vh;
+            background:
+                linear-gradient(rgba(0,0,0,0.50), rgba(0,0,0,0.50)),
+                url('images/hero.jpg') no-repeat center center/cover;
             display: flex;
             align-items: center;
+            justify-content: center;
             text-align: center;
             color: white;
-            margin-top: 74px;
         }
 
-        .hero-content {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem;
+        .hero-content { max-width: 820px; padding: 2rem; }
+
+        .hero-eyebrow {
+            font-size: 0.68rem;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--desert-green);
+            margin-bottom: 1.2rem;
         }
 
         .hero h1 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 4rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.4);
-            letter-spacing: 0.02em;
+            font-size: 4.6rem;
+            font-weight: 700;
+            line-height: 1.06;
+            margin-bottom: 1.4rem;
+            text-shadow: 2px 3px 10px rgba(0,0,0,0.4);
         }
 
         .hero p {
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
-            text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
-            font-weight: 400;
-            max-width: 600px;
+            font-size: 1.05rem;
+            margin-bottom: 2.4rem;
+            line-height: 1.85;
+            opacity: 0.9;
+            max-width: 660px;
             margin-left: auto;
             margin-right: auto;
-            margin-bottom: 2.5rem;
-        }
-
-        .btn-group {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
         }
 
         .btn {
             display: inline-block;
             background-color: var(--desert-green);
             color: white;
-            padding: 0.8rem 2rem;
+            padding: 1rem 2.4rem;
             border-radius: 30px;
             text-decoration: none;
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.76rem;
+            letter-spacing: 0.13em;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            transition: all 0.3s;
+            transition: all 0.25s;
             border: none;
             cursor: pointer;
         }
 
-        .btn:hover {
-            background-color: #69a67e;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        .btn:hover { background-color: #63a677; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.2); }
+        .btn-pine { background-color: var(--dark-pine); }
+        .btn-pine:hover { background-color: #1e3535; }
+        .btn-red { background-color: var(--sunset-red); }
+        .btn-red:hover { background-color: #d45e40; }
+
+        /* ── SHARED ── */
+        section { padding: 6rem 0; }
+
+        .section-eyebrow {
+            display: block;
+            font-size: 0.67rem;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--mountain-pink);
+            margin-bottom: 0.7rem;
         }
 
-        .btn-secondary {
-            background-color: transparent;
-            border: 2px solid white;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background-color: white;
-            color: var(--dark-pine);
-        }
-
-        /* Section Titles */
-        .section-title {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
+        .section-title { text-align: center; margin-bottom: 3.5rem; }
 
         .section-title h2 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 2.8rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            color: var(--dark-pine);
+            font-size: 2.9rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 0.9rem;
         }
 
-        .section-title p {
-            font-size: 1rem;
-            max-width: 580px;
-            margin: 0 auto;
-            color: #666;
-            line-height: 1.7;
-        }
+        .section-title p { font-size: 0.97rem; max-width: 580px; margin: 0 auto; color: #666; line-height: 1.85; }
 
-        /* Our Story Section */
-        .our-story {
-            padding: 6rem 0;
-            background-color: white;
-        }
+        /* ── OUR STORY ── */
+        .our-story { background: white; }
 
-        .our-story .story-grid {
+        .story-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 5rem;
             align-items: center;
         }
 
-        .story-img {
-            width: 100%;
-            height: 520px;
-            object-fit: cover;
+        .story-image {
+            height: 500px;
+            background: url('images/gallery1.jpg') no-repeat center center/cover;
             border-radius: 4px;
         }
 
-        .story-content .eyebrow {
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--mountain-pink);
-            margin-bottom: 1rem;
-            display: block;
-        }
+        .story-content .section-eyebrow { color: var(--mountain-pink); }
 
         .story-content h2 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 3rem;
-            font-weight: 600;
-            line-height: 1.15;
-            color: var(--dark-pine);
-            margin-bottom: 1.5rem;
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1.18;
+            margin-bottom: 1.6rem;
         }
 
         .story-content p {
+            font-size: 0.93rem;
+            line-height: 1.95;
             color: #555;
-            font-size: 0.95rem;
-            line-height: 1.8;
-            margin-bottom: 1rem;
+            margin-bottom: 1.2rem;
         }
 
-        .story-stats {
-            display: flex;
-            gap: 2.5rem;
-            margin-top: 2rem;
-            padding-top: 2rem;
-            border-top: 1px solid #e8e0d8;
-        }
 
-        .stat-item .stat-number {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 2.5rem;
-            font-weight: 600;
-            color: var(--mountain-pink);
-            display: block;
-            line-height: 1;
-        }
 
-        .stat-item .stat-label {
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: #888;
-            margin-top: 0.35rem;
-            display: block;
-        }
+        /* ── PEAKS TO POOLS ── */
+        .peaks-to-pools { background: var(--dark-pine); color: white; }
+        .peaks-to-pools .section-title h2 { color: white; }
+        .peaks-to-pools .section-title p { color: rgba(255,255,255,0.72); }
+        .peaks-to-pools .section-eyebrow { color: var(--desert-green); }
 
-        /* Peaks to Pools Section */
-        .peaks-to-pools {
-            padding: 6rem 0;
-            background-color: var(--dark-pine);
-            color: white;
-            text-align: center;
-        }
-
-        .peaks-to-pools .eyebrow {
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--mountain-pink);
-            margin-bottom: 1rem;
-            display: block;
-        }
-
-        .peaks-to-pools h2 {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 3.5rem;
-            font-weight: 400;
-            color: white;
-            margin-bottom: 1.25rem;
-        }
-
-        .peaks-to-pools .intro {
-            font-size: 1rem;
-            color: rgba(255,255,255,0.7);
-            max-width: 600px;
-            margin: 0 auto 4rem;
-            line-height: 1.8;
-        }
-
-        .pillars-grid {
+        .arc-panels {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 0;
-            max-width: 900px;
-            margin: 0 auto 4rem;
-        }
-
-        .pillar {
-            padding: 2rem 2.5rem;
-            border-right: 1px solid rgba(255,255,255,0.15);
-        }
-
-        .pillar:last-child {
-            border-right: none;
-        }
-
-        .pillar h3 {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 1.5rem;
-            font-weight: 400;
-            color: var(--mountain-pink);
-            margin-bottom: 1rem;
-        }
-
-        .pillar p {
-            font-size: 0.88rem;
-            color: rgba(255,255,255,0.65);
-            line-height: 1.8;
-        }
-
-        .peaks-tagline {
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.25em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.35);
-        }
-
-        /* Gear Rental Section */
-        .gear-rental {
-            padding: 6rem 0;
-            background-color: var(--sand-beige);
-        }
-
-        .gear-rental .eyebrow {
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--mountain-pink);
-            margin-bottom: 1rem;
-            display: block;
-            text-align: center;
-        }
-
-        .gear-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            margin-top: 3rem;
-        }
-
-        .gear-card {
-            background-color: white;
-            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            margin-top: 1rem;
         }
 
-        .gear-card-header {
-            padding: 2rem;
-            text-align: center;
+        .arc-panel {
+            padding: 2.6rem 2.2rem;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            position: relative;
         }
+        .arc-panel:last-child { border-right: none; }
 
-        .gear-card-header.light {
-            background-color: #eef3ef;
-            color: var(--dark-pine);
-        }
-
-        .gear-card-header.dark {
-            background-color: var(--dark-pine);
-            color: white;
-        }
-
-        .gear-card-header.pink {
-            background-color: var(--mountain-pink);
-            color: white;
-        }
-
-        .gear-card-header h3 {
+        .arc-num {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 1.6rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .gear-price {
-            font-size: 2rem;
+            font-size: 5rem;
             font-weight: 700;
+            color: rgba(255,255,255,0.06);
+            position: absolute;
+            top: 0.8rem;
+            right: 1rem;
+            line-height: 1;
+            pointer-events: none;
         }
 
-        .gear-price span {
-            font-size: 1rem;
-            font-weight: 400;
-            opacity: 0.8;
+        .arc-panel h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.55rem;
+            font-weight: 700;
+            color: var(--mountain-pink);
+            margin-bottom: 0.9rem;
         }
 
-        .gear-card-body {
-            padding: 1.75rem 2rem;
-            flex: 1;
+        .arc-panel p { font-size: 0.87rem; line-height: 1.85; color: rgba(255,255,255,0.72); }
+
+        /* ── AFTER THE TRAIL ── */
+        .after-trail { background: var(--sand-beige); }
+        .after-trail .section-eyebrow { color: var(--desert-green); }
+
+        .after-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.4rem;
+            margin-bottom: 2rem;
+        }
+
+        .after-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.07);
             display: flex;
             flex-direction: column;
         }
 
-        .gear-card-body ul {
-            list-style: none;
-            flex: 1;
-        }
-
-        .gear-card-body ul li {
-            padding: 0.65rem 0;
-            border-bottom: 1px solid #f0ebe4;
-            font-size: 0.88rem;
-            color: #555;
+        .after-card-header {
+            background: var(--dark-pine);
+            padding: 1.15rem 1.4rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.9rem;
         }
 
-        .gear-card-body ul li::before {
-            content: "—";
-            color: var(--mountain-pink);
-            font-weight: 700;
+        .after-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--mountain-pink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
             flex-shrink: 0;
         }
 
-        .gear-card-footer {
-            padding: 1.5rem 2rem;
-        }
-
-        .btn-full {
-            display: block;
-            width: 100%;
-            text-align: center;
-            padding: 0.9rem;
-            border-radius: 2px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 0.12em;
+        .after-card-type {
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            text-decoration: none;
-            transition: all 0.3s;
-            cursor: pointer;
-            border: none;
+            color: rgba(255,255,255,0.48);
+            font-weight: 600;
         }
 
-        .btn-full.pink {
-            background-color: var(--mountain-pink);
-            color: white;
-        }
-
-        .btn-full.pink:hover {
-            background-color: #e06050;
-        }
-
-        .btn-full.dark {
-            background-color: var(--dark-pine);
-            color: white;
-        }
-
-        .btn-full.dark:hover {
-            background-color: #1a3535;
-        }
-
-        @media (max-width: 768px) {
-            .our-story .story-grid {
-                grid-template-columns: 1fr;
-                gap: 2rem;
-            }
-            .pillars-grid,
-            .gear-grid {
-                grid-template-columns: 1fr;
-            }
-            .pillar {
-                border-right: none;
-                border-bottom: 1px solid rgba(255,255,255,0.15);
-            }
-        }
-
-        /* Membership Section */
-        .membership {
-            padding: 6rem 0;
-            background-color: white;
-        }
-
-        .membership-tiers {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 2rem;
-        }
-
-        .tier-card {
-            background-color: var(--sand-beige);
-            border-radius: 12px;
-            overflow: hidden;
-            width: 300px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .tier-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
-        }
-
-        .tier-header {
-            background-color: var(--mountain-pink);
-            color: white;
-            padding: 1.75rem 1.5rem;
-            text-align: center;
-        }
-
-        .tier-header h3 {
+        .after-card-header h3 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 1.6rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .tier-price {
-            font-size: 2.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
-        }
-
-        .tier-price span {
-            font-size: 1rem;
-            font-weight: 400;
-            opacity: 0.85;
-        }
-
-        .tier-explorer .tier-header { background-color: var(--desert-green); }
-        .tier-summit .tier-header { background-color: var(--sunset-red); }
-
-        .tier-features {
-            padding: 1.5rem;
-        }
-
-        .tier-features ul {
-            list-style: none;
-            margin-bottom: 1.5rem;
-        }
-
-        .tier-features li {
-            margin-bottom: 0.75rem;
-            position: relative;
-            padding-left: 1.5rem;
-            font-size: 0.9rem;
-            color: #444;
-        }
-
-        .tier-features li::before {
-            content: "✓";
-            color: var(--desert-green);
-            position: absolute;
-            left: 0;
-            font-weight: 700;
-        }
-
-        .tier-footer {
-            padding: 0 1.5rem 1.5rem;
-            text-align: center;
-        }
-
-        /* Events Section */
-        .events {
-            padding: 6rem 0;
-            background-color: var(--sand-beige);
-        }
-
-        .events-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
-
-        .event-card {
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            background-color: white;
-            transition: transform 0.3s;
-        }
-
-        .event-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .event-img {
-            height: 220px;
-            background-position: center;
-            background-size: cover;
-            background-repeat: no-repeat;
-        }
-
-        .event-info {
-            padding: 1.5rem;
-        }
-
-        .event-date {
-            display: inline-block;
-            background-color: var(--mountain-pink);
             color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 20px;
-            margin-bottom: 0.75rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 0.05em;
+            line-height: 1.25;
+            margin-top: 0.1rem;
         }
 
-        .event-info h3 {
+        .after-card-body { padding: 1.5rem; flex: 1; }
+
+        .recovery-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--desert-green);
+            margin-bottom: 0.4rem;
+        }
+
+        .recovery-headline {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--dark-pine);
+            margin-bottom: 0.75rem;
+            line-height: 1.2;
+        }
+
+        .after-card-body p {
+            font-size: 0.85rem;
+            line-height: 1.82;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .partner-line {
+            font-size: 0.7rem;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--mountain-pink);
+            border-top: 1px solid #eee;
+            padding-top: 0.8rem;
+            display: block;
+        }
+
+        .after-cta {
+            background: var(--dark-pine);
+            border-radius: 8px;
+            padding: 2.8rem 3rem;
+            text-align: center;
+            color: white;
+            margin-top: 1.4rem;
+        }
+
+        .after-cta p {
+            font-size: 1rem;
+            line-height: 1.85;
+            color: rgba(255,255,255,0.82);
+            max-width: 580px;
+            margin: 0 auto 1.6rem;
+        }
+
+        /* ── CONSULTATIONS ── */
+        .consultations { background: white; }
+        .consultations .section-eyebrow { color: var(--mountain-pink); }
+
+        .consult-intro {
+            max-width: 680px;
+            margin: 0 auto 3.5rem;
+            text-align: center;
+            font-size: 0.97rem;
+            line-height: 1.9;
+            color: #666;
+        }
+
+        .consult-tiers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.4rem;
+        }
+
+        .consult-card {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+            transition: transform 0.25s;
+        }
+
+        .consult-card:hover { transform: translateY(-5px); }
+
+        .consult-header {
+            padding: 2rem 1.6rem;
+            text-align: center;
+            color: white;
+        }
+        .consult-card:nth-child(1) .consult-header { background: var(--mountain-pink); }
+        .consult-card:nth-child(2) .consult-header { background: var(--sunset-red); }
+        .consult-card:nth-child(3) .consult-header { background: var(--dark-pine); }
+
+        .consult-header h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.45rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+        .consult-price { font-size: 2rem; font-weight: 700; margin: 0.4rem 0; }
+        .consult-tagline { font-size: 0.78rem; opacity: 0.85; font-style: italic; }
+
+        .consult-body { padding: 1.6rem; background: var(--sand-beige); }
+        .consult-body p { font-size: 0.87rem; line-height: 1.85; color: #555; margin-bottom: 1.4rem; }
+
+        /* ── GEAR RENTAL ── */
+        .gear-rental { background: var(--sand-beige); }
+        .gear-rental .section-eyebrow { color: var(--mountain-pine); }
+
+        .gear-intro {
+            max-width: 660px;
+            margin: 0 auto 3.5rem;
+            text-align: center;
+            font-size: 0.97rem;
+            line-height: 1.9;
+            color: #666;
+        }
+
+        .gear-packages {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.4rem;
+        }
+
+        .gear-card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+            transition: transform 0.25s;
+        }
+
+        .gear-card:hover { transform: translateY(-4px); }
+
+        .gear-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+
+        .gear-name {
             font-family: 'Cormorant Garamond', serif;
             font-size: 1.4rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
+            font-weight: 700;
             color: var(--dark-pine);
         }
 
-        .event-description {
-            margin-bottom: 1.25rem;
-            color: #666;
-            font-size: 0.9rem;
-            line-height: 1.6;
+        .gear-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--mountain-pink);
+            white-space: nowrap;
+        }
+        .gear-price span { font-size: 0.75rem; font-weight: 400; color: #999; }
+
+        .gear-desc { font-size: 0.87rem; line-height: 1.82; color: #666; margin-bottom: 1rem; }
+
+        .gear-best {
+            font-size: 0.67rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--desert-green);
         }
 
-        /* Gallery */
-        .gallery {
-            padding: 6rem 0;
-            background-color: white;
+        .placeholder-tag {
+            display: inline-block;
+            background: rgba(231,111,81,0.1);
+            color: var(--sunset-red);
+            border: 1px dashed var(--sunset-red);
+            border-radius: 3px;
+            padding: 0.1rem 0.45rem;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-left: 4px;
+            vertical-align: middle;
         }
+
+        /* ── GALLERY ── */
+        .gallery { background: var(--sand-beige); }
+        .gallery .section-eyebrow { color: var(--mountain-pink); }
 
         .gallery-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(2, 280px);
+            grid-template-rows: 280px 240px;
             gap: 1rem;
         }
 
         .gallery-item {
             background-position: center;
             background-size: cover;
-            background-repeat: no-repeat;
-            border-radius: 10px;
-            overflow: hidden;
-            transition: transform 0.3s, box-shadow 0.3s;
+            border-radius: 6px;
+            transition: transform 0.3s;
             cursor: pointer;
         }
 
-        .gallery-item:hover {
-            transform: scale(1.02);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-        }
+        .gallery-item:hover { transform: scale(1.02); }
+        .gallery-item:nth-child(1) { grid-column: span 2; }
 
-        .gallery-item.tall {
-            grid-row: span 2;
-        }
-
-        /* Newsletter */
-        .newsletter {
-            padding: 5rem 0;
-            background: linear-gradient(135deg, var(--dark-pine) 0%, #1a3535 100%);
-            color: white;
-            text-align: center;
-        }
-
-        .newsletter .section-title h2 {
-            color: white;
-        }
-
-        .newsletter .section-title p {
-            color: rgba(255,255,255,0.75);
-        }
+        /* ── NEWSLETTER ── */
+        .newsletter { background: var(--mountain-pink); color: white; text-align: center; }
+        .newsletter .section-title h2 { color: white; font-family: 'Cormorant Garamond', serif; }
+        .newsletter .section-title p { color: rgba(255,255,255,0.88); }
 
         .newsletter-form {
-            max-width: 480px;
+            max-width: 500px;
             margin: 2rem auto 0;
             display: flex;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             border-radius: 30px;
             overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
 
         .newsletter-form input {
             flex: 1;
-            padding: 0.9rem 1.5rem;
+            padding: 1rem 1.4rem;
             border: none;
             outline: none;
             font-family: 'Montserrat', sans-serif;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
+            color: var(--dark-pine);
         }
 
         .newsletter-form button {
-            background-color: var(--mountain-pink);
+            background: var(--sunset-red);
             border: none;
             color: white;
-            padding: 0 1.75rem;
+            padding: 0 1.6rem;
             cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85rem;
-            letter-spacing: 0.05em;
+            font-weight: 700;
+            font-size: 0.74rem;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
             font-family: 'Montserrat', sans-serif;
-            transition: background-color 0.3s;
+            white-space: nowrap;
         }
 
-        .newsletter-form button:hover {
-            background-color: #e06050;
-        }
+        /* ── FOOTER ── */
+        footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 
-        /* Footer */
-        footer {
-            background-color: #1a2e2e;
-            color: white;
-            padding: 3.5rem 0 1.5rem;
-        }
+        .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2rem; margin-bottom: 2.5rem; }
 
-        .footer-content {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: 2rem;
-            margin-bottom: 2.5rem;
-        }
-
-        .footer-column {
-            min-width: 200px;
-        }
-
-        .footer-logo {
-            height: 48px;
-            width: auto;
-            margin-bottom: 1rem;
-            /* invert to white for dark background */
-            filter: brightness(0) invert(1);
-            opacity: 0.9;
-        }
-
-        .footer-column p {
-            color: rgba(255,255,255,0.65);
-            font-size: 0.85rem;
-            line-height: 1.7;
-        }
+        .footer-column { min-width: 180px; }
 
         .footer-column h3 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 1.25rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 1.2rem;
             color: var(--desert-green);
         }
 
-        .footer-column ul {
-            list-style: none;
-        }
+        .footer-column p { color: rgba(255,255,255,0.62); font-size: 0.86rem; line-height: 1.9; }
 
-        .footer-column ul li {
-            margin-bottom: 0.6rem;
-        }
+        .footer-column ul { list-style: none; }
+        .footer-column ul li { margin-bottom: 0.55rem; }
+        .footer-column ul li a { color: rgba(255,255,255,0.62); text-decoration: none; font-size: 0.86rem; transition: color 0.2s; }
+        .footer-column ul li a:hover { color: var(--mountain-pink); }
 
-        .footer-column ul li a {
-            color: rgba(255,255,255,0.65);
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: color 0.3s;
-        }
-
-        .footer-column ul li a:hover {
-            color: var(--mountain-pink);
-        }
-
-        .social-links {
-            display: flex;
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
-        }
-
+        .social-links { display: flex; gap: 0.6rem; margin-bottom: 1.1rem; }
         .social-links a {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 38px;
-            height: 38px;
-            background-color: rgba(255,255,255,0.1);
-            border-radius: 50%;
-            color: white;
-            text-decoration: none;
-            font-size: 0.75rem;
-            font-weight: 700;
-            transition: background-color 0.3s;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%; color: white; text-decoration: none;
+            font-size: 0.7rem; font-weight: 700;
+            transition: background 0.2s;
         }
-
-        .social-links a:hover {
-            background-color: var(--mountain-pink);
-        }
+        .social-links a:hover { background: var(--mountain-pink); }
 
         .footer-bottom {
             text-align: center;
             padding-top: 1.5rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.4);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.38);
             font-size: 0.8rem;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .hero h1 { font-size: 2.8rem; }
-
-            .nav-links {
-                position: fixed;
-                top: 68px;
-                left: -100%;
-                width: 100%;
-                height: calc(100vh - 68px);
-                background-color: var(--dark-pine);
-                flex-direction: column;
-                align-items: center;
-                justify-content: flex-start;
-                padding-top: 2.5rem;
-                gap: 1.5rem;
-                transition: left 0.3s;
-            }
-
-            .nav-links.active { left: 0; }
-            .hamburger { display: block; }
-
-            .gallery-grid {
-                grid-template-columns: repeat(2, 1fr);
-                grid-template-rows: auto;
-            }
-
-            .gallery-item.tall { grid-row: span 1; }
-        }
-
-        @media (max-width: 480px) {
-            .hero h1 { font-size: 2.2rem; }
-            .gallery-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <header>
-        <div class="container">
-            <nav>
-                <a href="#" class="logo">
-                    <img src="images/logo.svg" alt="Palm Springs Adventure Club">
-                </a>
-                <ul class="nav-links" id="navLinks">
-                    <li><a href="#about">Our Story</a></li>
-                    <li><a href="#gear">Gear</a></li>
-                    <li><a href="#membership">Membership</a></li>
-                    <li><a href="#events">Events</a></li>
-                    <li><a href="#gallery">Gallery</a></li>
-                    <li><a href="#contact">Contact</a></li>
-                </ul>
-                <button class="hamburger" id="hamburger">☰</button>
-            </nav>
-        </div>
-    </header>
+<!-- ── HEADER ── -->
+<header>
+    <div class="container">
+        <nav>
+            <a href="#" class="logo">
+                <img src="images/logo.svg" alt="Palm Springs Adventure Club" style="height: 48px; width: auto;">
+            </a>
+            <ul class="nav-links">
+                <li><a href="#adventures">Adventures</a></li>
+                <li><a href="#after-trail">After the Trail</a></li>
+                <li><a href="#gear">Gear Rental</a></li>
+                <li><a href="#story">About</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </div>
+</header>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-content">
-            <h1>Desert Adventures, Expertly Curated</h1>
-            <p>Personalized hiking recommendations, gear rental, and guided experiences in the Coachella Valley — from San Jacinto's summit to Palm Springs' finest pools.</p>
-            <div class="btn-group">
-                <a href="#membership" class="btn">Book a Consultation</a>
-                <a href="#events" class="btn btn-secondary">Upcoming Adventures</a>
+<!-- ── HERO ── -->
+<section class="hero">
+    <div class="hero-content">
+        <p class="hero-eyebrow">Peaks to Pools</p>
+        <h1>Desert Adventures, Expertly Curated</h1>
+        <p>Personalized adventure recommendations, gear rental, and guided experiences in the Coachella Valley – from the heights of Mount San Jacinto to the luxury pools, fine dining, and experiences of Palm Springs.</p>
+        <a href="#adventures" class="btn">Personalize Your Adventure</a>
+    </div>
+</section>
+
+<!-- ── OUR STORY ── -->
+<section class="our-story" id="story">
+    <div class="container">
+        <div class="story-grid">
+            <div class="story-image"></div>
+            <div class="story-content">
+                <span class="section-eyebrow">Our Story</span>
+                <h2>Insider Knowledge, Refined Expectations</h2>
+                <p>Palm Springs Adventure Club was inspired by the incredible trails, palm trees, and waterfalls hidden in the mountains only moments from the luxury pools, fine dining, and elegant experiences of Palm Springs.</p>
+                <p>Palm Springs is rooted in indigenous history, steeped in Hollywood legend, and surrounded by opportunities for world class outdoor adventures and luxury <em>après trail</em> relaxation. We curate every trail, every moment, every pairing based on first-hand experience.</p>
+                <p>Based in Palm Springs and committed to finding the best of the best, we offer personalized adventure recommendations that match your fitness level and group size — then connect you with the finest recovery experiences the desert has to offer.</p>
+
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Our Story Section -->
-    <section class="our-story" id="about">
-        <div class="container">
-            <div class="story-grid">
-                <div class="story-img-wrap">
-                    <img src="images/gallery4.jpg" alt="Hiking in the desert" class="story-img">
-                </div>
-                <div class="story-content">
-                    <span class="eyebrow">Our Story</span>
-                    <h2>Insider Knowledge, Luxury Standards</h2>
-                    <p>Palm Springs Adventure Club was born from a simple belief: the best desert experiences come from insider knowledge, not generic guidebooks. We curate every trail, every moment, every pairing with the same care a sommelier brings to a perfect wine list.</p>
-                    <p>Based in Palm Springs and deeply embedded in the Coachella Valley's outdoor community, we offer personalized consultations that match your fitness level, aesthetic preferences, and luxury expectations — then connect you with the finest recovery experiences the desert has to offer.</p>
-                    <div class="story-stats">
-                        <div class="stat-item">
-                            <span class="stat-number">50+</span>
-                            <span class="stat-label">Curated Trails</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">100%</span>
-                            <span class="stat-label">Personalized</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">10k+</span>
-                            <span class="stat-label">Miles Logged</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Peaks to Pools Section -->
-    <section class="peaks-to-pools" id="philosophy">
-        <div class="container">
-            <span class="eyebrow">The PSAC Philosophy</span>
+<!-- ── PEAKS TO POOLS ── -->
+<section class="peaks-to-pools" id="peaks-to-pools">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-eyebrow">The PSAC Experience</span>
             <h2>Peaks to Pools</h2>
-            <p class="intro">The desert offers two perfect gifts: its wild, silent peaks and its warm, restorative pools. We connect them into a single unforgettable experience.</p>
-            <div class="pillars-grid">
-                <div class="pillar">
-                    <h3>The Ascent</h3>
-                    <p>Expert trail selection matched to your level, from gentle canyon walks to the 10,834 ft summit of San Jacinto.</p>
-                </div>
-                <div class="pillar">
-                    <h3>The Partnership</h3>
-                    <p>Curated pairings with Villa Royale, Miro's, Pharos, and Palm Springs' finest hospitality venues.</p>
-                </div>
-                <div class="pillar">
-                    <h3>The Recovery</h3>
-                    <p>A perfectly matched pool, spa, or dining experience waiting for you when you return from the mountain.</p>
-                </div>
-            </div>
-            <p class="peaks-tagline">Connecting Desert Wilderness with Palm Springs Luxury Since 2024</p>
+            <p>The desert offers two perfect gifts: world class outdoor experiences and refined relaxation. We connect them into an unforgettable experience.</p>
         </div>
-    </section>
-
-    <!-- Gear Rental Section -->
-    <section class="gear-rental" id="gear">
-        <div class="container">
-            <span class="eyebrow">Gear Rental</span>
-            <div class="section-title">
-                <h2>Adventure-Ready Equipment</h2>
-                <p>Travel light. We provide everything you need for a safe, comfortable desert adventure — curated gear packages delivered ready to use.</p>
+        <div class="arc-panels">
+            <div class="arc-panel">
+                <div class="arc-num">1</div>
+                <h3>The Guide</h3>
+                <p>We match the trail to your pace, your group, and the conditions. Every recommendation includes a recommended gear list, gear rental options, and an overview of what to expect.</p>
             </div>
-            <div class="gear-grid">
-                <!-- Desert Essentials -->
-                <div class="gear-card">
-                    <div class="gear-card-header light">
-                        <h3>Desert Essentials</h3>
-                        <div class="gear-price">$45<span>/day</span></div>
-                    </div>
-                    <div class="gear-card-body">
-                        <ul>
-                            <li>Trekking poles</li>
-                            <li>Hydration pack (3L)</li>
-                            <li>Trail map &amp; compass</li>
-                            <li>Basic first aid kit</li>
-                            <li>Sun protection kit</li>
-                        </ul>
-                    </div>
-                    <div class="gear-card-footer">
-                        <a href="#contact" class="btn-full pink">Reserve</a>
-                    </div>
-                </div>
-
-                <!-- Premium Package -->
-                <div class="gear-card">
-                    <div class="gear-card-header dark">
-                        <h3>Premium Package</h3>
-                        <div class="gear-price">$65<span>/day</span></div>
-                    </div>
-                    <div class="gear-card-body">
-                        <ul>
-                            <li>Everything in Essentials</li>
-                            <li>GPS device (Garmin)</li>
-                            <li>Satellite communicator</li>
-                            <li>Lightweight daypack</li>
-                            <li>Trail snack selection</li>
-                            <li>Microspikes (seasonal)</li>
-                        </ul>
-                    </div>
-                    <div class="gear-card-footer">
-                        <a href="#contact" class="btn-full pink">Reserve</a>
-                    </div>
-                </div>
-
-                <!-- Custom Package -->
-                <div class="gear-card">
-                    <div class="gear-card-header pink">
-                        <h3>Custom Package</h3>
-                        <div class="gear-price">Let's Talk</div>
-                    </div>
-                    <div class="gear-card-body">
-                        <ul>
-                            <li>Group gear outfitting</li>
-                            <li>Multi-day expeditions</li>
-                            <li>Specialty equipment</li>
-                            <li>Photography gear</li>
-                            <li>Custom packing lists</li>
-                        </ul>
-                    </div>
-                    <div class="gear-card-footer">
-                        <a href="#contact" class="btn-full dark">Inquire</a>
-                    </div>
-                </div>
+            <div class="arc-panel">
+                <div class="arc-num">2</div>
+                <h3>The Peak</h3>
+                <p>Whether you're logging miles, making camp, or chasing a PR — the desert rewards those who safely venture.</p>
+            </div>
+            <div class="arc-panel">
+                <div class="arc-num">3</div>
+                <h3>The Pool</h3>
+                <p>We know which table to book, which pool is worth it, and which cold brew at which spot is the right way to close a day like yours.</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Membership Section -->
-    <section class="membership" id="membership">
-        <div class="container">
-            <div class="section-title">
-                <h2>Membership Options</h2>
-                <p>Choose the membership tier that fits your adventure style and unlock exclusive benefits and experiences.</p>
+<!-- ── AFTER THE TRAIL ── -->
+<section class="after-trail" id="after-trail">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-eyebrow">After The Trail</span>
+            <h2>Relax &amp; Recover In Style</h2>
+            <p>Recover in the refined elegance of Palm Springs' pools, restaurants, shops, and boutique hotels.</p>
+        </div>
+
+        <div class="after-cards">
+
+            <!-- Card 1: After the Summit -->
+            <div class="after-card">
+                <div class="after-card-header">
+                    <div class="after-card-icon">⛰</div>
+                    <div>
+                        <div class="after-card-type">After the Summit</div>
+                        <h3>San Jacinto · North Lykken · Long elevation gain</h3>
+                    </div>
+                </div>
+                <div class="after-card-body">
+                    <div class="recovery-label">Recovery</div>
+                    <div class="recovery-headline">You earned a real meal.</div>
+                    <p>There's a restaurant in Palm Springs that feels designed for the person who just came off a mountain. The right table, the right thing on the menu, the right way to sit down and let the legs know the day is over.</p>
+                    <span class="partner-line">[Placeholder — Miro's or preferred partner] <span class="placeholder-tag">confirm</span></span>
+                </div>
             </div>
-            <div class="membership-tiers">
-                <!-- Trail Tier -->
-                <div class="tier-card tier-trail">
-                    <div class="tier-header">
-                        <h3>Trail Membership</h3>
-                        <div class="tier-price">$99<span>/year</span></div>
-                    </div>
-                    <div class="tier-features">
-                        <ul>
-                            <li>Access to monthly group hikes</li>
-                            <li>Member newsletter</li>
-                            <li>10% discount on merchandise</li>
-                            <li>Invitation to seasonal socials</li>
-                        </ul>
-                        <div class="tier-footer">
-                            <a href="#" class="btn">Select Plan</a>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Explorer Tier -->
-                <div class="tier-card tier-explorer">
-                    <div class="tier-header">
-                        <h3>Explorer Membership</h3>
-                        <div class="tier-price">$199<span>/year</span></div>
-                    </div>
-                    <div class="tier-features">
-                        <ul>
-                            <li>All Trail Membership benefits</li>
-                            <li>Priority registration for events</li>
-                            <li>One free guided adventure per year</li>
-                            <li>20% discount on merchandise</li>
-                            <li>Access to exclusive explorer trips</li>
-                        </ul>
-                        <div class="tier-footer">
-                            <a href="#" class="btn">Select Plan</a>
-                        </div>
+            <!-- Card 2: After the Trail Run -->
+            <div class="after-card">
+                <div class="after-card-header">
+                    <div class="after-card-icon">🏃</div>
+                    <div>
+                        <div class="after-card-type">After the Trail Run</div>
+                        <h3>South Lykken · Indian Canyons loop · High-pace run</h3>
                     </div>
                 </div>
+                <div class="after-card-body">
+                    <div class="recovery-label">Recovery</div>
+                    <div class="recovery-headline">The pool that makes sense after miles.</div>
+                    <p>Not every pool in Palm Springs is built for the person who just explored miles of the desert. We know the one that is — where the water is cold, the sun angle is right by early afternoon, and nobody minds that you're still slightly in your head from the effort.</p>
+                    <span class="partner-line">[Placeholder — Villa Royale or preferred partner] <span class="placeholder-tag">confirm</span></span>
+                </div>
+            </div>
 
-                <!-- Summit Tier -->
-                <div class="tier-card tier-summit">
-                    <div class="tier-header">
-                        <h3>Summit Membership</h3>
-                        <div class="tier-price">$349<span>/year</span></div>
-                    </div>
-                    <div class="tier-features">
-                        <ul>
-                            <li>All Explorer Membership benefits</li>
-                            <li>Three free guided adventures per year</li>
-                            <li>30% discount on merchandise</li>
-                            <li>Annual exclusive summit retreat</li>
-                            <li>Personalized adventure planning</li>
-                            <li>Free equipment rentals</li>
-                        </ul>
-                        <div class="tier-footer">
-                            <a href="#" class="btn">Select Plan</a>
-                        </div>
+            <!-- Card 3: After the Overnight -->
+            <div class="after-card">
+                <div class="after-card-header">
+                    <div class="after-card-icon">🌙</div>
+                    <div>
+                        <div class="after-card-type">After the Overnight</div>
+                        <h3>Backcountry · High desert · Joshua Tree stargazing</h3>
                     </div>
                 </div>
+                <div class="after-card-body">
+                    <div class="recovery-label">Recovery</div>
+                    <div class="recovery-headline">Civilization, done right.</div>
+                    <p>Coming out of the backcountry into Palm Springs is one of the better contrasts the desert offers. We know where to land: a room worth checking into, a morning table worth walking to, a moment of actual luxury that earns its place after a night on the ground.</p>
+                    <span class="partner-line">[Placeholder — Villa Royale or hotel partner] <span class="placeholder-tag">confirm</span></span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="after-cta">
+            <p>Every Palm Springs Adventure Club guide includes a personalized After the Trail recommendation. Tell us what you're looking for and start your adventure.</p>
+            <a href="#adventures" class="btn">Personalize Your Adventure</a>
+        </div>
+    </div>
+</section>
+
+<!-- ── CONSULTATIONS ── -->
+<section class="consultations" id="adventures">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-eyebrow">Personally Curated Adventures</span>
+            <h2>The Palm Springs experiences most people never find</h2>
+            <p>Expert local knowledge personalized for you — your pace, your group, your goals. Day hikes, trail runs, mountain summits, and luxurious Palm Springs experiences are at your fingertips.</p>
+        </div>
+
+        <div class="consult-tiers">
+
+            <div class="consult-card">
+                <div class="consult-header">
+                    <h3>Trail Consultation</h3>
+                    <div class="consult-price">$90</div>
+                    <div class="consult-tagline">The right trail for an exceptional Palm Springs outdoor experience</div>
+                </div>
+                <div class="consult-body">
+                    <p>A focused 30-minute session covering trail selection and what to bring. Ideal for first-time visitors, anyone new to the area, or anyone who wants a confident starting point without the guesswork. Gear rental can be added on.</p>
+                    <a href="#contact" class="btn">Book Now</a>
+                </div>
+            </div>
+
+            <div class="consult-card">
+                <div class="consult-header">
+                    <h3>Adventure Consultation</h3>
+                    <div class="consult-price">$180</div>
+                    <div class="consult-tagline">A full day, tailored to your sense of adventure</div>
+                </div>
+                <div class="consult-body">
+                    <p>A 60-minute deep dive: trail selection with backup options, gear checklist tuned to your activity (hike, run, or overnight), timing, conditions, and a curated After the Trail recommendation to close the day right.</p>
+                    <a href="#contact" class="btn">Book Now</a>
+                </div>
+            </div>
+
+            <div class="consult-card">
+                <div class="consult-header">
+                    <h3>Custom Experience</h3>
+                    <div class="consult-price">from $540</div>
+                    <div class="consult-tagline">Something truly unique</div>
+                </div>
+                <div class="consult-body">
+                    <p>Multi-day itineraries, group adventures, backcountry planning, or experiences that don't fit a standard format. Tell us what you're imagining.</p>
+                    <a href="#contact" class="btn btn-pine">Get in Touch</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- ── GEAR RENTAL ── -->
+<section class="gear-rental" id="gear">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-eyebrow">Gear Rental</span>
+            <h2>Everything you need. Delivered.</h2>
+        </div>
+
+        <p class="gear-intro">You don't have to travel with $400+ of gear to have a great day on the trail. Our gear rental packages are curated, well-maintained, and enable a safe day of hiking, running, or adventure in the desert and mountains in Palm Springs and the greater Coachella Valley.</p>
+
+        <div class="gear-packages">
+
+            <div class="gear-card">
+                <div class="gear-top">
+                    <div class="gear-name">Desert Essentials</div>
+                    <div class="gear-price">$45 <span>/ day</span></div>
+                </div>
+                <p class="gear-desc">The fundamentals for a confident day hike or trail run. Trekking poles, hydration pack, and trail map kit. <span class="placeholder-tag">confirm gear list</span></p>
+                <div class="gear-best">Best for: First-timers · Day hikers · Trail runners</div>
+            </div>
+
+            <div class="gear-card">
+                <div class="gear-top">
+                    <div class="gear-name">Premium</div>
+                    <div class="gear-price">$65 <span>/ day</span></div>
+                </div>
+                <p class="gear-desc">Everything in Desert Essentials plus a lightweight pack, satellite communicator, and sun protection kit. For people who want to go further. <span class="placeholder-tag">confirm gear list</span></p>
+                <div class="gear-best">Best for: Longer routes · Summit attempts · Solo adventurers</div>
+            </div>
+
+            <div class="gear-card">
+                <div class="gear-top">
+                    <div class="gear-name">Overnight Kit</div>
+                    <div class="gear-price">$95 <span>/ night</span></div>
+                </div>
+                <p class="gear-desc">Lightweight tent, sleeping bag rated for desert nights, sleeping pad, headlamp, and camp cooking basics. Everything you need for one night in the San Jacintos or Joshua Tree without checking a bag. <span class="placeholder-tag">confirm gear list</span> <span class="placeholder-tag">confirm availability</span></p>
+                <div class="gear-best">Best for: First-time backcountry campers · Travelers without gear</div>
+            </div>
+
+            <div class="gear-card">
+                <div class="gear-top">
+                    <div class="gear-name">Custom</div>
+                    <div class="gear-price" style="font-size:0.95rem; color: var(--dark-pine); font-weight:600;">Quoted on request</div>
+                </div>
+                <p class="gear-desc">Group rentals, multi-day expeditions, or specific gear needs. Contact us and we'll build the right kit.</p>
+                <div class="gear-best">Best for: Groups · Multi-night trips · Special requirements</div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- MEMBERSHIP SECTION — SKIPPED PER AUDIT DOC -->
+<!-- ADVENTURE SCHEDULE — SKIPPED PER AUDIT DOC -->
+
+<!-- ── GALLERY ── -->
+<section class="gallery" id="gallery">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-eyebrow">Trail Gallery</span>
+            <h2>As we found it.</h2>
+            <p>Trails, summits, camps, and canyons — as we found them.</p>
+        </div>
+        <div class="gallery-grid">
+            <div class="gallery-item" style="background-image: url('images/gallery1.jpg')"></div>
+            <div class="gallery-item" style="background-image: url('images/gallery2.jpg')"></div>
+            <div class="gallery-item" style="background-image: url('images/gallery3.jpg')"></div>
+            <div class="gallery-item" style="background-image: url('images/gallery4.jpg')"></div>
+            <div class="gallery-item" style="background-image: url('images/gallery5.jpg')"></div>
+        </div>
+    </div>
+</section>
+
+<!-- ── NEWSLETTER ── -->
+<section class="newsletter">
+    <div class="container">
+        <div class="section-title">
+            <h2>Stay in the Know.</h2>
+            <p>Monthly trail conditions, run routes, seasonal overnight windows, and insider recovery picks — the kind of local knowledge that doesn't exist anywhere else.</p>
+        </div>
+        <div class="newsletter-form">
+            <input type="email" placeholder="Your email address">
+            <button type="button">Subscribe</button>
+        </div>
+    </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer id="contact">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-column">
+                <h3>Palm Springs Adventure Club</h3>
+                <p>Operated by Pink Mountain Ventures LLC<br>
+                Palm Springs, CA <span class="placeholder-tag">confirm address</span><br><br>
+                Phone: (760) 123-4567 <span class="placeholder-tag">confirm</span><br>
+                <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6a020f0606052a1a0b0607191a1803040d190b0e1c0f041e1f180f09061f0844090507">[email&#160;protected]</a></p>
+            </div>
+            <div class="footer-column">
+                <h3>Explore</h3>
+                <ul>
+                    <li><a href="#adventures">Adventures &amp; Consultations</a></li>
+                    <li><a href="#peaks-to-pools">Peaks to Pools</a></li>
+                    <li><a href="#after-trail">After the Trail</a></li>
+                    <li><a href="#gear">Gear Rental</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Connect</h3>
+                <div class="social-links">
+                    <a href="#">IG</a>
+                    <a href="#">FB</a>
+                    <a href="#">TW</a>
+                    <a href="#">YT</a>
+                </div>
+                <p style="font-size:0.78rem; color: rgba(255,255,255,0.38);">Social URLs are placeholders <span class="placeholder-tag">confirm</span></p>
             </div>
         </div>
-    </section>
-
-    <!-- Events Section -->
-    <section class="events" id="events">
-        <div class="container">
-            <div class="section-title">
-                <h2>Upcoming Adventures</h2>
-                <p>Explore our calendar of guided adventures, workshops, and social events.</p>
-            </div>
-            <div class="events-grid">
-                <!-- Event 1 -->
-                <div class="event-card">
-                    <div class="event-img" style="background-image: url('images/event1.jpg')"></div>
-                    <div class="event-info">
-                        <span class="event-date">March 15, 2025</span>
-                        <h3>North Lykken Wildflower Hike</h3>
-                        <p class="event-description">Spring blooms on the Ramon Trailhead route with panoramic valley views. Limited to 8 guests.</p>
-                        <a href="#" class="btn">Register</a>
-                    </div>
-                </div>
-
-                <!-- Event 2 -->
-                <div class="event-card">
-                    <div class="event-img" style="background-image: url('images/event2.jpg')"></div>
-                    <div class="event-info">
-                        <span class="event-date">April 5, 2025</span>
-                        <h3>Joshua Tree Sunrise Run</h3>
-                        <p class="event-description">Guided trail run through Barker Dam at first light — boulders, Joshua trees, and desert silence.</p>
-                        <a href="#" class="btn">Register</a>
-                    </div>
-                </div>
-
-                <!-- Event 3 -->
-                <div class="event-card">
-                    <div class="event-img" style="background-image: url('images/event3.jpg')"></div>
-                    <div class="event-info">
-                        <span class="event-date">April 19, 2025</span>
-                        <h3>Indian Canyons Palm Oasis Trek</h3>
-                        <p class="event-description">Explore the West Fork Trail through one of the world's largest native palm oases on Agua Caliente land.</p>
-                        <a href="#" class="btn">Register</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Gallery Section -->
-    <section class="gallery" id="gallery">
-        <div class="container">
-            <div class="section-title">
-                <h2>The Desert Awaits</h2>
-                <p>Every trail tells a story. These are ours.</p>
-            </div>
-            <div class="gallery-grid">
-                <div class="gallery-item tall" style="background-image: url('images/gallery1.jpg')"></div>
-                <div class="gallery-item" style="background-image: url('images/gallery2.jpg')"></div>
-                <div class="gallery-item" style="background-image: url('images/gallery3.jpg')"></div>
-                <div class="gallery-item" style="background-image: url('images/gallery4.jpg')"></div>
-                <div class="gallery-item" style="background-image: url('images/gallery5.jpg')"></div>
-                <div class="gallery-item" style="background-image: url('images/gallery6.jpg')"></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Newsletter Section -->
-    <section class="newsletter" id="contact">
-        <div class="container">
-            <div class="section-title">
-                <h2>Stay in the Know</h2>
-                <p>Seasonal trail conditions, insider routes, and exclusive event access — delivered to your inbox.</p>
-            </div>
-            <form class="newsletter-form">
-                <input type="email" placeholder="Your email address">
-                <button type="submit">Subscribe</button>
-            </form>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer>
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-column">
-                    <img src="images/logo.svg" alt="Palm Springs Adventure Club" class="footer-logo">
-                    <p>Operated by Pink Mountain Ventures LLC<br>
-                    Palm Springs, CA</p>
-                </div>
-                <div class="footer-column">
-                    <h3>Quick Links</h3>
-                    <ul>
-                        <li><a href="#membership">Membership</a></li>
-                        <li><a href="#events">Events</a></li>
-                        <li><a href="#gallery">Gallery</a></li>
-                        <li><a href="#">About Us</a></li>
-                    </ul>
-                </div>
-                <div class="footer-column">
-                    <h3>Connect With Us</h3>
-                    <div class="social-links">
-                        <a href="#">IG</a>
-                        <a href="#">FB</a>
-                        <a href="#">YT</a>
-                    </div>
-                    <p>Email: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="325a575e5e5d7242535e5f4142405b5c5541535644575c46474057515e47501c515d5f">[email&#160;protected]</a></p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2025 Palm Springs Adventure Club · Pink Mountain Ventures LLC · All Rights Reserved.</p>
-            </div>
-        </div>
-    </footer>
-
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-        const hamburger = document.getElementById('hamburger');
-        const navLinks = document.getElementById('navLinks');
-
-        hamburger.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
+        <div class="footer-bottom">
+            <p>&copy; 2026 Palm Springs Adventure Cl
