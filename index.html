@@ -206,7 +206,7 @@
 
         .after-cards {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 1.4rem;
             margin-bottom: 1.4rem;
         }
@@ -296,6 +296,8 @@
             overflow: hidden;
             box-shadow: 0 4px 18px rgba(0,0,0,0.08);
             transition: transform 0.25s;
+            display: flex;
+            flex-direction: column;
         }
 
         .consult-card:hover { transform: translateY(-5px); }
@@ -318,8 +320,8 @@
         .consult-price { font-size: 2rem; font-weight: 700; margin: 0.4rem 0; }
         .consult-tagline { font-size: 0.78rem; opacity: 0.85; font-style: italic; }
 
-        .consult-body { padding: 1.6rem; background: var(--sand-beige); }
-        .consult-body p { font-size: 0.87rem; line-height: 1.85; color: #555; margin-bottom: 1.4rem; }
+        .consult-body { padding: 1.6rem; background: var(--sand-beige); flex: 1; display: flex; flex-direction: column; }
+        .consult-body p { font-size: 0.87rem; line-height: 1.85; color: #555; margin-bottom: 1.4rem; flex: 1; }
 
         /* ── GEAR RENTAL ── */
         .gear-rental { background: var(--sand-beige); }
@@ -671,8 +673,8 @@
     <div class="container">
         <div class="section-title">
             <span class="section-eyebrow">Personally Curated Adventures</span>
-            <h2>The Palm Springs experiences most people never find</h2>
-            <p>Expert local knowledge personalized for you — your pace, your group, your goals. Day hikes, trail runs, mountain summits, and luxurious Palm Springs experiences are at your fingertips.</p>
+            <h2>Your Palm Springs adventure, expertly planned</h2>
+            <p>Expert local knowledge personalized for you — your pace, your group, your goals. Day hikes, trail runs, mountain summits, and luxurious Palm Springs experiences, curated specifically for you.</p>
         </div>
 
         <div class="consult-tiers">
@@ -680,11 +682,11 @@
                 <div class="consult-header">
                     <h3>Trail Consultation</h3>
                     <div class="consult-price">$90</div>
-                    <div class="consult-tagline">The right trail for an exceptional Palm Springs outdoor experience</div>
+                    <div class="consult-tagline">The right trail for an exceptional Palm Springs day</div>
                 </div>
                 <div class="consult-body">
-                    <p>A focused 30-minute session covering trail selection and what to bring. Ideal for first-time visitors, anyone new to the area, or anyone who wants a confident starting point without the guesswork. Gear rental can be added on.</p>
-                    <a href="#contact" class="btn">Book Now</a>
+                    <p>Your trail recommendation, curated for your group, your fitness level, and the conditions. Includes what to bring, what to expect, and gear rental options if you need them.</p>
+                    <a href="#contact" class="btn">Build My Adventure</a>
                 </div>
             </div>
 
@@ -695,8 +697,8 @@
                     <div class="consult-tagline">A full day, tailored to your sense of adventure</div>
                 </div>
                 <div class="consult-body">
-                    <p>A 60-minute deep dive: trail selection with backup options, gear checklist tuned to your activity (hike, run, or overnight), timing, conditions, and a curated After the Trail recommendation to close the day right.</p>
-                    <a href="#contact" class="btn">Book Now</a>
+                    <p>Trail selection with backup options, a gear checklist tuned to your activity — hike, run, or overnight — timing, conditions, and a personalized After the Trail recommendation to close the day right.</p>
+                    <a href="#contact" class="btn">Build My Adventure</a>
                 </div>
             </div>
 
@@ -708,7 +710,7 @@
                 </div>
                 <div class="consult-body">
                     <p>Multi-day itineraries, group adventures, backcountry planning, or experiences that don't fit a standard format. Tell us what you're imagining.</p>
-                    <a href="#contact" class="btn btn-pine">Get in Touch</a>
+                    <a href="#contact" class="btn btn-pine">Build My Adventure</a>
                 </div>
             </div>
         </div>
@@ -821,7 +823,7 @@
                 <h3>Palm Springs Adventure Club</h3>
                 <p>Operated by Pink Mountain Ventures LLC<br>
                 Palm Springs, CA<br><br>
-                <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="731b161f1f1c3303121f1e0003011a1d1400121705161d07060116101f06115d101c1e">[email&#160;protected]</a></p>
+                <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0169646d6d6e4171606d6c727173686f6672606577646f75747364626d74632f626e6c">[email&#160;protected]</a></p>
             </div>
             <div class="footer-column">
                 <h3>Explore</h3>
