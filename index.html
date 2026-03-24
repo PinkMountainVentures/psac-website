@@ -206,94 +206,55 @@
 
         .after-cards {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 1.4rem;
             margin-bottom: 1.4rem;
         }
 
         .after-card {
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 18px rgba(0,0,0,0.07);
-            display: flex;
-            flex-direction: column;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            transition: transform 0.3s;
         }
 
-        .after-card-header {
-            background: var(--dark-pine);
-            padding: 1.15rem 1.4rem;
-            display: flex;
-            align-items: center;
-            gap: 0.9rem;
+        .after-card:hover { transform: translateY(-4px); }
+
+        .after-card-img {
+            height: 210px;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
         }
 
-        .after-card-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--mountain-pink);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            flex-shrink: 0;
+        .after-card-body {
+            padding: 1.25rem 1.5rem 1.6rem;
         }
 
-        .after-card-type {
-            font-size: 0.62rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.48);
-            font-weight: 600;
-        }
-
-        .after-card-header h3 {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: white;
-            line-height: 1.25;
-            margin-top: 0.1rem;
-        }
-
-        .after-card-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; }
-
-        .recovery-label {
+        .after-card-label {
             font-size: 0.62rem;
             letter-spacing: 0.14em;
             text-transform: uppercase;
             font-weight: 700;
             color: var(--desert-green);
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.5rem;
         }
 
-        .recovery-headline {
+        .after-card-title {
             font-family: 'Cormorant Garamond', serif;
             font-size: 1.35rem;
             font-weight: 700;
             color: var(--dark-pine);
-            margin-bottom: 0.75rem;
-            line-height: 1.2;
+            line-height: 1.25;
+            margin-bottom: 0.6rem;
         }
 
-        .after-card-body p {
+        .after-card-desc {
             font-size: 0.85rem;
             line-height: 1.82;
             color: #666;
-            margin-bottom: 1rem;
-            flex: 1;
-        }
-
-        .partner-line {
-            font-size: 0.7rem;
-            letter-spacing: 0.07em;
-            text-transform: uppercase;
-            font-weight: 600;
-            color: var(--mountain-pink);
-            border-top: 1px solid #eee;
-            padding-top: 0.8rem;
-            display: block;
+            margin: 0;
         }
 
         .after-cta {
@@ -579,6 +540,7 @@
             .arc-panel:last-child { border-bottom: none; }
 
             .after-cards { grid-template-columns: 1fr; }
+            .after-card-img { height: 200px; }
 
             .consult-tiers { grid-template-columns: 1fr; }
 
@@ -664,53 +626,37 @@
         </div>
 
         <div class="after-cards">
+
+            <!-- Card 1: After the Hike — swap image: images/after-hike.jpg -->
             <div class="after-card">
-                <div class="after-card-header">
-                    <div class="after-card-icon">⛰</div>
-                    <div>
-                        <div class="after-card-type">After the Summit</div>
-                        <h3>San Jacinto · North Lykken · Long elevation gain</h3>
-                    </div>
-                </div>
+                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1575429198097-0414ec08e8cd?w=800&q=80');"></div>
                 <div class="after-card-body">
-                    <div class="recovery-label">Recovery</div>
-                    <div class="recovery-headline">You earned a real meal.</div>
-                    <p>There's a restaurant in Palm Springs that feels designed for the person who just came off a mountain. The right table, the right thing on the menu, the right way to sit down and let the legs know the day is over.</p>
-                    <span class="partner-line">[Partner TBC]</span>
+                    <p class="after-card-label">After the Hike</p>
+                    <h3 class="after-card-title">You earned a real meal.</h3>
+                    <p class="after-card-desc">The right table. The right thing on the menu. The legs finally at rest.</p>
                 </div>
             </div>
 
+            <!-- Card 2: After the Run — swap image: images/after-run.jpg -->
             <div class="after-card">
-                <div class="after-card-header">
-                    <div class="after-card-icon">🏃</div>
-                    <div>
-                        <div class="after-card-type">After the Trail Run</div>
-                        <h3>South Lykken · Indian Canyons loop · High-pace run</h3>
-                    </div>
-                </div>
+                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1540979388789-6cee28a1cdc9?w=800&q=80');"></div>
                 <div class="after-card-body">
-                    <div class="recovery-label">Recovery</div>
-                    <div class="recovery-headline">The pool that makes sense after miles.</div>
-                    <p>Not every pool in Palm Springs is built for the person who just explored miles of the desert. We know the one that is — where the water is cold, the sun angle is right by early afternoon, and nobody minds that you're still slightly in your head from the effort.</p>
-                    <span class="partner-line">[Partner TBC]</span>
+                    <p class="after-card-label">After the Run</p>
+                    <h3 class="after-card-title">The pool that makes sense after miles.</h3>
+                    <p class="after-card-desc">Cold water. Right sun angle. Nobody minding you're still in your head.</p>
                 </div>
             </div>
 
+            <!-- Card 3: After the Summit — swap image: images/after-summit.jpg -->
             <div class="after-card">
-                <div class="after-card-header">
-                    <div class="after-card-icon">🌙</div>
-                    <div>
-                        <div class="after-card-type">After the Overnight</div>
-                        <h3>Backcountry · High desert · Joshua Tree stargazing</h3>
-                    </div>
-                </div>
+                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80');"></div>
                 <div class="after-card-body">
-                    <div class="recovery-label">Recovery</div>
-                    <div class="recovery-headline">Civilization, done right.</div>
-                    <p>Coming out of the backcountry into Palm Springs is one of the better contrasts the desert offers. We know where to land: a room worth checking into, a morning table worth walking to, a moment of actual luxury that earns its place after a night on the ground.</p>
-                    <span class="partner-line">[Partner TBC]</span>
+                    <p class="after-card-label">After the Summit</p>
+                    <h3 class="after-card-title">Civilization, done right.</h3>
+                    <p class="after-card-desc">A room worth checking into. A morning table worth walking to.</p>
                 </div>
             </div>
+
         </div>
 
         <div class="after-cta">
@@ -875,7 +821,7 @@
                 <h3>Palm Springs Adventure Club</h3>
                 <p>Operated by Pink Mountain Ventures LLC<br>
                 Palm Springs, CA<br><br>
-                hello@palmspringsadventureclub.com</p>
+                <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="731b161f1f1c3303121f1e0003011a1d1400121705161d07060116101f06115d101c1e">[email&#160;protected]</a></p>
             </div>
             <div class="footer-column">
                 <h3>Explore</h3>
@@ -902,14 +848,7 @@
     </div>
 </footer>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
     const hamburger = document.getElementById('hamburger');
     const navLinks = document.getElementById('navLinks');
-    hamburger.addEventListener('click', () => navLinks.classList.toggle('active'));
-    document.querySelectorAll('.nav-links a').forEach(link => {
-        link.addEventListener('click', () => navLinks.classList.remove('active'));
-    });
-</script>
-
-</body>
-</html>
+    hamburger.addEven
