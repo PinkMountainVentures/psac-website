@@ -337,8 +337,10 @@
 
         .gear-packages {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.4rem;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            max-width: 760px;
+            margin: 0 auto;
         }
 
         .gear-card {
@@ -376,6 +378,34 @@
             text-transform: uppercase;
             font-weight: 700;
             color: var(--desert-green);
+        }
+
+        .gear-addon {
+            max-width: 760px;
+            margin: 1.2rem auto 0;
+            background: white;
+            border-radius: 8px;
+            padding: 1.1rem 1.6rem;
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .gear-addon-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--mountain-pink);
+            white-space: nowrap;
+        }
+
+        .gear-addon p {
+            font-size: 0.87rem;
+            line-height: 1.7;
+            color: #666;
+            margin: 0;
         }
 
         /* ── OUR STORY ── */
@@ -546,7 +576,7 @@
 
             .consult-tiers { grid-template-columns: 1fr; }
 
-            .gear-packages { grid-template-columns: 1fr; }
+            .gear-packages { gap: 0.8rem; }
 
             .story-grid { grid-template-columns: 1fr; gap: 2rem; }
             .story-image { height: 300px; }
@@ -731,7 +761,7 @@
             <div class="gear-card">
                 <div class="gear-top">
                     <div class="gear-name">Desert Essentials</div>
-                    <div class="gear-price">$45 <span>/ day</span></div>
+                    <div class="gear-price">$60 <span>/ day</span></div>
                 </div>
                 <p class="gear-desc">The fundamentals for a confident day hike or trail run. Trekking poles, hydration pack, and trail map kit.</p>
                 <div class="gear-best">Best for: First-timers · Day hikers · Trail runners</div>
@@ -740,19 +770,10 @@
             <div class="gear-card">
                 <div class="gear-top">
                     <div class="gear-name">Premium</div>
-                    <div class="gear-price">$65 <span>/ day</span></div>
+                    <div class="gear-price">$80 <span>/ day</span></div>
                 </div>
-                <p class="gear-desc">Everything in Desert Essentials plus a lightweight pack, satellite communicator, and sun protection kit. For people who want to go further.</p>
+                <p class="gear-desc">Everything in Desert Essentials, plus a premium hydration pack with extra storage for gear, food, and additional fluids — and a sun protection kit. For people who want to go further.</p>
                 <div class="gear-best">Best for: Longer routes · Summit attempts · Solo adventurers</div>
-            </div>
-
-            <div class="gear-card">
-                <div class="gear-top">
-                    <div class="gear-name">Overnight Kit</div>
-                    <div class="gear-price">$95 <span>/ night</span></div>
-                </div>
-                <p class="gear-desc">Lightweight tent, sleeping bag rated for desert nights, sleeping pad, headlamp, and camp cooking basics. Everything you need for one night in the San Jacintos or Joshua Tree without checking a bag.</p>
-                <div class="gear-best">Best for: First-time backcountry campers · Travelers without gear</div>
             </div>
 
             <div class="gear-card">
@@ -760,9 +781,14 @@
                     <div class="gear-name">Custom</div>
                     <div class="gear-price" style="font-size:0.95rem; color: var(--dark-pine); font-weight:600;">Quoted on request</div>
                 </div>
-                <p class="gear-desc">Group rentals, multi-day expeditions, or specific gear needs. Contact us and we'll build the right kit.</p>
-                <div class="gear-best">Best for: Groups · Multi-night trips · Special requirements</div>
+                <p class="gear-desc">Group rentals, multi-day expeditions, overnight kit builds, or any configuration that doesn't fit a standard package. Tell us what you need and we'll build the right kit.</p>
+                <div class="gear-best">Best for: Groups · Overnight trips · Special requirements</div>
             </div>
+        </div>
+
+        <div class="gear-addon">
+            <span class="gear-addon-label">Add-on</span>
+            <p>Satellite communicator available with any rental package — $30/day. A $75 refundable deposit is required and returned upon check-in of the device.</p>
         </div>
     </div>
 </section>
