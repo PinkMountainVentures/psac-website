@@ -716,7 +716,7 @@
                 </div>
                 <div class="consult-body">
                     <p>Your trail recommendation, curated for your group, your fitness level, and the conditions. Includes what to bring, what to expect, and gear rental options if you need them.</p>
-                    <a href="#contact" class="btn">Build My Adventure</a>
+                    <a href="https://form.jotform.com/260839011262148" class="btn jotform-btn">Build My Adventure</a>
                 </div>
             </div>
 
@@ -728,7 +728,7 @@
                 </div>
                 <div class="consult-body">
                     <p>Trail selection with backup options, a gear checklist tuned to your activity — hike, run, or overnight — timing, conditions, and a personalized After the Trail recommendation to close the day right.</p>
-                    <a href="#contact" class="btn">Build My Adventure</a>
+                    <a href="https://form.jotform.com/260839011262148" class="btn jotform-btn">Build My Adventure</a>
                 </div>
             </div>
 
@@ -740,7 +740,7 @@
                 </div>
                 <div class="consult-body">
                     <p>Multi-day itineraries, group adventures, backcountry planning, or experiences that don't fit a standard format. Tell us what you're imagining.</p>
-                    <a href="#contact" class="btn btn-pine">Build My Adventure</a>
+                    <a href="https://form.jotform.com/260839011262148" class="btn btn-pine jotform-btn">Build My Adventure</a>
                 </div>
             </div>
         </div>
@@ -876,7 +876,33 @@
     </div>
 </footer>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
     const hamburger = document.getElementById('hamburger');
     const navLinks = document.getElementById('navLinks');
-    hamburger.addEven
+    hamburger.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+    });
+    const mobileLinks = document.querySelectorAll('.nav-links a');
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navLinks.classList.remove('active');
+        });
+    });
+</script>
+
+<!-- JotForm Lightbox -->
+<iframe
+  id="JotFormIFrame-260839011262148"
+  title="Palm Springs Adventure Club Consultation"
+  src="https://form.jotform.com/260839011262148"
+  style="display:none;"
+  allow="geolocation; microphone; camera; fullscreen"
+  frameborder="0">
+</iframe>
+<script src="https://cdn.jotfor.ms/s/umd/latest/for-form-embed-handler.js"></script>
+<script>
+  window.jotformEmbedHandler("iframe[id='JotFormIFrame-260839011262148']", "https://form.jotform.com/");
+</script>
+
+</body>
+</html>
