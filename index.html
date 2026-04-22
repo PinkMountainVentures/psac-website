@@ -891,9 +891,20 @@
 </script>
 
 <!-- JotForm Modal -->
-<div id="jotform-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
-  <div style="position:relative; width:90%; max-width:780px; height:88vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4);">
-    <button onclick="document.getElementById('jotform-modal').style.display='none'" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:1.6rem; cursor:pointer; color:#666; z-index:10; line-height:1;">&times;</button>
+<style>
+  #jotform-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
+  #jotform-modal-inner { position:relative; width:90%; max-width:780px; height:88vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+  #jotform-modal-close { position:absolute; top:12px; right:16px; background:none; border:none; font-size:1.6rem; cursor:pointer; color:#666; z-index:10; line-height:1; }
+  @media (max-width: 768px) {
+    #jotform-modal { align-items:stretch; justify-content:stretch; }
+    #jotform-modal-inner { width:100%; max-width:100%; height:100%; border-radius:0; box-shadow:none; }
+    #jotform-modal-close { top:16px; right:20px; font-size:2rem; color:#2A4747; }
+  }
+</style>
+
+<div id="jotform-modal">
+  <div id="jotform-modal-inner">
+    <button id="jotform-modal-close" onclick="document.getElementById('jotform-modal').style.display='none'">&times;</button>
     <iframe
       id="JotFormIFrame-260839011262148"
       title="Palm Springs Adventure Club Consultation"
