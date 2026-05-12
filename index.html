@@ -180,6 +180,59 @@
             margin-right: auto;
         }
 
+        /* ── HERO STEPS ── */
+        .hero-steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 2.4rem;
+            flex-wrap: nowrap;
+        }
+
+        .hero-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0 1.4rem;
+        }
+
+        .hero-step svg {
+            opacity: 0.9;
+        }
+
+        .hero-step-label {
+            font-size: 0.62rem;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.85);
+            white-space: nowrap;
+        }
+
+        .hero-step-divider {
+            width: 1px;
+            height: 40px;
+            background: var(--desert-green);
+            opacity: 0.6;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 480px) {
+            .hero-step {
+                padding: 0 0.8rem;
+            }
+            .hero-step-label {
+                font-size: 0.56rem;
+                letter-spacing: 0.08em;
+            }
+            .hero-step svg {
+                width: 26px;
+                height: 26px;
+            }
+        }
+
         /* ── THE OTHER SIDE ── */
         .other-side {
             background: var(--dark-pine);
@@ -803,6 +856,38 @@
         <p class="hero-eyebrow">Peaks to Pools</p>
         <h1>The pool is perfect.<br>And it's not enough.</h1>
         <p>The pool soothes. Adventure restores. One takes the weight off. The other reminds you who you were before you started carrying it.</p>
+
+        <!-- How It Works -->
+        <div class="hero-steps">
+            <div class="hero-step">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Mountain -->
+                    <polyline points="2,28 12,10 18,20 22,14 30,28"/>
+                    <line x1="2" y1="28" x2="30" y2="28"/>
+                </svg>
+                <span class="hero-step-label">Feel the Pull</span>
+            </div>
+            <div class="hero-step-divider"></div>
+            <div class="hero-step">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Map -->
+                    <path d="M4 6l8 3 8-3 8 3v20l-8-3-8 3-8-3V6z"/>
+                    <line x1="12" y1="9" x2="12" y2="26"/>
+                    <line x1="20" y1="6" x2="20" y2="23"/>
+                </svg>
+                <span class="hero-step-label">Build Your Adventure</span>
+            </div>
+            <div class="hero-step-divider"></div>
+            <div class="hero-step">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Waves only -->
+                    <path d="M2 18c3-3 5-3 8 0s5 3 8 0 5-3 8 0"/>
+                    <path d="M2 24c3-3 5-3 8 0s5 3 8 0 5-3 8 0"/>
+                </svg>
+                <span class="hero-step-label">Earn the Pool</span>
+            </div>
+        </div>
+
         <a href="#" class="btn jotform-btn">Build My Adventure</a>
     </div>
 </section>
