@@ -59,6 +59,21 @@
 
         .nav-links a:hover { color: var(--desert-green); }
 
+        .nav-cta {
+            background: var(--desert-green);
+            color: white !important;
+            padding: 0.55rem 1.2rem;
+            border-radius: 30px;
+            font-weight: 600 !important;
+            transition: background 0.2s, transform 0.2s !important;
+        }
+
+        .nav-cta:hover {
+            background: #63a677 !important;
+            color: white !important;
+            transform: translateY(-1px);
+        }
+
         .hamburger {
             display: none;
             background: none;
@@ -66,6 +81,60 @@
             color: white;
             font-size: 1.5rem;
             cursor: pointer;
+        }
+
+        /* ── BUTTONS ── */
+        .btn {
+            display: inline-block;
+            background-color: var(--desert-green);
+            color: white;
+            padding: 1rem 2.4rem;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.76rem;
+            letter-spacing: 0.13em;
+            text-transform: uppercase;
+            transition: all 0.25s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover { background-color: #63a677; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.2); }
+        .btn-pine { background-color: var(--dark-pine); }
+        .btn-pine:hover { background-color: #1e3535; }
+        .btn-pink { background-color: var(--mountain-pink); }
+        .btn-pink:hover { background-color: #d4637f; }
+
+        /* ── SHARED ── */
+        section { padding: 6rem 0; }
+
+        .section-eyebrow {
+            display: block;
+            font-size: 0.67rem;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--mountain-pink);
+            margin-bottom: 0.7rem;
+        }
+
+        .section-title { text-align: center; margin-bottom: 3.5rem; }
+
+        .section-title h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.9rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 0.9rem;
+        }
+
+        .section-title p {
+            font-size: 0.97rem;
+            max-width: 580px;
+            margin: 0 auto;
+            color: #666;
+            line-height: 1.85;
         }
 
         /* ── HERO ── */
@@ -111,173 +180,90 @@
             margin-right: auto;
         }
 
-        /* ── BUTTONS ── */
-        .btn {
-            display: inline-block;
-            background-color: var(--desert-green);
+        /* ── THE OTHER SIDE ── */
+        .other-side {
+            background: var(--dark-pine);
             color: white;
-            padding: 1rem 2.4rem;
-            border-radius: 30px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.76rem;
-            letter-spacing: 0.13em;
-            text-transform: uppercase;
-            transition: all 0.25s;
-            border: none;
-            cursor: pointer;
+            padding: 5rem 0;
+            text-align: center;
         }
 
-        .btn:hover { background-color: #63a677; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.2); }
-        .btn-pine { background-color: var(--dark-pine); }
-        .btn-pine:hover { background-color: #1e3535; }
-
-        /* ── SHARED ── */
-        section { padding: 6rem 0; }
-
-        .section-eyebrow {
-            display: block;
-            font-size: 0.67rem;
-            letter-spacing: 0.22em;
-            text-transform: uppercase;
-            font-weight: 700;
-            color: var(--mountain-pink);
-            margin-bottom: 0.7rem;
-        }
-
-        .section-title { text-align: center; margin-bottom: 3.5rem; }
-
-        .section-title h2 {
+        .other-side p {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 2.9rem;
-            font-weight: 700;
-            line-height: 1.1;
-            margin-bottom: 0.9rem;
+            font-size: 1.5rem;
+            font-weight: 400;
+            line-height: 1.8;
+            max-width: 720px;
+            margin: 0 auto;
+            color: rgba(255,255,255,0.88);
         }
 
-        .section-title p { font-size: 0.97rem; max-width: 580px; margin: 0 auto; color: #666; line-height: 1.85; }
-
-        /* ── PEAKS TO POOLS ── */
-        .peaks-to-pools { background: var(--dark-pine); color: white; }
-        .peaks-to-pools .section-title h2 { color: white; }
-        .peaks-to-pools .section-title p { color: rgba(255,255,255,0.72); }
-        .peaks-to-pools .section-eyebrow { color: var(--desert-green); }
-
-        .arc-panels {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 6px;
-            overflow: hidden;
+        /* ── EVERYONE ARRIVES DIFFERENTLY ── */
+        .everyone-arrives {
+            background: var(--sand-beige);
+            padding: 6rem 0;
         }
 
-        .arc-panel {
-            padding: 2.6rem 2.2rem;
-            border-right: 1px solid rgba(255,255,255,0.1);
-            position: relative;
+        .everyone-arrives .section-title {
+            margin-bottom: 3rem;
         }
-        .arc-panel:last-child { border-right: none; }
 
-        .arc-num {
+        .everyone-arrives .section-title h2 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 5rem;
-            font-weight: 700;
-            color: rgba(255,255,255,0.06);
-            position: absolute;
-            top: 0.8rem;
-            right: 1rem;
-            line-height: 1;
-            pointer-events: none;
+            font-size: 2.6rem;
+            font-weight: 400;
+            font-style: italic;
+            color: var(--dark-pine);
         }
 
-        .arc-panel h3 {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 1.55rem;
-            font-weight: 700;
-            color: var(--mountain-pink);
-            margin-bottom: 0.9rem;
-        }
-
-        .arc-panel p { font-size: 0.87rem; line-height: 1.85; color: rgba(255,255,255,0.72); }
-
-        /* ── AFTER THE TRAIL ── */
-        .after-trail { background: var(--sand-beige); }
-        .after-trail .section-eyebrow { color: var(--desert-green); }
-
-        .after-cards {
+        .segment-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1.4rem;
-            margin-bottom: 1.4rem;
         }
 
-        .after-card {
+        .segment-card {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-            transition: transform 0.3s;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.07);
         }
 
-        .after-card:hover { transform: translateY(-4px); }
-
-        .after-card-img {
-            height: 210px;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
+        .segment-card-header {
+            padding: 1.4rem 1.6rem;
+            border-bottom: 3px solid;
         }
 
-        .after-card-body {
-            padding: 1.25rem 1.5rem 1.6rem;
-        }
+        .segment-card:nth-child(1) .segment-card-header { border-color: var(--sunset-red); }
+        .segment-card:nth-child(2) .segment-card-header { border-color: var(--desert-green); }
+        .segment-card:nth-child(3) .segment-card-header { border-color: var(--mountain-pink); }
 
-        .after-card-label {
-            font-size: 0.62rem;
-            letter-spacing: 0.14em;
+        .segment-label {
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
             text-transform: uppercase;
             font-weight: 700;
-            color: var(--desert-green);
-            margin-bottom: 0.5rem;
         }
 
-        .after-card-title {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 1.35rem;
-            font-weight: 700;
-            color: var(--dark-pine);
-            line-height: 1.25;
-            margin-bottom: 0.6rem;
+        .segment-card:nth-child(1) .segment-label { color: var(--sunset-red); }
+        .segment-card:nth-child(2) .segment-label { color: var(--desert-green); }
+        .segment-card:nth-child(3) .segment-label { color: var(--mountain-pink); }
+
+        .segment-card-body {
+            padding: 1.6rem;
         }
 
-        .after-card-desc {
-            font-size: 0.85rem;
-            line-height: 1.82;
-            color: #666;
-            margin: 0;
-        }
-
-        .after-cta {
-            background: var(--dark-pine);
-            border-radius: 8px;
-            padding: 2.8rem 3rem;
-            text-align: center;
-            color: white;
-        }
-
-        .after-cta p {
-            font-size: 1rem;
+        .segment-card-body p {
+            font-size: 0.88rem;
             line-height: 1.85;
-            color: rgba(255,255,255,0.82);
-            max-width: 580px;
-            margin: 0 auto 1.6rem;
+            color: #555;
         }
 
-        /* ── CONSULTATIONS ── */
+        /* ── YOUR ADVENTURE STARTS HERE ── */
         .consultations { background: white; }
 
         .consult-intro {
-            max-width: 680px;
+            max-width: 600px;
             margin: 0 auto 3.5rem;
             text-align: center;
             font-size: 0.97rem;
@@ -320,14 +306,27 @@
         .consult-price { font-size: 2rem; font-weight: 700; margin: 0.4rem 0; }
         .consult-tagline { font-size: 0.78rem; opacity: 0.85; font-style: italic; }
 
-        .consult-body { padding: 1.6rem; background: var(--sand-beige); flex: 1; display: flex; flex-direction: column; }
-        .consult-body p { font-size: 0.87rem; line-height: 1.85; color: #555; margin-bottom: 1.4rem; flex: 1; }
+        .consult-body {
+            padding: 1.6rem;
+            background: var(--sand-beige);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
 
-        /* ── GEAR RENTAL ── */
+        .consult-body p {
+            font-size: 0.87rem;
+            line-height: 1.85;
+            color: #555;
+            margin-bottom: 1.4rem;
+            flex: 1;
+        }
+
+        /* ── GEAR HANDLED ── */
         .gear-rental { background: var(--sand-beige); }
 
         .gear-intro {
-            max-width: 660px;
+            max-width: 600px;
             margin: 0 auto 3.5rem;
             text-align: center;
             font-size: 0.97rem;
@@ -408,37 +407,218 @@
             margin: 0;
         }
 
-        /* ── OUR STORY ── */
-        .our-story { background: white; }
+        /* ── AFTER THE TRAIL ── */
+        .after-trail { background: var(--dark-pine); color: white; }
+        .after-trail .section-eyebrow { color: var(--desert-green); }
+        .after-trail .section-title h2 { color: white; }
 
-        .story-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5rem;
-            align-items: center;
+        .after-trail-statement {
+            text-align: center;
+            margin-bottom: 3.5rem;
         }
 
-        .story-image {
-            height: 500px;
-            background: url('images/gallery1.jpg') no-repeat center center/cover;
-            border-radius: 4px;
-        }
-
-        .story-content .section-eyebrow { color: var(--mountain-pink); }
-
-        .story-content h2 {
+        .after-trail-statement p {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 2.5rem;
-            font-weight: 700;
-            line-height: 1.18;
-            margin-bottom: 1.6rem;
+            font-size: 1.35rem;
+            font-weight: 400;
+            font-style: italic;
+            line-height: 1.9;
+            color: rgba(255,255,255,0.82);
+            max-width: 640px;
+            margin: 0 auto;
         }
 
-        .story-content p {
-            font-size: 0.93rem;
-            line-height: 1.95;
+        .after-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.4rem;
+            margin-bottom: 1.4rem;
+        }
+
+        .after-card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .after-card:hover { transform: translateY(-4px); }
+
+        .after-card-img {
+            height: 210px;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .after-card-body { padding: 1.25rem 1.5rem 1.6rem; }
+
+        .after-card-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--desert-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .after-card-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: white;
+            line-height: 1.25;
+            margin-bottom: 0.6rem;
+        }
+
+        .after-card-desc {
+            font-size: 0.85rem;
+            line-height: 1.82;
+            color: rgba(255,255,255,0.62);
+            margin: 0;
+        }
+
+        .after-cta {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            padding: 2.8rem 3rem;
+            text-align: center;
+        }
+
+        .after-cta p {
+            font-size: 1rem;
+            line-height: 1.85;
+            color: rgba(255,255,255,0.72);
+            max-width: 520px;
+            margin: 0 auto 1.6rem;
+        }
+
+        /* ── THE CLUB ── */
+        .the-club { background: white; }
+        .the-club .section-eyebrow { color: var(--mountain-pink); }
+
+        .club-statement {
+            max-width: 680px;
+            margin: 0 auto 1.5rem;
+            text-align: center;
+        }
+
+        .club-statement p {
+            font-size: 0.97rem;
+            line-height: 1.9;
             color: #555;
-            margin-bottom: 1.2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .club-tagline {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-style: italic;
+            color: var(--dark-pine);
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 3.5rem;
+            line-height: 1.5;
+        }
+
+        .membership-tiers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.4rem;
+            margin-bottom: 1.4rem;
+        }
+
+        .tier-card {
+            background: var(--sand-beige);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+            transition: transform 0.25s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tier-card:hover { transform: translateY(-5px); }
+
+        .tier-header {
+            padding: 1.8rem 1.6rem;
+            text-align: center;
+            color: white;
+        }
+
+        .tier-card:nth-child(1) .tier-header { background: var(--mountain-pink); }
+        .tier-card:nth-child(2) .tier-header { background: var(--desert-green); }
+        .tier-card:nth-child(3) .tier-header { background: var(--sunset-red); }
+
+        .tier-header h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.45rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .tier-price { font-size: 1.9rem; font-weight: 700; margin: 0.3rem 0; }
+        .tier-price span { font-size: 0.85rem; font-weight: 400; opacity: 0.85; }
+        .tier-tagline { font-size: 0.76rem; opacity: 0.85; font-style: italic; }
+
+        .tier-body {
+            padding: 1.6rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tier-features {
+            list-style: none;
+            margin-bottom: 1.4rem;
+            flex: 1;
+        }
+
+        .tier-features li {
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: #555;
+            padding: 0.4rem 0 0.4rem 1.4rem;
+            position: relative;
+            border-bottom: 1px solid rgba(42,71,71,0.07);
+        }
+
+        .tier-features li:last-child { border-bottom: none; }
+
+        .tier-features li::before {
+            content: "✓";
+            color: var(--desert-green);
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        .founding-banner {
+            background: var(--dark-pine);
+            border-radius: 8px;
+            padding: 2.4rem 2.8rem;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 2rem;
+            margin-top: 1.4rem;
+        }
+
+        .founding-banner h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--mountain-pink);
+            margin-bottom: 0.4rem;
+        }
+
+        .founding-banner p {
+            font-size: 0.87rem;
+            line-height: 1.8;
+            color: rgba(255,255,255,0.72);
         }
 
         /* ── GALLERY ── */
@@ -464,10 +644,12 @@
 
         /* ── NEWSLETTER ── */
         .newsletter { background: var(--mountain-pink); color: white; text-align: center; }
+
         .newsletter .section-title h2 {
             font-family: 'Cormorant Garamond', serif;
             color: white;
         }
+
         .newsletter .section-title p { color: rgba(255,255,255,0.88); }
 
         .newsletter-form {
@@ -538,11 +720,23 @@
         }
         .social-links a:hover { background: var(--mountain-pink); }
 
+        .footer-tagline {
+            text-align: center;
+            padding: 1.5rem 0;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 1rem;
+        }
+
+        .footer-tagline p {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.15rem;
+            font-style: italic;
+            color: rgba(255,255,255,0.5);
+        }
+
         .footer-bottom {
             text-align: center;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(255,255,255,0.08);
-            color: rgba(255,255,255,0.38);
+            color: rgba(255,255,255,0.28);
             font-size: 0.8rem;
         }
 
@@ -567,19 +761,16 @@
 
             .hero h1 { font-size: 2.8rem; }
 
-            .arc-panels { grid-template-columns: 1fr; }
-            .arc-panel { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
-            .arc-panel:last-child { border-bottom: none; }
-
+            .segment-grid { grid-template-columns: 1fr; }
+            .consult-tiers { grid-template-columns: 1fr; }
             .after-cards { grid-template-columns: 1fr; }
             .after-card-img { height: 200px; }
+            .membership-tiers { grid-template-columns: 1fr; }
 
-            .consult-tiers { grid-template-columns: 1fr; }
-
-            .gear-packages { gap: 0.8rem; }
-
-            .story-grid { grid-template-columns: 1fr; gap: 2rem; }
-            .story-image { height: 300px; }
+            .founding-banner {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
 
             .gallery-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
             .gallery-item { height: 200px; }
@@ -600,10 +791,9 @@
             </a>
             <ul class="nav-links" id="navLinks">
                 <li><a href="#adventures">Adventures</a></li>
-                <li><a href="#after-trail">After the Trail</a></li>
-                <li><a href="#gear">Gear Rental</a></li>
-                <li><a href="#story">About</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="#gear">Gear</a></li>
+                <li><a href="#the-club">The Club</a></li>
+                <li><a href="#contact" class="nav-cta jotform-btn">Build My Adventure</a></li>
             </ul>
             <button class="hamburger" id="hamburger">☰</button>
         </nav>
@@ -614,154 +804,122 @@
 <section class="hero">
     <div class="hero-content">
         <p class="hero-eyebrow">Peaks to Pools</p>
-        <h1>Desert Adventures, Expertly Curated</h1>
-        <p>Personalized adventure recommendations, gear rental, and guided experiences in the Coachella Valley – from the heights of Mount San Jacinto to the luxury pools, fine dining, and experiences of Palm Springs.</p>
-        <a href="#adventures" class="btn">Personalize Your Adventure</a>
+        <h1>The pool is perfect.<br>And it's not enough.</h1>
+        <p>The pool soothes. Adventure restores. One takes the weight off. The other reminds you who you were before you started carrying it.</p>
+        <a href="#" class="btn jotform-btn">Build My Adventure</a>
     </div>
 </section>
 
-<!-- ── PEAKS TO POOLS ── -->
-<section class="peaks-to-pools" id="peaks-to-pools">
+<!-- ── THE OTHER SIDE ── -->
+<section class="other-side">
+    <div class="container">
+        <p>Just past the pool deck, past the restaurants and the long golden afternoons, adventure is waiting. The trails, the canyons, the ridgelines you keep looking at over your sunglasses. You've been feeling the pull since you arrived. Almost nobody knows where to start. That's exactly why we exist.</p>
+    </div>
+</section>
+
+<!-- ── EVERYONE ARRIVES DIFFERENTLY ── -->
+<section class="everyone-arrives" id="who-we-serve">
     <div class="container">
         <div class="section-title">
-            <span class="section-eyebrow">The PSAC Experience</span>
-            <h2>Peaks to Pools</h2>
-            <p>The desert offers two perfect gifts: world class outdoor experiences and refined relaxation. We connect them into an unforgettable experience.</p>
+            <span class="section-eyebrow">Who We Serve</span>
+            <h2>Everyone Arrives Differently.</h2>
         </div>
-        <div class="arc-panels">
-            <div class="arc-panel">
-                <div class="arc-num">1</div>
-                <h3>The Guide</h3>
-                <p>We match the trail to your pace, your group, and the conditions. Every recommendation includes a recommended gear list, gear rental options, and an overview of what to expect.</p>
+        <div class="segment-grid">
+
+            <div class="segment-card">
+                <div class="segment-card-header">
+                    <span class="segment-label">For the Curious</span>
+                </div>
+                <div class="segment-card-body">
+                    <p>You need more than the pool. Not because it isn't perfect — it is. But something keeps pulling your eyes toward the mountains. You've been meaning to find out what's up there. This is where you start.</p>
+                </div>
             </div>
-            <div class="arc-panel">
-                <div class="arc-num">2</div>
-                <h3>The Peak</h3>
-                <p>Whether you're logging miles, making camp, or chasing a PR — the desert rewards those who safely venture.</p>
+
+            <div class="segment-card">
+                <div class="segment-card-header">
+                    <span class="segment-label">For Parents</span>
+                </div>
+                <div class="segment-card-body">
+                    <p>You love Palm Springs. And somewhere between the third pool day and the restaurant that doesn't open until 5pm, you realized it wasn't built for your family. You were wrong about that. The real Palm Springs has always been for families. You just needed a starting point.</p>
+                </div>
             </div>
-            <div class="arc-panel">
-                <div class="arc-num">3</div>
-                <h3>The Pool</h3>
-                <p>We know which table to book, which pool is worth it, and which cold brew at which spot is the right way to close a day like yours.</p>
+
+            <div class="segment-card">
+                <div class="segment-card-header">
+                    <span class="segment-label">For Athletes</span>
+                </div>
+                <div class="segment-card-body">
+                    <p>You know how to move. You've put in the miles. What you're missing is terrain that matches you, people who get it without explanation, and a community built around the life you've chosen. That's here.</p>
+                </div>
             </div>
+
         </div>
     </div>
 </section>
 
-<!-- ── AFTER THE TRAIL ── -->
-<section class="after-trail" id="after-trail">
-    <div class="container">
-        <div class="section-title">
-            <span class="section-eyebrow">After The Trail</span>
-            <h2>Relax &amp; Recover In Style</h2>
-            <p>Recover in the refined elegance of Palm Springs' pools, restaurants, shops, and boutique hotels.</p>
-        </div>
-
-        <div class="after-cards">
-
-            <!-- Card 1: After the Hike — swap image: images/after-hike.jpg -->
-            <div class="after-card">
-                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1648443524182-a538cb701a45?q=80&w=987&auto=format&fit=crop');"></div>
-                <div class="after-card-body">
-                    <p class="after-card-label">After the Hike</p>
-                    <h3 class="after-card-title">You earned a real meal.</h3>
-                    <p class="after-card-desc">The right table. The right thing on the menu. The legs finally at rest.</p>
-                </div>
-            </div>
-
-            <!-- Card 2: After the Run — swap image: images/after-run.jpg -->
-            <div class="after-card">
-                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1624279025174-4a3c7d318d9d?q=80&w=1035&auto=format&fit=crop');"></div>
-                <div class="after-card-body">
-                    <p class="after-card-label">After the Run</p>
-                    <h3 class="after-card-title">The pool that makes sense after miles.</h3>
-                    <p class="after-card-desc">Cold water. Right sun angle. Nobody minding you're still in your head.</p>
-                </div>
-            </div>
-
-            <!-- Card 3: After the Summit — swap image: images/after-summit.jpg -->
-            <div class="after-card">
-                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1602338221250-b3c14a78dce8?q=80&w=2074&auto=format&fit=crop');"></div>
-                <div class="after-card-body">
-                    <p class="after-card-label">After the Summit</p>
-                    <h3 class="after-card-title">Civilization, done right.</h3>
-                    <p class="after-card-desc">A room worth checking into. A morning table worth walking to.</p>
-                </div>
-            </div>
-
-        </div>
-
-        <div class="after-cta">
-            <p>Every Palm Springs Adventure Club guide includes a personalized After the Trail recommendation. Tell us what you're looking for and start your adventure.</p>
-            <a href="#adventures" class="btn">Personalize Your Adventure</a>
-        </div>
-    </div>
-</section>
-
-<!-- ── CONSULTATIONS ── -->
+<!-- ── YOUR ADVENTURE STARTS HERE ── -->
 <section class="consultations" id="adventures">
     <div class="container">
         <div class="section-title">
-            <span class="section-eyebrow">Personally Curated Adventures</span>
-            <h2>Your Palm Springs adventure, expertly planned</h2>
-            <p>Expert local knowledge personalized for you — your pace, your group, your goals. Day hikes, trail runs, mountain summits, and luxurious Palm Springs experiences, curated specifically for you.</p>
+            <span class="section-eyebrow">Adventure Consultations</span>
+            <h2>Your Adventure Starts Here.</h2>
         </div>
+        <p class="consult-intro">Tell us what kind of day you want to have. We'll take care of everything else.</p>
 
         <div class="consult-tiers">
             <div class="consult-card">
                 <div class="consult-header">
                     <h3>Trail Consultation</h3>
-                    <div class="consult-price">$90</div>
+                    <div class="consult-price">$125</div>
                     <div class="consult-tagline">The right trail for an exceptional day</div>
                 </div>
                 <div class="consult-body">
                     <p>Your trail recommendation, curated for your group, your fitness level, and the conditions. Includes what to bring, what to expect, and gear rental options if you need them.</p>
-                    <a href="https://form.jotform.com/260839011262148" class="btn jotform-btn">Build My Adventure</a>
+                    <a href="#" class="btn jotform-btn">Build My Adventure</a>
                 </div>
             </div>
 
             <div class="consult-card">
                 <div class="consult-header">
-                    <h3>Adventure Consultation</h3>
-                    <div class="consult-price">$180</div>
-                    <div class="consult-tagline">A full day, tailored to your sense of adventure</div>
+                    <h3>Peaks to Pools Guide</h3>
+                    <div class="consult-price">$225</div>
+                    <div class="consult-tagline">A full day, peaks to pools</div>
                 </div>
                 <div class="consult-body">
-                    <p>Trail selection with backup options, a gear checklist tuned to your activity — hike, run, or overnight — timing, conditions, and a personalized After the Trail recommendation to close the day right.</p>
-                    <a href="https://form.jotform.com/260839011262148" class="btn jotform-btn">Build My Adventure</a>
+                    <p>Trail selection with backup options, a gear checklist tuned to your activity, timing, conditions, and a personalized After the Trail recommendation to close the day right.</p>
+                    <a href="#" class="btn jotform-btn">Build My Adventure</a>
                 </div>
             </div>
 
             <div class="consult-card">
                 <div class="consult-header">
                     <h3>Custom Experience</h3>
-                    <div class="consult-price">from $540</div>
-                    <div class="consult-tagline">Something truly unique</div>
+                    <div class="consult-price">from $595</div>
+                    <div class="consult-tagline">Something truly your own</div>
                 </div>
                 <div class="consult-body">
                     <p>Multi-day itineraries, group adventures, backcountry planning, or experiences that don't fit a standard format. Tell us what you're imagining.</p>
-                    <a href="https://form.jotform.com/260839011262148" class="btn btn-pine jotform-btn">Build My Adventure</a>
+                    <a href="#" class="btn btn-pine jotform-btn">Build My Adventure</a>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ── GEAR RENTAL ── -->
+<!-- ── GEAR HANDLED ── -->
 <section class="gear-rental" id="gear">
     <div class="container">
         <div class="section-title">
             <span class="section-eyebrow">Gear Rental</span>
-            <h2>Everything you need. Delivered.</h2>
+            <h2>Gear Handled.</h2>
         </div>
-
-        <p class="gear-intro">You don't have to travel with $400+ of gear to have a great day on the trail. Our gear rental packages are curated, well-maintained, and enable a safe day of hiking, running, or adventure in the desert and mountains in Palm Springs and the greater Coachella Valley.</p>
+        <p class="gear-intro">The only thing between you and the adventure is showing up. The gear is ready when you are.</p>
 
         <div class="gear-packages">
             <div class="gear-card">
                 <div class="gear-top">
                     <div class="gear-name">Desert Essentials</div>
-                    <div class="gear-price">$60 <span>/ day</span></div>
+                    <div class="gear-price">$65 <span>/ day</span></div>
                 </div>
                 <p class="gear-desc">The fundamentals for a confident day hike or trail run. Trekking poles, hydration pack, and trail map kit.</p>
                 <div class="gear-best">Best for: First-timers · Day hikers · Trail runners</div>
@@ -769,11 +927,20 @@
 
             <div class="gear-card">
                 <div class="gear-top">
-                    <div class="gear-name">Premium</div>
-                    <div class="gear-price">$80 <span>/ day</span></div>
+                    <div class="gear-name">Peak Performance</div>
+                    <div class="gear-price">$95 <span>/ day</span></div>
                 </div>
-                <p class="gear-desc">Everything in Desert Essentials, plus a premium hydration pack with extra storage for gear, food, and additional fluids — and a sun protection kit. For people who want to go further.</p>
+                <p class="gear-desc">Everything in Desert Essentials, plus a premium hydration pack with extra storage for gear, food, and additional fluids and a sun protection kit. For people who want to go further.</p>
                 <div class="gear-best">Best for: Longer routes · Summit attempts · Solo adventurers</div>
+            </div>
+
+            <div class="gear-card">
+                <div class="gear-top">
+                    <div class="gear-name">Peaks to Pools Kit</div>
+                    <div class="gear-price">$145 <span>/ day</span></div>
+                </div>
+                <p class="gear-desc">The full kit for a full day. Everything in Peak Performance plus recovery essentials for the afternoon after — because the pool is part of the plan.</p>
+                <div class="gear-best">Best for: Full-day adventures · The complete Peaks to Pools experience</div>
             </div>
 
             <div class="gear-card">
@@ -793,18 +960,129 @@
     </div>
 </section>
 
-<!-- ── OUR STORY ── -->
-<section class="our-story" id="story">
+<!-- ── AFTER THE TRAIL ── -->
+<section class="after-trail" id="after-trail">
     <div class="container">
-        <div class="story-grid">
-            <div class="story-image"></div>
-            <div class="story-content">
-                <span class="section-eyebrow">Our Story</span>
-                <h2>Insider Knowledge, Refined Expectations</h2>
-                <p>Palm Springs Adventure Club was inspired by the incredible trails, palm trees, and waterfalls hidden in the mountains only moments from the luxury pools, fine dining, and elegant experiences of Palm Springs.</p>
-                <p>Palm Springs is rooted in indigenous history, steeped in Hollywood legend, and surrounded by opportunities for world class outdoor adventures and luxury <em>après trail</em> relaxation. We curate every trail, every moment, every pairing based on first-hand experience.</p>
-                <p>Based in Palm Springs and committed to finding the best of the best, we offer personalized adventure recommendations that match your fitness level and group size — then connect you with the finest recovery experiences the desert has to offer.</p>
+        <div class="section-title">
+            <span class="section-eyebrow">After the Trail</span>
+            <h2>Relaxation means more when you've earned it.</h2>
+        </div>
+
+        <div class="after-trail-statement">
+            <p>Everything hits differently after. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started — and it will feel like somewhere new. So will you.</p>
+        </div>
+
+        <div class="after-cards">
+            <div class="after-card">
+                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1648443524182-a538cb701a45?q=80&w=987&auto=format&fit=crop');"></div>
+                <div class="after-card-body">
+                    <p class="after-card-label">After the Hike</p>
+                    <h3 class="after-card-title">You earned a real meal.</h3>
+                    <p class="after-card-desc">The right table. The right thing on the menu. The legs finally at rest.</p>
+                </div>
             </div>
+
+            <div class="after-card">
+                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1624279025174-4a3c7d318d9d?q=80&w=1035&auto=format&fit=crop');"></div>
+                <div class="after-card-body">
+                    <p class="after-card-label">After the Run</p>
+                    <h3 class="after-card-title">The pool that makes sense after miles.</h3>
+                    <p class="after-card-desc">Cold water. Right sun angle. Nobody minding you're still in your head.</p>
+                </div>
+            </div>
+
+            <div class="after-card">
+                <div class="after-card-img" style="background-image: url('https://images.unsplash.com/photo-1602338221250-b3c14a78dce8?q=80&w=2074&auto=format&fit=crop');"></div>
+                <div class="after-card-body">
+                    <p class="after-card-label">After the Summit</p>
+                    <h3 class="after-card-title">Civilization, done right.</h3>
+                    <p class="after-card-desc">A room worth checking into. A morning table worth walking to.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="after-cta">
+            <p>Every Palm Springs Adventure Club guide includes a personalized After the Trail recommendation built around your day.</p>
+            <a href="#" class="btn jotform-btn">Build My Adventure</a>
+        </div>
+    </div>
+</section>
+
+<!-- ── THE CLUB ── -->
+<section class="the-club" id="the-club">
+    <div class="container">
+        <div class="section-title">
+            <span class="section-eyebrow">Membership</span>
+            <h2>This Is Where You Belong.</h2>
+        </div>
+
+        <div class="club-statement">
+            <p>The people who looked up from the pool deck, put the drink down, and actually went. That's the club.</p>
+        </div>
+
+        <div class="club-tagline">
+            The desert is where you find yourself.<br>The club is where you find each other.
+        </div>
+
+        <div class="membership-tiers">
+            <div class="tier-card">
+                <div class="tier-header">
+                    <h3>Trail</h3>
+                    <div class="tier-price">$199<span>/yr</span></div>
+                    <div class="tier-tagline">Your starting point</div>
+                </div>
+                <div class="tier-body">
+                    <ul class="tier-features">
+                        <li>2 Trail Consultations included</li>
+                        <li>15% off gear rental</li>
+                        <li>Adventure Hat (member price)</li>
+                        <li>Member newsletter</li>
+                    </ul>
+                    <a href="#" class="btn jotform-btn">Join the Club</a>
+                </div>
+            </div>
+
+            <div class="tier-card">
+                <div class="tier-header">
+                    <h3>Explorer</h3>
+                    <div class="tier-price">$399<span>/yr</span></div>
+                    <div class="tier-tagline">The full experience</div>
+                </div>
+                <div class="tier-body">
+                    <ul class="tier-features">
+                        <li>2 Peaks to Pools Consultations included</li>
+                        <li>20% off gear rental</li>
+                        <li>Adventure Hat included</li>
+                        <li>Member newsletter + priority access</li>
+                    </ul>
+                    <a href="#" class="btn jotform-btn">Join the Club</a>
+                </div>
+            </div>
+
+            <div class="tier-card">
+                <div class="tier-header">
+                    <h3>Summit</h3>
+                    <div class="tier-price">$699<span>/yr</span></div>
+                    <div class="tier-tagline">All of it</div>
+                </div>
+                <div class="tier-body">
+                    <ul class="tier-features">
+                        <li>1 Custom + 2 Peaks to Pools Consultations</li>
+                        <li>25% off gear rental</li>
+                        <li>Both hats included</li>
+                        <li>First access to all events + experiences</li>
+                    </ul>
+                    <a href="#" class="btn btn-pink jotform-btn">Join the Club</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="founding-banner">
+            <div>
+                <h3>Founding Member</h3>
+                <p>50 spots. One-time $1,499. Summit benefits for life, plus the Founding Member hat, welcome kit, and permanent recognition as someone who was here from the beginning.</p>
+            </div>
+            <a href="#" class="btn jotform-btn">Become a Founding Member</a>
         </div>
     </div>
 </section>
@@ -831,8 +1109,8 @@
 <section class="newsletter">
     <div class="container">
         <div class="section-title">
-            <h2>Stay in the Know.</h2>
-            <p>Monthly trail conditions, run routes, seasonal overnight windows, and insider recovery picks — the kind of local knowledge that doesn't exist anywhere else.</p>
+            <h2>The Pull to Adventure Doesn't Go Away.</h2>
+            <p>Stay close — the trails, the seasons, the reminders that the best version of this trip is still out there. In your inbox when the timing is right.</p>
         </div>
         <div class="newsletter-form">
             <input type="email" placeholder="Your email address">
@@ -849,15 +1127,15 @@
                 <h3>Palm Springs Adventure Club</h3>
                 <p>Operated by Pink Mountain Ventures LLC<br>
                 Palm Springs, CA<br><br>
-                <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0169646d6d6e4171606d6c727173686f6672606577646f75747364626d74632f626e6c">[email&#160;protected]</a></p>
+                hello@palmspringsadventureclub.com</p>
             </div>
             <div class="footer-column">
                 <h3>Explore</h3>
                 <ul>
-                    <li><a href="#adventures">Adventures &amp; Consultations</a></li>
-                    <li><a href="#peaks-to-pools">Peaks to Pools</a></li>
-                    <li><a href="#after-trail">After the Trail</a></li>
+                    <li><a href="#adventures">Adventures</a></li>
                     <li><a href="#gear">Gear Rental</a></li>
+                    <li><a href="#after-trail">After the Trail</a></li>
+                    <li><a href="#the-club">The Club</a></li>
                 </ul>
             </div>
             <div class="footer-column">
@@ -870,12 +1148,16 @@
                 </div>
             </div>
         </div>
+        <div class="footer-tagline">
+            <p>Peaks to Pools. The desert, fully lived.</p>
+        </div>
         <div class="footer-bottom">
             <p>&copy; 2026 Palm Springs Adventure Club &nbsp;·&nbsp; Pink Mountain Ventures LLC &nbsp;·&nbsp; All Rights Reserved</p>
         </div>
     </div>
 </footer>
 
+<!-- ── MOBILE NAV SCRIPT ── -->
 <script>
     const hamburger = document.getElementById('hamburger');
     const navLinks = document.getElementById('navLinks');
@@ -890,7 +1172,7 @@
     });
 </script>
 
-<!-- JotForm Modal -->
+<!-- ── JOTFORM MODAL ── -->
 <style>
   #jotform-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
   #jotform-modal-inner { position:relative; width:90%; max-width:780px; height:88vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); display:flex; flex-direction:column; }
@@ -924,20 +1206,15 @@
 <script>
   document.addEventListener("DOMContentLoaded", function() {
     var modal = document.getElementById('jotform-modal');
-
     document.querySelectorAll('.jotform-btn').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
         modal.style.display = 'flex';
       });
     });
-
     modal.addEventListener('click', function(e) {
-      if (e.target === modal) {
-        modal.style.display = 'none';
-      }
+      if (e.target === modal) modal.style.display = 'none';
     });
-
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') modal.style.display = 'none';
     });
