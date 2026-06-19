@@ -322,6 +322,31 @@
             color: #555;
         }
 
+        .segment-trail-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 0.6rem;
+        }
+
+        .segment-card:nth-child(1) .segment-trail-label { color: var(--sunset-red); }
+        .segment-card:nth-child(2) .segment-trail-label { color: var(--desert-green); }
+        .segment-card:nth-child(3) .segment-trail-label { color: var(--mountain-pink); }
+
+        .segment-trail-moment {
+            border-top: 1px solid rgba(42,71,71,0.08);
+            padding: 1.2rem 1.6rem 1.6rem;
+        }
+
+        .segment-trail-moment p {
+            font-size: 0.9rem;
+            line-height: 1.85;
+            color: #555;
+            font-style: italic;
+        }
+
         /* ── YOUR ADVENTURE STARTS HERE ── */
         .consultations { background: white; }
 
@@ -856,6 +881,7 @@
             </a>
             <ul class="nav-links" id="navLinks">
                 <li><a href="#adventures">Adventures</a></li>
+                <li><a href="#gear">Gear</a></li>
                 <li><a href="#the-club">The Club</a></li>
                 <li><a href="#contact" class="nav-cta jotform-btn">Start My Adventure</a></li>
             </ul>
@@ -918,7 +944,7 @@
 <section class="everyone-arrives" id="who-we-serve">
     <div class="container">
         <div class="section-title">
-            <span class="section-eyebrow">Who We Serve</span>
+            <span class="section-eyebrow">Find Yourself Here</span>
             <h2>Everyone Arrives Differently.</h2>
         </div>
         <div class="segment-grid">
@@ -928,7 +954,11 @@
                     <span class="segment-label">For the Curious</span>
                 </div>
                 <div class="segment-card-body">
-                    <p>You need more than the pool. Not because it isn't perfect — it is. But something keeps pulling your eyes toward the mountains. You've been meaning to find out what's up there. This is where you start.</p>
+                    <p>You need more than the pool. Not because it isn't perfect. It is. But something keeps pulling your eyes toward the mountains. You've been meaning to find out what's up there.</p>
+                </div>
+                <div class="segment-trail-moment">
+                    <span class="segment-trail-label">On the Trail</span>
+                    <p>On a trail in a canyon, gradually climbing up a series of 7 waterfalls, each one pulling you further. Somewhere between the second and the third waterfall, you stop thinking about everything else. That's the version of you that is calling for adventure.</p>
                 </div>
             </div>
 
@@ -937,7 +967,11 @@
                     <span class="segment-label">For Parents</span>
                 </div>
                 <div class="segment-card-body">
-                    <p>You love Palm Springs. And somewhere between the third pool day and the restaurant that doesn't open until 5pm, you realized it wasn't built for your family. You were wrong about that. The real Palm Springs has always been for families. You just needed a starting point.</p>
+                    <p>You love Palm Springs. Your kids love it too, mostly. But between the adults-only pool and the restaurant without a kids menu, you start wondering if there's a version of this trip that's actually for all of you.</p>
+                </div>
+                <div class="segment-trail-moment">
+                    <span class="segment-trail-label">On the Trail</span>
+                    <p>Your child stops every few feet to pick up a rock and hand it to you for safekeeping. Somewhere up the trail, they find their favorite boulder, climb it, and sit down to eat an apple. You linger. There's nowhere else to be.</p>
                 </div>
             </div>
 
@@ -947,6 +981,10 @@
                 </div>
                 <div class="segment-card-body">
                     <p>You know how to move. You've put in the miles. What you're missing is terrain that matches you, people who get it without explanation, and a community built around the life you've chosen. That's here.</p>
+                </div>
+                <div class="segment-trail-moment">
+                    <span class="segment-trail-label">On the Trail</span>
+                    <p>Past the canyon walls, scrambling up rock ledge after rock ledge, you turn around and catch it — Mount San Jacinto perfectly framed between the walls of the wash. The awe hits before the thought does. Skin rising, breath short. That's what the miles are for.</p>
                 </div>
             </div>
 
@@ -958,10 +996,11 @@
 <section class="consultations" id="adventures">
     <div class="container">
         <div class="section-title">
-            <span class="section-eyebrow">Adventure Consultations</span>
+            <span class="section-eyebrow">On the Trail</span>
             <h2>This Is Where It Starts.</h2>
         </div>
         <p class="consult-intro">Tell us about the day you're imagining. Who's coming, what you want to experience, how much time you have.</p>
+        <p class="consult-intro" style="margin-top: -2rem;">We place you on the right trail and build an adventure guide written specifically for your group. It covers the route, the terrain, viewpoints, landmarks, and where to go to be at peace when you get back. A gear kit arrives at your hotel before you hit the trailhead.</p>
         <div style="text-align: center; margin-bottom: 1rem;">
             <a href="#" class="btn jotform-btn">Start My Adventure</a>
         </div>
@@ -1033,16 +1072,12 @@
             <h2>You felt the pull and went. That's the Peaks to Pools life. The Club is yours.</h2>
         </div>
 
-        <div class="club-statement">
-            <p>The people who looked up from the pool deck, put the drink down, and actually went. That's the club.</p>
-        </div>
-
         <div class="club-tagline">
             The desert is where you find yourself.<br>The club is where you find each other.
         </div>
 
         <div style="text-align: center; margin-bottom: 2rem;">
-            <a href="#" class="btn jotform-btn">Join the Club</a>
+            <a href="/membership" class="btn btn-pine">Explore the Club</a>
         </div>
     </div>
 </section>
