@@ -100,9 +100,9 @@
       scroll-snap-type: x mandatory;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
-      padding: 0 24px 32px;
+      padding: 0 48px 32px;
       cursor: grab;
-      gap: 0;
+      gap: 12px;
     }
 
     .mem-vignettes-scroll::-webkit-scrollbar { display: none; }
@@ -113,12 +113,12 @@
       scroll-snap-align: start;
       background: var(--dark-pine);
       padding: 44px 36px 40px;
-      margin-right: 2px;
       position: relative;
+      border-radius: 6px;
     }
 
-    .mem-vignette-card:first-child { border-radius: 4px 0 0 4px; }
-    .mem-vignette-card:last-child  { border-radius: 0 4px 4px 0; margin-right: 0; }
+    .mem-vignette-card:first-child { border-radius: 6px; }
+    .mem-vignette-card:last-child  { border-radius: 6px; }
 
     .mem-vignette-card .card-label {
       font-size: 0.6rem;
@@ -151,15 +151,6 @@
       font-weight: 500;
       margin-top: 0.5rem;
       margin-bottom: 0;
-    }
-
-    .mem-vignette-card .card-accent {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 3px;
-      width: 48px;
-      background: var(--mountain-pink);
     }
 
     .mem-scroll-hint {
@@ -520,7 +511,6 @@
           <p>This morning has been timed to the minute. When the light arrives, it finds the highest ridgeline first. Rose deepens into coral. Coral bleeds into amber.</p>
           <p>It happens almost every morning in Palm Springs. Most people are asleep for it.</p>
           <p class="card-closer">By the time you are back at the trailhead, you have made plans for the next one.</p>
-          <div class="card-accent" aria-hidden="true"></div>
         </article>
 
         <article class="mem-vignette-card" role="listitem">
@@ -529,7 +519,6 @@
           <p>Summer in Palm Springs has a different pace. And on one night this season, members will sit down together at one of Palm Springs' best restaurants for a dinner that does not appear on any public calendar.</p>
           <p>Inside, where it is cool and unhurried, a menu built for the occasion. A long table. The kind of conversation that starts before the first course arrives because nobody needs context.</p>
           <p class="card-closer">The best evenings in Palm Springs happen when nobody is in a hurry to be anywhere else.</p>
-          <div class="card-accent" aria-hidden="true"></div>
         </article>
 
         <article class="mem-vignette-card" role="listitem">
@@ -538,7 +527,6 @@
           <p>Not every Club night needs a reservation. A bar takeover. A rooftop. A space that fits thirty people if everyone is willing to stand close.</p>
           <p>This is where new members meet the ones who have been here since the beginning. Where someone overhears a trail recommendation that changes their next weekend. Where a guest pass gets used and the person who shows up realizes they need to be a member.</p>
           <p class="card-closer">Show up. See who is there. That is the whole plan.</p>
-          <div class="card-accent" aria-hidden="true"></div>
         </article>
 
         <article class="mem-vignette-card" role="listitem">
@@ -548,7 +536,6 @@
           <p>Cactus to Clouds in a single day. A Desert Riders breakfast at dawn on the trails those riders first explored a century ago. Three days in the San Jacinto wilderness — up the Skyline Trail, south on the PCT, down Jo Pond. Nights deep in the pines.</p>
           <p>Every marquee experience is member-only. Logistics handled. Permits secured. A keepsake when it is over.</p>
           <p class="card-closer">They open to members first, fill quickly, and do not come back around until the season is right again.</p>
-          <div class="card-accent" aria-hidden="true"></div>
         </article>
 
       </div>
