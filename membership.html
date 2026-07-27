@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Membership — Palm Springs Adventure Club</title>
   <meta name="description" content="Join Palm Springs Adventure Club. Trail and Summit membership tiers with access to guided hikes, marquee experiences, and a community of people who take this place seriously.">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 
   <style>
@@ -438,26 +439,7 @@
 
     .btn-mem-dark:hover { opacity: 0.85; }
 
-    /* PAGE FOOTER */
-    .mem-footer {
-      background: var(--dark-pine);
-      border-top: 1px solid rgba(248,241,233,0.1);
-      padding: 48px 24px;
-      text-align: center;
-    }
 
-    .mem-footer p {
-      font-size: 0.78rem;
-      color: rgba(248,241,233,0.4);
-      letter-spacing: 0.06em;
-    }
-
-    .mem-footer a {
-      color: rgba(248,241,233,0.4);
-      text-decoration: none;
-    }
-
-    .mem-footer a:hover { color: var(--sand-beige); }
 
     /* Mobile overrides */
     @media (max-width: 768px) {
@@ -483,22 +465,23 @@
 
 <body>
 
-  <!-- NAV -->
-  <header>
+<!-- ── HEADER ── -->
+<header>
     <div class="container">
-      <nav>
-        <a href="/" class="logo"><span>PS</span>Adventure Club</a>
-        <ul class="nav-links" id="navLinks">
-          <li><a href="/membership.html">Membership</a></li>
-          <li><a href="/#adventures">Adventures</a></li>
-          <li><a href="/#trails">Trails</a></li>
-          <li><a href="/#gear">Gear</a></li>
-          <li><a href="/#contact">Contact</a></li>
-        </ul>
-        <button class="hamburger" id="hamburger" aria-label="Open menu">&#9776;</button>
-      </nav>
+        <nav>
+            <a href="/" class="logo">
+                <img src="images/logo.svg" alt="Palm Springs Adventure Club" style="height: 48px; width: auto;">
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/#adventures">On the Trail</a></li>
+                <li><a href="/#after-trail">After the Trail</a></li>
+                <li><a href="/#the-club">The Club</a></li>
+                <li><a href="/#contact" class="nav-cta jotform-btn">Start My Adventure</a></li>
+            </ul>
+            <button class="hamburger" id="hamburger">☰</button>
+        </nav>
     </div>
-  </header>
+</header>
 
   <main>
 
@@ -682,40 +665,128 @@
 
   </main>
 
-  <!-- FOOTER -->
-  <footer class="mem-footer">
-    <div class="mem-container">
-      <p>Palm Springs Adventure Club &nbsp;&middot;&nbsp; Peaks to Pools &nbsp;&middot;&nbsp; <a href="/">palmspringsadventureclub.com</a></p>
+<!-- ── FOOTER ── -->
+<footer id="contact">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-column">
+                <h3>Palm Springs Adventure Club</h3>
+                <p>Operated by Pink Mountain Ventures LLC<br>
+                Palm Springs, CA<br><br>
+                hello@palmspringsadventureclub.com</p>
+            </div>
+            <div class="footer-column">
+                <h3>Explore</h3>
+                <ul>
+                    <li><a href="/#adventures">On the Trail</a></li>
+                    <li><a href="/#after-trail">After the Trail</a></li>
+                    <li><a href="/#the-club">The Club</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Connect</h3>
+                <div class="social-links">
+                    <a href="#">IG</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-tagline">
+            <p>Peaks to Pools. Earn your peace.</p>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Palm Springs Adventure Club &nbsp;·&nbsp; Pink Mountain Ventures LLC &nbsp;·&nbsp; All Rights Reserved</p>
+        </div>
     </div>
-  </footer>
+</footer>
 
-  <script>
+<!-- ── MOBILE NAV SCRIPT ── -->
+<script>
     const hamburger = document.getElementById('hamburger');
-    const navLinks  = document.getElementById('navLinks');
-    hamburger.addEventListener('click', () => navLinks.classList.toggle('active'));
+    const navLinks = document.getElementById('navLinks');
+    hamburger.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+    });
+    const mobileLinks = document.querySelectorAll('.nav-links a');
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navLinks.classList.remove('active');
+        });
+    });
+</script>
 
+<!-- ── VIGNETTE DRAG SCROLL ── -->
+<script>
     const scroll = document.getElementById('vignetteScroll');
     let isDown = false, startX, scrollLeft;
 
     scroll.addEventListener('mousedown', e => {
-      isDown = true;
-      scroll.classList.add('is-dragging');
-      startX = e.pageX - scroll.offsetLeft;
-      scrollLeft = scroll.scrollLeft;
+        isDown = true;
+        scroll.classList.add('is-dragging');
+        startX = e.pageX - scroll.offsetLeft;
+        scrollLeft = scroll.scrollLeft;
     });
     scroll.addEventListener('mouseleave', () => { isDown = false; scroll.classList.remove('is-dragging'); });
     scroll.addEventListener('mouseup',    () => { isDown = false; scroll.classList.remove('is-dragging'); });
     scroll.addEventListener('mousemove',  e => {
-      if (!isDown) return;
-      e.preventDefault();
-      scroll.scrollLeft = scrollLeft - (e.pageX - scroll.offsetLeft - startX) * 1.5;
+        if (!isDown) return;
+        e.preventDefault();
+        scroll.scrollLeft = scrollLeft - (e.pageX - scroll.offsetLeft - startX) * 1.5;
     });
 
     const hint = document.getElementById('scrollHint');
     scroll.addEventListener('scroll', () => {
-      if (scroll.scrollLeft > 40) hint.style.opacity = '0';
+        if (scroll.scrollLeft > 40) hint.style.opacity = '0';
     }, { passive: true });
-  </script>
+</script>
+
+<!-- ── JOTFORM MODAL ── -->
+<style>
+  #jotform-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
+  #jotform-modal-inner { position:relative; width:90%; max-width:780px; height:88vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); display:flex; flex-direction:column; }
+  #jotform-modal-header { background:#2A4747; padding:0.9rem 1.4rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  #jotform-modal-header img { height:36px; width:auto; }
+  #jotform-modal-close { background:none; border:none; font-size:1.6rem; cursor:pointer; color:rgba(255,255,255,0.7); line-height:1; padding:0; transition:color 0.2s; }
+  #jotform-modal-close:hover { color:white; }
+  #jotform-modal-iframe { flex:1; border:none; width:100%; }
+  @media (max-width: 768px) {
+    #jotform-modal { align-items:stretch; justify-content:stretch; }
+    #jotform-modal-inner { width:100%; max-width:100%; height:100%; border-radius:0; box-shadow:none; }
+    #jotform-modal-close { font-size:2rem; }
+  }
+</style>
+
+<div id="jotform-modal">
+  <div id="jotform-modal-inner">
+    <div id="jotform-modal-header">
+      <img src="images/logo.svg" alt="Palm Springs Adventure Club">
+      <button id="jotform-modal-close" onclick="document.getElementById('jotform-modal').style.display='none'">&times;</button>
+    </div>
+    <iframe
+      id="jotform-modal-iframe"
+      title="Palm Springs Adventure Club Consultation"
+      src="https://form.jotform.com/260839011262148"
+      allow="geolocation; microphone; camera; fullscreen">
+    </iframe>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    var modal = document.getElementById('jotform-modal');
+    document.querySelectorAll('.jotform-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        modal.style.display = 'flex';
+      });
+    });
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') modal.style.display = 'none';
+    });
+  });
+</script>
 
 </body>
 </html>
