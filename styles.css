@@ -103,7 +103,7 @@ nav { display: flex; justify-content: space-between; align-items: center; }
 .btn-pine { background-color: var(--dark-pine); }
 .btn-pine:hover { background-color: #1e3535; }
 .btn-pink { background-color: var(--mountain-pink); }
-.btn-pink:hover { background-color: #d4637f; }
+.btn-pink:hover { background-color: #e06a5a; }
 
 /* ── SHARED ── */
 section { padding: 6rem 0; }
