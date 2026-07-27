@@ -29,19 +29,26 @@
 
     /* HERO */
     .mem-hero {
-      padding: 140px 24px 100px;
-      background: var(--dark-pine);
+      min-height: 88vh;
+      background:
+        linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)),
+        url('images/membership-hero.jpg') no-repeat center center / cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       text-align: center;
+      padding: 120px 24px 80px;
     }
 
     .mem-hero h1 {
       font-family: 'Cormorant Garamond', serif;
       font-size: clamp(2.2rem, 5vw, 3.8rem);
-      font-weight: 400;
-      color: var(--sand-beige);
-      line-height: 1.15;
+      font-weight: 700;
+      color: white;
+      line-height: 1.1;
       max-width: 820px;
-      margin: 0 auto 2rem;
+      margin: 0 auto 1.5rem;
+      text-shadow: 2px 3px 10px rgba(0,0,0,0.4);
     }
 
     .mem-hero h1 em {
@@ -55,16 +62,9 @@
     }
 
     .mem-hero-body p {
-      font-size: 1rem;
+      font-size: 1.05rem;
       line-height: 1.8;
-      color: rgba(248,241,233,0.78);
-      margin-bottom: 1rem;
-    }
-
-    .mem-hero-body p.hero-closer {
-      color: var(--sand-beige);
-      font-weight: 500;
-      margin-top: 0.5rem;
+      color: rgba(255,255,255,0.88);
     }
 
     /* COMMUNITY HEADER */
@@ -488,11 +488,13 @@
     <!-- HERO -->
     <section class="mem-hero" aria-label="Membership introduction">
       <div class="mem-container">
-        <span class="mem-eyebrow">The Club</span>
+        <span class="mem-eyebrow" style="color: var(--desert-green);">The Club</span>
         <h1>Membership is how Palm Springs stops being a destination<em> and starts being yours.</em></h1>
         <div class="mem-hero-body">
-          <p>You already know the feeling. The weight lifts somewhere on the trail. You come back different. Quieter, clearer, more yourself than you have been in a while.</p>
-          <p class="hero-closer">The trail keeps something alive in you. The Club is how you get more of it.</p>
+          <p>The trail keeps something alive in you. The Club is how you get more of it.</p>
+        </div>
+        <div style="margin-top: 2rem;">
+          <a href="#join" class="btn">Join the Club</a>
         </div>
       </div>
     </section>
