@@ -185,7 +185,7 @@
     /* TIER TABLE */
     .mem-tiers {
       padding: 100px 24px;
-      background: var(--dark-pine);
+      background: white;
     }
 
     .mem-tiers-header {
@@ -198,7 +198,7 @@
       font-family: 'Cormorant Garamond', serif;
       font-size: clamp(1.8rem, 3.5vw, 2.8rem);
       font-weight: 400;
-      color: var(--sand-beige);
+      color: var(--dark-pine);
       line-height: 1.25;
       margin-bottom: 1.5rem;
     }
@@ -206,10 +206,10 @@
     .mem-tiers-header p {
       font-size: 0.9rem;
       line-height: 1.8;
-      color: rgba(248,241,233,0.75);
+      color: #666;
     }
 
-    .mem-tiers-header p strong { color: var(--sand-beige); }
+    .mem-tiers-header p strong { color: var(--dark-pine); }
 
     .mem-tier-table-wrap {
       overflow-x: auto;
@@ -243,7 +243,7 @@
       font-family: 'Cormorant Garamond', serif;
       font-size: 1.5rem;
       font-weight: 400;
-      color: var(--sand-beige);
+      color: var(--dark-pine);
       display: block;
       margin-bottom: 4px;
     }
@@ -251,7 +251,7 @@
     .tier-col-price {
       font-size: 0.78rem;
       font-weight: 500;
-      color: rgba(248,241,233,0.6);
+      color: #999;
       letter-spacing: 0.04em;
       display: block;
     }
@@ -259,8 +259,8 @@
     .tier-col-founding .tier-col-name  { color: var(--mountain-pink); }
     .tier-col-founding .tier-col-price { color: var(--mountain-pink); opacity: 0.85; }
 
-    .mem-tier-table tbody tr { border-top: 1px solid rgba(248,241,233,0.1); }
-    .mem-tier-table tbody tr:last-child { border-bottom: 1px solid rgba(248,241,233,0.1); }
+    .mem-tier-table tbody tr { border-top: 1px solid rgba(42,71,71,0.1); }
+    .mem-tier-table tbody tr:last-child { border-bottom: 1px solid rgba(42,71,71,0.1); }
 
     .mem-tier-table tbody th {
       padding: 18px 24px;
@@ -269,7 +269,7 @@
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: rgba(248,241,233,0.5);
+      color: rgba(42,71,71,0.5);
       vertical-align: top;
     }
 
@@ -277,19 +277,19 @@
       padding: 18px 24px;
       text-align: center;
       font-size: 0.88rem;
-      color: rgba(248,241,233,0.85);
+      color: var(--dark-pine);
       vertical-align: top;
       line-height: 1.5;
     }
 
     .mem-tier-table tbody td.founding-col {
-      color: var(--sand-beige);
-      font-weight: 500;
+      color: var(--dark-pine);
+      font-weight: 600;
     }
 
     .mem-tier-table thead th.founding-col,
     .mem-tier-table tbody td.founding-col {
-      background: rgba(245,130,113,0.07);
+      background: rgba(245,130,113,0.09);
     }
 
     .tier-founding-badge {
@@ -311,7 +311,7 @@
     /* FOUNDING MEMBER */
     .mem-founding {
       padding: 100px 24px;
-      background: var(--sand-beige);
+      background: var(--dark-pine);
     }
 
     .mem-founding-inner {
@@ -323,7 +323,7 @@
       font-family: 'Cormorant Garamond', serif;
       font-size: clamp(2rem, 4vw, 3rem);
       font-weight: 400;
-      color: var(--dark-pine);
+      color: var(--sand-beige);
       line-height: 1.2;
       margin-bottom: 2rem;
     }
@@ -331,17 +331,17 @@
     .mem-founding p {
       font-size: 0.95rem;
       line-height: 1.9;
-      color: var(--dark-pine);
+      color: rgba(248,241,233,0.82);
       margin-bottom: 1.4rem;
     }
 
-    .mem-founding p.founding-pivot { font-size: 1.05rem; font-weight: 600; }
+    .mem-founding p.founding-pivot { font-size: 1.05rem; font-weight: 600; color: var(--sand-beige); }
 
     .mem-founding p.founding-close {
       font-family: 'Cormorant Garamond', serif;
       font-size: 1.2rem;
       font-style: italic;
-      opacity: 0.8;
+      color: rgba(248,241,233,0.65);
     }
 
     .mem-founding-rule {
@@ -356,7 +356,7 @@
     /* CTA */
     .mem-cta {
       padding: 100px 24px;
-      background: var(--dark-pine);
+      background: var(--sand-beige);
       text-align: center;
     }
 
@@ -364,14 +364,14 @@
       font-family: 'Cormorant Garamond', serif;
       font-size: clamp(1.8rem, 3.5vw, 2.8rem);
       font-weight: 400;
-      color: var(--sand-beige);
+      color: var(--dark-pine);
       margin-bottom: 1.5rem;
     }
 
     .mem-cta p {
       font-size: 0.9rem;
       line-height: 1.8;
-      color: rgba(248,241,233,0.72);
+      color: #666;
       max-width: 560px;
       margin: 0 auto 1rem;
     }
@@ -383,7 +383,7 @@
 
     .mem-cta p.cta-upgrade-note {
       font-size: 0.78rem;
-      color: rgba(248,241,233,0.45);
+      color: rgba(42,71,71,0.45);
       font-style: italic;
       max-width: 480px;
     }
@@ -571,7 +571,7 @@
     <section class="mem-tiers" aria-label="Membership tiers">
       <div class="mem-container">
         <div class="mem-tiers-header">
-          <span class="mem-eyebrow" style="color:rgba(248,241,233,0.45)">Choose Your Tier</span>
+          <span class="mem-eyebrow">Choose Your Tier</span>
           <h2>Trail gets you in. Summit takes you further. Founding Member is Summit tier for life, at a rate that will never be available again after the first fifty.</h2>
           <p>Summit is <strong>$899 a year</strong>. Founding Member is <strong>$1,499 once</strong>. The rate never changes. The benefits never expire. And when the fifty spots are gone, this option is gone with them.</p>
         </div>
@@ -643,7 +643,7 @@
     <section class="mem-founding" aria-label="Founding Member">
       <div class="mem-container">
         <div class="mem-founding-inner">
-          <span class="mem-eyebrow">Founding Member</span>
+          <span class="mem-eyebrow" style="color:var(--mountain-pink)">Founding Member</span>
           <h2>Be there before it was anything.</h2>
           <div class="mem-founding-rule" aria-hidden="true"></div>
           <p>There will be a morning, a few years from now, when you are standing on a trail with people you trust completely and you will barely remember what it felt like before you knew them. Before the early starts and the shared miles and the tables that went late because nobody wanted to be the first to leave.</p>
@@ -651,7 +651,7 @@
           <p>The first fifty people in any room set the tone for everyone who follows. You become like the people you spend your time with. Choose accordingly.</p>
           <p class="founding-close">Summit tier for life. A locked rate. A hat made for fifty people and no one else. And the quiet satisfaction of having arrived before anyone had to tell you to.</p>
           <div class="mem-founding-cta">
-            <a href="#join" class="btn-mem-dark">Become a Founding Member</a>
+            <a href="#join" class="btn-mem-secondary" style="color:var(--sand-beige);border-color:rgba(248,241,233,0.4)">Become a Founding Member</a>
           </div>
         </div>
       </div>
@@ -660,13 +660,13 @@
     <!-- CTA -->
     <section class="mem-cta" id="join" aria-label="Join">
       <div class="mem-container">
-        <span class="mem-eyebrow" style="color:rgba(248,241,233,0.45)">Join the Club</span>
+        <span class="mem-eyebrow">Join the Club</span>
         <h2>You already know which one is yours.</h2>
         <p>Select your membership tier below. Complete payment through our secure checkout. Your membership is active immediately and your confirmation arrives within minutes.</p>
         <p class="cta-founding-note">Founding Members — your hat ships within 7 days. There are limited spots remaining.</p>
         <div class="mem-cta-buttons">
-          <a href="#trail-form" class="btn-mem-secondary">Join as Trail Member</a>
-          <a href="#summit-form" class="btn-mem-secondary">Join as Summit Member</a>
+          <a href="#trail-form" class="btn-mem-secondary" style="color:var(--dark-pine);border-color:rgba(42,71,71,0.35)">Join as Trail Member</a>
+          <a href="#summit-form" class="btn-mem-secondary" style="color:var(--dark-pine);border-color:rgba(42,71,71,0.35)">Join as Summit Member</a>
           <a href="#founding-form" class="btn-mem-primary">Become a Founding Member</a>
         </div>
         <p class="cta-upgrade-note">Recently completed a PSAC experience? Note your experience date at checkout and we will apply your booking fee toward your first year.</p>
