@@ -88,6 +88,15 @@
       font-style: italic;
     }
 
+    .mem-community-sub {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(42,71,71,0.5);
+    }
+
     /* VIGNETTES */
     .mem-vignettes {
       padding: 0 0 100px;
@@ -634,7 +643,7 @@
 
   <main>
 
-    <!-- HERO -->
+        <!-- HERO -->
     <section class="mem-hero" aria-label="Membership introduction">
       <div class="mem-container">
         <span class="mem-eyebrow" style="color: var(--desert-green);">The Club</span>
@@ -643,65 +652,33 @@
           <p>The trail keeps something alive in you.<br>The Club is how you get more of it.</p>
         </div>
         <div style="margin-top: 2rem;">
-          <a href="#join" class="btn btn-pink">Join the Club</a>
+          <a href="#founding" class="btn btn-pink">Join the Club</a>
         </div>
       </div>
     </section>
 
-    <!-- COMMUNITY HEADER -->
-    <section class="mem-community-header" aria-label="Community">
+
+        <!-- FOUNDING MEMBER -->
+    <section class="mem-founding" id="founding" aria-label="Founding Member">
       <div class="mem-container">
-        <h2>
-          The desert is where you find yourself.
-          <span>The Club is where you find each other.</span>
-        </h2>
+        <div class="mem-founding-inner">
+          <span class="mem-eyebrow" style="color:var(--mountain-pink)">Founding Member</span>
+          <h2>Be there before it was anything.</h2>
+          <div class="mem-founding-rule" aria-hidden="true"></div>
+          <p>There will be a morning, a few years from now, when you are standing on a trail with people you trust completely and you will barely remember what it felt like before you knew them. Before the early starts and the shared miles and the tables that went late because nobody wanted to be the first to leave.</p>
+          <p class="founding-pivot">You are deciding right now whether you are one of those people.</p>
+          <p>The first fifty people in any room set the tone for everyone who follows. You become like the people you spend your time with. Choose accordingly.</p>
+          <p class="founding-close">Summit tier for life. A locked rate. A hat made for fifty people and no one else. And the quiet satisfaction of having arrived before anyone had to tell you to.</p>
+          <div class="mem-founding-cta">
+            <a href="#tiers" class="btn-mem-secondary" style="color:var(--sand-beige);border-color:rgba(248,241,233,0.4)">Become a Founding Member</a>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- VIGNETTES -->
-    <section class="mem-vignettes" aria-label="Member experiences">
-      <p class="mem-scroll-hint" id="scrollHint" aria-hidden="true">Scroll to explore &rarr;</p>
-      <div class="mem-vignettes-scroll" id="vignetteScroll" role="list">
 
-        <article class="mem-vignette-card" role="listitem">
-          <span class="card-label">Twice Monthly</span>
-          <h3>The Pink Mountain Hike</h3>
-          <p>The alarm goes off before the city does. Someone hands you a coffee before you have said a word. You do not know everyone yet. That changes on the way up.</p>
-          <p>This morning has been timed to the minute. When the light arrives, it finds the highest ridgeline first. Rose deepens into coral. Coral bleeds into amber.</p>
-          <p>It happens almost every morning in Palm Springs. Most people are asleep for it.</p>
-          <p class="card-closer">By the time you are back at the trailhead, you have made plans for the next one.</p>
-        </article>
-
-        <article class="mem-vignette-card" role="listitem">
-          <span class="card-label">Members Only</span>
-          <h3>The Summer Table</h3>
-          <p>Summer in Palm Springs has a different pace. And on one night this season, members will sit down together at one of Palm Springs' best restaurants for a dinner that does not appear on any public calendar.</p>
-          <p>Inside, where it is cool and unhurried, a menu built for the occasion. A long table. The kind of conversation that starts before the first course arrives because nobody needs context.</p>
-          <p class="card-closer">The best evenings in Palm Springs happen when nobody is in a hurry to be anywhere else.</p>
-        </article>
-
-        <article class="mem-vignette-card" role="listitem">
-          <span class="card-label">A Few Times a Season</span>
-          <h3>The Happy Hour</h3>
-          <p>Not every Club night needs a reservation. A bar takeover. A rooftop. A space that fits thirty people if everyone is willing to stand close.</p>
-          <p>This is where new members meet the ones who have been here since the beginning. Where someone overhears a trail recommendation that changes their next weekend. Where a guest pass gets used and the person who shows up realizes they need to be a member.</p>
-          <p class="card-closer">Show up. See who is there. That is the whole plan.</p>
-        </article>
-
-        <article class="mem-vignette-card" role="listitem">
-          <span class="card-label">Member Only Events</span>
-          <h3>The Marquee Experience</h3>
-          <p>Some experiences require more than showing up. These are the ones members talk about for years.</p>
-          <p>Cactus to Clouds in a single day. A Desert Riders breakfast at dawn on the trails those riders first explored a century ago. Three days in the San Jacinto wilderness — up the Skyline Trail, south on the PCT, down Jo Pond. Nights deep in the pines.</p>
-          <p>Every marquee experience is member-only. Logistics handled. Permits secured. A keepsake when it is over.</p>
-          <p class="card-closer">They open to members first, fill quickly, and do not come back around until the season is right again.</p>
-        </article>
-
-      </div>
-    </section>
-
-    <!-- TIER COMPARISON -->
-    <section class="mem-tiers" aria-label="Membership tiers">
+    <section id="tiers">
+        <section class="mem-tiers" aria-label="Membership tiers">
       <div class="mem-tiers-inner">
 
         <!-- Left: header copy -->
@@ -890,40 +867,64 @@
       </div>
     </section>
 
-    <!-- FOUNDING MEMBER -->
-    <section class="mem-founding" aria-label="Founding Member">
+
+    </section>
+
+        <!-- COMMUNITY HEADER -->
+    <section class="mem-community-header" aria-label="Community">
       <div class="mem-container">
-        <div class="mem-founding-inner">
-          <span class="mem-eyebrow" style="color:var(--mountain-pink)">Founding Member</span>
-          <h2>Be there before it was anything.</h2>
-          <div class="mem-founding-rule" aria-hidden="true"></div>
-          <p>There will be a morning, a few years from now, when you are standing on a trail with people you trust completely and you will barely remember what it felt like before you knew them. Before the early starts and the shared miles and the tables that went late because nobody wanted to be the first to leave.</p>
-          <p class="founding-pivot">You are deciding right now whether you are one of those people.</p>
-          <p>The first fifty people in any room set the tone for everyone who follows. You become like the people you spend your time with. Choose accordingly.</p>
-          <p class="founding-close">Summit tier for life. A locked rate. A hat made for fifty people and no one else. And the quiet satisfaction of having arrived before anyone had to tell you to.</p>
-          <div class="mem-founding-cta">
-            <a href="#join" class="btn-mem-secondary" style="color:var(--sand-beige);border-color:rgba(248,241,233,0.4)">Become a Founding Member</a>
-          </div>
-        </div>
+        <h2>
+          The desert is where you find yourself.
+          <span>The Club is where you find each other.</span>
+        </h2>
+        <p class="mem-community-sub">Here is what membership feels like.</p>
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="mem-cta" id="join" aria-label="Join">
-      <div class="mem-container">
-        <span class="mem-eyebrow">Join the Club</span>
-        <h2>You already know which one is yours.</h2>
-        <p>Select your membership tier below. Complete payment through our secure checkout. Your membership is active immediately and your confirmation arrives within minutes.</p>
-        <p class="cta-founding-note">Founding Members — your hat ships within 7 days. There are limited spots remaining.</p>
-        <div class="mem-cta-buttons">
-          <a href="#trail-form" class="btn-mem-secondary" style="color:var(--dark-pine);border-color:rgba(42,71,71,0.35)">Join as Trail Member</a>
-          <a href="#summit-form" class="btn-mem-secondary" style="color:var(--dark-pine);border-color:rgba(42,71,71,0.35)">Join as Summit Member</a>
-          <a href="#founding-form" class="btn-mem-primary">Become a Founding Member</a>
-        </div>
-        <p class="cta-upgrade-note">Recently completed a PSAC experience? Note your experience date at checkout and we will apply your booking fee toward your first year.</p>
+    <!-- VIGNETTES -->
+    <section class="mem-vignettes" aria-label="Member experiences">
+      <p class="mem-scroll-hint" id="scrollHint" aria-hidden="true">Scroll to explore &rarr;</p>
+      <div class="mem-vignettes-scroll" id="vignetteScroll" role="list">
+
+        <article class="mem-vignette-card" role="listitem">
+          <span class="card-label">Twice Monthly</span>
+          <h3>The Pink Mountain Hike</h3>
+          <p>The alarm goes off before the city does. Someone hands you a coffee before you have said a word. You do not know everyone yet. That changes on the way up.</p>
+          <p>This morning has been timed to the minute. When the light arrives, it finds the highest ridgeline first. Rose deepens into coral. Coral bleeds into amber.</p>
+          <p>It happens almost every morning in Palm Springs. Most people are asleep for it.</p>
+          <p class="card-closer">By the time you are back at the trailhead, you have made plans for the next one.</p>
+        </article>
+
+        <article class="mem-vignette-card" role="listitem">
+          <span class="card-label">Members Only</span>
+          <h3>The Summer Table</h3>
+          <p>Summer in Palm Springs has a different pace. And on one night this season, members will sit down together at one of Palm Springs' best restaurants for a dinner that does not appear on any public calendar.</p>
+          <p>Inside, where it is cool and unhurried, a menu built for the occasion. A long table. The kind of conversation that starts before the first course arrives because nobody needs context.</p>
+          <p class="card-closer">The best evenings in Palm Springs happen when nobody is in a hurry to be anywhere else.</p>
+        </article>
+
+        <article class="mem-vignette-card" role="listitem">
+          <span class="card-label">A Few Times a Season</span>
+          <h3>The Happy Hour</h3>
+          <p>Not every Club night needs a reservation. A bar takeover. A rooftop. A space that fits thirty people if everyone is willing to stand close.</p>
+          <p>This is where new members meet the ones who have been here since the beginning. Where someone overhears a trail recommendation that changes their next weekend. Where a guest pass gets used and the person who shows up realizes they need to be a member.</p>
+          <p class="card-closer">Show up. See who is there. That is the whole plan.</p>
+        </article>
+
+        <article class="mem-vignette-card" role="listitem">
+          <span class="card-label">Member Only Events</span>
+          <h3>The Marquee Experience</h3>
+          <p>Some experiences require more than showing up. These are the ones members talk about for years.</p>
+          <p>Cactus to Clouds in a single day. A Desert Riders breakfast at dawn on the trails those riders first explored a century ago. Three days in the San Jacinto wilderness — up the Skyline Trail, south on the PCT, down Jo Pond. Nights deep in the pines.</p>
+          <p>Every marquee experience is member-only. Logistics handled. Permits secured. A keepsake when it is over.</p>
+          <p class="card-closer">They open to members first, fill quickly, and do not come back around until the season is right again.</p>
+        </article>
+
       </div>
     </section>
 
+
+  </main>
   </main>
 
 <!-- ── FOOTER ── -->
