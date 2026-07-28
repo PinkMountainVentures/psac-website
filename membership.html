@@ -184,33 +184,44 @@
 
     /* TIER TABLE */
     .mem-tiers {
-      padding: 100px 24px;
+      padding: 80px 24px;
       background: white;
     }
 
+    /* Desktop: two-column layout */
+    .mem-tiers-inner {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 64px;
+      align-items: start;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
     .mem-tiers-header {
-      max-width: 720px;
-      margin: 0 auto 64px;
-      text-align: center;
+      position: sticky;
+      top: 100px;
     }
 
     .mem-tiers-header h2 {
       font-family: 'Cormorant Garamond', serif;
-      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-size: clamp(1.6rem, 2.5vw, 2.2rem);
       font-weight: 400;
       color: var(--dark-pine);
       line-height: 1.25;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.2rem;
     }
 
     .mem-tiers-header p {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       line-height: 1.8;
       color: #666;
+      margin-bottom: 0.8rem;
     }
 
     .mem-tiers-header p strong { color: var(--dark-pine); }
 
+    /* Desktop table */
     .mem-tier-table-wrap {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -218,7 +229,6 @@
 
     .mem-tier-table {
       width: 100%;
-      min-width: 640px;
       border-collapse: collapse;
     }
 
@@ -229,27 +239,27 @@
     }
 
     .mem-tier-table thead th {
-      padding: 28px 24px 24px;
+      padding: 20px 16px 16px;
       text-align: center;
       vertical-align: bottom;
     }
 
     .mem-tier-table thead th:first-child {
       text-align: left;
-      width: 28%;
+      width: 24%;
     }
 
     .tier-col-name {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 1.5rem;
+      font-size: 1.35rem;
       font-weight: 400;
       color: var(--dark-pine);
       display: block;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .tier-col-price {
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       font-weight: 500;
       color: #999;
       letter-spacing: 0.04em;
@@ -263,9 +273,9 @@
     .mem-tier-table tbody tr:last-child { border-bottom: 1px solid rgba(42,71,71,0.1); }
 
     .mem-tier-table tbody th {
-      padding: 18px 24px;
+      padding: 14px 16px;
       text-align: left;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -274,9 +284,9 @@
     }
 
     .mem-tier-table tbody td {
-      padding: 18px 24px;
+      padding: 14px 16px;
       text-align: center;
-      font-size: 0.88rem;
+      font-size: 0.84rem;
       color: var(--dark-pine);
       vertical-align: top;
       line-height: 1.5;
@@ -289,12 +299,53 @@
 
     .mem-tier-table thead th.founding-col,
     .mem-tier-table tbody td.founding-col {
-      background: rgba(245,130,113,0.09);
+      background: rgba(245,130,113,0.07);
     }
+
+    /* CTA row */
+    .mem-tier-table .tier-cta-row td {
+      padding: 20px 16px 24px;
+      border-top: 2px solid rgba(42,71,71,0.1);
+      border-bottom: none;
+    }
+
+    .tier-cta-btn {
+      display: inline-block;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 30px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tier-cta-btn-outline {
+      color: var(--dark-pine);
+      border: 1.5px solid rgba(42,71,71,0.3);
+      background: transparent;
+    }
+
+    .tier-cta-btn-outline:hover {
+      border-color: var(--dark-pine);
+      background: var(--dark-pine);
+      color: white;
+    }
+
+    .tier-cta-btn-pink {
+      color: white;
+      background: var(--mountain-pink);
+      border: 1.5px solid var(--mountain-pink);
+    }
+
+    .tier-cta-btn-pink:hover { background: #e06a5a; border-color: #e06a5a; }
 
     .tier-founding-badge {
       display: inline-block;
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       font-weight: 600;
       letter-spacing: 0.1em;
       text-transform: uppercase;
@@ -307,6 +358,75 @@
 
     .tier-avail-open    { color: var(--desert-green); font-size: 0.82rem; font-weight: 500; }
     .tier-avail-limited { color: var(--mountain-pink); font-size: 0.82rem; font-weight: 600; }
+
+    /* Mobile tier cards */
+    .mem-tier-cards {
+      display: none;
+    }
+
+    .mem-tier-card {
+      background: var(--sand-beige);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+
+    .mem-tier-card-header {
+      padding: 20px 24px;
+      background: var(--dark-pine);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .mem-tier-card-header.founding {
+      background: var(--mountain-pink);
+    }
+
+    .mem-tier-card-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 400;
+      color: white;
+    }
+
+    .mem-tier-card-price {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+    }
+
+    .mem-tier-card-body {
+      padding: 20px 24px 24px;
+    }
+
+    .mem-tier-card-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(42,71,71,0.08);
+      font-size: 0.84rem;
+    }
+
+    .mem-tier-card-row:last-of-type { border-bottom: none; }
+
+    .mem-tier-card-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(42,71,71,0.5);
+      flex: 0 0 40%;
+    }
+
+    .mem-tier-card-value {
+      color: var(--dark-pine);
+      text-align: right;
+      flex: 1;
+      line-height: 1.4;
+    }
 
     /* FOUNDING MEMBER */
     .mem-founding {
@@ -454,6 +574,19 @@
     @media (max-width: 768px) {
       .mem-hero { padding: 120px 24px 80px; }
 
+      .mem-tiers-inner {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+
+      .mem-tiers-header {
+        position: static;
+        text-align: center;
+      }
+
+      .mem-tier-table-wrap { display: none; }
+      .mem-tier-cards { display: block; }
+
       .mem-vignettes-scroll {
         padding: 0 20px 32px;
         scroll-padding-left: 20px;
@@ -569,72 +702,190 @@
 
     <!-- TIER COMPARISON -->
     <section class="mem-tiers" aria-label="Membership tiers">
-      <div class="mem-container">
+      <div class="mem-tiers-inner">
+
+        <!-- Left: header copy -->
         <div class="mem-tiers-header">
           <span class="mem-eyebrow">Choose Your Tier</span>
           <h2>Trail gets you in. Summit takes you further. Founding Member is Summit tier for life, at a rate that will never be available again after the first fifty.</h2>
           <p>Summit is <strong>$899 a year</strong>. Founding Member is <strong>$1,499 once</strong>. The rate never changes. The benefits never expire. And when the fifty spots are gone, this option is gone with them.</p>
         </div>
 
-        <div class="mem-tier-table-wrap">
-          <table class="mem-tier-table">
-            <caption>Palm Springs Adventure Club membership tier comparison: Trail, Summit, and Founding Member</caption>
-            <thead>
-              <tr>
-                <th scope="col"></th>
-                <th scope="col">
-                  <span class="tier-col-name">Trail</span>
-                  <span class="tier-col-price">$399 / year</span>
-                </th>
-                <th scope="col">
-                  <span class="tier-col-name">Summit</span>
-                  <span class="tier-col-price">$899 / year</span>
-                </th>
-                <th scope="col" class="founding-col tier-col-founding">
-                  <span class="tier-col-name">Founding Member</span>
-                  <span class="tier-col-price">$1,499 once</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">Included Experiences</th>
-                <td>1 Peaks to Pools booking fee<br><small style="opacity:0.6">($195 value)</small></td>
-                <td>2 Peaks to Pools + 1 Custom booking fee<br><small style="opacity:0.6">($875 value)</small></td>
-                <td class="founding-col">All Summit benefits, forever</td>
-              </tr>
-              <tr>
-                <th scope="row">Guest Experience Passes</th>
-                <td>2 / year</td>
-                <td>2 / year</td>
-                <td class="founding-col">4 / year</td>
-              </tr>
-              <tr>
-                <th scope="row">Discount on Experiences</th>
-                <td>20% off</td>
-                <td>25% off</td>
-                <td class="founding-col">25% off</td>
-              </tr>
-              <tr>
-                <th scope="row">Hat at Signup</th>
-                <td>Adventure Hat</td>
-                <td>Adventure Hat + Casual Hat</td>
-                <td class="founding-col">Founding Member Hat<br><span class="tier-founding-badge">50 made. Never again.</span></td>
-              </tr>
-              <tr>
-                <th scope="row">Event Access</th>
-                <td>Trail events + community gatherings</td>
-                <td>Advanced access + marquee events</td>
-                <td class="founding-col">Advanced access + marquee events + locked rate</td>
-              </tr>
-              <tr>
-                <th scope="row">Availability</th>
-                <td><span class="tier-avail-open">Open</span></td>
-                <td><span class="tier-avail-open">Open</span></td>
-                <td class="founding-col"><span class="tier-avail-limited">50 spots only</span></td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Right: table (desktop) + cards (mobile) -->
+        <div>
+
+          <!-- Desktop table -->
+          <div class="mem-tier-table-wrap">
+            <table class="mem-tier-table">
+              <caption>Palm Springs Adventure Club membership tier comparison: Trail, Summit, and Founding Member</caption>
+              <thead>
+                <tr>
+                  <th scope="col"></th>
+                  <th scope="col">
+                    <span class="tier-col-name">Trail</span>
+                    <span class="tier-col-price">$399 / year</span>
+                  </th>
+                  <th scope="col">
+                    <span class="tier-col-name">Summit</span>
+                    <span class="tier-col-price">$899 / year</span>
+                  </th>
+                  <th scope="col" class="founding-col tier-col-founding">
+                    <span class="tier-col-name">Founding Member</span>
+                    <span class="tier-col-price">$1,499 once</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Included</th>
+                  <td>1 Peaks to Pools experience<br><small style="opacity:0.6">Trail matching, digital guide, After the Trail curation</small></td>
+                  <td>2 Peaks to Pools + 1 Custom experience<br><small style="opacity:0.6">Everything Trail includes, plus Custom routing</small></td>
+                  <td class="founding-col">All Summit benefits, forever</td>
+                </tr>
+                <tr>
+                  <th scope="row">Guest Passes</th>
+                  <td>2 / year</td>
+                  <td>2 / year</td>
+                  <td class="founding-col">4 / year</td>
+                </tr>
+                <tr>
+                  <th scope="row">Discount</th>
+                  <td>20% off</td>
+                  <td>25% off</td>
+                  <td class="founding-col">25% off</td>
+                </tr>
+                <tr>
+                  <th scope="row">Hat</th>
+                  <td>Adventure Hat</td>
+                  <td>Adventure Hat + Casual Hat</td>
+                  <td class="founding-col">Founding Member Hat<br><span class="tier-founding-badge">50 made. Never again.</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Events</th>
+                  <td>Trail events + community gatherings</td>
+                  <td>Advanced access + marquee events</td>
+                  <td class="founding-col">Advanced access + marquee events + locked rate</td>
+                </tr>
+                <tr>
+                  <th scope="row">Availability</th>
+                  <td><span class="tier-avail-open">Open</span></td>
+                  <td><span class="tier-avail-open">Open</span></td>
+                  <td class="founding-col"><span class="tier-avail-limited">50 spots only</span></td>
+                </tr>
+                <tr class="tier-cta-row">
+                  <td></td>
+                  <td><a href="#trail-form" class="tier-cta-btn tier-cta-btn-outline">Join as Trail</a></td>
+                  <td><a href="#summit-form" class="tier-cta-btn tier-cta-btn-outline">Join as Summit</a></td>
+                  <td class="founding-col"><a href="#founding-form" class="tier-cta-btn tier-cta-btn-pink">Become a Founding Member</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile cards -->
+          <div class="mem-tier-cards">
+
+            <div class="mem-tier-card">
+              <div class="mem-tier-card-header">
+                <span class="mem-tier-card-name">Trail</span>
+                <span class="mem-tier-card-price">$399 / year</span>
+              </div>
+              <div class="mem-tier-card-body">
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Included</span>
+                  <span class="mem-tier-card-value">1 Peaks to Pools experience</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Guest Passes</span>
+                  <span class="mem-tier-card-value">2 / year</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Discount</span>
+                  <span class="mem-tier-card-value">20% off</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Hat</span>
+                  <span class="mem-tier-card-value">Adventure Hat</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Events</span>
+                  <span class="mem-tier-card-value">Trail events + community gatherings</span>
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                  <a href="#trail-form" class="tier-cta-btn tier-cta-btn-outline" style="display:inline-block;width:100%;box-sizing:border-box;">Join as Trail Member</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="mem-tier-card">
+              <div class="mem-tier-card-header">
+                <span class="mem-tier-card-name">Summit</span>
+                <span class="mem-tier-card-price">$899 / year</span>
+              </div>
+              <div class="mem-tier-card-body">
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Included</span>
+                  <span class="mem-tier-card-value">2 Peaks to Pools + 1 Custom experience</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Guest Passes</span>
+                  <span class="mem-tier-card-value">2 / year</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Discount</span>
+                  <span class="mem-tier-card-value">25% off</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Hat</span>
+                  <span class="mem-tier-card-value">Adventure Hat + Casual Hat</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Events</span>
+                  <span class="mem-tier-card-value">Advanced access + marquee events</span>
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                  <a href="#summit-form" class="tier-cta-btn tier-cta-btn-outline" style="display:inline-block;width:100%;box-sizing:border-box;">Join as Summit Member</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="mem-tier-card">
+              <div class="mem-tier-card-header founding">
+                <span class="mem-tier-card-name">Founding Member</span>
+                <span class="mem-tier-card-price">$1,499 once</span>
+              </div>
+              <div class="mem-tier-card-body">
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Included</span>
+                  <span class="mem-tier-card-value">All Summit benefits, forever</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Guest Passes</span>
+                  <span class="mem-tier-card-value">4 / year</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Discount</span>
+                  <span class="mem-tier-card-value">25% off, locked forever</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Hat</span>
+                  <span class="mem-tier-card-value">Founding Member Hat — 50 made. Never again.</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Events</span>
+                  <span class="mem-tier-card-value">Advanced access + marquee events + locked rate</span>
+                </div>
+                <div class="mem-tier-card-row">
+                  <span class="mem-tier-card-label">Availability</span>
+                  <span class="mem-tier-card-value" style="color:var(--mountain-pink);font-weight:600;">50 spots only</span>
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                  <a href="#founding-form" class="tier-cta-btn tier-cta-btn-pink" style="display:inline-block;width:100%;box-sizing:border-box;">Become a Founding Member</a>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </section>
