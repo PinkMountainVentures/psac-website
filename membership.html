@@ -164,33 +164,6 @@
       margin: 3rem 0;
     }
 
-    /* VILLAIN */
-    .mem-villain {
-      padding: 80px 24px;
-      background: white;
-    }
-
-    .mem-villain-inner {
-      max-width: 760px;
-      margin: 0 auto;
-    }
-
-    .mem-villain p {
-      font-size: 1rem;
-      line-height: 1.9;
-      color: var(--dark-pine);
-      margin-bottom: 1.6rem;
-    }
-
-    .mem-villain p:last-child {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: clamp(1.4rem, 2.5vw, 1.8rem);
-      font-weight: 400;
-      font-style: italic;
-      color: var(--dark-pine);
-      margin-bottom: 0;
-    }
-
     /* HERO */
     .mem-hero {
       min-height: 88vh;
@@ -407,10 +380,19 @@
     }
 
     .mem-tiers-header p {
-      font-size: 0.88rem;
-      line-height: 1.8;
-      color: #666;
-      margin-bottom: 0.8rem;
+      font-size: 0.95rem;
+      line-height: 1.85;
+      color: #555;
+      margin-bottom: 1.2rem;
+    }
+
+    .mem-tiers-header p:last-child { margin-bottom: 0; }
+
+    .mem-tiers-close {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      font-style: italic;
+      color: var(--dark-pine) !important;
     }
 
     .mem-tiers-header p strong { color: var(--dark-pine); }
@@ -890,13 +872,7 @@
       </div>
     </section>
 
-    <!-- VILLAIN -->
-    <section class="mem-villain" aria-label="What membership protects">
-      <div class="mem-villain-inner">
-        <p>Out there, something shifts. The wonder. The clarity. The silence. You remember who you are underneath the schedule, the obligations, and the version of yourself everyone else needs you to be. The pool feels earned. The dinner feels deserved. The history feels alive. Then ordinary life closes back over you and you spend the next eleven months vaguely aware that something is missing.</p>
-        <p>The Club exists for the people who are not willing to let that person disappear again.</p>
-      </div>
-    </section>
+
 
         <!-- FOUNDING MEMBER -->
     <section class="mem-founding" id="founding" aria-label="Founding Member">
@@ -923,8 +899,8 @@
         <!-- Left: header copy -->
         <div class="mem-tiers-header">
           <span class="mem-eyebrow">Choose Your Tier</span>
-          <h2>Membership unlocks more adventure and a community of people to grow with.</h2>
-          <p>Founding Member is <strong>$1,499 once</strong>. The rate never changes. The benefits never expire. And when the fifty spots are gone, this option is gone with them.</p>
+          <p>Going deeper changes everything. The trail earns the pool. The ridge earns the dinner. Palm Springs stops being a destination and starts being somewhere you belong. Then ordinary life closes back over you and you spend the next eleven months vaguely aware that something is missing.</p>
+          <p class="mem-tiers-close">The Club exists for the people who are not willing to let that person disappear again.</p>
         </div>
 
         <!-- Right: table (desktop) + cards (mobile) -->
