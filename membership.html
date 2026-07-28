@@ -135,7 +135,7 @@
     }
 
     .mem-why-inner {
-      max-width: 760px;
+      max-width: 860px;
       margin: 0 auto;
     }
 
@@ -355,19 +355,15 @@
       background: white;
     }
 
-    /* Desktop: two-column layout */
     .mem-tiers-inner {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 64px;
-      align-items: start;
       max-width: 1100px;
       margin: 0 auto;
     }
 
     .mem-tiers-header {
-      position: sticky;
-      top: 100px;
+      max-width: 700px;
+      margin: 0 auto 48px;
+      text-align: center;
     }
 
     .mem-tiers-header h2 {
@@ -772,16 +768,6 @@
         padding: 0 0 40px;
       }
 
-      .mem-tiers-inner {
-        grid-template-columns: 1fr;
-        gap: 32px;
-      }
-
-      .mem-tiers-header {
-        position: static;
-        text-align: center;
-      }
-
       .mem-tier-table-wrap { display: none; }
       .mem-tier-cards { display: block; }
 
@@ -896,14 +882,14 @@
     <section class="mem-tiers" id="tiers" aria-label="Membership tiers">
       <div class="mem-tiers-inner">
 
-        <!-- Left: header copy -->
+        <!-- Header copy -->
         <div class="mem-tiers-header">
           <span class="mem-eyebrow">Choose Your Tier</span>
           <p>Going deeper changes everything. The trail earns the pool. The ridge earns the dinner. Palm Springs stops being a destination and starts being somewhere you belong. Then ordinary life closes back over you and you spend the next eleven months vaguely aware that something is missing.</p>
           <p class="mem-tiers-close">The Club exists for the people who are not willing to let that person disappear again.</p>
         </div>
 
-        <!-- Right: table (desktop) + cards (mobile) -->
+        <!-- Table (desktop) + cards (mobile) -->
         <div>
 
           <!-- Desktop table -->
