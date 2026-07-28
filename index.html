@@ -3,29 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Palm Springs Adventure Club</title>
+    <title>Palm Springs Adventure Club — Peaks to Pools Desert Adventures</title>
+    <meta name="description" content="Palm Springs Adventure Club offers personalized desert trail adventures, expert route curation, and premium gear rental. From mountain peaks to Palm Springs pools — earn your relaxation.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://www.palmspringsadventureclub.com/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.palmspringsadventureclub.com/">
+    <meta property="og:title" content="Palm Springs Adventure Club — Peaks to Pools Desert Adventures">
+    <meta property="og:description" content="Personalized desert trail adventures, expert route curation, and premium gear rental in Palm Springs. Earn your pool time.">
+    <meta property="og:image" content="https://www.palmspringsadventureclub.com/images/hero.jpg">
+
+    <!-- Schema: LocalBusiness + TouristInformationCenter -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": ["LocalBusiness", "TouristInformationCenter"],
+          "@id": "https://www.palmspringsadventureclub.com/#business",
+          "name": "Palm Springs Adventure Club",
+          "alternateName": "PSAC",
+          "description": "Palm Springs Adventure Club offers personalized desert trail adventures, expert route curation, gear rental, and after-trail experience recommendations in Palm Springs, California. Operated by Pink Mountain Ventures LLC.",
+          "url": "https://www.palmspringsadventureclub.com",
+          "email": "hello@palmspringsadventureclub.com",
+          "slogan": "Peaks to Pools. Earn your peace.",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Palm Springs",
+            "addressRegion": "CA",
+            "addressCountry": "US"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 33.8303,
+            "longitude": -116.5453
+          },
+          "areaServed": {
+            "@type": "City",
+            "name": "Palm Springs"
+          },
+          "priceRange": "$$",
+          "currenciesAccepted": "USD",
+          "paymentAccepted": "Credit Card",
+          "sameAs": [
+            "https://www.instagram.com/palmspringsadventureclub"
+          ],
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Desert Trail Adventures",
+            "itemListElement": [
+              {
+                "@type": "Offer",
+                "name": "Trail Guide Experience",
+                "description": "Personalized trail matching, digital guide, and After the Trail curation for your group.",
+                "price": "100.00",
+                "priceCurrency": "USD"
+              },
+              {
+                "@type": "Offer",
+                "name": "Peaks to Pools Experience",
+                "description": "Full Peaks to Pools arc — trail adventure with premium gear, personalized guide, and curated after-trail recommendations.",
+                "price": "195.00",
+                "priceCurrency": "USD"
+              },
+              {
+                "@type": "Offer",
+                "name": "Custom Experience",
+                "description": "Fully custom desert adventure designed around your group's goals, fitness, and interests.",
+                "price": "595.00",
+                "priceCurrency": "USD"
+              }
+            ]
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.palmspringsadventureclub.com/#website",
+          "url": "https://www.palmspringsadventureclub.com",
+          "name": "Palm Springs Adventure Club",
+          "publisher": {
+            "@id": "https://www.palmspringsadventureclub.com/#business"
+          }
+        }
+      ]
+    }
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <!-- ── HEADER ── -->
-<header>
-    <div class="container">
-        <nav>
-            <a href="#" class="logo">
-                <img src="images/logo.svg" alt="Palm Springs Adventure Club" style="height: 48px; width: auto;">
-            </a>
-            <ul class="nav-links" id="navLinks">
-                <li><a href="#adventures">On the Trail</a></li>
-                <li><a href="#after-trail">After the Trail</a></li>
-                <li><a href="#the-club">The Club</a></li>
-                <li><a href="#contact" class="nav-cta jotform-btn">Start My Adventure</a></li>
-            </ul>
-            <button class="hamburger" id="hamburger">☰</button>
-        </nav>
-    </div>
-</header>
+<div id="nav-placeholder"></div>
 
 <!-- ── HERO ── -->
 <section class="hero">
@@ -183,7 +255,7 @@
         </div>
 
         <div style="text-align: center; margin-bottom: 2rem;">
-            <a href="/membership.html" class="btn btn-pine">Explore the Club</a>
+            <a href="/membership" class="btn btn-pine">Explore the Club</a>
         </div>
     </div>
 </section>
@@ -203,53 +275,10 @@
 </section>
 
 <!-- ── FOOTER ── -->
-<footer id="contact">
-    <div class="container">
-        <div class="footer-content">
-            <div class="footer-column">
-                <h3>Palm Springs Adventure Club</h3>
-                <p>Operated by Pink Mountain Ventures LLC<br>
-                Palm Springs, CA<br><br>
-                hello@palmspringsadventureclub.com</p>
-            </div>
-            <div class="footer-column">
-                <h3>Explore</h3>
-                <ul>
-                    <li><a href="#adventures">On the Trail</a></li>
-                    <li><a href="#after-trail">After the Trail</a></li>
-                    <li><a href="#the-club">The Club</a></li>
-                </ul>
-            </div>
-            <div class="footer-column">
-                <h3>Connect</h3>
-                <div class="social-links">
-                    <a href="#">IG</a>
-                </div>
-            </div>
-        </div>
-        <div class="footer-tagline">
-            <p>Peaks to Pools. Earn your peace.</p>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; 2026 Palm Springs Adventure Club &nbsp;·&nbsp; Pink Mountain Ventures LLC &nbsp;·&nbsp; All Rights Reserved</p>
-        </div>
-    </div>
-</footer>
+<div id="footer-placeholder"></div>
 
-<!-- ── MOBILE NAV SCRIPT ── -->
-<script>
-    const hamburger = document.getElementById('hamburger');
-    const navLinks = document.getElementById('navLinks');
-    hamburger.addEventListener('click', () => {
-        navLinks.classList.toggle('active');
-    });
-    const mobileLinks = document.querySelectorAll('.nav-links a');
-    mobileLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            navLinks.classList.remove('active');
-        });
-    });
-</script>
+<!-- ── COMPONENT LOADER ── -->
+<script src="/components/components.js"></script>
 
 <!-- ── JOTFORM MODAL ── -->
 <style>

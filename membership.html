@@ -4,7 +4,108 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Membership — Palm Springs Adventure Club</title>
-  <meta name="description" content="Join Palm Springs Adventure Club. Trail and Summit membership tiers with access to guided hikes, marquee experiences, and a community of people who take this place seriously.">
+  <meta name="description" content="Join Palm Springs Adventure Club. Trail and Summit membership tiers with access to guided trail adventures, marquee experiences, community events, and a community of people who take this place seriously.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://www.palmspringsadventureclub.com/membership">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.palmspringsadventureclub.com/membership">
+  <meta property="og:title" content="Membership — Palm Springs Adventure Club">
+  <meta property="og:description" content="Trail and Summit membership tiers with access to guided adventures, marquee experiences, and a community of people who take Palm Springs seriously.">
+  <meta property="og:image" content="https://www.palmspringsadventureclub.com/images/membership-hero.jpg">
+
+  <!-- Schema: Membership offerings -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://www.palmspringsadventureclub.com/membership#webpage",
+        "url": "https://www.palmspringsadventureclub.com/membership",
+        "name": "Membership — Palm Springs Adventure Club",
+        "description": "Trail and Summit membership tiers for Palm Springs Adventure Club, including Founding Member status.",
+        "isPartOf": {
+          "@id": "https://www.palmspringsadventureclub.com/#website"
+        },
+        "about": {
+          "@id": "https://www.palmspringsadventureclub.com/#business"
+        }
+      },
+      {
+        "@type": "ItemList",
+        "name": "PSAC Membership Tiers",
+        "description": "Palm Springs Adventure Club membership options for desert trail adventure enthusiasts.",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "item": {
+              "@type": "Product",
+              "name": "Trail Membership",
+              "description": "Entry-level PSAC membership. Includes 1 Peaks to Pools experience, 1 guest pass per year, 15% gear rental discount, Adventure Club Hat, and members-only event access.",
+              "brand": {
+                "@type": "Brand",
+                "name": "Palm Springs Adventure Club"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "399.00",
+                "priceCurrency": "USD",
+                "priceValidUntil": "2027-12-31",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.palmspringsadventureclub.com/membership"
+              }
+            }
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "item": {
+              "@type": "Product",
+              "name": "Summit Membership",
+              "description": "Full PSAC membership. Includes 2 Peaks to Pools + 1 Custom experience, 2 guest passes per year, 25% gear rental discount, Adventure Club Hat, and early event access.",
+              "brand": {
+                "@type": "Brand",
+                "name": "Palm Springs Adventure Club"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "899.00",
+                "priceCurrency": "USD",
+                "priceValidUntil": "2027-12-31",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.palmspringsadventureclub.com/membership"
+              }
+            }
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "item": {
+              "@type": "Product",
+              "name": "Founding Member",
+              "description": "Lifetime PSAC Summit membership for the first 50 members. Includes all Summit benefits forever at a locked rate, 4 guest passes per year, exclusive Founding Member Hat (50 made, never again), and early event access.",
+              "brand": {
+                "@type": "Brand",
+                "name": "Palm Springs Adventure Club"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "1499.00",
+                "priceCurrency": "USD",
+                "availability": "https://schema.org/LimitedAvailability",
+                "url": "https://www.palmspringsadventureclub.com/membership"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 
@@ -30,14 +131,35 @@
     /* HERO */
     .mem-hero {
       min-height: 88vh;
-      background:
-        linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)),
-        url('images/membership-hero.jpg') no-repeat center center / cover;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
       padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    .mem-hero-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      z-index: 0;
+    }
+
+    .mem-hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 1;
+    }
+
+    .mem-hero .mem-container {
+      position: relative;
+      z-index: 2;
     }
 
     .mem-hero h1 {
@@ -646,27 +768,22 @@
 <body>
 
 <!-- ── HEADER ── -->
-<header>
-    <div class="container">
-        <nav>
-            <a href="/" class="logo">
-                <img src="images/logo.svg" alt="Palm Springs Adventure Club" style="height: 48px; width: auto;">
-            </a>
-            <ul class="nav-links" id="navLinks">
-                <li><a href="/#adventures">On the Trail</a></li>
-                <li><a href="/#after-trail">After the Trail</a></li>
-                <li><a href="/#the-club">The Club</a></li>
-                <li><a href="/#contact" class="nav-cta jotform-btn">Start My Adventure</a></li>
-            </ul>
-            <button class="hamburger" id="hamburger">☰</button>
-        </nav>
-    </div>
-</header>
+<div id="nav-placeholder"></div>
 
   <main>
 
         <!-- HERO -->
     <section class="mem-hero" aria-label="Membership introduction">
+      <img
+        src="images/membership-hero.jpg"
+        alt="Desert trail at sunset in Palm Springs, California — the San Jacinto mountains glow amber and coral as golden light crosses the valley"
+        class="mem-hero-img"
+        width="1920"
+        height="1280"
+        loading="eager"
+        fetchpriority="high"
+      >
+      <div class="mem-hero-overlay" aria-hidden="true"></div>
       <div class="mem-container">
         <span class="mem-eyebrow" style="color: var(--desert-green);">The Club</span>
         <h1>Membership is how Palm Springs stops being a destination<em> and starts being yours.</em></h1>
@@ -946,53 +1063,10 @@
   </main>
 
 <!-- ── FOOTER ── -->
-<footer id="contact">
-    <div class="container">
-        <div class="footer-content">
-            <div class="footer-column">
-                <h3>Palm Springs Adventure Club</h3>
-                <p>Operated by Pink Mountain Ventures LLC<br>
-                Palm Springs, CA<br><br>
-                hello@palmspringsadventureclub.com</p>
-            </div>
-            <div class="footer-column">
-                <h3>Explore</h3>
-                <ul>
-                    <li><a href="/#adventures">On the Trail</a></li>
-                    <li><a href="/#after-trail">After the Trail</a></li>
-                    <li><a href="/#the-club">The Club</a></li>
-                </ul>
-            </div>
-            <div class="footer-column">
-                <h3>Connect</h3>
-                <div class="social-links">
-                    <a href="#">IG</a>
-                </div>
-            </div>
-        </div>
-        <div class="footer-tagline">
-            <p>Peaks to Pools. Earn your peace.</p>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; 2026 Palm Springs Adventure Club &nbsp;·&nbsp; Pink Mountain Ventures LLC &nbsp;·&nbsp; All Rights Reserved</p>
-        </div>
-    </div>
-</footer>
+<div id="footer-placeholder"></div>
 
-<!-- ── MOBILE NAV SCRIPT ── -->
-<script>
-    const hamburger = document.getElementById('hamburger');
-    const navLinks = document.getElementById('navLinks');
-    hamburger.addEventListener('click', () => {
-        navLinks.classList.toggle('active');
-    });
-    const mobileLinks = document.querySelectorAll('.nav-links a');
-    mobileLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            navLinks.classList.remove('active');
-        });
-    });
-</script>
+<!-- ── COMPONENT LOADER ── -->
+<script src="/components/components.js"></script>
 
 <!-- ── VIGNETTE DRAG SCROLL ── -->
 <script>
