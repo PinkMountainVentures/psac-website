@@ -97,7 +97,22 @@
 <body>
 
 <!-- ── HEADER ── -->
-<div id="nav-placeholder"></div>
+<header>
+    <div class="container">
+        <nav>
+            <a href="/" class="logo">
+                <img src="/images/logo.svg" alt="Palm Springs Adventure Club" style="height: 48px; width: auto;">
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/#adventures">On the Trail</a></li>
+                <li><a href="/#after-trail">After the Trail</a></li>
+                <li><a href="/#the-club">The Club</a></li>
+                <li><a href="/#contact" class="nav-cta jotform-btn">Start My Adventure</a></li>
+            </ul>
+            <button class="hamburger" id="hamburger">☰</button>
+        </nav>
+    </div>
+</header>
 
 <!-- ── HERO ── -->
 <section class="hero">
@@ -275,10 +290,53 @@
 </section>
 
 <!-- ── FOOTER ── -->
-<div id="footer-placeholder"></div>
+<footer id="contact">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-column">
+                <h3>Palm Springs Adventure Club</h3>
+                <p>Operated by Pink Mountain Ventures LLC<br>
+                Palm Springs, CA<br><br>
+                hello@palmspringsadventureclub.com</p>
+            </div>
+            <div class="footer-column">
+                <h3>Explore</h3>
+                <ul>
+                    <li><a href="/#adventures">On the Trail</a></li>
+                    <li><a href="/#after-trail">After the Trail</a></li>
+                    <li><a href="/#the-club">The Club</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Connect</h3>
+                <div class="social-links">
+                    <a href="#">IG</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-tagline">
+            <p>Peaks to Pools. Earn your peace.</p>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Palm Springs Adventure Club &nbsp;·&nbsp; Pink Mountain Ventures LLC &nbsp;·&nbsp; All Rights Reserved</p>
+        </div>
+    </div>
+</footer>
 
-<!-- ── COMPONENT LOADER ── -->
-<script src="/components/components.js"></script>
+<!-- ── MOBILE NAV SCRIPT ── -->
+<script>
+    const hamburger = document.getElementById('hamburger');
+    const navLinks = document.getElementById('navLinks');
+    hamburger.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+    });
+    const mobileLinks = document.querySelectorAll('.nav-links a');
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navLinks.classList.remove('active');
+        });
+    });
+</script>
 
 <!-- ── JOTFORM MODAL ── -->
 <style>
