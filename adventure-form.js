@@ -43,9 +43,6 @@
     "Ready to —"
   ];
 
-  // "Who's coming" answers that collect a per-person roster (name/age/fitness)
-  var ROSTER_WHO_KEYS = ['friends', 'friends_kids', 'family_kids'];
-
   // ── STATE ────────────────────────────────────────
   var state = {
     step: 0,
@@ -196,7 +193,6 @@
       { v: 'friends_kids', label: 'A group of friends, including kids' },
       { v: 'family_kids', label: 'Family, including kids' }
     ];
-    var ROSTER_WHO = ROSTER_WHO_KEYS;
     c.render = function (root) {
       var html = '<div class="paf-q">Who\'s coming? <span class="paf-req">*</span></div>';
       html += '<div class="paf-options" data-field="who"></div>';
@@ -247,14 +243,16 @@
           row._data = data;
           var idx = Array.prototype.indexOf.call(rowsWrap.children, row);
           state.answers.q2_roster[idx] = data;
+          refreshNav();
         }
         name.addEventListener('input', sync);
-        age.addEventListener('input', sync);
+        age.addEventListener('change', sync);
         fit.addEventListener('change', sync);
         del.addEventListener('click', function () {
           var idx = Array.prototype.indexOf.call(rowsWrap.children, row);
           state.answers.q2_roster.splice(idx, 1);
           row.remove();
+          refreshNav();
         });
 
         row.appendChild(name); row.appendChild(age); row.appendChild(fit); row.appendChild(del);
@@ -274,29 +272,42 @@
           Array.prototype.forEach.call(optWrap.children, function (c2) { c2.classList.remove('is-selected'); });
           b.classList.add('is-selected');
           state.answers.q2_who = w.v;
-          if (ROSTER_WHO.indexOf(w.v) !== -1) {
-            rosterWrap.style.display = 'block';
-            if (state.answers.q2_roster.length === 0) {
-              rowsWrap.innerHTML = '';
-              addRow(); addRow();
+          rosterWrap.style.display = 'block';
+          var defaultRows = (w.v === 'solo') ? 1 : 2;
+          if (state.answers.q2_roster.length === 0) {
+            rowsWrap.innerHTML = '';
+            for (var i = 0; i < defaultRows; i++) addRow();
+          } else if (w.v === 'solo' && state.answers.q2_roster.length > 1) {
+            // "Just me" is unambiguous — trim back down to a single person.
+            while (rowsWrap.children.length > 1) {
+              rowsWrap.removeChild(rowsWrap.lastChild);
             }
-          } else {
-            rosterWrap.style.display = 'none';
+            state.answers.q2_roster = state.answers.q2_roster.slice(0, 1);
           }
           refreshNav();
         });
         optWrap.appendChild(b);
       });
 
-      if (ROSTER_WHO.indexOf(state.answers.q2_who) !== -1) {
+      if (state.answers.q2_who) {
         rosterWrap.style.display = 'block';
         rowsWrap.innerHTML = '';
-        var existing = state.answers.q2_roster.length ? state.answers.q2_roster.slice() : [null, null];
+        var defaultRows = (state.answers.q2_who === 'solo') ? 1 : 2;
+        var existing = state.answers.q2_roster.length
+          ? state.answers.q2_roster.slice()
+          : new Array(defaultRows).fill(null);
         state.answers.q2_roster = [];
         existing.forEach(function (p) { addRow(p); });
       }
     };
-    c.isValid = function () { return !!state.answers.q2_who; };
+    c.isValid = function () {
+      if (!state.answers.q2_who) return false;
+      var roster = state.answers.q2_roster;
+      if (!roster.length) return false;
+      return roster.every(function (p) {
+        return !!(p && p.name && p.name.trim() && p.age && p.fitness);
+      });
+    };
     return c;
   }
 
@@ -424,27 +435,16 @@
   }
 
   function recommendedGearQty() {
-    var who = state.answers.q2_who;
-    if (who === 'solo') return 1;
-    if (who === 'partner') return 2;
-    if (ROSTER_WHO_KEYS.indexOf(who) !== -1) {
-      var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
-      // The age range picker starts at 14+, so every roster entry with an
-      // age selected is a teen/adult and gets its own recommended package.
-      return Math.max(roster.length, 1);
-    }
-    return 1;
+    // The roster is collected for every "who's coming" option now, and the
+    // age range picker starts at 14+, so every filled-in roster row is a
+    // teen/adult and gets its own recommended gear package.
+    var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
+    return Math.max(roster.length, 1);
   }
 
   function totalHeadcount() {
-    var who = state.answers.q2_who;
-    if (who === 'solo') return 1;
-    if (who === 'partner') return 2;
-    if (ROSTER_WHO_KEYS.indexOf(who) !== -1) {
-      var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
-      return Math.max(roster.length, 1);
-    }
-    return 1;
+    var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
+    return Math.max(roster.length, 1);
   }
 
   function cardGearQty() {
