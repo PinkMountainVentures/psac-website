@@ -800,3 +800,103 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
 }
+
+/* ============================================
+   PLAN YOUR DAY — custom adventure intake form
+   ============================================ */
+
+.paf-progress-bar { height: 4px; background: rgba(42,71,71,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 0.9rem; }
+.paf-progress-fill { height: 100%; background: var(--mountain-pink); transition: width 0.3s ease; }
+
+.paf-progress-labels { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.8rem; flex-wrap: wrap; }
+.paf-progress-section { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,71,71,0.4); font-weight: 600; }
+.paf-progress-section.is-active { color: var(--mountain-pink); }
+
+.paf-card-body { min-height: 280px; max-height: 56vh; overflow-y: auto; padding-right: 0.4rem; }
+
+.paf-q { font-family: 'Cormorant Garamond', serif; font-size: 1.55rem; font-weight: 700; color: var(--dark-pine); line-height: 1.25; margin-bottom: 0.5rem; }
+.paf-req { color: var(--mountain-pink); }
+.paf-sub { font-size: 0.83rem; color: rgba(42,71,71,0.65); margin-bottom: 1.2rem; line-height: 1.55; }
+.paf-transition { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1rem; color: var(--mountain-pink); margin-bottom: 1.2rem; }
+
+.paf-options { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.8rem; }
+.paf-starters { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
+
+.paf-option-btn, .paf-starter-btn {
+    text-align: left;
+    background: white;
+    border: 1px solid rgba(42,71,71,0.15);
+    color: var(--dark-pine);
+    padding: 0.85rem 1.1rem;
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.paf-option-btn:hover, .paf-starter-btn:hover { border-color: var(--mountain-pink); }
+.paf-option-btn.is-selected, .paf-starter-btn.is-selected { background: var(--mountain-pink); border-color: var(--mountain-pink); color: white; }
+
+.paf-stitch-line { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; color: var(--dark-pine); padding-top: 1rem; border-top: 1px solid rgba(42,71,71,0.1); }
+.paf-stitch-prefix { font-style: italic; color: rgba(42,71,71,0.45); }
+.paf-stitch-prefix.is-active { font-style: normal; color: var(--dark-pine); }
+.paf-stitch-input { border: none; border-bottom: 2px solid var(--mountain-pink); background: transparent; font-family: inherit; font-size: inherit; color: var(--dark-pine); outline: none; min-width: 220px; padding: 2px 4px; font-style: italic; }
+
+.paf-textarea, .paf-text-input, .paf-date-input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(42,71,71,0.2);
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    color: var(--dark-pine);
+    background: white;
+}
+.paf-textarea { min-height: 110px; resize: vertical; }
+
+.paf-roster { margin-top: 1.3rem; padding-top: 1.2rem; border-top: 1px dashed rgba(42,71,71,0.2); }
+.paf-roster-sub { font-size: 0.78rem; color: rgba(42,71,71,0.6); margin-bottom: 0.9rem; }
+.paf-roster-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+.paf-roster-input { border: 1px solid rgba(42,71,71,0.18); border-radius: 6px; padding: 0.6rem 0.7rem; font-family: 'Montserrat', sans-serif; font-size: 0.82rem; background: var(--sand-beige); color: var(--dark-pine); }
+.paf-roster-name { flex: 2; }
+.paf-roster-age { width: 64px; }
+.paf-roster-fit { flex: 2; }
+.paf-roster-del { background: none; border: none; color: var(--sunset-red); font-size: 1.3rem; cursor: pointer; padding: 0 4px; line-height: 1; }
+.paf-add-person { background: none; border: 1px dashed var(--mountain-pink); color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.78rem; padding: 0.55rem 1rem; border-radius: 6px; cursor: pointer; }
+
+.paf-stepper { display: flex; align-items: center; gap: 1.6rem; margin-top: 0.4rem; }
+.paf-stepper-btn { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--dark-pine); background: white; color: var(--dark-pine); font-size: 1.3rem; cursor: pointer; }
+.paf-stepper-value { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--dark-pine); min-width: 40px; text-align: center; }
+
+.paf-price-card { background: var(--sand-beige); border-radius: 10px; padding: 1.4rem 1.5rem; margin-bottom: 1.2rem; border: 1px solid rgba(42,71,71,0.1); }
+.paf-price-tier { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; color: var(--mountain-pink); margin-bottom: 0.7rem; }
+.paf-price-line { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--dark-pine); padding: 0.3rem 0; }
+.paf-price-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.15rem; color: var(--dark-pine); border-top: 1px solid rgba(42,71,71,0.15); margin-top: 0.5rem; padding-top: 0.6rem; }
+.paf-price-switch { font-size: 0.76rem; color: rgba(42,71,71,0.6); margin-bottom: 1.3rem; }
+.paf-price-switch a { color: var(--mountain-pink); text-decoration: underline; cursor: pointer; }
+.paf-reserve-btn { width: 100%; background: var(--desert-green); color: white; padding: 0.95rem 1.6rem; border-radius: 30px; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.13em; text-transform: uppercase; border: none; cursor: pointer; }
+.paf-reserve-btn:hover { background: #63a677; }
+.paf-price-note { font-size: 0.72rem; color: rgba(42,71,71,0.55); margin-top: 0.9rem; line-height: 1.6; }
+
+.paf-closing-eyebrow { font-size: 0.67rem; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; color: var(--mountain-pink); margin-bottom: 0.6rem; }
+.paf-closing-headline { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--dark-pine); line-height: 1.15; margin-bottom: 1.2rem; }
+.paf-closing-dynamic { font-size: 0.92rem; color: var(--dark-pine); line-height: 1.75; background: var(--sand-beige); padding: 1.2rem 1.3rem; border-radius: 8px; margin-bottom: 1.5rem; }
+.paf-closing-dynamic em { font-style: italic; color: var(--mountain-pink); }
+.paf-closing-sub { font-size: 0.85rem; color: rgba(42,71,71,0.65); margin-bottom: 0.7rem; }
+.paf-rating { display: flex; gap: 8px; }
+.paf-star { background: none; border: none; font-size: 1.9rem; color: rgba(42,71,71,0.22); cursor: pointer; line-height: 1; padding: 0; }
+.paf-star.is-filled { color: var(--mountain-pink); }
+
+.paf-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 1.1rem; margin-top: 0.8rem; border-top: 1px solid rgba(42,71,71,0.1); }
+.paf-nav-btn { font-family: 'Montserrat', sans-serif; cursor: pointer; }
+.paf-nav-prev { background: none; border: none; color: var(--dark-pine); opacity: 0.7; font-weight: 600; font-size: 0.8rem; letter-spacing: 0.04em; padding: 0.6rem 0.4rem; }
+.paf-nav-next { background: var(--desert-green); color: white; border: none; border-radius: 30px; padding: 0.75rem 1.7rem; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.paf-nav-next:hover:not(:disabled) { background: #63a677; }
+.paf-nav-next:disabled { opacity: 0.35; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+    .paf-roster-row { flex-wrap: wrap; }
+    .paf-roster-name { flex: 1 1 100%; }
+    .paf-roster-age { flex: 1 1 30%; }
+    .paf-roster-fit { flex: 1 1 60%; }
+}

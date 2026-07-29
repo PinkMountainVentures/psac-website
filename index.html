@@ -107,7 +107,7 @@
                 <li><a href="/#adventures">On the Trail</a></li>
                 <li><a href="/#after-trail">After the Trail</a></li>
                 <li><a href="/#the-club">The Club</a></li>
-                <li><a href="/#contact" class="nav-cta jotform-btn">Start My Adventure</a></li>
+                <li><a href="/#contact" class="nav-cta start-adventure-btn">Start My Adventure</a></li>
             </ul>
             <button class="hamburger" id="hamburger">☰</button>
         </nav>
@@ -121,7 +121,7 @@
         <h1>The pool is perfect.<br>And it's not enough.</h1>
         <p>Just past the pool deck, past the restaurants and the long golden afternoons, adventure is waiting.</p>
 
-        <a href="#" class="btn jotform-btn">Start My Adventure</a>
+        <a href="#" class="btn start-adventure-btn">Start My Adventure</a>
     </div>
 </section>
 
@@ -194,7 +194,7 @@
         </div>
         <p class="consult-intro">The best days in Palm Springs do not happen by accident. The right trail matched to your group. Gear handled before you leave the hotel. After the Trail curated for exactly how you want to feel when you get back. You show up. Everything else is handled.</p>
         <div style="text-align: center; margin-bottom: 1rem;">
-            <a href="#" class="btn jotform-btn">Start My Adventure</a>
+            <a href="#" class="btn start-adventure-btn">Start My Adventure</a>
         </div>
 
         <div class="gallery-grid" style="margin-top: 3.5rem;">
@@ -250,7 +250,7 @@
 
         <div class="after-cta">
             <p>Every Palm Springs Adventure Club guide includes a personalized After the Trail recommendation built around your day.</p>
-            <a href="#" class="btn jotform-btn">Start My Adventure</a>
+            <a href="#" class="btn start-adventure-btn">Start My Adventure</a>
         </div>
     </div>
 </section>
@@ -336,43 +336,44 @@
     });
 </script>
 
-<!-- ── JOTFORM MODAL ── -->
+<!-- ── PLAN YOUR DAY MODAL (custom adventure form) ── -->
 <style>
-  #jotform-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
-  #jotform-modal-inner { position:relative; width:90%; max-width:780px; height:88vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); display:flex; flex-direction:column; }
-  #jotform-modal-header { background:#2A4747; padding:0.9rem 1.4rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-  #jotform-modal-header img { height:36px; width:auto; }
-  #jotform-modal-close { background:none; border:none; font-size:1.6rem; cursor:pointer; color:rgba(255,255,255,0.7); line-height:1; padding:0; transition:color 0.2s; }
-  #jotform-modal-close:hover { color:white; }
-  #jotform-modal-iframe { flex:1; border:none; width:100%; }
+  #adventure-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
+  #adventure-modal-inner { position:relative; width:92%; max-width:640px; max-height:90vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); display:flex; flex-direction:column; }
+  #adventure-modal-header { background:#2A4747; padding:0.9rem 1.4rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  #adventure-modal-header img { height:36px; width:auto; }
+  #adventure-modal-close { background:none; border:none; font-size:1.6rem; cursor:pointer; color:rgba(255,255,255,0.7); line-height:1; padding:0; transition:color 0.2s; }
+  #adventure-modal-close:hover { color:white; }
+  #adventure-form-root { flex:1; overflow-y:auto; padding:1.8rem 1.8rem 1.4rem; background:white; }
   @media (max-width: 768px) {
-    #jotform-modal { align-items:stretch; justify-content:stretch; }
-    #jotform-modal-inner { width:100%; max-width:100%; height:100%; border-radius:0; box-shadow:none; }
-    #jotform-modal-close { font-size:2rem; }
+    #adventure-modal { align-items:stretch; justify-content:stretch; }
+    #adventure-modal-inner { width:100%; max-width:100%; height:100%; max-height:100%; border-radius:0; box-shadow:none; }
+    #adventure-modal-close { font-size:2rem; }
   }
 </style>
 
-<div id="jotform-modal">
-  <div id="jotform-modal-inner">
-    <div id="jotform-modal-header">
+<div id="adventure-modal">
+  <div id="adventure-modal-inner">
+    <div id="adventure-modal-header">
       <img src="images/logo.svg" alt="Palm Springs Adventure Club">
-      <button id="jotform-modal-close" onclick="document.getElementById('jotform-modal').style.display='none'">&times;</button>
+      <button id="adventure-modal-close" onclick="document.getElementById('adventure-modal').style.display='none'">&times;</button>
     </div>
-    <iframe
-      id="jotform-modal-iframe"
-      title="Palm Springs Adventure Club Consultation"
-      src="https://form.jotform.com/262086205216047"
-      allow="geolocation; microphone; camera; fullscreen">
-    </iframe>
+    <div id="adventure-form-root"></div>
   </div>
 </div>
 
+<script src="adventure-form.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function() {
-    var modal = document.getElementById('jotform-modal');
-    document.querySelectorAll('.jotform-btn').forEach(function(btn) {
+    var modal = document.getElementById('adventure-modal');
+    var mounted = false;
+    document.querySelectorAll('.start-adventure-btn').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
+        if (!mounted) {
+          PSACAdventureForm.mount(document.getElementById('adventure-form-root'));
+          mounted = true;
+        }
         modal.style.display = 'flex';
       });
     });
