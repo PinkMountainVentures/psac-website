@@ -201,7 +201,7 @@
       var html = '<div class="paf-q">Who\'s coming? <span class="paf-req">*</span></div>';
       html += '<div class="paf-options" data-field="who"></div>';
       html += '<div class="paf-roster" data-field="roster" style="display:none;">' +
-        '<div class="paf-roster-sub">Tell us a little about who\'s coming — ages, energy levels, anything useful.</div>' +
+        '<div class="paf-roster-sub">Tell us a little about who\'s coming, including name, age range, and fitness level.</div>' +
         '<div class="paf-roster-rows" data-field="roster_rows"></div>' +
         '<button type="button" class="paf-add-person" data-field="add_person">+ Add person</button>' +
         '</div>';
@@ -217,19 +217,28 @@
         row.className = 'paf-roster-row';
         var name = document.createElement('input');
         name.type = 'text'; name.placeholder = 'Name'; name.className = 'paf-roster-input paf-roster-name';
-        var age = document.createElement('input');
-        age.type = 'number'; age.min = '0'; age.placeholder = 'Age'; age.className = 'paf-roster-input paf-roster-age';
+        var age = document.createElement('select');
+        age.className = 'paf-roster-input paf-roster-age';
+        ['Age range', '14–18', '18–25', '26–35', '36–45', '46–55', '56–65', '66+'].forEach(function (o, i) {
+          var opt = document.createElement('option');
+          opt.textContent = o;
+          opt.value = i === 0 ? '' : o;
+          age.appendChild(opt);
+        });
         var fit = document.createElement('select');
         fit.className = 'paf-roster-input paf-roster-fit';
-        ['Fitness level', 'Easygoing pace', 'Comfortable hiker', 'Strong / experienced'].forEach(function (o) {
-          var opt = document.createElement('option'); opt.textContent = o; fit.appendChild(opt);
+        ['Fitness level', 'Easygoing pace', 'Comfortable hiker', 'Strong / experienced'].forEach(function (o, i) {
+          var opt = document.createElement('option');
+          opt.textContent = o;
+          opt.value = i === 0 ? '' : o;
+          fit.appendChild(opt);
         });
         var del = document.createElement('button');
         del.type = 'button'; del.className = 'paf-roster-del'; del.textContent = '×'; del.title = 'Remove';
 
         if (prefill) {
           name.value = prefill.name || '';
-          age.value = prefill.age || '';
+          if (prefill.age) age.value = prefill.age;
           if (prefill.fitness) fit.value = prefill.fitness;
         }
 
@@ -420,9 +429,9 @@
     if (who === 'partner') return 2;
     if (ROSTER_WHO_KEYS.indexOf(who) !== -1) {
       var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
-      if (roster.length === 0) return 1;
-      var teenAdult = roster.filter(function (p) { return !p.age || Number(p.age) >= 13; }).length;
-      return Math.max(teenAdult, 1);
+      // The age range picker starts at 14+, so every roster entry with an
+      // age selected is a teen/adult and gets its own recommended package.
+      return Math.max(roster.length, 1);
     }
     return 1;
   }

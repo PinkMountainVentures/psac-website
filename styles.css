@@ -859,7 +859,7 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 .paf-roster-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
 .paf-roster-input { border: 1px solid rgba(42,71,71,0.18); border-radius: 6px; padding: 0.6rem 0.7rem; font-family: 'Montserrat', sans-serif; font-size: 0.82rem; background: var(--sand-beige); color: var(--dark-pine); }
 .paf-roster-name { flex: 2; }
-.paf-roster-age { width: 64px; }
+.paf-roster-age { width: 110px; flex-shrink: 0; }
 .paf-roster-fit { flex: 2; }
 .paf-roster-del { background: none; border: none; color: var(--sunset-red); font-size: 1.3rem; cursor: pointer; padding: 0 4px; line-height: 1; }
 .paf-add-person { background: none; border: 1px dashed var(--mountain-pink); color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.78rem; padding: 0.55rem 1rem; border-radius: 6px; cursor: pointer; }
