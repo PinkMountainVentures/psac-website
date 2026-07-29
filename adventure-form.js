@@ -324,12 +324,13 @@
 
   function cardDateTime() {
     var c = cardShell('adventure', true);
-    var TIMES = ['Early start (before 7am)', 'Morning (7–9am)', 'Mid-morning (after 9am)', 'Flexible'];
+    var TIMES = ['Early start (before 8am)', 'Morning (8am – 10am)', 'Mid-Morning (after 10am)', 'Flexible'];
     c.render = function (root) {
       var html = '<div class="paf-q">When are you going? <span class="paf-req">*</span></div>';
       html += '<input type="date" class="paf-date-input" data-field="date" value="' + esc(state.answers.q3_date || '') + '">';
       html += '<div class="paf-sub" style="margin-top:1.5rem;">Time preference</div>';
       html += '<div class="paf-options" data-field="time"></div>';
+      html += '<div class="paf-time-note">Starting after 12pm is not recommended due to heat.</div>';
       root.innerHTML = html;
 
       root.querySelector('[data-field="date"]').addEventListener('input', function (e) {

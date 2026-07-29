@@ -854,6 +854,23 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 }
 .paf-textarea { min-height: 110px; resize: vertical; }
 
+.paf-date-input {
+    font-size: 1.1rem;
+    padding: 1.1rem 1.2rem;
+    background: var(--sand-beige);
+    border-radius: 10px;
+    accent-color: var(--mountain-pink);
+    cursor: pointer;
+}
+.paf-date-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.65;
+    transform: scale(1.2);
+}
+.paf-date-input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+.paf-time-note { font-size: 0.78rem; font-style: italic; color: rgba(42,71,71,0.55); margin-top: 0.9rem; }
+
 .paf-roster { margin-top: 1.3rem; padding-top: 1.2rem; border-top: 1px dashed rgba(42,71,71,0.2); }
 .paf-roster-sub { font-size: 0.78rem; color: rgba(42,71,71,0.6); margin-bottom: 0.9rem; }
 .paf-roster-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
