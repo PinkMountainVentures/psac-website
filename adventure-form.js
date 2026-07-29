@@ -386,16 +386,19 @@
         h += '</div>';
         calendarEl.innerHTML = h;
 
-        calendarEl.querySelector('[data-nav="prev"]').addEventListener('click', function () {
+        calendarEl.querySelector('[data-nav="prev"]').addEventListener('click', function (e) {
+          e.stopPropagation();
           viewDate.setMonth(viewDate.getMonth() - 1);
           renderCalendar();
         });
-        calendarEl.querySelector('[data-nav="next"]').addEventListener('click', function () {
+        calendarEl.querySelector('[data-nav="next"]').addEventListener('click', function (e) {
+          e.stopPropagation();
           viewDate.setMonth(viewDate.getMonth() + 1);
           renderCalendar();
         });
         Array.prototype.forEach.call(calendarEl.querySelectorAll('.paf-cal-day[data-date]'), function (btn) {
-          btn.addEventListener('click', function () {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
             var iso = btn.getAttribute('data-date');
             state.answers.q3_date = iso;
             trigger.textContent = formatDisplay(iso);
