@@ -169,17 +169,30 @@
     c.render = function (root) {
       var html = '';
       if (transitionLine) html += '<div class="paf-transition">' + esc(transitionLine) + '</div>';
-      html += '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
+      html += '<div class="paf-q">' + (required ? '<span class="paf-req">*</span> ' : '') + esc(text) + '</div>';
       if (subtext) html += '<div class="paf-sub">' + esc(subtext) + '</div>';
       html += '<div class="paf-starters" data-field="' + id + '_starters"></div>';
       html += '<div class="paf-stitch-line"><span class="paf-stitch-prefix" data-field="' + id + '_prefix">Pick a line above to begin your sentence</span>' +
-        '<input type="text" class="paf-stitch-input" data-field="' + id + '_text" placeholder="keep typing…" style="display:none;"></div>';
+        '<textarea rows="1" class="paf-stitch-input" data-field="' + id + '_text" placeholder="keep typing…" style="display:none;"></textarea></div>';
       root.innerHTML = html;
 
       var starterWrap = root.querySelector('[data-field="' + id + '_starters"]');
       var prefixEl = root.querySelector('[data-field="' + id + '_prefix"]');
       var inputEl = root.querySelector('[data-field="' + id + '_text"]');
       var current = state.answers[id];
+
+      // Textarea substitutes for a plain <input> so a long continuation
+      // wraps onto multiple lines instead of scrolling sideways (where it
+      // used to hide the start of what someone typed). Height grows with
+      // content; Enter is swallowed so it stays one flowing thought
+      // instead of turning into line breaks.
+      function autoGrow() {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = inputEl.scrollHeight + 'px';
+      }
+      inputEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') e.preventDefault();
+      });
 
       starters.forEach(function (s) {
         var b = document.createElement('button');
@@ -193,8 +206,9 @@
           state.answers[id] = { starter: s, text: (state.answers[id] && state.answers[id].text) || '' };
           prefixEl.textContent = s + ' ';
           prefixEl.classList.add('is-active');
-          inputEl.style.display = 'inline-block';
+          inputEl.style.display = 'block';
           inputEl.value = state.answers[id].text;
+          autoGrow();
           inputEl.focus();
           refreshNav();
         });
@@ -204,13 +218,15 @@
       if (current) {
         prefixEl.textContent = current.starter + ' ';
         prefixEl.classList.add('is-active');
-        inputEl.style.display = 'inline-block';
+        inputEl.style.display = 'block';
         inputEl.value = current.text || '';
+        autoGrow();
       }
 
       inputEl.addEventListener('input', function () {
         if (!state.answers[id]) return;
         state.answers[id].text = inputEl.value;
+        autoGrow();
       });
     };
     c.isValid = function () { return !required || !!(state.answers[id] && state.answers[id].starter); };
@@ -227,7 +243,7 @@
       { v: 'family_kids', label: 'Family, including kids' }
     ];
     c.render = function (root) {
-      var html = '<div class="paf-q">Who\'s coming? <span class="paf-req">*</span></div>';
+      var html = '<div class="paf-q"><span class="paf-req">*</span> Who\'s coming?</div>';
       html += '<div class="paf-options" data-field="who"></div>';
       html += '<div class="paf-roster" data-field="roster" style="display:none;">' +
         '<div class="paf-roster-sub">Tell us a little about who\'s coming, including name, age range, and fitness level.</div>' +
@@ -377,7 +393,7 @@
     }
 
     c.render = function (root) {
-      var html = '<div class="paf-q">When are you going? <span class="paf-req">*</span></div>';
+      var html = '<div class="paf-q"><span class="paf-req">*</span> When are you going?</div>';
       html += '<div class="paf-date-picker" data-field="date-picker">';
       html += '<button type="button" class="paf-date-trigger' + (state.answers.q3_date ? '' : ' is-placeholder') + '" data-field="date-trigger">' +
         (state.answers.q3_date ? esc(formatDisplay(state.answers.q3_date)) : 'Select a date') + '</button>';
@@ -485,7 +501,7 @@
   function cardTextarea(id, section, text, subtext, placeholder, required) {
     var c = cardShell(section, required);
     c.render = function (root) {
-      var html = '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
+      var html = '<div class="paf-q">' + (required ? '<span class="paf-req">*</span> ' : '') + esc(text) + '</div>';
       if (subtext) html += '<div class="paf-sub">' + esc(subtext) + '</div>';
       html += '<textarea class="paf-textarea" data-field="' + id + '" placeholder="' + esc(placeholder || '') + '">' + esc(state.answers[id] || '') + '</textarea>';
       root.innerHTML = html;
@@ -501,7 +517,7 @@
   function cardText(id, section, text, subtext, placeholder, required) {
     var c = cardShell(section, required);
     c.render = function (root) {
-      var html = '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
+      var html = '<div class="paf-q">' + (required ? '<span class="paf-req">*</span> ' : '') + esc(text) + '</div>';
       if (subtext) html += '<div class="paf-sub">' + esc(subtext) + '</div>';
       html += '<input type="text" class="paf-text-input" data-field="' + id + '" placeholder="' + esc(placeholder || '') + '" value="' + esc(state.answers[id] || '') + '">';
       root.innerHTML = html;
@@ -517,7 +533,7 @@
   function cardSelect(id, section, text, options, required, onSelect) {
     var c = cardShell(section, required);
     c.render = function (root) {
-      var html = '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
+      var html = '<div class="paf-q">' + (required ? '<span class="paf-req">*</span> ' : '') + esc(text) + '</div>';
       html += '<div class="paf-options" data-field="' + id + '"></div>';
       root.innerHTML = html;
       var wrap = root.querySelector('[data-field="' + id + '"]');
@@ -544,7 +560,7 @@
     var c = cardShell(section, required);
     c.render = function (root) {
       var subtext = max ? ('Pick up to ' + max + '.') : null;
-      var html = '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
+      var html = '<div class="paf-q">' + (required ? '<span class="paf-req">*</span> ' : '') + esc(text) + '</div>';
       if (subtext) html += '<div class="paf-sub">' + esc(subtext) + '</div>';
       html += '<div class="paf-options paf-options-wrap" data-field="' + id + '"></div>';
       root.innerHTML = html;
@@ -751,7 +767,7 @@
         }
       });
 
-      var html = '<div class="paf-q">Who needs a gear kit? <span class="paf-req">*</span></div>';
+      var html = '<div class="paf-q"><span class="paf-req">*</span> Who needs a gear kit?</div>';
       html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit — ' +
         BASE_GEAR_COPY + ', plus keepsakes to keep. Turn any off if you\'d like to share.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
