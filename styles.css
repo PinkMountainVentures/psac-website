@@ -979,10 +979,6 @@ select.paf-roster-input {
     .paf-roster-age { flex: 1 1 32%; width: auto; }
     .paf-roster-fit { flex: 1 1 48%; }
     .paf-roster-del { flex: 0 0 auto; margin-left: auto; }
-
-    .paf-gear-row { flex-wrap: wrap; }
-    .paf-gear-row-info { flex: 1 1 100%; }
-    .paf-gear-toggle { flex: 0 0 auto; margin-left: auto; }
 }
 
 /* ── LEGAL / POLICY PAGES ── */
