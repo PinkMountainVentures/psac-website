@@ -60,7 +60,14 @@ module.exports = async function handler(req, res) {
     var params = new URLSearchParams();
     params.append('amount', String(amountCents));
     params.append('currency', 'usd');
-    params.append('automatic_payment_methods[enabled]', 'true');
+    // Restricted to card-rail methods only (card entry, Apple Pay, Google
+    // Pay) — all settle instantly, matching the immediate "Reserved"
+    // confirmation this flow shows the guest. Deliberately excludes bank
+    // debit/ACH (multi-day settlement, can still fail after the fact) and
+    // Amazon Pay. Apple Pay/Google Pay ride on the 'card' type and appear
+    // automatically in the Payment Element when the browser/device
+    // supports them — no separate type needed.
+    params.append('payment_method_types[]', 'card');
     if (email) params.append('receipt_email', email);
     params.append('description', tier.name + ' — Palm Springs Adventure Club');
     params.append('metadata[tier]', tierKey);
