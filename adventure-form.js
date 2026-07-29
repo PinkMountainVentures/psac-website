@@ -651,7 +651,7 @@
         BASE_GEAR_COPY + ', plus keepsakes to keep. Turn any off if you\'d like to share.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
-        '<div class="paf-kit-details-row"><strong>Rental gear</strong> (same for every tier): ' + BASE_GEAR_COPY + '.</div>' +
+        '<div class="paf-kit-details-row"><strong>Rental gear:</strong> ' + BASE_GEAR_COPY + '.</div>' +
         '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few PSAC keepsakes — the exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
         '</div>';
       html += '<div class="paf-gear-list" data-field="gear-list"></div>';
