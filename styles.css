@@ -808,8 +808,9 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 .paf-progress-bar { height: 4px; background: rgba(42,71,71,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 0.9rem; }
 .paf-progress-fill { height: 100%; background: var(--mountain-pink); transition: width 0.3s ease; }
 
-.paf-progress-labels { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.8rem; flex-wrap: wrap; }
-.paf-progress-section { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,71,71,0.4); font-weight: 600; }
+.paf-progress-labels { display: flex; flex-wrap: nowrap; gap: 1.1rem; margin-bottom: 1.8rem; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; }
+.paf-progress-labels::-webkit-scrollbar { display: none; }
+.paf-progress-section { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,71,71,0.4); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
 .paf-progress-section.is-active { color: var(--mountain-pink); }
 
 .paf-card-body { min-height: 280px; max-height: 56vh; overflow-y: auto; padding-right: 0.4rem; }

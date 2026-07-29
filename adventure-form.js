@@ -112,7 +112,7 @@
       cardWho(),
       cardDateTime(),
       cardTextarea('q4', 'move', "What's the most challenging thing you've done outdoors that felt great?",
-        "Doesn't have to be epic. Could be a trail, a ride, a climb — anything that pushed you and paid off.", false),
+        null, "Doesn't have to be epic. Could be a trail, a ride, a climb — anything that pushed you and paid off.", false),
       cardMultiselect('q5', 'move', 'What activity are you planning?', [
         'Hiking', 'Trail running'
       ], null, true),
@@ -129,7 +129,7 @@
           state.answers.tier = state.answers.include_after_trail === false ? 'trail' : 'p2p';
         }
       }),
-      cardText('q7', 'move', 'Any physical considerations we should know about?',
+      cardTextarea('q7', 'move', 'Any physical considerations we should know about?',
         'Anything that affects how you or anyone in your group moves. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
         'Bad knee on descents, prefer no scrambling, slower pace is fine — anything like that.', false),
       cardMultiselect('q8', 'after', 'What draws you most on a great day out?', [
@@ -137,7 +137,7 @@
         'Water — streams, pools, falls', 'Photography opportunities', 'Learning about the place',
         'Moving fast', 'Moving slow and taking it all in'
       ], 3, true),
-      cardText('q9', 'after', 'Is there anything specific you want to see or do on this adventure?',
+      cardTextarea('q9', 'after', 'Is there anything specific you want to see or do on this adventure?',
         null, 'A summit, a canyon, a specific trail you\'ve heard about — anything on your list.', false),
       cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
@@ -149,7 +149,7 @@
         'Simple and restorative', 'Comfortable and easy', 'Elevated and indulgent', 'Surprise me'
       ], true),
       cardTextarea('q15', 'trail', 'Anything else we should know to make this day exactly right?',
-        'This is your space. Anything at all.', false),
+        null, 'This is your space. Anything at all.', false),
       cardGearList(),
       cardContact(),
       cardRecap(),
@@ -482,10 +482,11 @@
     return c;
   }
 
-  function cardTextarea(id, section, text, placeholder, required) {
+  function cardTextarea(id, section, text, subtext, placeholder, required) {
     var c = cardShell(section, required);
     c.render = function (root) {
       var html = '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
+      if (subtext) html += '<div class="paf-sub">' + esc(subtext) + '</div>';
       html += '<textarea class="paf-textarea" data-field="' + id + '" placeholder="' + esc(placeholder || '') + '">' + esc(state.answers[id] || '') + '</textarea>';
       root.innerHTML = html;
       root.querySelector('[data-field="' + id + '"]').addEventListener('input', function (e) {
@@ -1140,6 +1141,11 @@
     els.progress.innerHTML = html;
     var pct = Math.round((state.step / (cards.length - 1)) * 100);
     els.progressFill.style.width = pct + '%';
+
+    // Labels scroll horizontally on narrow screens instead of wrapping —
+    // keep the active one in view without the guest having to swipe.
+    var activeEl = els.progress.querySelector('.paf-progress-section.is-active');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
   function renderStep() {
