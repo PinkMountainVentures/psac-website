@@ -13,9 +13,9 @@
   var SUBMIT_ENDPOINT = ""; // paste the Google Apps Script Web App /exec URL here once deployed
 
   var TIERS = {
-    trail:  { key: 'trail',  name: 'Trail Guide',        booking: 100, gear: 65 },
-    p2p:    { key: 'p2p',    name: 'Peaks to Pools',     booking: 195, gear: 100 },
-    custom: { key: 'custom', name: 'Custom Experience',  booking: 595, gear: 100 }
+    trail:  { key: 'trail',  name: 'Trail Guide Experience',    booking: 100, gear: 65 },
+    p2p:    { key: 'p2p',    name: 'Peaks to Pools Experience', booking: 195, gear: 100 },
+    custom: { key: 'custom', name: 'Custom Experience',         booking: 595, gear: 100 }
   };
 
   var SECTIONS = [
@@ -112,9 +112,9 @@
       ], true),
       cardTextarea('q15', 'trail', 'Anything else we should know to make this day exactly right?',
         'This is your space. Anything at all.', false),
-      cardAfterTrailToggle(),
       cardGearList(),
       cardContact(),
+      cardRecap(),
       cardPricing(),
       cardClosing()
     ];
@@ -562,17 +562,57 @@
     return lower.slice(0, -1).join(', ') + ' and ' + lower[lower.length - 1];
   }
 
-  function cardAfterTrailToggle() {
-    var c = cardShell('trail', true);
+  function stitchFragment(field) {
+    return field && field.starter ? (field.starter + ' ' + (field.text || '')).trim() : '';
+  }
+
+  // Builds the recap paragraph on cardRecap(), re-run live whenever the
+  // after-trail toggle changes so the narrative always matches the current
+  // choice before price is revealed.
+  function buildRecapNarrative() {
+    var q1Frag = stitchFragment(state.answers.q1);
+    var activity = (state.answers.q5 && state.answers.q5.length)
+      ? state.answers.q5.join(' and ').toLowerCase()
+      : 'your adventure';
+    var duration = state.answers.q6 ? state.answers.q6.toLowerCase() : '';
+    var headcount = totalHeadcount();
+    var groupPhrase = headcount === 1 ? 'just you' : ('your group of ' + headcount);
+    var gearCount = selectedGearCount();
+    var gearPhrase = gearCount === 1 ? '1 gear kit' : (gearCount + ' gear kits');
+
+    var opener = q1Frag
+      ? 'You told us "' + q1Frag + '," so we\'re building '
+      : 'We\'re building ';
+    var lines = [];
+    lines.push(opener + (duration ? duration + ' of ' : '') + activity + ' for ' + groupPhrase + '.');
+    lines.push('That means ' + gearPhrase + ' — everything delivered and picked up, nothing for you to plan.');
+
+    if (state.answers.include_after_trail === false) {
+      lines.push('You\'ve chosen to keep it trail-only — just the adventure, nothing after.');
+    } else {
+      lines.push('Afterward, we\'ll build in ' + recoveryPreviewText() + '.');
+    }
+    return lines.join(' ');
+  }
+
+  function cardRecap() {
+    var c = cardShell('kit', true);
     var OPTIONS = [
       { v: true, label: 'Yes, include it' },
       { v: false, label: 'No, trail only' }
     ];
     c.render = function (root) {
-      var html = '<div class="paf-q">Want to include a recovery experience after your trail? <span class="paf-req">*</span></div>';
-      html += '<div class="paf-sub">Based on what you told us, we\'d build in something like ' + esc(recoveryPreviewText()) + '.</div>';
+      var html = '<div class="paf-closing-eyebrow">Almost there</div>';
+      html += '<div class="paf-q">Here\'s the day we\'re building.</div>';
+      html += '<div class="paf-closing-dynamic" data-field="narrative"></div>';
+      html += '<div class="paf-sub" style="margin-top:0.4rem;">Want to include a recovery experience after your trail? <span class="paf-req">*</span></div>';
       html += '<div class="paf-options" data-field="opt"></div>';
       root.innerHTML = html;
+
+      var narrativeEl = root.querySelector('[data-field="narrative"]');
+      function refreshNarrative() { narrativeEl.textContent = buildRecapNarrative(); }
+      refreshNarrative();
+
       var wrap = root.querySelector('[data-field="opt"]');
       OPTIONS.forEach(function (o) {
         var b = document.createElement('button');
@@ -584,6 +624,7 @@
           b.classList.add('is-selected');
           state.answers.include_after_trail = o.v;
           state.answers.tier = o.v ? 'p2p' : 'trail';
+          refreshNarrative();
           refreshNav();
         });
         wrap.appendChild(b);
@@ -605,14 +646,13 @@
         }
       });
 
-      var tierKey = state.answers.tier;
       var html = '<div class="paf-q">Who needs a gear kit? <span class="paf-req">*</span></div>';
       html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit — ' +
-        BASE_GEAR_COPY + ', plus ' + keepsakeCopy(tierKey) + ' to keep. Turn any off if you\'d like to share.</div>';
+        BASE_GEAR_COPY + ', plus keepsakes to keep. Turn any off if you\'d like to share.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
         '<div class="paf-kit-details-row"><strong>Rental gear</strong> (same for every tier): ' + BASE_GEAR_COPY + '.</div>' +
-        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> ' + keepsakeCopy(tierKey) + '.</div>' +
+        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few PSAC keepsakes — the exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
         '</div>';
       html += '<div class="paf-gear-list" data-field="gear-list"></div>';
       root.innerHTML = html;
@@ -712,19 +752,35 @@
   function renderPricing(root) {
     var tier = TIERS[state.answers.tier];
     var total = computeTotal(state.answers.tier);
+    var gearCount = selectedGearCount();
     var html = '<div class="paf-q">Here\'s your day.</div>';
     html += '<div class="paf-price-card">';
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
-    html += '<div class="paf-price-line"><span>Booking fee</span><span>$' + tier.booking + '</span></div>';
-    var gearCount = selectedGearCount();
+    html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span>$' + tier.booking + '</span></div>';
     html += '<div class="paf-price-line"><span>Gear kit × ' + gearCount + '</span><span>$' + (tier.gear * gearCount) + '</span></div>';
     html += '<div class="paf-price-total"><span>Total</span><span>$' + total + '</span></div>';
     html += '</div>';
+    html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s included? <span data-field="disclosure-icon">+</span></button>';
+    html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
+      '<div class="paf-kit-details-row">Route selection tailored to your group and the day\'s conditions, built from lived experience on these trails.</div>' +
+      '<div class="paf-kit-details-row">Every logistic handled — no permits, no planning, no guesswork.</div>' +
+      '<div class="paf-kit-details-row">No-hassle gear delivery and pickup.</div>' +
+      '<div class="paf-kit-details-row"><strong>Your gear kit:</strong> ' + BASE_GEAR_COPY + ', plus ' + keepsakeCopy(state.answers.tier) + ' to keep.</div>' +
+      '</div>';
     html += '<div class="paf-price-switch">Prefer something else? ' +
-      '<a href="#" data-tier="trail">Trail Guide</a> · <a href="#" data-tier="p2p">Peaks to Pools</a> · <a href="#" data-tier="custom">Custom Experience</a></div>';
+      '<a href="#" data-tier="trail">' + esc(TIERS.trail.name) + '</a> · <a href="#" data-tier="p2p">' + esc(TIERS.p2p.name) + '</a> · <a href="#" data-tier="custom">' + esc(TIERS.custom.name) + '</a></div>';
     html += '<button type="button" class="paf-reserve-btn" data-field="reserve">Reserve My Spot</button>';
     html += '<div class="paf-price-note">Payment is being finalized. You will not be charged yet — we\'ll follow up within one business day to confirm your date and collect payment.</div>';
     root.innerHTML = html;
+
+    var disclosureBtn = root.querySelector('[data-field="disclosure"]');
+    var detailsEl = root.querySelector('[data-field="details"]');
+    var iconEl = root.querySelector('[data-field="disclosure-icon"]');
+    disclosureBtn.addEventListener('click', function () {
+      var isOpen = detailsEl.style.display !== 'none';
+      detailsEl.style.display = isOpen ? 'none' : 'block';
+      iconEl.textContent = isOpen ? '+' : '–';
+    });
 
     Array.prototype.forEach.call(root.querySelectorAll('[data-tier]'), function (a) {
       a.addEventListener('click', function (e) {
@@ -743,10 +799,8 @@
     var c = cardShell('kit', false);
     c.isClosing = true;
     c.render = function (root) {
-      var q1 = state.answers.q1;
-      var q12 = state.answers.q12;
-      var q1Frag = q1 ? (q1.starter + ' ' + (q1.text || '')).trim() : '';
-      var q12Frag = q12 ? (q12.starter + ' ' + (q12.text || '')).trim() : '';
+      var q1Frag = stitchFragment(state.answers.q1);
+      var q12Frag = stitchFragment(state.answers.q12);
       var html = '<div class="paf-closing-eyebrow">Reserved</div>';
       html += '<div class="paf-closing-headline">Your adventure is<br>already taking shape.</div>';
       if (q1Frag || q12Frag) {

@@ -125,8 +125,8 @@ function joinRoster_(roster) {
 }
 
 var TIER_LABELS = {
-  trail: 'Trail Guide',
-  p2p: 'Peaks to Pools',
+  trail: 'Trail Guide Experience',
+  p2p: 'Peaks to Pools Experience',
   custom: 'Custom Experience'
 };
 
