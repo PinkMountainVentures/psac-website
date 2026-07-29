@@ -63,7 +63,7 @@
       q13: [],
       q14: null,
       q15: '',
-      include_after_trail: null,  // true | false — set by cardAfterTrailToggle
+      include_after_trail: true,  // true | false — assumed included; opt out on the recap screen
       contact_name: '',
       contact_email: '',
       contact_phone: '',
@@ -619,47 +619,75 @@
 
   function cardRecap() {
     var c = cardShell('kit', true);
-    var OPTIONS = [
-      { v: true, label: 'Yes, include it' },
-      { v: false, label: 'No, trail only' }
-    ];
+    c.nextLabel = 'Reserve My Spot';
     c.render = function (root) {
+      // Local to this render only — collapses back to closed every time the
+      // guest (re)enters this card, doesn't need to persist in state.
+      var confirmOpen = false;
+
       var html = '<div class="paf-closing-eyebrow">Almost there</div>';
       html += '<div class="paf-q">Here\'s the day we\'re building.</div>';
       html += '<div class="paf-closing-dynamic" data-field="narrative"></div>';
       html += '<div class="paf-value-list" data-field="value-list"></div>';
-      html += '<div class="paf-sub" style="margin-top:1.4rem;">Want to include a recovery experience after your trail? <span class="paf-req">*</span></div>';
-      html += '<div class="paf-options" data-field="opt"></div>';
+      html += '<div class="paf-after-trail" data-field="after-trail"></div>';
       root.innerHTML = html;
 
       var narrativeEl = root.querySelector('[data-field="narrative"]');
       var valueListEl = root.querySelector('[data-field="value-list"]');
+      var afterTrailEl = root.querySelector('[data-field="after-trail"]');
+
       function refreshRecap() {
         narrativeEl.textContent = buildRecapNarrative();
         valueListEl.innerHTML = buildValueItems().map(function (item) {
           return '<div class="paf-value-item"><span class="paf-value-check">✓</span>' + esc(item) + '</div>';
         }).join('');
+        renderAfterTrailToggle();
       }
-      refreshRecap();
 
-      var wrap = root.querySelector('[data-field="opt"]');
-      OPTIONS.forEach(function (o) {
-        var b = document.createElement('button');
-        b.type = 'button'; b.className = 'paf-option-btn';
-        b.textContent = o.label;
-        if (state.answers.include_after_trail === o.v) b.classList.add('is-selected');
-        b.addEventListener('click', function () {
-          Array.prototype.forEach.call(wrap.children, function (c2) { c2.classList.remove('is-selected'); });
-          b.classList.add('is-selected');
-          state.answers.include_after_trail = o.v;
-          state.answers.tier = o.v ? 'p2p' : 'trail';
-          refreshRecap();
-          refreshNav();
-        });
-        wrap.appendChild(b);
-      });
+      function setIncludeAfterTrail(val) {
+        state.answers.include_after_trail = val;
+        state.answers.tier = val ? 'p2p' : 'trail';
+        confirmOpen = false;
+        refreshRecap();
+      }
+
+      // Assumed included by default — no toggle to answer, just a small
+      // low-key way out. Removing it is a real pricing/tier change, so it
+      // gets an inline confirm step rather than executing on first click.
+      function renderAfterTrailToggle() {
+        var included = state.answers.include_after_trail !== false;
+        var h;
+        if (included && !confirmOpen) {
+          h = '<button type="button" class="paf-link-btn" data-field="open-confirm">Prefer trail-only?</button>';
+        } else if (included && confirmOpen) {
+          h = '<div class="paf-inline-confirm">' +
+            '<div class="paf-inline-confirm-text">Removing the after-trail experience downgrades from ' +
+            esc(TIERS.p2p.name) + ' to ' + esc(TIERS.trail.name) + ', including a smaller gear kit.</div>' +
+            '<div class="paf-inline-confirm-actions">' +
+            '<button type="button" class="paf-link-btn paf-link-btn-confirm" data-field="confirm-remove">Yes, switch to trail-only</button>' +
+            '<button type="button" class="paf-link-btn" data-field="cancel-remove">Never mind</button>' +
+            '</div></div>';
+        } else {
+          h = '<button type="button" class="paf-link-btn" data-field="add-back">Add back an after-trail experience</button>';
+        }
+        afterTrailEl.innerHTML = h;
+
+        var openBtn = afterTrailEl.querySelector('[data-field="open-confirm"]');
+        if (openBtn) openBtn.addEventListener('click', function () { confirmOpen = true; renderAfterTrailToggle(); });
+
+        var confirmBtn = afterTrailEl.querySelector('[data-field="confirm-remove"]');
+        if (confirmBtn) confirmBtn.addEventListener('click', function () { setIncludeAfterTrail(false); });
+
+        var cancelBtn = afterTrailEl.querySelector('[data-field="cancel-remove"]');
+        if (cancelBtn) cancelBtn.addEventListener('click', function () { confirmOpen = false; renderAfterTrailToggle(); });
+
+        var addBackBtn = afterTrailEl.querySelector('[data-field="add-back"]');
+        if (addBackBtn) addBackBtn.addEventListener('click', function () { setIncludeAfterTrail(true); });
+      }
+
+      refreshRecap();
     };
-    c.isValid = function () { return state.answers.include_after_trail !== null; };
+    c.isValid = function () { return true; };
     return c;
   }
 
@@ -815,7 +843,7 @@
       '</div>';
     html += '<div class="paf-price-switch">Prefer something else? ' +
       '<a href="#" data-tier="trail">' + esc(TIERS.trail.name) + '</a> · <a href="#" data-tier="p2p">' + esc(TIERS.p2p.name) + '</a> · <a href="#" data-tier="custom">' + esc(TIERS.custom.name) + '</a></div>';
-    html += '<button type="button" class="paf-reserve-btn" data-field="reserve">Reserve My Spot</button>';
+    html += '<button type="button" class="paf-reserve-btn" data-field="reserve">Confirm & Reserve</button>';
     html += '<div class="paf-price-note">Payment is being finalized. You will not be charged yet — we\'ll follow up within one business day to confirm your date and collect payment.</div>';
     root.innerHTML = html;
 
@@ -964,6 +992,7 @@
     var isLast = state.step === cards.length - 1;
     var isPricing = !!card.isPricing;
     els.footer.style.display = (isLast || isPricing) ? 'none' : 'flex';
+    els.nextBtn.textContent = (card.nextLabel || 'Next') + ' →';
     els.cardBody.scrollTop = 0;
     refreshNav();
   }
