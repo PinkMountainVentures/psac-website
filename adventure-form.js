@@ -260,6 +260,15 @@
         sync();
       }
 
+      // "Just me" is exactly one person — no adding, no removing.
+      function refreshRosterControls() {
+        var isSolo = state.answers.q2_who === 'solo';
+        addBtn.style.display = isSolo ? 'none' : '';
+        Array.prototype.forEach.call(rowsWrap.querySelectorAll('.paf-roster-del'), function (btn) {
+          btn.style.display = isSolo ? 'none' : '';
+        });
+      }
+
       addBtn.addEventListener('click', function () { addRow(); });
 
       WHO.forEach(function (w) {
@@ -284,6 +293,7 @@
             }
             state.answers.q2_roster = state.answers.q2_roster.slice(0, 1);
           }
+          refreshRosterControls();
           refreshNav();
         });
         optWrap.appendChild(b);
@@ -299,6 +309,7 @@
         state.answers.q2_roster = [];
         existing.forEach(function (p) { addRow(p); });
       }
+      refreshRosterControls();
     };
     c.isValid = function () {
       if (!state.answers.q2_who) return false;

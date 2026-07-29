@@ -897,6 +897,7 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 @media (max-width: 600px) {
     .paf-roster-row { flex-wrap: wrap; }
     .paf-roster-name { flex: 1 1 100%; }
-    .paf-roster-age { flex: 1 1 30%; }
-    .paf-roster-fit { flex: 1 1 60%; }
+    .paf-roster-age { flex: 1 1 32%; width: auto; }
+    .paf-roster-fit { flex: 1 1 48%; }
+    .paf-roster-del { flex: 0 0 auto; margin-left: auto; }
 }
