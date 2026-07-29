@@ -89,7 +89,7 @@
         'Hiking', 'Trail running'
       ], null, true),
       cardSelect('q6', 'move', 'How long do you want to be out?', [
-        'A few hours (half day)', 'Full day', 'Sunrise to sunset', 'Overnight or multi-day'
+        'A few hours (half day)', 'Full day', 'Overnight or multi-day'
       ], true, function (val) {
         // Overnight/multi-day is inherently bespoke — routes it straight
         // to the Custom Experience tier, which gets built personally
