@@ -133,9 +133,10 @@ function tierLabel_(key) {
 
 var WHO_LABELS = {
   solo: 'Just me',
-  partner: 'My partner',
-  friends: 'A small group of friends',
-  family: 'Family including kids'
+  partner: 'Me and my partner',
+  friends: 'A group of friends',
+  friends_kids: 'A group of friends, including kids',
+  family_kids: 'Family, including kids'
 };
 
 function whoLabel_(key) {

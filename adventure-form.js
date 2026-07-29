@@ -43,12 +43,15 @@
     "Ready to —"
   ];
 
+  // "Who's coming" answers that collect a per-person roster (name/age/fitness)
+  var ROSTER_WHO_KEYS = ['friends', 'friends_kids', 'family_kids'];
+
   // ── STATE ────────────────────────────────────────
   var state = {
     step: 0,
     answers: {
       q1: null,            // { starter, text }
-      q2_who: null,         // solo | partner | friends | family
+      q2_who: null,         // solo | partner | friends | friends_kids | family_kids
       q2_roster: [],         // [{ name, age, fitness }]
       q3_date: '',
       q3_time: null,
@@ -188,10 +191,12 @@
     var c = cardShell('adventure', true);
     var WHO = [
       { v: 'solo', label: 'Just me' },
-      { v: 'partner', label: 'My partner' },
-      { v: 'friends', label: 'A small group of friends' },
-      { v: 'family', label: 'Family including kids' }
+      { v: 'partner', label: 'Me and my partner' },
+      { v: 'friends', label: 'A group of friends' },
+      { v: 'friends_kids', label: 'A group of friends, including kids' },
+      { v: 'family_kids', label: 'Family, including kids' }
     ];
+    var ROSTER_WHO = ROSTER_WHO_KEYS;
     c.render = function (root) {
       var html = '<div class="paf-q">Who\'s coming? <span class="paf-req">*</span></div>';
       html += '<div class="paf-options" data-field="who"></div>';
@@ -260,7 +265,7 @@
           Array.prototype.forEach.call(optWrap.children, function (c2) { c2.classList.remove('is-selected'); });
           b.classList.add('is-selected');
           state.answers.q2_who = w.v;
-          if (w.v === 'friends' || w.v === 'family') {
+          if (ROSTER_WHO.indexOf(w.v) !== -1) {
             rosterWrap.style.display = 'block';
             if (state.answers.q2_roster.length === 0) {
               rowsWrap.innerHTML = '';
@@ -274,7 +279,7 @@
         optWrap.appendChild(b);
       });
 
-      if (state.answers.q2_who === 'friends' || state.answers.q2_who === 'family') {
+      if (ROSTER_WHO.indexOf(state.answers.q2_who) !== -1) {
         rosterWrap.style.display = 'block';
         rowsWrap.innerHTML = '';
         var existing = state.answers.q2_roster.length ? state.answers.q2_roster.slice() : [null, null];
@@ -413,7 +418,7 @@
     var who = state.answers.q2_who;
     if (who === 'solo') return 1;
     if (who === 'partner') return 2;
-    if (who === 'friends' || who === 'family') {
+    if (ROSTER_WHO_KEYS.indexOf(who) !== -1) {
       var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
       if (roster.length === 0) return 1;
       var teenAdult = roster.filter(function (p) { return !p.age || Number(p.age) >= 13; }).length;
@@ -426,7 +431,7 @@
     var who = state.answers.q2_who;
     if (who === 'solo') return 1;
     if (who === 'partner') return 2;
-    if (who === 'friends' || who === 'family') {
+    if (ROSTER_WHO_KEYS.indexOf(who) !== -1) {
       var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
       return Math.max(roster.length, 1);
     }
