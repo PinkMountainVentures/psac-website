@@ -861,6 +861,16 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 .paf-roster-name { flex: 2; }
 .paf-roster-age { width: 110px; flex-shrink: 0; }
 .paf-roster-fit { flex: 2; }
+select.paf-roster-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='%232A4747' d='M5.5 7.5l4.5 5 4.5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 12px;
+    padding-right: 1.9rem;
+}
 .paf-roster-del { background: none; border: none; color: var(--sunset-red); font-size: 1.3rem; cursor: pointer; padding: 0 4px; line-height: 1; }
 .paf-add-person { background: none; border: 1px dashed var(--mountain-pink); color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.78rem; padding: 0.55rem 1rem; border-radius: 6px; cursor: pointer; }
 
