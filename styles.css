@@ -925,6 +925,7 @@ select.paf-roster-input {
 .paf-gear-toggle { display: flex; gap: 6px; }
 .paf-gear-toggle-btn { border: 1px solid rgba(42,71,71,0.2); background: white; color: var(--dark-pine); font-family: 'Montserrat', sans-serif; font-size: 0.76rem; font-weight: 600; padding: 0.4rem 0.85rem; border-radius: 20px; cursor: pointer; }
 .paf-gear-toggle-btn.is-selected { background: var(--desert-green); border-color: var(--desert-green); color: white; }
+.paf-gear-toggle-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .paf-price-card { background: var(--sand-beige); border-radius: 10px; padding: 1.4rem 1.5rem; margin-bottom: 1.2rem; border: 1px solid rgba(42,71,71,0.1); }
 .paf-price-tier { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; color: var(--mountain-pink); margin-bottom: 0.7rem; }

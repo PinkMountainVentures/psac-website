@@ -667,45 +667,62 @@
       });
 
       var listEl = root.querySelector('[data-field="gear-list"]');
-      roster.forEach(function (p, idx) {
-        var row = document.createElement('div');
-        row.className = 'paf-gear-row';
-        var isKid = p.age === 'Under 14';
-        var nameLabel = p.name && p.name.trim() ? p.name.trim() : ('Person ' + (idx + 1));
 
-        var info = document.createElement('div');
-        info.className = 'paf-gear-row-info';
-        info.innerHTML = '<span class="paf-gear-row-name">' + esc(nameLabel) + '</span>' +
-          (p.age ? '<span class="paf-gear-row-age">' + esc(p.age) + '</span>' : '');
-        row.appendChild(info);
+      // This is a bundle — every booking needs at least one gear kit. Any
+      // person who is currently the *only* remaining "yes" has their "no"
+      // button locked so the total can never drop to zero. Recomputed on
+      // every toggle since who counts as "the last one" changes as people
+      // flip their own choice.
+      function renderList() {
+        listEl.innerHTML = '';
+        var selectedCount = roster.filter(function (p) { return p.gearKit; }).length;
 
-        if (isKid) {
-          var notIncluded = document.createElement('span');
-          notIncluded.className = 'paf-gear-row-excluded';
-          notIncluded.textContent = 'Not included';
-          row.appendChild(notIncluded);
-        } else {
-          var toggle = document.createElement('div');
-          toggle.className = 'paf-gear-toggle';
-          ['Yes', 'No'].forEach(function (label) {
-            var val = label === 'Yes';
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'paf-gear-toggle-btn' + (p.gearKit === val ? ' is-selected' : '');
-            btn.textContent = label;
-            btn.addEventListener('click', function () {
-              p.gearKit = val;
-              Array.prototype.forEach.call(toggle.children, function (b) { b.classList.remove('is-selected'); });
-              btn.classList.add('is-selected');
-              refreshNav();
+        roster.forEach(function (p, idx) {
+          var row = document.createElement('div');
+          row.className = 'paf-gear-row';
+          var isKid = p.age === 'Under 14';
+          var nameLabel = p.name && p.name.trim() ? p.name.trim() : ('Person ' + (idx + 1));
+
+          var info = document.createElement('div');
+          info.className = 'paf-gear-row-info';
+          info.innerHTML = '<span class="paf-gear-row-name">' + esc(nameLabel) + '</span>' +
+            (p.age ? '<span class="paf-gear-row-age">' + esc(p.age) + '</span>' : '');
+          row.appendChild(info);
+
+          if (isKid) {
+            var notIncluded = document.createElement('span');
+            notIncluded.className = 'paf-gear-row-excluded';
+            notIncluded.textContent = 'Not included';
+            row.appendChild(notIncluded);
+          } else {
+            var isLastOne = p.gearKit === true && selectedCount === 1;
+            var toggle = document.createElement('div');
+            toggle.className = 'paf-gear-toggle';
+            ['Yes', 'No'].forEach(function (label) {
+              var val = label === 'Yes';
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'paf-gear-toggle-btn' + (p.gearKit === val ? ' is-selected' : '');
+              btn.textContent = label;
+              if (!val && isLastOne) {
+                btn.disabled = true;
+                btn.title = 'Every booking needs at least one gear kit';
+              }
+              btn.addEventListener('click', function () {
+                p.gearKit = val;
+                refreshNav();
+                renderList();
+              });
+              toggle.appendChild(btn);
             });
-            toggle.appendChild(btn);
-          });
-          row.appendChild(toggle);
-        }
+            row.appendChild(toggle);
+          }
 
-        listEl.appendChild(row);
-      });
+          listEl.appendChild(row);
+        });
+      }
+
+      renderList();
     };
     c.isValid = function () {
       return state.answers.q2_roster.some(function (p) { return p && p.gearKit; });
