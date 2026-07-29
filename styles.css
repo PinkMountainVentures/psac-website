@@ -978,3 +978,22 @@ select.paf-roster-input {
     .paf-gear-row-info { flex: 1 1 100%; }
     .paf-gear-toggle { flex: 0 0 auto; margin-left: auto; }
 }
+
+/* ── LEGAL / POLICY PAGES ── */
+.legal-hero { background: var(--dark-pine); padding: 5.5rem 0 3rem; }
+.legal-hero .container { max-width: 780px; }
+.legal-eyebrow { display: block; font-size: 0.67rem; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; color: var(--mountain-pink); margin-bottom: 0.8rem; }
+.legal-hero h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 400; color: var(--sand-beige); line-height: 1.2; }
+.legal-updated { margin-top: 0.9rem; font-size: 0.78rem; color: rgba(248,241,233,0.6); }
+
+.legal-body { padding: 3.5rem 0 5rem; background: white; }
+.legal-body .container { max-width: 780px; }
+.legal-body h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 600; color: var(--dark-pine); margin: 2.4rem 0 0.9rem; }
+.legal-body h2:first-child { margin-top: 0; }
+.legal-body p { font-size: 0.92rem; line-height: 1.8; color: #444; margin-bottom: 1rem; }
+.legal-body ul { margin: 0 0 1rem 1.3rem; }
+.legal-body li { font-size: 0.92rem; line-height: 1.8; color: #444; margin-bottom: 0.4rem; }
+.legal-body a { color: var(--mountain-pink); }
+.legal-body strong { color: var(--dark-pine); }
+.legal-contact { margin-top: 2.5rem; padding: 1.3rem 1.5rem; background: var(--sand-beige); border-radius: 8px; font-size: 0.88rem; }
+.legal-contact a { font-weight: 600; }
