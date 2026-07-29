@@ -101,11 +101,6 @@
       ], 3, true),
       cardText('q9', 'after', 'Is there anything specific you want to see or do on this adventure?',
         null, 'A summit, a canyon, a specific trail you\'ve heard about — anything on your list.', false),
-      cardMultiselect('q10', 'kit', 'What gear are you bringing?', [
-        'Hiking boots', 'Trail runners', 'Trekking poles', 'Hydration pack', 'Daypack',
-        'Navigation device or GPS', 'Satellite communicator', 'First aid kit', 'Sun protection',
-        'Layers for elevation change', "I'm not sure what I need yet"
-      ], null, false),
       cardGearQty(),
       cardStitch('q12', 'trail', 'At the end of this day, I want to feel —', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
