@@ -936,6 +936,7 @@ select.paf-roster-input {
 .paf-reserve-btn { width: 100%; background: var(--desert-green); color: white; padding: 0.95rem 1.6rem; border-radius: 30px; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.13em; text-transform: uppercase; border: none; cursor: pointer; }
 .paf-reserve-btn:hover { background: #63a677; }
 .paf-price-note { font-size: 0.72rem; color: rgba(42,71,71,0.55); margin-top: 0.9rem; line-height: 1.6; }
+.paf-price-nav { margin-top: 1.3rem; }
 
 .paf-closing-eyebrow { font-size: 0.67rem; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; color: var(--mountain-pink); margin-bottom: 0.6rem; }
 .paf-closing-headline { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--dark-pine); line-height: 1.15; margin-bottom: 1.2rem; }

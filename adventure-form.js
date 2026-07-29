@@ -90,7 +90,17 @@
       ], null, true),
       cardSelect('q6', 'move', 'How long do you want to be out?', [
         'A few hours (half day)', 'Full day', 'Sunrise to sunset', 'Overnight or multi-day'
-      ], true),
+      ], true, function (val) {
+        // Overnight/multi-day is inherently bespoke — routes it straight
+        // to the Custom Experience tier, which gets built personally
+        // rather than auto-priced. Switching away reverts to whichever
+        // standard tier the after-trail preference implies.
+        if (val === 'Overnight or multi-day') {
+          state.answers.tier = 'custom';
+        } else if (state.answers.tier === 'custom') {
+          state.answers.tier = state.answers.include_after_trail === false ? 'trail' : 'p2p';
+        }
+      }),
       cardText('q7', 'move', 'Any physical considerations we should know about?',
         'Anything that affects how you or anyone in your group moves. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
         'Bad knee on descents, prefer no scrambling, slower pace is fine — anything like that.', false),
@@ -475,7 +485,7 @@
     return c;
   }
 
-  function cardSelect(id, section, text, options, required) {
+  function cardSelect(id, section, text, options, required, onSelect) {
     var c = cardShell(section, required);
     c.render = function (root) {
       var html = '<div class="paf-q">' + esc(text) + (required ? ' <span class="paf-req">*</span>' : '') + '</div>';
@@ -491,6 +501,7 @@
           Array.prototype.forEach.call(wrap.children, function (c2) { c2.classList.remove('is-selected'); });
           b.classList.add('is-selected');
           state.answers[id] = o;
+          if (onSelect) onSelect(o);
           refreshNav();
         });
         wrap.appendChild(b);
@@ -657,6 +668,12 @@
       // low-key way out. Removing it is a real pricing/tier change, so it
       // gets an inline confirm step rather than executing on first click.
       function renderAfterTrailToggle() {
+        if (state.answers.tier === 'custom') {
+          afterTrailEl.innerHTML = '<div class="paf-value-item" style="border-bottom:none; padding-top:0;">' +
+            'Since this is a multi-day custom experience, we\'ll build your complete itinerary — trail days, recovery, ' +
+            'everything — and reach out personally to finalize it with you.</div>';
+          return;
+        }
         var included = state.answers.include_after_trail !== false;
         var h;
         if (included && !confirmOpen) {
@@ -829,12 +846,18 @@
     var tier = TIERS[state.answers.tier];
     var total = computeTotal(state.answers.tier);
     var gearCount = selectedGearCount();
+    var isCustom = state.answers.tier === 'custom';
+    var totalLabel = isCustom ? 'Starting estimate' : 'Total';
+    var reserveLabel = isCustom ? 'Request My Custom Experience' : 'Confirm & Reserve';
+    var priceNote = isCustom
+      ? 'This is a starting estimate for a multi-day custom experience — we\'ll personally reach out within one business day to build your complete itinerary and finalize pricing before anything is charged.'
+      : 'Payment is being finalized. You will not be charged yet — we\'ll follow up within one business day to confirm your date and collect payment.';
     var html = '<div class="paf-q">Here\'s your day.</div>';
     html += '<div class="paf-price-card">';
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
     html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span>$' + tier.booking + '</span></div>';
     html += '<div class="paf-price-line"><span>Gear kit × ' + gearCount + '</span><span>$' + (tier.gear * gearCount) + '</span></div>';
-    html += '<div class="paf-price-total"><span>Total</span><span>$' + total + '</span></div>';
+    html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + total + '</span></div>';
     html += '</div>';
     html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s included? <span data-field="disclosure-icon">+</span></button>';
     html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
@@ -843,9 +866,12 @@
       '<div class="paf-kit-details-row">No-hassle gear delivery and pickup.</div>' +
       '<div class="paf-kit-details-row"><strong>Your gear kit:</strong> ' + BASE_GEAR_COPY + ', plus ' + keepsakeCopy(state.answers.tier) + ' to keep.</div>' +
       '</div>';
-    html += '<button type="button" class="paf-reserve-btn" data-field="reserve">Confirm & Reserve</button>';
-    html += '<div class="paf-price-note">Payment is being finalized. You will not be charged yet — we\'ll follow up within one business day to confirm your date and collect payment.</div>';
+    html += '<button type="button" class="paf-reserve-btn" data-field="reserve">' + esc(reserveLabel) + '</button>';
+    html += '<div class="paf-price-note">' + esc(priceNote) + '</div>';
+    html += '<div class="paf-price-nav"><button type="button" class="paf-nav-btn paf-nav-prev" data-field="back">← Previous</button></div>';
     root.innerHTML = html;
+
+    root.querySelector('[data-field="back"]').addEventListener('click', function () { prev(); });
 
     var disclosureBtn = root.querySelector('[data-field="disclosure"]');
     var detailsEl = root.querySelector('[data-field="details"]');
