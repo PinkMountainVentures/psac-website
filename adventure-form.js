@@ -6,11 +6,37 @@
 (function () {
 
   // ── CONFIG ──────────────────────────────────────
-  // TODO(payment): once Stripe is set up, replace the "Reserve" step's
-  // submit handler with a redirect to the correct tier's Stripe Payment
-  // Link (or a call to a serverless Checkout Session endpoint). Until
-  // then we just capture the booking and tell the guest we'll follow up.
   var SUBMIT_ENDPOINT = ""; // paste the Google Apps Script Web App /exec URL here once deployed
+
+  // Stripe publishable key — safe to expose client-side (it can only
+  // create charges against the PaymentIntent our server creates, never
+  // move money on its own). Get this from the Stripe Dashboard →
+  // Developers → API keys. The matching *secret* key must never appear
+  // in this file — it lives only in the STRIPE_SECRET_KEY environment
+  // variable read by api/create-payment-intent.js.
+  var STRIPE_PUBLISHABLE_KEY = "pk_test_51TybOaPXYXpja2zMN06eY38zPQz7gtuqeY2fRrGmCc0nUNS3AH6fa4sZCs0sbxBOwBQLBOTFYBRRFaJcXpompn9l00ArdCLihA";
+
+  // Card element theming to match brand tokens in styles.css.
+  var STRIPE_APPEARANCE = {
+    theme: 'stripe',
+    variables: {
+      colorPrimary: '#2A4747',
+      colorText: '#2A4747',
+      colorDanger: '#E76F51',
+      fontFamily: 'Montserrat, sans-serif',
+      borderRadius: '8px'
+    }
+  };
+
+  var stripeInstance = null;
+  var stripeElementsInstance = null;
+
+  function getStripe() {
+    if (!stripeInstance && window.Stripe) {
+      stripeInstance = window.Stripe(STRIPE_PUBLISHABLE_KEY);
+    }
+    return stripeInstance;
+  }
 
   var TIERS = {
     trail:  { key: 'trail',  name: 'Trail Guide Experience',    booking: 100, gear: 65 },
@@ -68,7 +94,9 @@
       contact_email: '',
       contact_phone: '',
       tier: 'p2p',
-      rating: null
+      rating: null,
+      paymentIntentId: null,
+      paymentStatus: null
     }
   };
 
@@ -848,10 +876,14 @@
     var gearCount = selectedGearCount();
     var isCustom = state.answers.tier === 'custom';
     var totalLabel = isCustom ? 'Starting estimate' : 'Total';
-    var reserveLabel = isCustom ? 'Request My Custom Experience' : 'Confirm & Reserve';
+    var reserveLabel = isCustom ? 'Request My Custom Experience' : 'Continue to Payment';
+    // Standard tiers pay inline via the embedded Payment Element below, so
+    // no note is needed there — the payment form itself makes it obvious.
+    // Custom Experience still needs the explanation since no card is
+    // collected on this screen.
     var priceNote = isCustom
       ? 'This is a starting estimate for a multi-day custom experience — we\'ll personally reach out within one business day to build your complete itinerary and finalize pricing before anything is charged.'
-      : 'Payment is being finalized. You will not be charged yet — we\'ll follow up within one business day to confirm your date and collect payment.';
+      : null;
     var html = '<div class="paf-q">Here\'s your day.</div>';
     html += '<div class="paf-price-card">';
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
@@ -867,7 +899,16 @@
       '<div class="paf-kit-details-row"><strong>Your gear kit:</strong> ' + BASE_GEAR_COPY + ', plus ' + keepsakeCopy(state.answers.tier) + ' to keep.</div>' +
       '</div>';
     html += '<button type="button" class="paf-reserve-btn" data-field="reserve">' + esc(reserveLabel) + '</button>';
-    html += '<div class="paf-price-note">' + esc(priceNote) + '</div>';
+    if (!isCustom) {
+      html += '<div class="paf-payment-section" data-field="payment-section" style="display:none;">' +
+        '<div class="paf-payment-element" data-field="payment-element"></div>' +
+        '<div class="paf-payment-error" data-field="payment-error" style="display:none;"></div>' +
+        '<button type="button" class="paf-reserve-btn" data-field="pay-btn" disabled>Pay $' + total + ' &amp; Reserve</button>' +
+        '</div>';
+    }
+    if (priceNote) {
+      html += '<div class="paf-price-note" data-field="price-note">' + esc(priceNote) + '</div>';
+    }
     html += '<div class="paf-price-nav"><button type="button" class="paf-nav-btn paf-nav-prev" data-field="back">← Previous</button></div>';
     root.innerHTML = html;
 
@@ -883,8 +924,106 @@
     });
 
     root.querySelector('[data-field="reserve"]').addEventListener('click', function () {
-      submitForm();
+      if (isCustom) {
+        submitForm();
+        return;
+      }
+      startStripePayment(root, total, gearCount);
     });
+  }
+
+  // Kicks off the embedded payment step for standard tiers: asks our
+  // serverless endpoint for a PaymentIntent (server recomputes the total
+  // from locked tier prices — never trusts a client-sent dollar amount),
+  // then mounts Stripe's Payment Element in place of the reserve button.
+  function startStripePayment(root, total, gearCount) {
+    var reserveBtn = root.querySelector('[data-field="reserve"]');
+    var section = root.querySelector('[data-field="payment-section"]');
+    var errorEl = root.querySelector('[data-field="payment-error"]');
+    var payBtn = root.querySelector('[data-field="pay-btn"]');
+    var stripe = getStripe();
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+    }
+
+    if (!stripe) {
+      section.style.display = 'block';
+      showError("Payment isn't available right now. Please refresh and try again, or reach out to us directly.");
+      return;
+    }
+
+    reserveBtn.disabled = true;
+    reserveBtn.textContent = 'Loading payment…';
+
+    fetch('/api/create-payment-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tier: state.answers.tier,
+        gearCount: gearCount,
+        email: state.answers.contact_email,
+        date: state.answers.q3_date
+      })
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok || !result.data || !result.data.clientSecret) {
+          throw new Error((result.data && result.data.error) || 'Could not start payment.');
+        }
+
+        reserveBtn.style.display = 'none';
+        section.style.display = 'block';
+
+        stripeElementsInstance = stripe.elements({
+          clientSecret: result.data.clientSecret,
+          appearance: STRIPE_APPEARANCE
+        });
+        var paymentElement = stripeElementsInstance.create('payment');
+        paymentElement.mount(root.querySelector('[data-field="payment-element"]'));
+
+        payBtn.disabled = false;
+        payBtn.addEventListener('click', function onPay() {
+          payBtn.disabled = true;
+          payBtn.textContent = 'Processing…';
+          errorEl.style.display = 'none';
+
+          stripe.confirmPayment({
+            elements: stripeElementsInstance,
+            redirect: 'if_required'
+          }).then(function (confirmResult) {
+            if (confirmResult.error) {
+              showError(confirmResult.error.message || 'Payment failed — please check your card details and try again.');
+              payBtn.disabled = false;
+              payBtn.textContent = 'Pay $' + total + ' & Reserve';
+              return;
+            }
+            var pi = confirmResult.paymentIntent;
+            if (pi && (pi.status === 'succeeded' || pi.status === 'processing')) {
+              state.answers.paymentIntentId = pi.id;
+              state.answers.paymentStatus = pi.status;
+              submitForm();
+            } else {
+              showError('Payment did not complete. Please try again.');
+              payBtn.disabled = false;
+              payBtn.textContent = 'Pay $' + total + ' & Reserve';
+            }
+          }).catch(function () {
+            showError('Something went wrong confirming your payment. Please try again.');
+            payBtn.disabled = false;
+            payBtn.textContent = 'Pay $' + total + ' & Reserve';
+          });
+        });
+      })
+      .catch(function (err) {
+        reserveBtn.disabled = false;
+        reserveBtn.textContent = 'Continue to Payment';
+        section.style.display = 'block';
+        showError(err.message || 'Could not start payment. Please try again.');
+      });
   }
 
   function cardClosing() {
@@ -956,7 +1095,9 @@
         phone: state.answers.contact_phone
       },
       tier: state.answers.tier,
-      total: computeTotal(state.answers.tier)
+      total: computeTotal(state.answers.tier),
+      paymentIntentId: state.answers.paymentIntentId || null,
+      paymentStatus: state.answers.paymentStatus || (state.answers.tier === 'custom' ? 'not_charged_custom_quote' : 'unpaid')
     };
   }
 

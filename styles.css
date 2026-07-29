@@ -934,9 +934,14 @@ select.paf-roster-input {
 .paf-price-switch { font-size: 0.76rem; color: rgba(42,71,71,0.6); margin-bottom: 1.3rem; }
 .paf-price-switch a { color: var(--mountain-pink); text-decoration: underline; cursor: pointer; }
 .paf-reserve-btn { width: 100%; background: var(--desert-green); color: white; padding: 0.95rem 1.6rem; border-radius: 30px; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.13em; text-transform: uppercase; border: none; cursor: pointer; }
-.paf-reserve-btn:hover { background: #63a677; }
+.paf-reserve-btn:hover:not(:disabled) { background: #63a677; }
+.paf-reserve-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .paf-price-note { font-size: 0.72rem; color: rgba(42,71,71,0.55); margin-top: 0.9rem; line-height: 1.6; }
 .paf-price-nav { margin-top: 1.3rem; }
+
+.paf-payment-section { margin-top: 1.2rem; }
+.paf-payment-element { background: white; border: 1px solid rgba(42,71,71,0.15); border-radius: 8px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+.paf-payment-error { font-size: 0.8rem; color: var(--sunset-red); background: rgba(231,111,81,0.1); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 1rem; line-height: 1.5; }
 
 .paf-closing-eyebrow { font-size: 0.67rem; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; color: var(--mountain-pink); margin-bottom: 0.6rem; }
 .paf-closing-headline { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--dark-pine); line-height: 1.15; margin-bottom: 1.2rem; }

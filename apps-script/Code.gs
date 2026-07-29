@@ -15,13 +15,12 @@ var COLUMNS = [
   'Submitted At',
   'Tier',
   'Total ($)',
-  'Gear Kits',
-  'Include After-Trail?',
+  'Gear Packages',
   'Headcount',
   'Date Requested',
   'Time Preference',
   'Who\'s Coming',
-  'Roster (name / age / fitness / gear kit)',
+  'Roster (name / age / fitness)',
   'Contact Name',
   'Contact Email',
   'Contact Phone',
@@ -77,8 +76,7 @@ function buildRow_(p) {
     p.submittedAt || new Date().toISOString(),
     tierLabel_(p.tier),
     p.total != null ? p.total : '',
-    p.gearKitsSelected != null ? p.gearKitsSelected : '',
-    p.includeAfterTrail === true ? 'Yes' : (p.includeAfterTrail === false ? 'No' : ''),
+    p.q11_gear_packages != null ? p.q11_gear_packages : '',
     p.headcount != null ? p.headcount : '',
     p.date || '',
     p.timePreference || '',
@@ -118,15 +116,14 @@ function joinRoster_(roster) {
   return roster
     .filter(function (r) { return r && (r.name || r.age); })
     .map(function (r) {
-      var gearLabel = r.age === 'Under 14' ? 'not included' : (r.gearKit ? 'gear kit yes' : 'gear kit no');
-      return (r.name || '(no name)') + ' / age ' + (r.age || '?') + ' / ' + (r.fitness || 'unspecified') + ' / ' + gearLabel;
+      return (r.name || '(no name)') + ' / age ' + (r.age || '?') + ' / ' + (r.fitness || 'unspecified');
     })
     .join('; ');
 }
 
 var TIER_LABELS = {
-  trail: 'Trail Guide Experience',
-  p2p: 'Peaks to Pools Experience',
+  trail: 'Trail Guide',
+  p2p: 'Peaks to Pools',
   custom: 'Custom Experience'
 };
 
