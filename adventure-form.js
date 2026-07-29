@@ -87,7 +87,7 @@
         "Doesn't have to be epic. Could be a trail, a ride, a climb — anything that pushed you and paid off.", false),
       cardMultiselect('q5', 'move', 'What activity are you planning?', [
         'Hiking', 'Trail running'
-      ], null, false),
+      ], null, true),
       cardSelect('q6', 'move', 'How long do you want to be out?', [
         'A few hours (half day)', 'Full day', 'Sunrise to sunset', 'Overnight or multi-day'
       ], true),
