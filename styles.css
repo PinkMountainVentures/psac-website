@@ -909,9 +909,22 @@ select.paf-roster-input {
 .paf-roster-del { background: none; border: none; color: var(--sunset-red); font-size: 1.3rem; cursor: pointer; padding: 0 4px; line-height: 1; }
 .paf-add-person { background: none; border: 1px dashed var(--mountain-pink); color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.78rem; padding: 0.55rem 1rem; border-radius: 6px; cursor: pointer; }
 
-.paf-stepper { display: flex; align-items: center; gap: 1.6rem; margin-top: 0.4rem; }
-.paf-stepper-btn { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--dark-pine); background: white; color: var(--dark-pine); font-size: 1.3rem; cursor: pointer; }
-.paf-stepper-value { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--dark-pine); min-width: 40px; text-align: center; }
+.paf-kit-disclosure { background: none; border: none; color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.8rem; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0.3rem 0; margin-top: 0.2rem; }
+.paf-kit-details { background: var(--sand-beige); border-radius: 8px; padding: 1rem 1.1rem; margin-top: 0.7rem; font-size: 0.82rem; color: var(--dark-pine); line-height: 1.6; }
+.paf-kit-details-row { margin-bottom: 0.4rem; }
+.paf-kit-details-row:last-child { margin-bottom: 0; }
+.paf-kit-details-row strong { color: var(--mountain-pink); }
+
+.paf-gear-list { margin-top: 1.4rem; }
+.paf-gear-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0.85rem 0; border-bottom: 1px solid rgba(42,71,71,0.1); }
+.paf-gear-row:last-child { border-bottom: none; }
+.paf-gear-row-info { display: flex; align-items: baseline; gap: 10px; }
+.paf-gear-row-name { font-family: 'Montserrat', sans-serif; font-size: 0.92rem; font-weight: 600; color: var(--dark-pine); }
+.paf-gear-row-age { font-size: 0.76rem; color: rgba(42,71,71,0.5); }
+.paf-gear-row-excluded { font-size: 0.76rem; color: rgba(42,71,71,0.45); font-style: italic; }
+.paf-gear-toggle { display: flex; gap: 6px; }
+.paf-gear-toggle-btn { border: 1px solid rgba(42,71,71,0.2); background: white; color: var(--dark-pine); font-family: 'Montserrat', sans-serif; font-size: 0.76rem; font-weight: 600; padding: 0.4rem 0.85rem; border-radius: 20px; cursor: pointer; }
+.paf-gear-toggle-btn.is-selected { background: var(--desert-green); border-color: var(--desert-green); color: white; }
 
 .paf-price-card { background: var(--sand-beige); border-radius: 10px; padding: 1.4rem 1.5rem; margin-bottom: 1.2rem; border: 1px solid rgba(42,71,71,0.1); }
 .paf-price-tier { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; color: var(--mountain-pink); margin-bottom: 0.7rem; }
@@ -945,4 +958,8 @@ select.paf-roster-input {
     .paf-roster-age { flex: 1 1 32%; width: auto; }
     .paf-roster-fit { flex: 1 1 48%; }
     .paf-roster-del { flex: 0 0 auto; margin-left: auto; }
+
+    .paf-gear-row { flex-wrap: wrap; }
+    .paf-gear-row-info { flex: 1 1 100%; }
+    .paf-gear-toggle { flex: 0 0 auto; margin-left: auto; }
 }

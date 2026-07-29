@@ -22,8 +22,8 @@
     { id: 'adventure', name: 'Your Adventure' },
     { id: 'move',       name: 'How You Move' },
     { id: 'after',       name: "What You're After" },
-    { id: 'kit',         name: 'Your Kit' },
-    { id: 'trail',       name: 'After the Trail' }
+    { id: 'trail',       name: 'After the Trail' },
+    { id: 'kit',         name: 'Your Kit' }
   ];
 
   var Q1_STARTERS = [
@@ -59,11 +59,11 @@
       q8: [],
       q9: '',
       q10: [],
-      q11_qty: null,         // gear package quantity, user-adjustable
       q12: null,
       q13: [],
       q14: null,
       q15: '',
+      include_after_trail: null,  // true | false — set by cardAfterTrailToggle
       contact_name: '',
       contact_email: '',
       contact_phone: '',
@@ -101,7 +101,6 @@
       ], 3, true),
       cardText('q9', 'after', 'Is there anything specific you want to see or do on this adventure?',
         null, 'A summit, a canyon, a specific trail you\'ve heard about — anything on your list.', false),
-      cardGearQty(),
       cardStitch('q12', 'trail', 'At the end of this day, I want to feel —', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
       cardMultiselect('q13', 'trail', 'What does recovery look like for you?', [
@@ -113,6 +112,8 @@
       ], true),
       cardTextarea('q15', 'trail', 'Anything else we should know to make this day exactly right?',
         'This is your space. Anything at all.', false),
+      cardAfterTrailToggle(),
+      cardGearList(),
       cardContact(),
       cardPricing(),
       cardClosing()
@@ -209,7 +210,7 @@
         name.type = 'text'; name.placeholder = 'Name'; name.className = 'paf-roster-input paf-roster-name';
         var age = document.createElement('select');
         age.className = 'paf-roster-input paf-roster-age';
-        ['Age range', '14–18', '18–25', '26–35', '36–45', '46–55', '56–65', '66+'].forEach(function (o, i) {
+        ['Age range', 'Under 14', '14–18', '18–25', '26–35', '36–45', '46–55', '56–65', '66+'].forEach(function (o, i) {
           var opt = document.createElement('option');
           opt.textContent = o;
           opt.value = i === 0 ? '' : o;
@@ -226,6 +227,12 @@
         var del = document.createElement('button');
         del.type = 'button'; del.className = 'paf-roster-del'; del.textContent = '×'; del.title = 'Remove';
 
+        // Gear kit inclusion is decided later, on the "Your Kit" step. It
+        // lives on this same roster object, so we carry it forward via
+        // closure rather than re-reading state (which gets wiped and
+        // rebuilt from scratch every time this card re-renders).
+        var gearKit = prefill ? prefill.gearKit : undefined;
+
         if (prefill) {
           name.value = prefill.name || '';
           if (prefill.age) age.value = prefill.age;
@@ -233,7 +240,7 @@
         }
 
         function sync() {
-          var data = { name: name.value, age: age.value, fitness: fit.value };
+          var data = { name: name.value, age: age.value, fitness: fit.value, gearKit: gearKit };
           row._data = data;
           var idx = Array.prototype.indexOf.call(rowsWrap.children, row);
           state.answers.q2_roster[idx] = data;
@@ -526,47 +533,148 @@
     return c;
   }
 
-  function recommendedGearQty() {
-    // The roster is collected for every "who's coming" option now, and the
-    // age range picker starts at 14+, so every filled-in roster row is a
-    // teen/adult and gets its own recommended gear package.
-    var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
-    return Math.max(roster.length, 1);
-  }
-
   function totalHeadcount() {
     var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
     return Math.max(roster.length, 1);
   }
 
-  function cardGearQty() {
-    var c = cardShell('kit', true);
+  // Gear kit quantity is now derived directly from each roster person's
+  // .gearKit flag (set on the "Your Kit" step) rather than a standalone
+  // stepper value.
+  function selectedGearCount() {
+    var n = state.answers.q2_roster.filter(function (p) { return p && p.gearKit; }).length;
+    return Math.max(n, 0);
+  }
+
+  var BASE_GEAR_COPY = 'a daypack, trekking poles, a full water bottle, electrolytes, trail snacks, sunscreen, and a first aid kit';
+
+  function keepsakeCopy(tierKey) {
+    return tierKey === 'trail' ? 'a PSAC bandana' : 'a PSAC tote, Turkish towel, and bandana';
+  }
+
+  function recoveryPreviewText() {
+    var picks = (state.answers.q13 || []).filter(function (x) {
+      return x && x.indexOf('open to whatever') === -1;
+    });
+    if (!picks.length) return 'a proper recovery — pool time, good food, somewhere to unwind';
+    var lower = picks.map(function (s) { return s.charAt(0).toLowerCase() + s.slice(1); });
+    if (lower.length === 1) return lower[0];
+    return lower.slice(0, -1).join(', ') + ' and ' + lower[lower.length - 1];
+  }
+
+  function cardAfterTrailToggle() {
+    var c = cardShell('trail', true);
+    var OPTIONS = [
+      { v: true, label: 'Yes, include it' },
+      { v: false, label: 'No, trail only' }
+    ];
     c.render = function (root) {
-      if (state.answers.q11_qty === null) state.answers.q11_qty = recommendedGearQty();
-      var html = '<div class="paf-q">How many gear packages would you like?</div>';
-      html += '<div class="paf-sub">Every booking includes at least one. We recommend one per teen or adult in your group, so everyone has their own water, electrolytes, sunscreen, and keepsakes. Share if you\'d like — just adjust below.</div>';
-      html += '<div class="paf-stepper">' +
-        '<button type="button" class="paf-stepper-btn" data-field="minus">−</button>' +
-        '<span class="paf-stepper-value" data-field="value">' + state.answers.q11_qty + '</span>' +
-        '<button type="button" class="paf-stepper-btn" data-field="plus">+</button>' +
-        '</div>';
+      var html = '<div class="paf-q">Want to include a recovery experience after your trail? <span class="paf-req">*</span></div>';
+      html += '<div class="paf-sub">Based on what you told us, we\'d build in something like ' + esc(recoveryPreviewText()) + '.</div>';
+      html += '<div class="paf-options" data-field="opt"></div>';
       root.innerHTML = html;
-      var valueEl = root.querySelector('[data-field="value"]');
-      root.querySelector('[data-field="minus"]').addEventListener('click', function () {
-        state.answers.q11_qty = Math.max(1, state.answers.q11_qty - 1);
-        valueEl.textContent = state.answers.q11_qty;
-      });
-      root.querySelector('[data-field="plus"]').addEventListener('click', function () {
-        state.answers.q11_qty = state.answers.q11_qty + 1;
-        valueEl.textContent = state.answers.q11_qty;
+      var wrap = root.querySelector('[data-field="opt"]');
+      OPTIONS.forEach(function (o) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'paf-option-btn';
+        b.textContent = o.label;
+        if (state.answers.include_after_trail === o.v) b.classList.add('is-selected');
+        b.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrap.children, function (c2) { c2.classList.remove('is-selected'); });
+          b.classList.add('is-selected');
+          state.answers.include_after_trail = o.v;
+          state.answers.tier = o.v ? 'p2p' : 'trail';
+          refreshNav();
+        });
+        wrap.appendChild(b);
       });
     };
-    c.isValid = function () { return state.answers.q11_qty >= 1; };
+    c.isValid = function () { return state.answers.include_after_trail !== null; };
+    return c;
+  }
+
+  function cardGearList() {
+    var c = cardShell('kit', true);
+    c.render = function (root) {
+      var roster = state.answers.q2_roster.filter(function (p) { return p && (p.name || p.age); });
+      roster.forEach(function (p) {
+        if (p.age === 'Under 14') {
+          p.gearKit = false;
+        } else if (p.gearKit === undefined || p.gearKit === null) {
+          p.gearKit = true;
+        }
+      });
+
+      var tierKey = state.answers.tier;
+      var html = '<div class="paf-q">Who needs a gear kit? <span class="paf-req">*</span></div>';
+      html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit — ' +
+        BASE_GEAR_COPY + ', plus ' + keepsakeCopy(tierKey) + ' to keep. Turn any off if you\'d like to share.</div>';
+      html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
+      html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
+        '<div class="paf-kit-details-row"><strong>Rental gear</strong> (same for every tier): ' + BASE_GEAR_COPY + '.</div>' +
+        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> ' + keepsakeCopy(tierKey) + '.</div>' +
+        '</div>';
+      html += '<div class="paf-gear-list" data-field="gear-list"></div>';
+      root.innerHTML = html;
+
+      var disclosureBtn = root.querySelector('[data-field="disclosure"]');
+      var detailsEl = root.querySelector('[data-field="details"]');
+      var iconEl = root.querySelector('[data-field="disclosure-icon"]');
+      disclosureBtn.addEventListener('click', function () {
+        var isOpen = detailsEl.style.display !== 'none';
+        detailsEl.style.display = isOpen ? 'none' : 'block';
+        iconEl.textContent = isOpen ? '+' : '–';
+      });
+
+      var listEl = root.querySelector('[data-field="gear-list"]');
+      roster.forEach(function (p, idx) {
+        var row = document.createElement('div');
+        row.className = 'paf-gear-row';
+        var isKid = p.age === 'Under 14';
+        var nameLabel = p.name && p.name.trim() ? p.name.trim() : ('Person ' + (idx + 1));
+
+        var info = document.createElement('div');
+        info.className = 'paf-gear-row-info';
+        info.innerHTML = '<span class="paf-gear-row-name">' + esc(nameLabel) + '</span>' +
+          (p.age ? '<span class="paf-gear-row-age">' + esc(p.age) + '</span>' : '');
+        row.appendChild(info);
+
+        if (isKid) {
+          var notIncluded = document.createElement('span');
+          notIncluded.className = 'paf-gear-row-excluded';
+          notIncluded.textContent = 'Not included';
+          row.appendChild(notIncluded);
+        } else {
+          var toggle = document.createElement('div');
+          toggle.className = 'paf-gear-toggle';
+          ['Yes', 'No'].forEach(function (label) {
+            var val = label === 'Yes';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'paf-gear-toggle-btn' + (p.gearKit === val ? ' is-selected' : '');
+            btn.textContent = label;
+            btn.addEventListener('click', function () {
+              p.gearKit = val;
+              Array.prototype.forEach.call(toggle.children, function (b) { b.classList.remove('is-selected'); });
+              btn.classList.add('is-selected');
+              refreshNav();
+            });
+            toggle.appendChild(btn);
+          });
+          row.appendChild(toggle);
+        }
+
+        listEl.appendChild(row);
+      });
+    };
+    c.isValid = function () {
+      return state.answers.q2_roster.some(function (p) { return p && p.gearKit; });
+    };
     return c;
   }
 
   function cardContact() {
-    var c = cardShell('trail', true);
+    var c = cardShell('kit', true);
     c.render = function (root) {
       var html = '<div class="paf-q">Almost there. How should we reach you?</div>';
       html += '<input type="text" class="paf-text-input" data-field="contact_name" placeholder="Name" value="' + esc(state.answers.contact_name) + '" style="margin-bottom:0.9rem;">';
@@ -588,11 +696,11 @@
 
   function computeTotal(tierKey) {
     var tier = TIERS[tierKey];
-    return tier.booking + tier.gear * state.answers.q11_qty;
+    return tier.booking + tier.gear * selectedGearCount();
   }
 
   function cardPricing() {
-    var c = cardShell('trail', false);
+    var c = cardShell('kit', false);
     c.isPricing = true;
     c.render = function (root) {
       renderPricing(root);
@@ -608,7 +716,8 @@
     html += '<div class="paf-price-card">';
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
     html += '<div class="paf-price-line"><span>Booking fee</span><span>$' + tier.booking + '</span></div>';
-    html += '<div class="paf-price-line"><span>Gear package × ' + state.answers.q11_qty + '</span><span>$' + (tier.gear * state.answers.q11_qty) + '</span></div>';
+    var gearCount = selectedGearCount();
+    html += '<div class="paf-price-line"><span>Gear kit × ' + gearCount + '</span><span>$' + (tier.gear * gearCount) + '</span></div>';
     html += '<div class="paf-price-total"><span>Total</span><span>$' + total + '</span></div>';
     html += '</div>';
     html += '<div class="paf-price-switch">Prefer something else? ' +
@@ -631,7 +740,7 @@
   }
 
   function cardClosing() {
-    var c = cardShell('trail', false);
+    var c = cardShell('kit', false);
     c.isClosing = true;
     c.render = function (root) {
       var q1 = state.answers.q1;
@@ -689,11 +798,12 @@
       q8_draws: state.answers.q8,
       q9_specific: state.answers.q9,
       q10_gear_owned: state.answers.q10,
-      q11_gear_packages: state.answers.q11_qty,
       q12: state.answers.q12,
       q13_recovery: state.answers.q13,
       q14_taste: state.answers.q14,
       q15_other: state.answers.q15,
+      includeAfterTrail: state.answers.include_after_trail,
+      gearKitsSelected: selectedGearCount(),
       contact: {
         name: state.answers.contact_name,
         email: state.answers.contact_email,
