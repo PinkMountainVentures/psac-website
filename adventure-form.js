@@ -546,10 +546,12 @@
     return Math.max(n, 0);
   }
 
-  var BASE_GEAR_COPY = 'a daypack, trekking poles, a full water bottle, electrolytes, trail snacks, sunscreen, and a first aid kit';
+  var BASE_GEAR_COPY = 'a daypack, trekking poles, 2 Hydro Flask water bottles, electrolytes, trail snacks, sunscreen, and a first aid kit';
 
   function keepsakeCopy(tierKey) {
-    return tierKey === 'trail' ? 'a PSAC bandana' : 'a PSAC tote, Turkish towel, and bandana';
+    return tierKey === 'trail'
+      ? 'a Palm Springs Adventure Club bandana'
+      : 'a Palm Springs Adventure Club tote, Turkish towel, and bandana';
   }
 
   function recoveryPreviewText() {
@@ -709,7 +711,7 @@
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
         '<div class="paf-kit-details-row"><strong>Rental gear:</strong> ' + BASE_GEAR_COPY + '.</div>' +
-        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few PSAC keepsakes — the exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
+        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few Palm Springs Adventure Club keepsakes — the exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
         '</div>';
       html += '<div class="paf-gear-list" data-field="gear-list"></div>';
       root.innerHTML = html;
@@ -841,8 +843,6 @@
       '<div class="paf-kit-details-row">No-hassle gear delivery and pickup.</div>' +
       '<div class="paf-kit-details-row"><strong>Your gear kit:</strong> ' + BASE_GEAR_COPY + ', plus ' + keepsakeCopy(state.answers.tier) + ' to keep.</div>' +
       '</div>';
-    html += '<div class="paf-price-switch">Prefer something else? ' +
-      '<a href="#" data-tier="trail">' + esc(TIERS.trail.name) + '</a> · <a href="#" data-tier="p2p">' + esc(TIERS.p2p.name) + '</a> · <a href="#" data-tier="custom">' + esc(TIERS.custom.name) + '</a></div>';
     html += '<button type="button" class="paf-reserve-btn" data-field="reserve">Confirm & Reserve</button>';
     html += '<div class="paf-price-note">Payment is being finalized. You will not be charged yet — we\'ll follow up within one business day to confirm your date and collect payment.</div>';
     root.innerHTML = html;
@@ -854,14 +854,6 @@
       var isOpen = detailsEl.style.display !== 'none';
       detailsEl.style.display = isOpen ? 'none' : 'block';
       iconEl.textContent = isOpen ? '+' : '–';
-    });
-
-    Array.prototype.forEach.call(root.querySelectorAll('[data-tier]'), function (a) {
-      a.addEventListener('click', function (e) {
-        e.preventDefault();
-        state.answers.tier = a.getAttribute('data-tier');
-        renderPricing(root);
-      });
     });
 
     root.querySelector('[data-field="reserve"]').addEventListener('click', function () {
