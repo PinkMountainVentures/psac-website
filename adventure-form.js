@@ -86,8 +86,7 @@
       cardTextarea('q4', 'move', "What's the most challenging thing you've done outdoors that felt great?",
         "Doesn't have to be epic. Could be a trail, a ride, a climb — anything that pushed you and paid off.", false),
       cardMultiselect('q5', 'move', 'What activity are you planning?', [
-        'Hiking', 'Trail running', 'Cycling or gravel riding', 'Jeep or off-road', 'Horseback',
-        'Architecture or cultural tour', "Not sure yet — help me decide"
+        'Hiking', 'Trail running'
       ], null, false),
       cardSelect('q6', 'move', 'How long do you want to be out?', [
         'A few hours (half day)', 'Full day', 'Sunrise to sunset', 'Overnight or multi-day'
