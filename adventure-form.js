@@ -92,7 +92,7 @@
         'A few hours (half day)', 'Full day', 'Sunrise to sunset', 'Overnight or multi-day'
       ], true),
       cardText('q7', 'move', 'Any physical considerations we should know about?',
-        'Anything that affects how you move — nothing medical required, just what\'s useful for building your day.',
+        'Anything that affects how you or anyone in your group moves. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
         'Bad knee on descents, prefer no scrambling, slower pace is fine — anything like that.', false),
       cardMultiselect('q8', 'after', 'What draws you most on a great day out?', [
         'Big views', 'Solitude and quiet', 'Physical challenge', 'Wildlife and nature', 'Interesting geology',
