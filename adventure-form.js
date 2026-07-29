@@ -27,20 +27,20 @@
   ];
 
   var Q1_STARTERS = [
-    "I need a day that's just mine —",
-    "We're celebrating —",
-    "I've been wanting to do this and I finally —",
-    "I want to push myself —",
-    "I'm showing someone I love this place —",
-    "I just need to be outside and —"
+    "I need a day that's just mine",
+    "We're celebrating",
+    "I've been wanting to do this and I finally",
+    "I want to push myself",
+    "I'm showing someone I love this place",
+    "I just need to be outside and"
   ];
 
   var Q12_STARTERS = [
-    "Completely emptied out and —",
-    "Like I earned something —",
-    "Relaxed and —",
-    "Proud that I —",
-    "Ready to —"
+    "Completely emptied out and",
+    "Like I earned something",
+    "Relaxed and",
+    "Proud that I",
+    "Ready to"
   ];
 
   // ── STATE ────────────────────────────────────────
@@ -101,7 +101,7 @@
       ], 3, true),
       cardText('q9', 'after', 'Is there anything specific you want to see or do on this adventure?',
         null, 'A summit, a canyon, a specific trail you\'ve heard about — anything on your list.', false),
-      cardStitch('q12', 'trail', 'At the end of this day, I want to feel —', Q12_STARTERS, true, null,
+      cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
       cardMultiselect('q13', 'trail', 'What does recovery look like for you?', [
         'A pool somewhere beautiful', 'A long cold drink', 'A proper meal', 'A spa or body treatment',
@@ -147,7 +147,7 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'paf-starter-btn';
-        b.textContent = s.replace(' —', '');
+        b.textContent = s;
         if (current && current.starter === s) b.classList.add('is-selected');
         b.addEventListener('click', function () {
           Array.prototype.forEach.call(starterWrap.children, function (c2) { c2.classList.remove('is-selected'); });
@@ -595,6 +595,28 @@
     return lines.join(' ');
   }
 
+  // The rational counterpart to the narrative above — a plain-spoken list
+  // of everything included, re-run alongside the narrative whenever the
+  // after-trail toggle changes (it affects both the tier line and whether
+  // the after-trail item appears at all).
+  function buildValueItems() {
+    var tier = TIERS[state.answers.tier];
+    var gearCount = selectedGearCount();
+    var gearWord = gearCount === 1 ? 'gear kit' : 'gear kits';
+    var items = [
+      'Personalized ' + tier.name + ' based on your preferences',
+      'Digital route guide with detailed information about your route',
+      'Printed route cards with waypoints and landmarks',
+      gearCount + ' ' + gearWord + ', including essential gear, snacks, sunscreen, and more for a successful experience',
+      'All gear delivered and picked up'
+    ];
+    if (state.answers.include_after_trail !== false) {
+      items.push('An "after the trail" experience that rewards your effort and helps you recover in Palm Springs style');
+    }
+    items.push('Nothing more for you to plan');
+    return items;
+  }
+
   function cardRecap() {
     var c = cardShell('kit', true);
     var OPTIONS = [
@@ -605,13 +627,20 @@
       var html = '<div class="paf-closing-eyebrow">Almost there</div>';
       html += '<div class="paf-q">Here\'s the day we\'re building.</div>';
       html += '<div class="paf-closing-dynamic" data-field="narrative"></div>';
-      html += '<div class="paf-sub" style="margin-top:0.4rem;">Want to include a recovery experience after your trail? <span class="paf-req">*</span></div>';
+      html += '<div class="paf-value-list" data-field="value-list"></div>';
+      html += '<div class="paf-sub" style="margin-top:1.4rem;">Want to include a recovery experience after your trail? <span class="paf-req">*</span></div>';
       html += '<div class="paf-options" data-field="opt"></div>';
       root.innerHTML = html;
 
       var narrativeEl = root.querySelector('[data-field="narrative"]');
-      function refreshNarrative() { narrativeEl.textContent = buildRecapNarrative(); }
-      refreshNarrative();
+      var valueListEl = root.querySelector('[data-field="value-list"]');
+      function refreshRecap() {
+        narrativeEl.textContent = buildRecapNarrative();
+        valueListEl.innerHTML = buildValueItems().map(function (item) {
+          return '<div class="paf-value-item"><span class="paf-value-check">✓</span>' + esc(item) + '</div>';
+        }).join('');
+      }
+      refreshRecap();
 
       var wrap = root.querySelector('[data-field="opt"]');
       OPTIONS.forEach(function (o) {
@@ -624,7 +653,7 @@
           b.classList.add('is-selected');
           state.answers.include_after_trail = o.v;
           state.answers.tier = o.v ? 'p2p' : 'trail';
-          refreshNarrative();
+          refreshRecap();
           refreshNav();
         });
         wrap.appendChild(b);
