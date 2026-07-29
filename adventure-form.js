@@ -325,18 +325,101 @@
   function cardDateTime() {
     var c = cardShell('adventure', true);
     var TIMES = ['Early start (before 8am)', 'Morning (8am – 10am)', 'Mid-Morning (after 10am)', 'Flexible'];
+    var outsideClickHandler = null;
+
+    function pad2(n) { return n < 10 ? '0' + n : String(n); }
+    function toISO(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+    function fromISO(iso) {
+      var parts = iso.split('-');
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+    function formatDisplay(iso) {
+      return fromISO(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
     c.render = function (root) {
       var html = '<div class="paf-q">When are you going? <span class="paf-req">*</span></div>';
-      html += '<input type="date" class="paf-date-input" data-field="date" value="' + esc(state.answers.q3_date || '') + '">';
+      html += '<div class="paf-date-picker" data-field="date-picker">';
+      html += '<button type="button" class="paf-date-trigger' + (state.answers.q3_date ? '' : ' is-placeholder') + '" data-field="date-trigger">' +
+        (state.answers.q3_date ? esc(formatDisplay(state.answers.q3_date)) : 'Select a date') + '</button>';
+      html += '<div class="paf-calendar" data-field="calendar" style="display:none;"></div>';
+      html += '</div>';
       html += '<div class="paf-sub" style="margin-top:1.5rem;">Time preference</div>';
       html += '<div class="paf-options" data-field="time"></div>';
       html += '<div class="paf-time-note">Starting after 12pm is not recommended due to heat.</div>';
       root.innerHTML = html;
 
-      root.querySelector('[data-field="date"]').addEventListener('input', function (e) {
-        state.answers.q3_date = e.target.value;
-        refreshNav();
+      var pickerWrap = root.querySelector('[data-field="date-picker"]');
+      var trigger = root.querySelector('[data-field="date-trigger"]');
+      var calendarEl = root.querySelector('[data-field="calendar"]');
+
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var viewDate = state.answers.q3_date ? fromISO(state.answers.q3_date) : new Date(today);
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+
+      function renderCalendar() {
+        var year = viewDate.getFullYear();
+        var month = viewDate.getMonth();
+        var monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        var startWeekday = new Date(year, month, 1).getDay();
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        var h = '<div class="paf-cal-header">' +
+          '<button type="button" class="paf-cal-nav" data-nav="prev">&#8249;</button>' +
+          '<span class="paf-cal-month">' + esc(monthLabel) + '</span>' +
+          '<button type="button" class="paf-cal-nav" data-nav="next">&#8250;</button>' +
+          '</div>';
+        h += '<div class="paf-cal-weekdays">';
+        ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(function (d) { h += '<span>' + d + '</span>'; });
+        h += '</div>';
+        h += '<div class="paf-cal-days">';
+        for (var i = 0; i < startWeekday; i++) h += '<span class="paf-cal-day is-empty"></span>';
+        for (var day = 1; day <= daysInMonth; day++) {
+          var thisDate = new Date(year, month, day);
+          var iso = toISO(thisDate);
+          var isPast = thisDate < today;
+          var isSelected = state.answers.q3_date === iso;
+          var cls = 'paf-cal-day' + (isPast ? ' is-disabled' : '') + (isSelected ? ' is-selected' : '');
+          h += '<button type="button" class="' + cls + '" data-date="' + iso + '"' + (isPast ? ' disabled' : '') + '>' + day + '</button>';
+        }
+        h += '</div>';
+        calendarEl.innerHTML = h;
+
+        calendarEl.querySelector('[data-nav="prev"]').addEventListener('click', function () {
+          viewDate.setMonth(viewDate.getMonth() - 1);
+          renderCalendar();
+        });
+        calendarEl.querySelector('[data-nav="next"]').addEventListener('click', function () {
+          viewDate.setMonth(viewDate.getMonth() + 1);
+          renderCalendar();
+        });
+        Array.prototype.forEach.call(calendarEl.querySelectorAll('.paf-cal-day[data-date]'), function (btn) {
+          btn.addEventListener('click', function () {
+            var iso = btn.getAttribute('data-date');
+            state.answers.q3_date = iso;
+            trigger.textContent = formatDisplay(iso);
+            trigger.classList.remove('is-placeholder');
+            calendarEl.style.display = 'none';
+            refreshNav();
+          });
+        });
+      }
+
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var willOpen = calendarEl.style.display === 'none';
+        if (willOpen) {
+          renderCalendar();
+        }
+        calendarEl.style.display = willOpen ? 'block' : 'none';
       });
+
+      if (outsideClickHandler) document.removeEventListener('click', outsideClickHandler);
+      outsideClickHandler = function (e) {
+        if (!pickerWrap.contains(e.target)) calendarEl.style.display = 'none';
+      };
+      document.addEventListener('click', outsideClickHandler);
 
       var timeWrap = root.querySelector('[data-field="time"]');
       TIMES.forEach(function (t) {

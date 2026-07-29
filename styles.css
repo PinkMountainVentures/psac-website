@@ -842,7 +842,7 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 .paf-stitch-prefix.is-active { font-style: normal; color: var(--dark-pine); }
 .paf-stitch-input { border: none; border-bottom: 2px solid var(--mountain-pink); background: transparent; font-family: inherit; font-size: inherit; color: var(--dark-pine); outline: none; min-width: 220px; padding: 2px 4px; font-style: italic; }
 
-.paf-textarea, .paf-text-input, .paf-date-input {
+.paf-textarea, .paf-text-input, .paf-date-trigger {
     width: 100%;
     padding: 0.85rem 1rem;
     border: 1px solid rgba(42,71,71,0.2);
@@ -854,22 +854,40 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 }
 .paf-textarea { min-height: 110px; resize: vertical; }
 
-.paf-date-input {
-    font-size: 1.1rem;
-    padding: 1.1rem 1.2rem;
-    background: var(--sand-beige);
-    border-radius: 10px;
-    accent-color: var(--mountain-pink);
-    cursor: pointer;
-}
-.paf-date-input::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.65;
-    transform: scale(1.2);
-}
-.paf-date-input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
-
 .paf-time-note { font-size: 0.78rem; font-style: italic; color: rgba(42,71,71,0.55); margin-top: 0.9rem; }
+
+/* Custom calendar dropdown — native <input type=date> popups can't be
+   restyled across browsers (Safari's is a native OS control), so this
+   replaces it with a fully brand-styled widget. */
+.paf-date-picker { position: relative; }
+.paf-date-trigger { text-align: left; cursor: pointer; }
+.paf-date-trigger:hover { border-color: var(--mountain-pink); }
+.paf-date-trigger.is-placeholder { color: rgba(42,71,71,0.4); }
+
+.paf-calendar {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 20;
+    width: 300px;
+    max-width: 90vw;
+    background: white;
+    border: 1px solid rgba(42,71,71,0.15);
+    border-radius: 10px;
+    box-shadow: 0 14px 34px rgba(42,71,71,0.2);
+    padding: 1rem 1.1rem 1.2rem;
+}
+.paf-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; }
+.paf-cal-month { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 600; color: var(--dark-pine); }
+.paf-cal-nav { background: none; border: none; font-size: 1.3rem; line-height: 1; color: var(--dark-pine); cursor: pointer; padding: 0.25rem 0.6rem; border-radius: 6px; }
+.paf-cal-nav:hover { background: var(--sand-beige); color: var(--mountain-pink); }
+.paf-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(42,71,71,0.45); margin-bottom: 0.35rem; }
+.paf-cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.paf-cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: none; border: none; border-radius: 50%; font-family: 'Montserrat', sans-serif; font-size: 0.82rem; color: var(--dark-pine); cursor: pointer; }
+.paf-cal-day:hover:not(.is-disabled):not(.is-empty) { background: var(--sand-beige); }
+.paf-cal-day.is-selected { background: var(--mountain-pink); color: white; font-weight: 600; }
+.paf-cal-day.is-disabled { color: rgba(42,71,71,0.22); cursor: default; }
+.paf-cal-day.is-empty { cursor: default; }
 
 .paf-roster { margin-top: 1.3rem; padding-top: 1.2rem; border-top: 1px dashed rgba(42,71,71,0.2); }
 .paf-roster-sub { font-size: 0.78rem; color: rgba(42,71,71,0.6); margin-bottom: 0.9rem; }
