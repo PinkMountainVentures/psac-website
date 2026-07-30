@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>After the Trail Experience — Palm Springs Adventure Club</title>
+    <meta name="description" content="The pool hits differently after miles. The meal earns its taste. Palm Springs Adventure Club builds your After the Trail plan into every experience.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://www.palmspringsadventureclub.com/after-the-trail-experience">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.palmspringsadventureclub.com/after-the-trail-experience">
+    <meta property="og:title" content="After the Trail Experience — Palm Springs Adventure Club">
+    <meta property="og:description" content="The pool hits differently after miles. The meal earns its taste. Palm Springs Adventure Club builds your After the Trail plan into every experience.">
+    <meta property="og:image" content="https://www.palmspringsadventureclub.com/images/hero.jpg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="After the Trail Experience — Palm Springs Adventure Club">
+    <meta name="twitter:description" content="The pool hits differently after miles. The meal earns its taste. Palm Springs Adventure Club builds your After the Trail plan into every experience.">
+    <meta name="twitter:image" content="https://www.palmspringsadventureclub.com/images/hero.jpg">
+
+    <!-- Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebPage",
+          "@id": "https://www.palmspringsadventureclub.com/after-the-trail-experience#webpage",
+          "url": "https://www.palmspringsadventureclub.com/after-the-trail-experience",
+          "name": "After the Trail Experience — Palm Springs Adventure Club",
+          "description": "Palm Springs Adventure Club builds a personalized After the Trail plan into every experience — the right recovery, the right meal, the right moment for your group after a desert trail adventure.",
+          "isPartOf": { "@id": "https://www.palmspringsadventureclub.com/#website" },
+          "about": { "@id": "https://www.palmspringsadventureclub.com/#business" }
+        },
+        {
+          "@type": "Service",
+          "@id": "https://www.palmspringsadventureclub.com/after-the-trail-experience#service",
+          "name": "After the Trail Experience",
+          "description": "A curated post-hike plan built into every Palm Springs Adventure Club experience. Recovery, meals, and the rest of the day matched to what your group just did on the trail.",
+          "provider": { "@id": "https://www.palmspringsadventureclub.com/#business" },
+          "areaServed": {
+            "@type": "City",
+            "name": "Palm Springs"
+          },
+          "serviceType": "Post-adventure recovery curation",
+          "audience": {
+            "@type": "Audience",
+            "audienceType": "Active travelers, outdoor enthusiasts, Palm Springs visitors"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+
+    <style>
+        /* ── PAGE-SPECIFIC STYLES ── */
+
+        .att-hero {
+            min-height: 92vh;
+            background: linear-gradient(to bottom, rgba(42,71,71,0.55) 0%, rgba(42,71,71,0.2) 60%, rgba(248,241,233,1) 100%),
+                        url('/images/after-trail-dinner.jpg') no-repeat center center / cover;
+            display: flex;
+            align-items: flex-end;
+            padding-bottom: 6rem;
+            margin-top: 72px;
+        }
+
+        .att-hero-inner {
+            max-width: 780px;
+            padding: 0 2rem;
+        }
+
+        .att-hero-eyebrow {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1.2rem;
+        }
+
+        .att-hero h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2.6rem, 6vw, 4.2rem);
+            font-weight: 600;
+            line-height: 1.1;
+            color: var(--sand-beige);
+            margin-bottom: 1.4rem;
+        }
+
+        .att-hero-body {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.15rem, 2.2vw, 1.4rem);
+            font-style: italic;
+            color: rgba(248,241,233,0.88);
+            line-height: 1.6;
+            max-width: 560px;
+        }
+
+        /* ── TRANSITION SECTION ── */
+        .att-transition {
+            background: var(--sand-beige);
+            padding: 5rem 2rem 4rem;
+            text-align: center;
+        }
+
+        .att-transition p {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+            color: var(--dark-pine);
+            max-width: 680px;
+            margin: 0 auto 1.4rem;
+            line-height: 1.65;
+        }
+
+        .att-transition p.secondary {
+            font-size: clamp(1rem, 1.8vw, 1.2rem);
+            color: rgba(42,71,71,0.7);
+            font-style: italic;
+        }
+
+        /* ── FEELING GRID ── */
+        .att-feelings {
+            background: var(--dark-pine);
+            padding: 5rem 2rem;
+        }
+
+        .att-feelings-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .att-feelings-header {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 2.5rem;
+            text-align: center;
+        }
+
+        .att-feelings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2px;
+        }
+
+        .att-feeling-card {
+            background: rgba(248,241,233,0.05);
+            padding: 2.8rem 2.2rem;
+            border-left: 1px solid rgba(248,241,233,0.1);
+            transition: background 0.3s;
+        }
+
+        .att-feeling-card:first-child {
+            border-left: none;
+        }
+
+        .att-feeling-card:hover {
+            background: rgba(248,241,233,0.09);
+        }
+
+        .att-feeling-label {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+        }
+
+        .att-feeling-headline {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.55rem;
+            font-weight: 600;
+            color: var(--sand-beige);
+            line-height: 1.25;
+            margin-bottom: 0.9rem;
+        }
+
+        .att-feeling-body {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.05rem;
+            font-style: italic;
+            color: rgba(248,241,233,0.65);
+            line-height: 1.6;
+        }
+
+        /* ── HOW IT WORKS ── */
+        .att-how {
+            background: var(--sand-beige);
+            padding: 5rem 2rem;
+        }
+
+        .att-how-inner {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .att-how-eyebrow {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+        }
+
+        .att-how h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 600;
+            color: var(--dark-pine);
+            line-height: 1.15;
+            margin-bottom: 2.5rem;
+        }
+
+        .att-how-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            border-top: 1px solid rgba(42,71,71,0.15);
+        }
+
+        .att-how-step {
+            display: grid;
+            grid-template-columns: 48px 1fr;
+            gap: 1.8rem;
+            padding: 2.2rem 0;
+            border-bottom: 1px solid rgba(42,71,71,0.15);
+            align-items: start;
+        }
+
+        .att-step-number {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.2rem;
+            font-weight: 400;
+            color: rgba(42,71,71,0.2);
+            line-height: 1;
+            padding-top: 0.2rem;
+        }
+
+        .att-step-content h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: var(--dark-pine);
+            margin-bottom: 0.4rem;
+        }
+
+        .att-step-content p {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 300;
+            color: rgba(42,71,71,0.72);
+            line-height: 1.7;
+        }
+
+        /* ── EARNED SECTION ── */
+        .att-earned {
+            background: var(--mountain-pink);
+            padding: 5rem 2rem;
+            text-align: center;
+        }
+
+        .att-earned h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2rem, 5vw, 3.4rem);
+            font-weight: 600;
+            color: white;
+            line-height: 1.2;
+            max-width: 720px;
+            margin: 0 auto 1.4rem;
+        }
+
+        .att-earned p {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.05rem, 2vw, 1.3rem);
+            font-style: italic;
+            color: rgba(255,255,255,0.82);
+            max-width: 560px;
+            margin: 0 auto 2.8rem;
+            line-height: 1.65;
+        }
+
+        .att-cta-btn {
+            display: inline-block;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            background: white;
+            padding: 1rem 2.4rem;
+            text-decoration: none;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .att-cta-btn:hover {
+            background: var(--sand-beige);
+        }
+
+        /* ── INCLUDED SECTION ── */
+        .att-included {
+            background: var(--sand-beige);
+            padding: 5rem 2rem;
+        }
+
+        .att-included-inner {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .att-included-eyebrow {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+        }
+
+        .att-included h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+            font-weight: 600;
+            color: var(--dark-pine);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .att-included-sub {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.1rem;
+            font-style: italic;
+            color: rgba(42,71,71,0.65);
+            margin-bottom: 3rem;
+            line-height: 1.6;
+        }
+
+        .att-experience-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .att-experience-item {
+            border-top: 2px solid var(--mountain-pink);
+            padding-top: 1.4rem;
+        }
+
+        .att-experience-item h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--dark-pine);
+            margin-bottom: 0.5rem;
+        }
+
+        .att-experience-item p {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 300;
+            color: rgba(42,71,71,0.68);
+            line-height: 1.65;
+        }
+
+        /* ── FINAL CTA ── */
+        .att-final {
+            background: var(--dark-pine);
+            padding: 5rem 2rem;
+            text-align: center;
+        }
+
+        .att-final h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.8rem, 4vw, 3rem);
+            font-weight: 600;
+            color: var(--sand-beige);
+            line-height: 1.2;
+            max-width: 680px;
+            margin: 0 auto 1.2rem;
+        }
+
+        .att-final p {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.15rem;
+            font-style: italic;
+            color: rgba(248,241,233,0.65);
+            max-width: 520px;
+            margin: 0 auto 2.8rem;
+            line-height: 1.65;
+        }
+
+        .att-final-btn {
+            display: inline-block;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--dark-pine);
+            background: var(--mountain-pink);
+            padding: 1rem 2.4rem;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+
+        .att-final-btn:hover {
+            background: #e8907f;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 640px) {
+            .att-feelings-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .att-feeling-card {
+                border-left: none;
+                border-top: 1px solid rgba(248,241,233,0.1);
+            }
+
+            .att-feeling-card:first-child {
+                border-top: none;
+            }
+
+            .att-how-step {
+                grid-template-columns: 36px 1fr;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+    <div class="container">
+        <nav>
+            <a href="/" class="logo">
+                <img src="/images/logo.svg" alt="Palm Springs Adventure Club" style="height: 48px; width: auto;">
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/#adventures">On the Trail</a></li>
+                <li><a href="/after-the-trail-experience">After the Trail</a></li>
+                <li><a href="/#the-club">The Club</a></li>
+                <li><a href="/#contact" class="nav-cta start-adventure-btn">Start My Adventure</a></li>
+            </ul>
+            <button class="hamburger" id="hamburger">☰</button>
+        </nav>
+    </div>
+</header>
+
+<!-- ── HERO ── -->
+<section class="att-hero">
+    <div class="att-hero-inner">
+        <p class="att-hero-eyebrow">After the Trail</p>
+        <h1>The pool hits differently after miles.</h1>
+        <p class="att-hero-body">You'll return to exactly where you started. It will feel like somewhere new. So will you.</p>
+    </div>
+</section>
+
+<!-- ── TRANSITION ── -->
+<section class="att-transition">
+    <p>Something shifts on the trail. The mental noise goes quiet somewhere between the second and third waterfall, or at the moment the canyon wall frames Mount San Jacinto perfectly above the wash. You stop thinking about everything else.</p>
+    <p>What comes back in its place is appetite. Simple, specific, uncomplicated desire. A burger. A cold drink. Your person across the table. The pool, finally earned.</p>
+    <p class="secondary">That version of the day doesn't happen by accident. We build it in from the start.</p>
+</section>
+
+<!-- ── FEELINGS GRID ── -->
+<section class="att-feelings">
+    <div class="att-feelings-inner">
+        <p class="att-feelings-header">What the trail gives back</p>
+        <div class="att-feelings-grid">
+            <div class="att-feeling-card">
+                <p class="att-feeling-label">Hunger</p>
+                <h3 class="att-feeling-headline">You earned a real meal.</h3>
+                <p class="att-feeling-body">Not the polite kind. The kind where the food tastes like it means something. The right table. The right thing on the menu. The legs finally at rest.</p>
+            </div>
+            <div class="att-feeling-card">
+                <p class="att-feeling-label">Stillness</p>
+                <h3 class="att-feeling-headline">The pool that makes sense after miles.</h3>
+                <p class="att-feeling-body">Cold water. Right sun angle. Nobody minding you're still in your head. Relaxation you can actually feel because you did something to deserve it.</p>
+            </div>
+            <div class="att-feeling-card">
+                <p class="att-feeling-label">Presence</p>
+                <h3 class="att-feeling-headline">A hot date with your person.</h3>
+                <p class="att-feeling-body">The trail strips the distraction away. What comes back is clarity -- about what you want, who you're with, where you are. The rest of the day opens up in front of you.</p>
+            </div>
+            <div class="att-feeling-card">
+                <p class="att-feeling-label">Peace</p>
+                <h3 class="att-feeling-headline">The lack of care for anything except this moment.</h3>
+                <p class="att-feeling-body">The calm that only comes after. Not forced relaxation -- the real kind. The kind you can't buy at check-in or fake by the pool. You have to go out and get it.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── EVENING IMAGE ── -->
+<div style="width:100%; max-height:480px; overflow:hidden; line-height:0;">
+    <img src="/images/after-trail-evening.jpg"
+         alt="Intimate evening dining in Palm Springs after a desert trail adventure"
+         style="width:100%; height:480px; object-fit:cover; object-position:center 40%;">
+</div>
+
+<!-- ── HOW IT WORKS ── -->
+<section class="att-how">
+    <div class="att-how-inner">
+        <p class="att-how-eyebrow">How it works</p>
+        <h2>Built into every experience from the start.</h2>
+        <div class="att-how-steps">
+            <div class="att-how-step">
+                <span class="att-step-number">1</span>
+                <div class="att-step-content">
+                    <h3>We learn your group.</h3>
+                    <p>When you start your adventure, you tell us who's coming, how you move, and what you're after. That shapes the trail. It also shapes the afternoon.</p>
+                </div>
+            </div>
+            <div class="att-how-step">
+                <span class="att-step-number">2</span>
+                <div class="att-step-content">
+                    <h3>The trail is matched to you.</h3>
+                    <p>Not a default route. The right canyon, the right elevation, the right distance for where your group is on this trip. Everything else is handled before you leave the hotel.</p>
+                </div>
+            </div>
+            <div class="att-how-step">
+                <span class="att-step-number">3</span>
+                <div class="att-step-content">
+                    <h3>Your After the Trail plan arrives with your gear.</h3>
+                    <p>Recovery, meals, and the rest of the day curated for your group -- based on timing, neighborhood, and what you'll actually want when you come back in from the desert.</p>
+                </div>
+            </div>
+            <div class="att-how-step">
+                <span class="att-step-number">4</span>
+                <div class="att-step-content">
+                    <h3>You go. You return. The day is waiting.</h3>
+                    <p>No research. No decisions. The best version of the rest of your day in Palm Springs, already figured out.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── EARNED ── -->
+<section class="att-earned">
+    <h2>Relaxation means more when you've earned it.</h2>
+    <p>Everything hits differently after. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started -- and it will feel like somewhere new.</p>
+    <a href="/#contact" class="att-cta-btn start-adventure-btn">Start My Adventure</a>
+</section>
+
+<!-- ── INCLUDED IN EVERY EXPERIENCE ── -->
+<section class="att-included">
+    <div class="att-included-inner">
+        <p class="att-included-eyebrow">Included in every experience</p>
+        <h2>After the Trail is not an add-on.</h2>
+        <p class="att-included-sub">Every Palm Springs Adventure Club experience includes a personalized After the Trail plan built around your group's day.</p>
+        <div class="att-experience-list">
+            <div class="att-experience-item">
+                <h3>Recovery</h3>
+                <p>Where to go when you get back. Cold water or mineral soak, based on what your body just did and how much of the day is left.</p>
+            </div>
+            <div class="att-experience-item">
+                <h3>The Meal</h3>
+                <p>The right table for how hungry you are, how you're dressed, and what you're in the mood for after a morning in the desert.</p>
+            </div>
+            <div class="att-experience-item">
+                <h3>The Rest of the Day</h3>
+                <p>Options that match your energy, your neighborhood, and the pace you want for the afternoon and evening.</p>
+            </div>
+            <div class="att-experience-item">
+                <h3>The Pool</h3>
+                <p>You already have one. We just make sure you arrive at it having done something that makes it mean more.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── FINAL CTA ── -->
+<section class="att-final">
+    <h2>The best days in Palm Springs do not happen by accident.</h2>
+    <p>Start your adventure. Everything else is handled.</p>
+    <a href="/#contact" class="att-final-btn start-adventure-btn">Start My Adventure</a>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer id="contact">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-column">
+                <h3>Palm Springs Adventure Club</h3>
+                <p>Operated by Pink Mountain Ventures LLC, DBA Palm Springs Adventure Club<br>
+                301 N Palm Canyon Drive, Suite 103179<br>
+                Palm Springs, CA 92262<br><br>
+                hello@palmspringsadventureclub.com</p>
+            </div>
+            <div class="footer-column">
+                <h3>Explore</h3>
+                <ul>
+                    <li><a href="/#adventures">On the Trail</a></li>
+                    <li><a href="/after-the-trail-experience">After the Trail</a></li>
+                    <li><a href="/#the-club">The Club</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Policies</h3>
+                <ul>
+                    <li><a href="/refund-policy">Cancellation &amp; Refund Policy</a></li>
+                    <li><a href="/terms">Terms of Service</a></li>
+                    <li><a href="/privacy">Privacy Policy</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Connect</h3>
+                <div class="social-links">
+                    <a href="#">IG</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-tagline">
+            <p>Peaks to Pools. Earn your peace.</p>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Palm Springs Adventure Club &nbsp;·&nbsp; Pink Mountain Ventures LLC &nbsp;·&nbsp; All Rights Reserved</p>
+        </div>
+    </div>
+</footer>
+
+<!-- ── MOBILE NAV SCRIPT ── -->
+<script>
+    const hamburger = document.getElementById('hamburger');
+    const navLinks = document.getElementById('navLinks');
+    hamburger.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+    });
+    const mobileLinks = document.querySelectorAll('.nav-links a');
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navLinks.classList.remove('active');
+        });
+    });
+</script>
+
+<!-- ── MODAL TRIGGER SCRIPT ── -->
+<style>
+  #adventure-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
+  #adventure-modal-inner { position:relative; width:92%; max-width:640px; max-height:90vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); display:flex; flex-direction:column; }
+  #adventure-modal-header { background:#2A4747; padding:0.9rem 1.4rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  #adventure-modal-header img { height:36px; width:auto; }
+  #adventure-modal-close { background:none; border:none; font-size:1.6rem; cursor:pointer; color:rgba(255,255,255,0.7); line-height:1; padding:0; transition:color 0.2s; }
+  #adventure-modal-close:hover { color:white; }
+  @media(max-width:600px){
+    #adventure-modal { align-items:stretch; justify-content:stretch; }
+    #adventure-modal-inner { width:100%; max-width:100%; height:100%; max-height:100%; border-radius:0; box-shadow:none; }
+    #adventure-modal-close { font-size:2rem; }
+  }
+</style>
+
+<div id="adventure-modal">
+  <div id="adventure-modal-inner">
+    <div id="adventure-modal-header">
+      <img src="/images/logo.svg" alt="Palm Springs Adventure Club">
+      <button id="adventure-modal-close" onclick="document.getElementById('adventure-modal').style.display='none'">&times;</button>
+    </div>
+    <iframe src="https://form.jotform.com/260839011262148" style="flex:1;border:none;width:100%;" title="Start My Adventure"></iframe>
+  </div>
+</div>
+
+<script>
+  var modal = document.getElementById('adventure-modal');
+  document.querySelectorAll('.start-adventure-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      modal.style.display = 'flex';
+    });
+  });
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) modal.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>
