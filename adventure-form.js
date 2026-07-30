@@ -983,6 +983,15 @@
     return tier.booking + tier.gear * selectedGearCount();
   }
 
+  // Refundable per-kit gear deposit — a card hold, never an actual charge,
+  // released once gear comes back complete and in working order. Priced to
+  // match the tier's existing gear-kit line item exactly (a deliberate
+  // choice, not a coincidence): $65/kit for Trail Guide, $100/kit for Peaks
+  // to Pools and Custom.
+  function depositPerKit(tierKey) {
+    return TIERS[tierKey].gear;
+  }
+
   function cardPricing() {
     var c = cardShell('kit', false);
     c.isPricing = true;
@@ -1000,6 +1009,8 @@
     var isCustom = state.answers.tier === 'custom';
     var totalLabel = isCustom ? 'Starting estimate' : 'Total';
     var reserveLabel = isCustom ? 'Request My Custom Experience' : 'Continue to Payment';
+    var depositEach = depositPerKit(state.answers.tier);
+    var depositTotal = depositEach * gearCount;
     // Standard tiers pay inline via the embedded Payment Element below, so
     // no note is needed there — the payment form itself makes it obvious.
     // Custom Experience still needs the explanation since no card is
@@ -1014,6 +1025,13 @@
     html += '<div class="paf-price-line"><span>Gear kit × ' + gearCount + '</span><span>$' + (tier.gear * gearCount) + '</span></div>';
     html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + total + '</span></div>';
     html += '</div>';
+    if (!isCustom) {
+      html += '<div class="paf-deposit-card">' +
+        '<div class="paf-deposit-line"><span>Refundable gear deposit</span><span>$' + depositTotal + '</span></div>' +
+        '<div class="paf-deposit-explain">This is a hold on your card, not a charge — $' + depositEach + ' per gear kit (' + gearCount + ' kit' + (gearCount === 1 ? '' : 's') + '). ' +
+        'It\'s released in full once your gear is returned complete and in working order. If anything is missing, lost, or damaged, its replacement cost is deducted from this hold before the rest is released.</div>' +
+        '</div>';
+    }
     html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s included? <span data-field="disclosure-icon">+</span></button>';
     html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
       '<div class="paf-kit-details-row">Route selection tailored to your group and the day\'s conditions, built from lived experience on these trails.</div>' +

@@ -938,6 +938,14 @@ select.paf-roster-input {
 .paf-reserve-btn:hover:not(:disabled) { background: #63a677; }
 .paf-reserve-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .paf-price-note { font-size: 0.72rem; color: rgba(42,71,71,0.55); margin-top: 0.9rem; line-height: 1.6; }
+
+/* Deliberately styled distinct from .paf-price-card (outlined, not filled)
+   so it doesn't read as part of the amount being charged today — this is
+   a hold, released after gear return, never money that changes hands. */
+.paf-deposit-card { border: 1px dashed rgba(42,71,71,0.3); border-radius: 10px; padding: 1rem 1.3rem; margin-bottom: 1.2rem; }
+.paf-deposit-line { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; color: var(--dark-pine); }
+.paf-deposit-explain { font-size: 0.72rem; color: rgba(42,71,71,0.65); margin-top: 0.5rem; line-height: 1.6; }
+
 .paf-price-nav { margin-top: 1.3rem; }
 
 .paf-payment-section { margin-top: 1.2rem; }
