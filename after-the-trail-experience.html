@@ -139,9 +139,10 @@
         }
 
         .att-transition p.secondary {
-            font-size: clamp(1rem, 1.8vw, 1.2rem);
-            color: rgba(42,71,71,0.7);
+            font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+            color: rgba(42,71,71,0.65);
             font-style: italic;
+            font-weight: 400;
         }
 
         /* ── FEELING GRID ── */
@@ -248,10 +249,11 @@
 
         .att-evening-image img {
             width: 100%;
-            height: 100%;
+            height: 133%;
             object-fit: cover;
-            object-position: center;
+            object-position: center 12%;
             display: block;
+            margin-top: -12%;
         }
 
         .att-evening-text {
@@ -362,7 +364,7 @@
 
         /* ── EARNED SECTION ── */
         .att-earned {
-            background: var(--mountain-pink);
+            background: var(--dark-pine);
             padding: 5rem 2rem;
             text-align: center;
         }
@@ -371,7 +373,7 @@
             font-family: 'Cormorant Garamond', serif;
             font-size: clamp(2rem, 5vw, 3.4rem);
             font-weight: 600;
-            color: white;
+            color: var(--sand-beige);
             line-height: 1.2;
             max-width: 720px;
             margin: 0 auto 1.4rem;
@@ -381,7 +383,7 @@
             font-family: 'Cormorant Garamond', serif;
             font-size: clamp(1.05rem, 2vw, 1.3rem);
             font-style: italic;
-            color: rgba(255,255,255,0.82);
+            color: rgba(248,241,233,0.7);
             max-width: 560px;
             margin: 0 auto 2.8rem;
             line-height: 1.65;
@@ -399,6 +401,7 @@
             padding: 1rem 2.4rem;
             text-decoration: none;
             transition: background 0.2s;
+            border-radius: 9999px;
         }
 
         .att-cta-btn:hover {
@@ -407,7 +410,7 @@
 
         /* ── INCLUDED SECTION ── */
         .att-included {
-            background: var(--sand-beige);
+            background: #f0e9e1;
             padding: 5rem 2rem;
         }
 
@@ -447,23 +450,22 @@
         .att-experience-list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 0;
-            border-top: 1px solid rgba(42,71,71,0.12);
-            border-left: 1px solid rgba(42,71,71,0.12);
+            gap: 2px;
+            background: rgba(42,71,71,0.08);
         }
 
         .att-experience-item {
-            padding: 2rem 2rem 2rem 0;
-            border-bottom: 1px solid rgba(42,71,71,0.12);
-            border-right: 1px solid rgba(42,71,71,0.12);
+            background: var(--sand-beige);
+            padding: 2.4rem 2.2rem;
+            border-top: 3px solid var(--mountain-pink);
         }
 
         .att-experience-item h3 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 1.25rem;
+            font-size: 1.3rem;
             font-weight: 600;
             color: var(--dark-pine);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.6rem;
         }
 
         .att-experience-item p {
@@ -514,6 +516,7 @@
             padding: 1rem 2.4rem;
             text-decoration: none;
             transition: background 0.2s;
+            border-radius: 9999px;
         }
 
         .att-final-btn:hover {
@@ -527,6 +530,11 @@
             }
             .att-evening-image {
                 height: 320px;
+            }
+            .att-evening-image img {
+                height: 100%;
+                margin-top: 0;
+                object-position: center 30%;
             }
             .att-evening-text {
                 padding: 3rem 2rem;
