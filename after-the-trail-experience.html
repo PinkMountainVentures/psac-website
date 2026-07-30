@@ -63,19 +63,33 @@
 
         .att-hero {
             min-height: 92vh;
-            background: linear-gradient(to bottom, rgba(42,71,71,0.55) 0%, rgba(42,71,71,0.2) 60%, rgba(248,241,233,1) 100%),
-                        url('/images/after-trail-dinner.jpg') no-repeat center center / cover;
+            background: url('/images/after-trail-dinner.jpg') no-repeat center center / cover;
             display: flex;
             align-items: flex-end;
-            padding-bottom: 6rem;
+            padding-bottom: 0;
             padding-top: 72px;
             margin-top: 0;
             box-sizing: border-box;
+            position: relative;
+        }
+
+        .att-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                135deg,
+                rgba(42,71,71,0.85) 0%,
+                rgba(42,71,71,0.65) 40%,
+                rgba(42,71,71,0.15) 100%
+            );
         }
 
         .att-hero-inner {
-            max-width: 780px;
-            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+            max-width: 760px;
+            padding: 0 3rem 5rem;
         }
 
         .att-hero-eyebrow {
@@ -90,20 +104,22 @@
 
         .att-hero h1 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: clamp(2.6rem, 6vw, 4.2rem);
+            font-size: clamp(2.8rem, 6.5vw, 4.8rem);
             font-weight: 600;
-            line-height: 1.1;
+            line-height: 1.05;
             color: var(--sand-beige);
-            margin-bottom: 1.4rem;
+            margin-bottom: 1.6rem;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.3);
         }
 
         .att-hero-body {
             font-family: 'Cormorant Garamond', serif;
-            font-size: clamp(1.15rem, 2.2vw, 1.4rem);
+            font-size: clamp(1.4rem, 2.8vw, 2rem);
             font-style: italic;
-            color: rgba(248,241,233,0.88);
-            line-height: 1.6;
+            color: rgba(248,241,233,0.92);
+            line-height: 1.5;
             max-width: 560px;
+            text-shadow: 0 1px 12px rgba(0,0,0,0.4);
         }
 
         /* ── TRANSITION SECTION ── */
@@ -137,6 +153,27 @@
         .att-feelings-inner {
             max-width: 1100px;
             margin: 0 auto;
+        }
+
+        .att-feelings-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+            font-weight: 600;
+            color: var(--sand-beige);
+            text-align: center;
+            margin-bottom: 0.8rem;
+            line-height: 1.2;
+        }
+
+        .att-feelings-subtitle {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1rem, 1.8vw, 1.2rem);
+            font-style: italic;
+            color: rgba(248,241,233,0.55);
+            text-align: center;
+            max-width: 560px;
+            margin: 0 auto 3rem;
+            line-height: 1.6;
         }
 
         .att-feelings-header {
@@ -196,6 +233,60 @@
             font-style: italic;
             color: rgba(248,241,233,0.65);
             line-height: 1.6;
+        }
+
+        /* ── EVENING FEATURE ── */
+        .att-evening {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 520px;
+        }
+
+        .att-evening-image {
+            overflow: hidden;
+        }
+
+        .att-evening-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+        }
+
+        .att-evening-text {
+            background: var(--dark-pine);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem 3.5rem;
+        }
+
+        .att-evening-eyebrow {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--mountain-pink);
+            margin-bottom: 1rem;
+        }
+
+        .att-evening-text h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.8rem, 3vw, 2.6rem);
+            font-weight: 600;
+            color: var(--sand-beige);
+            line-height: 1.15;
+            margin-bottom: 1.2rem;
+        }
+
+        .att-evening-text p {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1rem, 1.6vw, 1.2rem);
+            font-style: italic;
+            color: rgba(248,241,233,0.65);
+            line-height: 1.7;
         }
 
         /* ── HOW IT WORKS ── */
@@ -303,15 +394,15 @@
             font-weight: 600;
             letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: var(--mountain-pink);
-            background: white;
+            color: white;
+            background: var(--desert-green);
             padding: 1rem 2.4rem;
             text-decoration: none;
-            transition: background 0.2s, color 0.2s;
+            transition: background 0.2s;
         }
 
         .att-cta-btn:hover {
-            background: var(--sand-beige);
+            background: #6aad81;
         }
 
         /* ── INCLUDED SECTION ── */
@@ -355,18 +446,21 @@
 
         .att-experience-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0;
+            border-top: 1px solid rgba(42,71,71,0.12);
+            border-left: 1px solid rgba(42,71,71,0.12);
         }
 
         .att-experience-item {
-            border-top: 2px solid var(--mountain-pink);
-            padding-top: 1.4rem;
+            padding: 2rem 2rem 2rem 0;
+            border-bottom: 1px solid rgba(42,71,71,0.12);
+            border-right: 1px solid rgba(42,71,71,0.12);
         }
 
         .att-experience-item h3 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             font-weight: 600;
             color: var(--dark-pine);
             margin-bottom: 0.5rem;
@@ -382,16 +476,17 @@
 
         /* ── FINAL CTA ── */
         .att-final {
-            background: var(--dark-pine);
+            background: var(--sand-beige);
             padding: 5rem 2rem;
             text-align: center;
+            border-top: 1px solid rgba(42,71,71,0.1);
         }
 
         .att-final h2 {
             font-family: 'Cormorant Garamond', serif;
             font-size: clamp(1.8rem, 4vw, 3rem);
             font-weight: 600;
-            color: var(--sand-beige);
+            color: var(--dark-pine);
             line-height: 1.2;
             max-width: 680px;
             margin: 0 auto 1.2rem;
@@ -401,7 +496,7 @@
             font-family: 'Cormorant Garamond', serif;
             font-size: 1.15rem;
             font-style: italic;
-            color: rgba(248,241,233,0.65);
+            color: rgba(42,71,71,0.6);
             max-width: 520px;
             margin: 0 auto 2.8rem;
             line-height: 1.65;
@@ -414,18 +509,33 @@
             font-weight: 600;
             letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: var(--dark-pine);
-            background: var(--mountain-pink);
+            color: white;
+            background: var(--desert-green);
             padding: 1rem 2.4rem;
             text-decoration: none;
             transition: background 0.2s;
         }
 
         .att-final-btn:hover {
-            background: #e8907f;
+            background: #6aad81;
         }
 
         /* ── RESPONSIVE ── */
+        @media (max-width: 768px) {
+            .att-evening {
+                grid-template-columns: 1fr;
+            }
+            .att-evening-image {
+                height: 320px;
+            }
+            .att-evening-text {
+                padding: 3rem 2rem;
+            }
+            .att-experience-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 640px) {
             .att-feelings-grid {
                 grid-template-columns: 1fr;
@@ -497,6 +607,8 @@
 <section class="att-feelings">
     <div class="att-feelings-inner">
         <p class="att-feelings-header">What the trail gives back</p>
+        <h2 class="att-feelings-title">The trail strips everything away.<br>What comes back is yours.</h2>
+        <p class="att-feelings-subtitle">Four things hikers consistently feel when they return. We build your afternoon around all of them.</p>
         <div class="att-feelings-grid">
             <div class="att-feeling-card">
                 <p class="att-feeling-label">Hunger</p>
@@ -522,12 +634,17 @@
     </div>
 </section>
 
-<!-- ── EVENING IMAGE ── -->
-<div style="width:100%; max-height:480px; overflow:hidden; line-height:0;">
-    <img src="/images/after-trail-evening.jpg"
-         alt="Intimate evening dining in Palm Springs after a desert trail adventure"
-         style="width:100%; height:480px; object-fit:cover; object-position:center 40%;">
-</div>
+<!-- ── EVENING FEATURE ── -->
+<section class="att-evening">
+    <div class="att-evening-image">
+        <img src="/images/after-trail-evening.jpg" alt="Intimate evening dining in Palm Springs after a desert trail adventure">
+    </div>
+    <div class="att-evening-text">
+        <p class="att-evening-eyebrow">After dark</p>
+        <h2>A hot date with your person.</h2>
+        <p>The trail strips the noise away. What comes back in its place is simple: you want to be somewhere specific, with someone specific, without distraction. The right table. Low light. The kind of evening that only happens when the day before it meant something.</p>
+    </div>
+</section>
 
 <!-- ── HOW IT WORKS ── -->
 <section class="att-how">
