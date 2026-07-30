@@ -15,27 +15,20 @@
     <meta property="og:description" content="No groups. No guides. Just the right trail, the right gear, and the desert to yourself. Palm Springs Adventure Club.">
     <meta property="og:image" content="https://www.palmspringsadventureclub.com/images/hero.jpg">
 
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Palm Springs Adventure Club — Peaks to Pools Desert Adventures">
-    <meta name="twitter:description" content="No groups. No guides. Just the right trail, the right gear, and the desert to yourself. Palm Springs Adventure Club.">
-    <meta name="twitter:image" content="https://www.palmspringsadventureclub.com/images/hero.jpg">
-
-    <!-- Schema: LocalBusiness + SportsActivityLocation -->
+    <!-- Schema: LocalBusiness + TouristInformationCenter -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@graph": [
         {
-          "@type": ["LocalBusiness", "SportsActivityLocation"],
+          "@type": ["LocalBusiness", "TouristInformationCenter"],
           "@id": "https://www.palmspringsadventureclub.com/#business",
           "name": "Palm Springs Adventure Club",
-          "description": "Palm Springs Adventure Club delivers curated desert trail experiences with gear handled, routes matched to your group, and After the Trail recommendations built in. No groups. No guides. The desert to yourself.",
+          "alternateName": "PSAC",
+          "description": "Palm Springs Adventure Club offers personalized desert trail adventures, expert route curation, gear rental, and after-trail experience recommendations in Palm Springs, California. Operated by Pink Mountain Ventures LLC.",
           "url": "https://www.palmspringsadventureclub.com",
           "email": "hello@palmspringsadventureclub.com",
           "slogan": "Peaks to Pools. Earn your peace.",
-          "image": "https://www.palmspringsadventureclub.com/images/hero.jpg",
-          "logo": "https://www.palmspringsadventureclub.com/images/logo.svg",
           "address": {
             "@type": "PostalAddress",
             "streetAddress": "301 N Palm Canyon Drive, Suite 103179",
@@ -53,6 +46,7 @@
             "@type": "City",
             "name": "Palm Springs"
           },
+          "priceRange": "$$",
           "currenciesAccepted": "USD",
           "paymentAccepted": "Credit Card",
           "sameAs": [
@@ -60,22 +54,28 @@
           ],
           "hasOfferCatalog": {
             "@type": "OfferCatalog",
-            "name": "Desert Trail Experiences",
+            "name": "Desert Trail Adventures",
             "itemListElement": [
               {
                 "@type": "Offer",
                 "name": "Trail Guide Experience",
-                "description": "Personalized trail matching, gear delivery, and After the Trail curation for your group. Everything handled before you leave the hotel."
+                "description": "Personalized trail matching, digital guide, and After the Trail curation for your group.",
+                "price": "100.00",
+                "priceCurrency": "USD"
               },
               {
                 "@type": "Offer",
                 "name": "Peaks to Pools Experience",
-                "description": "The complete arc. A trail matched to your group, premium gear delivered, keepsakes included, and a curated After the Trail plan waiting when you return."
+                "description": "Full Peaks to Pools arc — trail adventure with premium gear, personalized guide, and curated after-trail recommendations.",
+                "price": "195.00",
+                "priceCurrency": "USD"
               },
               {
                 "@type": "Offer",
                 "name": "Custom Experience",
-                "description": "A fully custom desert adventure designed around your group's goals, timeline, and interests. Built from scratch for you."
+                "description": "Fully custom desert adventure designed around your group's goals, fitness, and interests.",
+                "price": "595.00",
+                "priceCurrency": "USD"
               }
             ]
           }
@@ -107,9 +107,9 @@
             </a>
             <ul class="nav-links" id="navLinks">
                 <li><a href="/#adventures">On the Trail</a></li>
-                <li><a href="/#after-trail">After the Trail</a></li>
-                <li><a href="/#the-club">The Club</a></li>
-                <li><a href="/#contact" class="nav-cta start-adventure-btn">Start My Adventure</a></li>
+                <li><a href="/after-the-trail-experience">After the Trail</a></li>
+                <li><a href="/membership">The Club</a></li>
+                <li><a href="#" class="nav-cta start-adventure-btn">Start My Adventure</a></li>
             </ul>
             <button class="hamburger" id="hamburger">☰</button>
         </nav>
@@ -304,8 +304,8 @@
                 <h3>Explore</h3>
                 <ul>
                     <li><a href="/#adventures">On the Trail</a></li>
-                    <li><a href="/#after-trail">After the Trail</a></li>
-                    <li><a href="/#the-club">The Club</a></li>
+                    <li><a href="/after-the-trail-experience">After the Trail</a></li>
+                    <li><a href="/membership">The Club</a></li>
                 </ul>
             </div>
             <div class="footer-column">
