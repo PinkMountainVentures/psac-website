@@ -78,17 +78,15 @@
       q2_roster: [],         // [{ name, age, fitness }]
       q3_date: '',
       q3_time: null,
-      q4: '',
       q5: [],
       q6: null,
       q7: '',
       q8: [],
       q9: '',
-      q10: [],
       q12: null,
       q13: [],
       q14: null,
-      q15: '',
+      dietary: [],
       include_after_trail: true,  // true | false — assumed included; opt out on the recap screen
       contact_name: '',
       contact_email: '',
@@ -111,8 +109,6 @@
         "We'll use this to help pick the right trail for the occasion."),
       cardWho(),
       cardDateTime(),
-      cardTextarea('q4', 'move', "What's the most challenging thing you've done outdoors that felt great?",
-        null, "Doesn't have to be epic. Could be a trail, a ride, a climb — anything that pushed you and paid off.", false),
       cardMultiselect('q5', 'move', 'What activity are you planning?', [
         'Hiking', 'Trail running'
       ], null, true),
@@ -129,27 +125,13 @@
           state.answers.tier = state.answers.include_after_trail === false ? 'trail' : 'p2p';
         }
       }),
-      cardTextarea('q7', 'move', 'Any physical considerations we should know about?',
-        'Anything that affects how you or anyone in your group moves. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
-        'Bad knee on descents, prefer no scrambling, slower pace is fine — anything like that.', false),
-      cardMultiselect('q8', 'after', 'What draws you most on a great day out?', [
-        'Big views', 'Solitude and quiet', 'Physical challenge', 'Wildlife and nature', 'Interesting geology',
-        'Water — streams, pools, falls', 'Photography opportunities', 'Learning about the place',
-        'Moving fast', 'Moving slow and taking it all in'
-      ], 3, true),
-      cardTextarea('q9', 'after', 'Is there anything specific you want to see or do on this adventure?',
-        null, 'A summit, a canyon, a specific trail you\'ve heard about — anything on your list.', false),
+      cardTextarea('q7', 'move', 'Anything else we should know to make this day exactly right?',
+        'Physical considerations, special requests, anything at all — nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
+        'Bad knee on descents, prefer no scrambling, celebrating a milestone — anything like that.', false),
+      cardInterests(),
       cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
-      cardMultiselect('q13', 'trail', 'What does recovery look like for you?', [
-        'A pool somewhere beautiful', 'A long cold drink', 'A proper meal', 'A spa or body treatment',
-        'Back to the hotel and horizontal', 'Getting back on the road', "I'm open to whatever you recommend"
-      ], null, false),
-      cardSelect('q14', 'trail', 'How would you describe your taste for the recovery experience?', [
-        'Simple and restorative', 'Comfortable and easy', 'Elevated and indulgent', 'Surprise me'
-      ], true),
-      cardTextarea('q15', 'trail', 'Anything else we should know to make this day exactly right?',
-        null, 'This is your space. Anything at all.', false),
+      cardRecoveryPreferences(),
       cardGearList(),
       cardContact(),
       cardRecap(),
@@ -556,6 +538,132 @@
     return c;
   }
 
+  // Combines the old "what draws you most" multiselect and "anything
+  // specific to see or do" free text into a single screen — both only
+  // ever fed the guide narrative, never structured routing, so there's no
+  // reason to make the guest click through two separate steps for them.
+  function cardInterests() {
+    var c = cardShell('after', true);
+    var OPTIONS = [
+      'Big views', 'Solitude and quiet', 'Physical challenge', 'Wildlife and nature', 'Interesting geology',
+      'Water — streams, pools, falls', 'Photography opportunities', 'Learning about the place',
+      'Moving fast', 'Moving slow and taking it all in'
+    ];
+    c.render = function (root) {
+      var html = '<div class="paf-q"><span class="paf-req">*</span> What draws you most on a great day out?</div>';
+      html += '<div class="paf-sub">Pick up to 3.</div>';
+      html += '<div class="paf-options paf-options-wrap" data-field="q8"></div>';
+      html += '<div class="paf-q" style="margin-top:1.75rem;">Is there anything specific you want to see or do on this adventure?</div>';
+      html += '<textarea class="paf-textarea" data-field="q9" placeholder="A summit, a canyon, a specific trail you\'ve heard about — anything on your list.">' + esc(state.answers.q9 || '') + '</textarea>';
+      root.innerHTML = html;
+
+      var wrap = root.querySelector('[data-field="q8"]');
+      OPTIONS.forEach(function (o) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'paf-option-btn';
+        b.textContent = o;
+        if (state.answers.q8.indexOf(o) !== -1) b.classList.add('is-selected');
+        b.addEventListener('click', function () {
+          var idx = state.answers.q8.indexOf(o);
+          if (idx !== -1) {
+            state.answers.q8.splice(idx, 1);
+            b.classList.remove('is-selected');
+          } else {
+            if (state.answers.q8.length >= 3) return;
+            state.answers.q8.push(o);
+            b.classList.add('is-selected');
+          }
+          refreshNav();
+        });
+        wrap.appendChild(b);
+      });
+
+      root.querySelector('[data-field="q9"]').addEventListener('input', function (e) {
+        state.answers.q9 = e.target.value;
+        refreshNav();
+      });
+    };
+    c.isValid = function () { return state.answers.q8.length > 0; };
+    return c;
+  }
+
+  // Combines the old "what does recovery look like" multiselect and
+  // "taste for the recovery experience" select into one screen, and adds
+  // dietary preferences here too — the Trail Database's After the Trail
+  // tab filters restaurant options by its Dietary Notes column, and until
+  // now nothing in this flow ever collected that. All three questions
+  // are about the same half of the day, so one screen covers it.
+  function cardRecoveryPreferences() {
+    var c = cardShell('trail', true);
+    var RECOVERY_OPTIONS = [
+      'A pool somewhere beautiful', 'A long cold drink', 'A proper meal', 'A spa or body treatment',
+      'Back to the hotel and horizontal', 'Getting back on the road', "I'm open to whatever you recommend"
+    ];
+    var TASTE_OPTIONS = ['Simple and restorative', 'Comfortable and easy', 'Elevated and indulgent', 'Surprise me'];
+    var DIETARY_OPTIONS = ['No restrictions', 'Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Nut allergy', 'Other allergy or restriction'];
+
+    c.render = function (root) {
+      var html = '<div class="paf-q">What does recovery look like for you?</div>';
+      html += '<div class="paf-options paf-options-wrap" data-field="q13"></div>';
+
+      html += '<div class="paf-q" style="margin-top:1.75rem;"><span class="paf-req">*</span> How would you describe your taste for the recovery experience?</div>';
+      html += '<div class="paf-options" data-field="q14"></div>';
+
+      html += '<div class="paf-q" style="margin-top:1.75rem;">Any dietary preferences we should plan around?</div>';
+      html += '<div class="paf-sub">Only relevant if your day includes a meal stop.</div>';
+      html += '<div class="paf-options paf-options-wrap" data-field="dietary"></div>';
+
+      root.innerHTML = html;
+
+      var q13Wrap = root.querySelector('[data-field="q13"]');
+      RECOVERY_OPTIONS.forEach(function (o) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'paf-option-btn';
+        b.textContent = o;
+        if (state.answers.q13.indexOf(o) !== -1) b.classList.add('is-selected');
+        b.addEventListener('click', function () {
+          var idx = state.answers.q13.indexOf(o);
+          if (idx !== -1) { state.answers.q13.splice(idx, 1); b.classList.remove('is-selected'); }
+          else { state.answers.q13.push(o); b.classList.add('is-selected'); }
+          refreshNav();
+        });
+        q13Wrap.appendChild(b);
+      });
+
+      var q14Wrap = root.querySelector('[data-field="q14"]');
+      TASTE_OPTIONS.forEach(function (o) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'paf-option-btn';
+        b.textContent = o;
+        if (state.answers.q14 === o) b.classList.add('is-selected');
+        b.addEventListener('click', function () {
+          Array.prototype.forEach.call(q14Wrap.children, function (c2) { c2.classList.remove('is-selected'); });
+          b.classList.add('is-selected');
+          state.answers.q14 = o;
+          refreshNav();
+        });
+        q14Wrap.appendChild(b);
+      });
+
+      var dietWrap = root.querySelector('[data-field="dietary"]');
+      DIETARY_OPTIONS.forEach(function (o) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'paf-option-btn';
+        b.textContent = o;
+        if (state.answers.dietary.indexOf(o) !== -1) b.classList.add('is-selected');
+        b.addEventListener('click', function () {
+          var idx = state.answers.dietary.indexOf(o);
+          if (idx !== -1) { state.answers.dietary.splice(idx, 1); b.classList.remove('is-selected'); }
+          else { state.answers.dietary.push(o); b.classList.add('is-selected'); }
+          refreshNav();
+        });
+        dietWrap.appendChild(b);
+      });
+    };
+    c.isValid = function () { return !!state.answers.q14; };
+    return c;
+  }
+
   function cardMultiselect(id, section, text, options, max, required) {
     var c = cardShell(section, required);
     c.render = function (root) {
@@ -621,7 +729,13 @@
   }
 
   function stitchFragment(field) {
-    return field && field.starter ? (field.starter + ' ' + (field.text || '')).trim() : '';
+    if (!field || !field.starter) return '';
+    var joined = (field.starter + ' ' + (field.text || '')).trim();
+    // Every place this fragment gets used wraps it in its own quote marks
+    // and adds its own trailing punctuation (a period or comma). Strip any
+    // period/exclamation/question mark the guest already typed so it
+    // doesn't double up into things like "...myself.." or "...mine.,".
+    return joined.replace(/[.!?]+$/, '');
   }
 
   // Builds the recap paragraph on cardRecap(), re-run live whenever the
@@ -1093,17 +1207,15 @@
       headcount: totalHeadcount(),
       date: state.answers.q3_date,
       timePreference: state.answers.q3_time,
-      q4_experience: state.answers.q4,
       q5_activity: state.answers.q5,
       q6_duration: state.answers.q6,
-      q7_physical: state.answers.q7,
+      q7_notes: state.answers.q7,
       q8_draws: state.answers.q8,
       q9_specific: state.answers.q9,
-      q10_gear_owned: state.answers.q10,
       q12: state.answers.q12,
       q13_recovery: state.answers.q13,
       q14_taste: state.answers.q14,
-      q15_other: state.answers.q15,
+      dietary_preferences: state.answers.dietary,
       includeAfterTrail: state.answers.include_after_trail,
       gearKitsSelected: selectedGearCount(),
       contact: {
