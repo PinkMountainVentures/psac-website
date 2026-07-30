@@ -148,12 +148,13 @@
         /* ── FEELING GRID ── */
         .att-feelings {
             background: var(--dark-pine);
-            padding: 5rem 2rem 0;
+            padding: 0;
         }
 
         .att-feelings-inner {
             max-width: 1100px;
             margin: 0 auto;
+            padding: 5rem 2rem 0;
         }
 
         .att-feelings-title {
@@ -192,10 +193,11 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 2px;
+            margin-top: 2.5rem;
         }
 
         .att-feeling-card {
-            background: rgba(248,241,233,0.05);
+            background: var(--dark-pine);
             padding: 2.8rem 2.2rem;
             border-left: 1px solid rgba(248,241,233,0.1);
             transition: background 0.3s;
@@ -206,7 +208,7 @@
         }
 
         .att-feeling-card:hover {
-            background: rgba(248,241,233,0.09);
+            background: rgba(248,241,233,0.06);
         }
 
         .att-feeling-label {
@@ -242,6 +244,8 @@
             grid-template-columns: 1fr 1fr;
             min-height: 520px;
             background: var(--dark-pine);
+            margin: 0;
+            padding: 0;
         }
 
         .att-evening-image {
@@ -295,13 +299,12 @@
         /* ── HOW IT WORKS ── */
         .att-how {
             background: var(--sand-beige);
-            padding: 0 2rem 5rem;
+            padding: 5rem 2rem;
         }
 
         .att-how-inner {
             max-width: 860px;
             margin: 0 auto;
-            padding-top: 5rem;
         }
 
         .att-how-eyebrow {
