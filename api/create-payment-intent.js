@@ -16,6 +16,48 @@ var TIERS = {
   p2p:   { name: 'Peaks to Pools Experience', booking: 195, gear: 100 }
 };
 
+function stripeAuthHeader() {
+  return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
+}
+
+// Finds an existing Stripe Customer by exact email match, or creates one.
+// This is what lets the deposit-hold PaymentIntent (created separately,
+// right after this one succeeds) reuse the same card without asking the
+// guest to enter it twice, and keeps a stable 1:1 mapping between a real
+// person and a Stripe Customer across repeat bookings rather than minting
+// a fresh Customer every time. Returns null (never throws) on any failure
+// so a Customer/Stripe hiccup never blocks the actual booking charge.
+async function findOrCreateCustomer(email, name) {
+  if (!email) return null;
+  try {
+    var listRes = await fetch('https://api.stripe.com/v1/customers?email=' + encodeURIComponent(email) + '&limit=1', {
+      headers: { 'Authorization': stripeAuthHeader() }
+    });
+    var listData = await listRes.json();
+    if (listRes.ok && listData.data && listData.data.length) {
+      return listData.data[0].id;
+    }
+
+    var createParams = new URLSearchParams();
+    createParams.append('email', email);
+    if (name) createParams.append('name', name);
+    var createRes = await fetch('https://api.stripe.com/v1/customers', {
+      method: 'POST',
+      headers: { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: createParams.toString()
+    });
+    var createData = await createRes.json();
+    if (!createRes.ok) {
+      console.error('Stripe error creating Customer:', createData);
+      return null;
+    }
+    return createData.id;
+  } catch (err) {
+    console.error('findOrCreateCustomer error:', err);
+    return null;
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -55,7 +97,15 @@ module.exports = async function handler(req, res) {
     }
 
     var email = String(body.email || '').slice(0, 200);
+    var name = String(body.name || '').slice(0, 200);
     var date = String(body.date || '').slice(0, 40);
+
+    // Find-or-create the Stripe Customer up front so we can attach it to
+    // this PaymentIntent and save the payment method on confirmation — the
+    // deposit-hold PaymentIntent (created right after this one succeeds)
+    // reuses that same saved card via the Customer, so the guest never
+    // enters their card twice for one booking.
+    var customerId = await findOrCreateCustomer(email, name);
 
     var params = new URLSearchParams();
     params.append('amount', String(amountCents));
@@ -73,11 +123,18 @@ module.exports = async function handler(req, res) {
     params.append('metadata[tier]', tierKey);
     params.append('metadata[gearCount]', String(gearCount));
     if (date) params.append('metadata[date]', date);
+    if (customerId) {
+      params.append('customer', customerId);
+      // on_session: the guest is actively completing this payment right
+      // now, so the saved-card reuse for the deposit hold happens moments
+      // later in the same visit, not as a true unattended future charge.
+      params.append('setup_future_usage', 'on_session');
+    }
 
     var stripeRes = await fetch('https://api.stripe.com/v1/payment_intents', {
       method: 'POST',
       headers: {
-        'Authorization': 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64'),
+        'Authorization': stripeAuthHeader(),
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: params.toString()
@@ -94,7 +151,8 @@ module.exports = async function handler(req, res) {
 
     res.status(200).json({
       clientSecret: data.client_secret,
-      amount: totalDollars
+      amount: totalDollars,
+      customerId: customerId || null
     });
   } catch (err) {
     console.error('create-payment-intent error:', err);

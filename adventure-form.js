@@ -6,7 +6,9 @@
 (function () {
 
   // ── CONFIG ──────────────────────────────────────
-  var SUBMIT_ENDPOINT = ""; // paste the Google Apps Script Web App /exec URL here once deployed
+  // Booking persistence goes through /api/save-booking (server-side proxy
+  // to the Apps Script Web App bound to the Bookings & Operations sheet) —
+  // see api/save-booking.js. No client-side endpoint URL needed here.
 
   // Stripe publishable key — safe to expose client-side (it can only
   // create charges against the PaymentIntent our server creates, never
@@ -93,7 +95,11 @@
       tier: 'p2p',
       rating: null,
       paymentIntentId: null,
-      paymentStatus: null
+      paymentStatus: null,
+      depositPaymentIntentId: null,
+      depositStatus: null,
+      personId: null,
+      bookingId: null
     }
   };
 
@@ -1105,6 +1111,7 @@
         tier: state.answers.tier,
         gearCount: gearCount,
         email: state.answers.contact_email,
+        name: state.answers.contact_name,
         date: state.answers.q3_date
       })
     })
@@ -1146,7 +1153,8 @@
             if (pi && (pi.status === 'succeeded' || pi.status === 'processing')) {
               state.answers.paymentIntentId = pi.id;
               state.answers.paymentStatus = pi.status;
-              submitForm();
+              payBtn.textContent = 'Finalizing your reservation…';
+              placeDepositHoldThenFinish(state.answers.tier, gearCount, pi.id);
             } else {
               showError('Payment did not complete. Please try again.');
               payBtn.disabled = false;
@@ -1164,6 +1172,51 @@
         reserveBtn.textContent = 'Continue to Payment';
         section.style.display = 'block';
         showError(err.message || 'Could not start payment. Please try again.');
+      });
+  }
+
+  // Runs right after the main booking charge succeeds. Places the
+  // refundable gear deposit hold on the same card (no second card entry —
+  // the server reuses the saved payment method via the Stripe Customer
+  // attached to the main PaymentIntent). The outcome here never blocks the
+  // booking itself: the guest already paid, so whatever happens with the
+  // deposit hold just gets recorded and, if it didn't succeed, needs a
+  // manual look before the trip rather than stranding the guest mid-flow.
+  function placeDepositHoldThenFinish(tierKey, gearCount, mainPaymentIntentId) {
+    var stripe = getStripe();
+
+    fetch('/api/create-deposit-hold', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: tierKey, gearCount: gearCount, mainPaymentIntentId: mainPaymentIntentId })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'requires_action' && data.clientSecret && stripe) {
+          return stripe.handleNextAction({ clientSecret: data.clientSecret }).then(function (actionResult) {
+            var pi = actionResult && actionResult.paymentIntent;
+            if (!actionResult.error && pi && pi.status === 'requires_capture') {
+              state.answers.depositPaymentIntentId = pi.id;
+              state.answers.depositStatus = 'held';
+            } else {
+              state.answers.depositStatus = 'failed';
+            }
+          });
+        }
+        if (data.status === 'succeeded') {
+          state.answers.depositPaymentIntentId = data.paymentIntentId;
+          state.answers.depositStatus = 'held';
+        } else {
+          // 'unavailable' (no saved payment method) or 'failed' — logged
+          // server-side already; just record the outcome here.
+          state.answers.depositStatus = data.status || 'failed';
+        }
+      })
+      .catch(function () {
+        state.answers.depositStatus = 'error';
+      })
+      .then(function () {
+        submitForm();
       });
   }
 
@@ -1227,6 +1280,9 @@
       dietary_preferences: state.answers.dietary,
       includeAfterTrail: state.answers.include_after_trail,
       gearKitsSelected: selectedGearCount(),
+      // Shared delivery duffels, not one per kit — 1 duffel covers up to 2
+      // kits, 2 covers 3-4, 3 covers 5-6, and so on (Math.ceil(n/2)).
+      duffelCount: Math.ceil(Math.max(selectedGearCount(), 1) / 2),
       contact: {
         name: state.answers.contact_name,
         email: state.answers.contact_email,
@@ -1235,23 +1291,30 @@
       tier: state.answers.tier,
       total: computeTotal(state.answers.tier),
       paymentIntentId: state.answers.paymentIntentId || null,
-      paymentStatus: state.answers.paymentStatus || (state.answers.tier === 'custom' ? 'not_charged_custom_quote' : 'unpaid')
+      paymentStatus: state.answers.paymentStatus || (state.answers.tier === 'custom' ? 'not_charged_custom_quote' : 'unpaid'),
+      depositPaymentIntentId: state.answers.depositPaymentIntentId || null,
+      depositStatus: state.answers.depositStatus || (state.answers.tier === 'custom' ? 'not_applicable' : null)
     };
   }
 
   function submitForm() {
     var payload = buildPayload();
-    if (SUBMIT_ENDPOINT) {
-      try {
-        fetch(SUBMIT_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) { /* fail silently, still show closing screen */ }
-    }
-    goToStep(cards.length - 1);
+    fetch('/api/save-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok) {
+          state.answers.personId = data.personId || null;
+          state.answers.bookingId = data.bookingId || null;
+        }
+      })
+      .catch(function () { /* fail silently — booking/payment already happened, still show closing screen */ })
+      .then(function () {
+        goToStep(cards.length - 1);
+      });
   }
 
   // ── NAV / RENDER SHELL ───────────────────────────
