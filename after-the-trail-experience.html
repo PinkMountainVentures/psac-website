@@ -68,7 +68,9 @@
             display: flex;
             align-items: flex-end;
             padding-bottom: 6rem;
-            margin-top: 72px;
+            padding-top: 72px;
+            margin-top: 0;
+            box-sizing: border-box;
         }
 
         .att-hero-inner {
@@ -150,7 +152,7 @@
 
         .att-feelings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 2px;
         }
 
@@ -443,6 +445,16 @@
                 gap: 1rem;
             }
         }
+
+        @media (min-width: 641px) {
+            .att-feeling-card:nth-child(odd) {
+                border-left: none;
+            }
+            .att-feeling-card:nth-child(1),
+            .att-feeling-card:nth-child(2) {
+                border-bottom: 2px solid rgba(248,241,233,0.08);
+            }
+        }
     </style>
 </head>
 <body>
@@ -499,12 +511,12 @@
             <div class="att-feeling-card">
                 <p class="att-feeling-label">Presence</p>
                 <h3 class="att-feeling-headline">A hot date with your person.</h3>
-                <p class="att-feeling-body">The trail strips the distraction away. What comes back is clarity -- about what you want, who you're with, where you are. The rest of the day opens up in front of you.</p>
+                <p class="att-feeling-body">The trail strips the distraction away. What comes back is clarity about what you want, who you're with, where you are. The rest of the day opens up in front of you.</p>
             </div>
             <div class="att-feeling-card">
                 <p class="att-feeling-label">Peace</p>
                 <h3 class="att-feeling-headline">The lack of care for anything except this moment.</h3>
-                <p class="att-feeling-body">The calm that only comes after. Not forced relaxation -- the real kind. The kind you can't buy at check-in or fake by the pool. You have to go out and get it.</p>
+                <p class="att-feeling-body">The calm that only comes after. Not forced relaxation. The real kind. The kind you can't buy at check-in or fake by the pool. You have to go out and get it.</p>
             </div>
         </div>
     </div>
@@ -541,7 +553,7 @@
                 <span class="att-step-number">3</span>
                 <div class="att-step-content">
                     <h3>Your After the Trail plan arrives with your gear.</h3>
-                    <p>Recovery, meals, and the rest of the day curated for your group -- based on timing, neighborhood, and what you'll actually want when you come back in from the desert.</p>
+                    <p>Recovery, meals, and the rest of the day curated for your group. Based on timing, neighborhood, and what you'll actually want when you come back in from the desert.</p>
                 </div>
             </div>
             <div class="att-how-step">
@@ -558,7 +570,7 @@
 <!-- ── EARNED ── -->
 <section class="att-earned">
     <h2>Relaxation means more when you've earned it.</h2>
-    <p>Everything hits differently after. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started -- and it will feel like somewhere new.</p>
+    <p>Everything hits differently after. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started and it will feel like somewhere new.</p>
     <a href="/#contact" class="att-cta-btn start-adventure-btn">Start My Adventure</a>
 </section>
 
