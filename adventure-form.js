@@ -82,7 +82,6 @@
       q6: null,
       q7: '',
       q8: [],
-      q9: '',
       q12: null,
       q13: [],
       q14: null,
@@ -553,8 +552,6 @@
       var html = '<div class="paf-q"><span class="paf-req">*</span> What draws you most on a great day out?</div>';
       html += '<div class="paf-sub">Pick up to 3.</div>';
       html += '<div class="paf-options paf-options-wrap" data-field="q8"></div>';
-      html += '<div class="paf-q" style="margin-top:1.75rem;">Is there anything specific you want to see or do on this adventure?</div>';
-      html += '<textarea class="paf-textarea" data-field="q9" placeholder="A summit, a canyon, a specific trail you\'ve heard about — anything on your list.">' + esc(state.answers.q9 || '') + '</textarea>';
       root.innerHTML = html;
 
       var wrap = root.querySelector('[data-field="q8"]');
@@ -576,11 +573,6 @@
           refreshNav();
         });
         wrap.appendChild(b);
-      });
-
-      root.querySelector('[data-field="q9"]').addEventListener('input', function (e) {
-        state.answers.q9 = e.target.value;
-        refreshNav();
       });
     };
     c.isValid = function () { return state.answers.q8.length > 0; };
@@ -1211,7 +1203,6 @@
       q6_duration: state.answers.q6,
       q7_notes: state.answers.q7,
       q8_draws: state.answers.q8,
-      q9_specific: state.answers.q9,
       q12: state.answers.q12,
       q13_recovery: state.answers.q13,
       q14_taste: state.answers.q14,
