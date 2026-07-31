@@ -1315,8 +1315,11 @@
       // to feel") here too, but that question moved to the post-booking
       // experience, so there is no personalized answer left to complete this
       // sentence with. If q12 ever comes back into this flow, revisit
-      // whether this fixed line should go back to being personalized.
-      html += "And when it's done, you'll walk away with more than you brought.";
+      // whether this fixed line should go back to being personalized. Reuses
+      // the "everything hits differently after" line already on the
+      // homepage, so the closing screen echoes language the guest may
+      // already recognize.
+      html += "And when it's done, everything will hit differently. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started but it will feel like somewhere new. So will you.";
       html += '</div>';
       html += '<div class="paf-closing-sub">How did that feel?</div>';
       html += '<div class="paf-rating" data-field="rating"></div>';
