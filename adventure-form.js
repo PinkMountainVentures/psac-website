@@ -88,11 +88,15 @@
       q13: [],
       q14: null,
       dietary: [],
-      include_after_trail: true,  // true | false, assumed included; opt out on the recap screen
+      include_after_trail: false,  // forced off for launch: Trail Guide (trail-only) is the only
+                                    // experience offered, so there's nothing to opt out of. The
+                                    // toggle logic (setIncludeAfterTrail / renderAfterTrailToggle,
+                                    // both in cardRecap below) stays defined, unused, for when
+                                    // Peaks to Pools relaunches and this becomes a real choice again.
       contact_name: '',
       contact_email: '',
       contact_phone: '',
-      tier: 'p2p',
+      tier: 'trail',
       rating: null,
       paymentIntentId: null,
       paymentStatus: null,
@@ -783,7 +787,7 @@
       'Digital route guide with detailed information about your route',
       'Printed route cards with waypoints and landmarks',
       gearCount + ' ' + gearWord + ', including essential gear, snacks, sunscreen, and more for a successful experience',
-      'All gear delivered and picked up'
+      'All rental gear delivered and picked up'
     ];
     if (state.answers.include_after_trail !== false) {
       items.push('An "after the trail" experience that rewards your effort and helps you recover in Palm Springs style');
@@ -816,7 +820,11 @@
         valueListEl.innerHTML = buildValueItems().map(function (item) {
           return '<div class="paf-value-item"><span class="paf-value-check">✓</span>' + esc(item) + '</div>';
         }).join('');
-        renderAfterTrailToggle();
+        // renderAfterTrailToggle() no longer called: Trail Guide (trail-only) is
+        // the only launch experience, so there is nothing to opt in or out of.
+        // The function stays defined below, unused, and the empty
+        // [data-field="after-trail"] container above stays in the markup, so
+        // reactivating this later is just uncommenting this one line.
       }
 
       function setIncludeAfterTrail(val) {

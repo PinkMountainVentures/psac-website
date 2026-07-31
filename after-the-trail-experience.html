@@ -723,7 +723,7 @@
     <h2>Relaxation means more when you've earned it.</h2>
     <p>Everything hits differently after. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started and it will feel like somewhere new.</p>
     <p class="att-earned-why">That's why After the Trail is built into every experience. Not as an afterthought. As the point.</p>
-    <a href="/#contact" class="att-cta-btn start-adventure-btn">Start My Adventure</a>
+    <a href="#" class="att-cta-btn start-adventure-btn">Start My Adventure</a>
 </section>
 
 <!-- ── INCLUDED IN EVERY EXPERIENCE ── -->
@@ -758,7 +758,7 @@
 <section class="att-final">
     <h2>The best days in Palm Springs do not happen by accident.</h2>
     <p>Start your adventure. Everything else is handled.</p>
-    <a href="/#contact" class="att-final-btn start-adventure-btn">Start My Adventure</a>
+    <a href="#" class="att-final-btn start-adventure-btn">Start My Adventure</a>
 </section>
 
 <!-- ── FOOTER ── -->
@@ -827,7 +827,8 @@
   #adventure-modal-header img { height:36px; width:auto; }
   #adventure-modal-close { background:none; border:none; font-size:1.6rem; cursor:pointer; color:rgba(255,255,255,0.7); line-height:1; padding:0; transition:color 0.2s; }
   #adventure-modal-close:hover { color:white; }
-  @media(max-width:600px){
+  #adventure-form-root { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:1.8rem 1.8rem 1.4rem; background:white; }
+  @media (max-width: 768px) {
     #adventure-modal { align-items:stretch; justify-content:stretch; }
     #adventure-modal-inner { width:100%; max-width:100%; height:100%; max-height:100%; border-radius:0; box-shadow:none; }
     #adventure-modal-close { font-size:2rem; }
@@ -837,25 +838,36 @@
 <div id="adventure-modal">
   <div id="adventure-modal-inner">
     <div id="adventure-modal-header">
-      <img src="/images/logo.svg" alt="Palm Springs Adventure Club">
+      <img src="images/logo.svg" alt="Palm Springs Adventure Club">
       <button id="adventure-modal-close" onclick="document.getElementById('adventure-modal').style.display='none'">&times;</button>
     </div>
-    <iframe src="https://form.jotform.com/260839011262148" style="flex:1;border:none;width:100%;" title="Start My Adventure"></iframe>
+    <div id="adventure-form-root"></div>
   </div>
 </div>
 
+<script src="https://js.stripe.com/v3/"></script>
+<script src="/adventure-form.js"></script>
 <script>
-  var modal = document.getElementById('adventure-modal');
-  document.querySelectorAll('.start-adventure-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      modal.style.display = 'flex';
+  document.addEventListener("DOMContentLoaded", function() {
+    var modal = document.getElementById('adventure-modal');
+    var mounted = false;
+    document.querySelectorAll('.start-adventure-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!mounted) {
+          PSACAdventureForm.mount(document.getElementById('adventure-form-root'));
+          mounted = true;
+        }
+        modal.style.display = 'flex';
+      });
+    });
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') modal.style.display = 'none';
     });
   });
-  modal.addEventListener('click', function(e) {
-    if (e.target === modal) modal.style.display = 'none';
-  });
 </script>
-
 </body>
 </html>
