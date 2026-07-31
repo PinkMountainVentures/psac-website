@@ -123,7 +123,7 @@
   function buildCards() {
     cards = [
       cardStitch('q1', 'adventure', "What's bringing you out?", Q1_STARTERS, true,
-        "We'll use this to help pick the right trail for the occasion."),
+        "We'll use this to help pick the right trail for the occasion. Just a few quick questions, then we'll build your route and gear so you're ready to go."),
       cardWho(),
       cardDateTime(),
       cardMultiselect('q5', 'move', 'What activity are you planning?', [
@@ -849,7 +849,8 @@
     var gearCount = selectedGearCount();
     var gearWord = gearCount === 1 ? 'gear kit' : 'gear kits';
     var items = [
-      'Personalized ' + tier.name + ' based on your preferences',
+      'Personalized ' + tier.name + ', built from lived experience on these trails',
+      'Every logistic handled: no permits, no planning, no guesswork',
       'Digital route guide with detailed information about your route',
       'Printed route cards with waypoints and landmarks',
       gearCount + ' ' + gearWord + ', including essential gear, snacks, sunscreen, and more for a successful experience',
@@ -1303,16 +1304,20 @@
     c.isClosing = true;
     c.render = function (root) {
       var q1Frag = stitchFragment(state.answers.q1);
-      var q12Frag = stitchFragment(state.answers.q12);
       var html = '<div class="paf-closing-eyebrow">Reserved</div>';
       html += '<div class="paf-closing-headline">Your adventure is<br>already taking shape.</div>';
-      if (q1Frag || q12Frag) {
-        html += '<div class="paf-closing-dynamic">';
-        if (q1Frag) html += 'You told us <em>"' + esc(q1Frag) + '."</em> ';
-        html += "We're building a day designed around exactly that. ";
-        if (q12Frag) html += 'And when it\'s done, you\'ll walk away <em>"' + esc(q12Frag) + '."</em>';
-        html += '</div>';
+      html += '<div class="paf-closing-dynamic">';
+      if (q1Frag) {
+        html += 'You told us <em>"' + esc(q1Frag) + '."</em> We\'re building a day designed around exactly that. ';
       }
+      // Fixed, non-personalized close (narrative audit recommendation 2).
+      // Used to quote back state.answers.q12 ("at the end of this day, I want
+      // to feel") here too, but that question moved to the post-booking
+      // experience, so there is no personalized answer left to complete this
+      // sentence with. If q12 ever comes back into this flow, revisit
+      // whether this fixed line should go back to being personalized.
+      html += "And when it's done, you'll walk away with more than you brought.";
+      html += '</div>';
       html += '<div class="paf-closing-sub">How did that feel?</div>';
       html += '<div class="paf-rating" data-field="rating"></div>';
       root.innerHTML = html;
