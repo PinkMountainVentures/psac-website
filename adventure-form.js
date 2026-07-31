@@ -1062,8 +1062,7 @@
     if (!isCustom) {
       html += '<div class="paf-deposit-card">' +
         '<div class="paf-deposit-line"><span>Refundable gear deposit</span><span>$' + depositTotal + '</span></div>' +
-        '<div class="paf-deposit-explain">This is a hold on your card, not a charge: $' + depositEach + ' per gear kit (' + gearCount + ' kit' + (gearCount === 1 ? '' : 's') + '). ' +
-        'It\'s released in full once your gear is returned complete and in working order. If anything is missing, lost, or damaged, its replacement cost is deducted from this hold before the rest is released.</div>' +
+        '<div class="paf-deposit-explain">This is a hold on your card, not a charge. It\'s released in full once your gear comes back complete and in working order. If something is missing, lost, or damaged, we deduct replacement cost from this hold first. If the damage or loss is significant, we reserve the right to charge the remaining balance directly to the card on file, up to the kit\'s full retail value of $550, to cover it.</div>' +
         '</div>';
     }
     html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s included? <span data-field="disclosure-icon">+</span></button>';
