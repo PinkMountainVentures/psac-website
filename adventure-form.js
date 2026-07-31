@@ -50,6 +50,15 @@
   // checkout (see cardDuration() and showCustomContactOverlay() below).
   var CUSTOM_CONTACT_EMAIL = 'hello@palmspringsadventureclub.com';
 
+  // Gear delivery is evening-before-only, no morning-of delivery. Working
+  // backward from that (see psac-gear-delivery-timing-for-booking-flow.md):
+  // guest's delivery address is due T-3, which leaves a T-2 buffer day for
+  // trail assignment and courier pre-scheduling before checkout and delivery
+  // on T-1. A hike booked with less notice than this collapses that buffer,
+  // so the date picker in cardDateTime() below floors selectable dates at
+  // today + this many days instead of just blocking dates before today.
+  var MIN_BOOKING_LEAD_DAYS = 3;
+
   // "What You're After" (id: 'after') and "After the Trail" (id: 'trail') are
   // both removed: their only cards (cardInterests() and the q12 cardStitch(),
   // see the comments in buildCards() below) are no longer in the active flow,
@@ -399,6 +408,7 @@
         (state.answers.q3_date ? esc(formatDisplay(state.answers.q3_date)) : 'Select a date') + '</button>';
       html += '<div class="paf-calendar" data-field="calendar" style="display:none;"></div>';
       html += '</div>';
+      html += '<div class="paf-time-note">Bookings need at least ' + MIN_BOOKING_LEAD_DAYS + ' days\' notice so we can arrange gear delivery.</div>';
       html += '<div class="paf-sub" style="margin-top:1.5rem;">Time preference</div>';
       html += '<div class="paf-options" data-field="time"></div>';
       html += '<div class="paf-time-note">Starting after 12pm is not recommended due to heat.</div>';
@@ -410,7 +420,9 @@
 
       var today = new Date();
       today.setHours(0, 0, 0, 0);
-      var viewDate = state.answers.q3_date ? fromISO(state.answers.q3_date) : new Date(today);
+      var minDate = new Date(today);
+      minDate.setDate(minDate.getDate() + MIN_BOOKING_LEAD_DAYS);
+      var viewDate = state.answers.q3_date ? fromISO(state.answers.q3_date) : new Date(minDate);
       viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
 
       function renderCalendar() {
@@ -433,10 +445,13 @@
         for (var day = 1; day <= daysInMonth; day++) {
           var thisDate = new Date(year, month, day);
           var iso = toISO(thisDate);
-          var isPast = thisDate < today;
+          // Disabled if it's in the past OR inside the gear-delivery lead
+          // time (today through today + MIN_BOOKING_LEAD_DAYS - 1), not just
+          // strictly before today. See MIN_BOOKING_LEAD_DAYS above.
+          var isDisabled = thisDate < minDate;
           var isSelected = state.answers.q3_date === iso;
-          var cls = 'paf-cal-day' + (isPast ? ' is-disabled' : '') + (isSelected ? ' is-selected' : '');
-          h += '<button type="button" class="' + cls + '" data-date="' + iso + '"' + (isPast ? ' disabled' : '') + '>' + day + '</button>';
+          var cls = 'paf-cal-day' + (isDisabled ? ' is-disabled' : '') + (isSelected ? ' is-selected' : '');
+          h += '<button type="button" class="' + cls + '" data-date="' + iso + '"' + (isDisabled ? ' disabled' : '') + '>' + day + '</button>';
         }
         h += '</div>';
         calendarEl.innerHTML = h;
