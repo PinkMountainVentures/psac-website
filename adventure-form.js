@@ -46,6 +46,10 @@
     custom: { key: 'custom', name: 'Custom Experience',         booking: 595, gear: 100 }
   };
 
+  // Multi-day trips route to a personal email inquiry instead of instant
+  // checkout (see cardDuration() and showCustomContactOverlay() below).
+  var CUSTOM_CONTACT_EMAIL = 'hello@palmspringsadventureclub.com';
+
   // "What You're After" (id: 'after') and "After the Trail" (id: 'trail') are
   // both removed: their only cards (cardInterests() and the q12 cardStitch(),
   // see the comments in buildCards() below) are no longer in the active flow,
@@ -125,19 +129,7 @@
       cardMultiselect('q5', 'move', 'What activity are you planning?', [
         'Hiking', 'Trail running'
       ], null, true),
-      cardSelect('q6', 'move', 'How long do you want to be out?', [
-        'A few hours (half day)', 'Full day', 'Overnight or multi-day'
-      ], true, function (val) {
-        // Overnight/multi-day is inherently bespoke, routes it straight
-        // to the Custom Experience tier, which gets built personally
-        // rather than auto-priced. Switching away reverts to whichever
-        // standard tier the after-trail preference implies.
-        if (val === 'Overnight or multi-day') {
-          state.answers.tier = 'custom';
-        } else if (state.answers.tier === 'custom') {
-          state.answers.tier = state.answers.include_after_trail === false ? 'trail' : 'p2p';
-        }
-      }),
+      cardDuration(),
       cardTextarea('q7', 'move', 'Anything else we should know to make this day exactly right?',
         'Physical considerations, special requests, anything at all. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
         'Bad knee on descents, prefer no scrambling, celebrating a milestone, anything like that.', false),
@@ -564,6 +556,29 @@
     return c;
   }
 
+  function cardDuration() {
+    var c = cardSelect('q6', 'move', 'How long do you want to be out?', [
+      'A few hours (half day)', 'Full day', 'Overnight or multi-day'
+    ], true, function (val) {
+      // Overnight/multi-day is inherently bespoke, routes it straight
+      // to the Custom Experience tier, which gets built personally
+      // rather than auto-priced. Switching away reverts to whichever
+      // standard tier the after-trail preference implies.
+      if (val === 'Overnight or multi-day') {
+        state.answers.tier = 'custom';
+      } else if (state.answers.tier === 'custom') {
+        state.answers.tier = state.answers.include_after_trail === false ? 'trail' : 'p2p';
+      }
+    });
+    // Consulted in next(): picking Overnight/multi-day here doesn't continue
+    // into the rest of the booking flow (Custom Experience isn't sold at
+    // launch). Instead it shows a personal contact overlay in place of the
+    // next card, without advancing state.step, so this stays the "current"
+    // step underneath and the guest lands right back here on "Previous."
+    c.branchesToCustomContact = true;
+    return c;
+  }
+
   // Not currently used in buildCards() (see the comment there). Kept as
   // reference: combines the old "what draws you most" multiselect and
   // "anything specific to see or do" free text into a single screen.
@@ -758,6 +773,42 @@
     // period/exclamation/question mark the guest already typed so it
     // doesn't double up into things like "...myself.." or "...mine.,".
     return joined.replace(/[.!?]+$/, '');
+  }
+
+  // Standalone date formatter for the custom-contact email draft below.
+  // Duplicates the small bit of logic living inside cardDateTime()'s own
+  // closure rather than exposing that closure's internals just for this.
+  function formatDateForEmail(iso) {
+    if (!iso) return null;
+    var parts = iso.split('-');
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  // Suggested subject/body for the guest to send us once they pick Overnight
+  // or multi-day (see cardDuration() and showCustomContactOverlay()). Filled
+  // in from whatever they've already told us by this point in the flow, so
+  // they are not stuck retyping what they just answered.
+  function buildCustomInquiryEmail() {
+    var subject = 'Multi-day adventure inquiry';
+    var headcount = totalHeadcount();
+    var lines = [];
+    lines.push('Hi Palm Springs Adventure Club,');
+    lines.push('');
+    lines.push("I'm interested in planning an overnight or multi-day adventure. Here's what I have so far:");
+    lines.push('');
+    lines.push('Group size: ' + headcount + (headcount === 1 ? ' person' : ' people'));
+    lines.push('Preferred dates: ' + (formatDateForEmail(state.answers.q3_date) || 'Flexible'));
+    if (state.answers.q5 && state.answers.q5.length) {
+      lines.push('Activity: ' + state.answers.q5.join(' and '));
+    }
+    var q1Frag = stitchFragment(state.answers.q1);
+    if (q1Frag) {
+      lines.push("What I'm looking for: " + q1Frag);
+    }
+    lines.push('');
+    lines.push("I'd love to hear what's possible.");
+    return { subject: subject, body: lines.join('\n') };
   }
 
   // Builds the recap paragraph on cardRecap(), re-run live whenever the
@@ -1397,11 +1448,78 @@
   function next() {
     var card = cards[state.step];
     if (!card.isValid()) return;
+    if (card.branchesToCustomContact && state.answers.tier === 'custom') {
+      showCustomContactOverlay();
+      return;
+    }
     if (state.step < cards.length - 1) goToStep(state.step + 1);
   }
 
   function prev() {
     if (state.step > 0) goToStep(state.step - 1);
+  }
+
+  // ── CUSTOM CONTACT OVERLAY ───────────────────────
+  // Shown in place of the next card when cardDuration() flags
+  // branchesToCustomContact and the guest picked Overnight/multi-day. Does
+  // not touch state.step, so this takes over els.cardBody/footer visually
+  // while the flow underneath stays parked on the duration card. "Previous"
+  // (rendered inline here, not the shared footer) just re-renders that same
+  // step, landing the guest right back where they were.
+  function renderCustomContactCard(root) {
+    var email = buildCustomInquiryEmail();
+    var mailtoHref = 'mailto:' + CUSTOM_CONTACT_EMAIL +
+      '?subject=' + encodeURIComponent(email.subject) +
+      '&body=' + encodeURIComponent(email.body);
+
+    var html = '<div class="paf-q">Let\'s build this one together.</div>';
+    html += '<div class="paf-sub">Overnight and multi-day adventures are planned personally rather than booked instantly. Send us a note and we will build a complete itinerary with you.</div>';
+    html += '<div class="paf-closing-dynamic">';
+    html += '<div style="margin-bottom:0.9rem;"><strong>To:</strong> ' + esc(CUSTOM_CONTACT_EMAIL) + '</div>';
+    html += '<div style="margin-bottom:0.3rem;"><strong>Subject</strong></div>';
+    html += '<div data-field="subject-text" style="margin-bottom:0.9rem;">' + esc(email.subject) + '</div>';
+    html += '<div style="margin-bottom:0.3rem;"><strong>Message</strong></div>';
+    html += '<div data-field="body-text" style="white-space:pre-wrap;">' + esc(email.body) + '</div>';
+    html += '</div>';
+    html += '<a href="' + esc(mailtoHref) + '" class="paf-reserve-btn" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box;">Open Email to Send</a>';
+    html += '<div style="display:flex; gap:1.4rem; margin-top:0.9rem;">';
+    html += '<button type="button" class="paf-link-btn" data-field="copy-subject">Copy subject</button>';
+    html += '<button type="button" class="paf-link-btn" data-field="copy-body">Copy message</button>';
+    html += '</div>';
+    html += '<div class="paf-price-nav"><button type="button" class="paf-nav-btn paf-nav-prev" data-field="back">← Previous</button></div>';
+    root.innerHTML = html;
+
+    function wireCopyButton(fieldName, text) {
+      var btn = root.querySelector('[data-field="' + fieldName + '"]');
+      if (!btn) return;
+      var originalLabel = btn.textContent;
+      btn.addEventListener('click', function () {
+        var done = function () {
+          btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = originalLabel; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(function () { /* clipboard denied, leave button as-is */ });
+        }
+      });
+    }
+    wireCopyButton('copy-subject', email.subject);
+    wireCopyButton('copy-body', email.body);
+
+    root.querySelector('[data-field="back"]').addEventListener('click', function () {
+      hideCustomContactOverlay();
+    });
+  }
+
+  function showCustomContactOverlay() {
+    els.cardBody.innerHTML = '';
+    renderCustomContactCard(els.cardBody);
+    els.footer.style.display = 'none';
+    els.cardBody.scrollTop = 0;
+  }
+
+  function hideCustomContactOverlay() {
+    renderStep();
   }
 
   // ── MOUNT ────────────────────────────────────────
