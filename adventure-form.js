@@ -46,10 +46,14 @@
     custom: { key: 'custom', name: 'Custom Experience',         booking: 595, gear: 100 }
   };
 
+  // "What You're After" (id: 'after') removed: its only card, cardInterests(),
+  // is no longer in the active flow (see the comment in buildCards() below), so
+  // this section would never highlight and just sits dead in the progress bar.
+  // Restore this entry alongside re-adding cardInterests() if that ever moves
+  // back into Start My Adventure.
   var SECTIONS = [
     { id: 'adventure', name: 'Your Adventure' },
     { id: 'move',       name: 'How You Move' },
-    { id: 'after',       name: "What You're After" },
     { id: 'trail',       name: 'After the Trail' },
     { id: 'kit',         name: 'Your Kit' }
   ];
@@ -137,7 +141,11 @@
       cardTextarea('q7', 'move', 'Anything else we should know to make this day exactly right?',
         'Physical considerations, special requests, anything at all. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
         'Bad knee on descents, prefer no scrambling, celebrating a milestone, anything like that.', false),
-      cardInterests(),
+      // cardInterests() removed from the active flow ("What draws you most on
+      // a great day out?"). Still an important signal for trail selection, but
+      // it's moving to the post-booking experience instead, captured after
+      // payment rather than blocking the initial reservation. The function
+      // stays defined below, unused, as reference for that workstream.
       cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
       // cardRecoveryPreferences() removed from the active flow (recovery look-like,
@@ -551,10 +559,12 @@
     return c;
   }
 
-  // Combines the old "what draws you most" multiselect and "anything
-  // specific to see or do" free text into a single screen. Both only
-  // ever fed the guide narrative, never structured routing, so there's no
-  // reason to make the guest click through two separate steps for them.
+  // Not currently used in buildCards() (see the comment there). Kept as
+  // reference: combines the old "what draws you most" multiselect and
+  // "anything specific to see or do" free text into a single screen.
+  // An important signal for trail selection, which is exactly why it moved
+  // to the post-booking experience rather than being cut: it's captured
+  // after payment instead of adding friction to the initial reservation.
   function cardInterests() {
     var c = cardShell('after', true);
     var OPTIONS = [
