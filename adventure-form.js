@@ -1,5 +1,5 @@
 /* ============================================
-   PSAC — Plan Your Day (custom intake flow)
+   PSAC: Plan Your Day (custom intake flow)
    Replaces the JotForm modal. Vanilla JS, no deps.
    ============================================ */
 
@@ -7,14 +7,14 @@
 
   // ── CONFIG ──────────────────────────────────────
   // Booking persistence goes through /api/save-booking (server-side proxy
-  // to the Apps Script Web App bound to the Bookings & Operations sheet) —
-  // see api/save-booking.js. No client-side endpoint URL needed here.
+  // to the Apps Script Web App bound to the Bookings & Operations sheet).
+  // See api/save-booking.js. No client-side endpoint URL needed here.
 
-  // Stripe publishable key — safe to expose client-side (it can only
+  // Stripe publishable key: safe to expose client-side (it can only
   // create charges against the PaymentIntent our server creates, never
   // move money on its own). Get this from the Stripe Dashboard →
   // Developers → API keys. The matching *secret* key must never appear
-  // in this file — it lives only in the STRIPE_SECRET_KEY environment
+  // in this file. It lives only in the STRIPE_SECRET_KEY environment
   // variable read by api/create-payment-intent.js.
   var STRIPE_PUBLISHABLE_KEY = "pk_test_51TybOaPXYXpja2zMN06eY38zPQz7gtuqeY2fRrGmCc0nUNS3AH6fa4sZCs0sbxBOwBQLBOTFYBRRFaJcXpompn9l00ArdCLihA";
 
@@ -88,7 +88,7 @@
       q13: [],
       q14: null,
       dietary: [],
-      include_after_trail: true,  // true | false — assumed included; opt out on the recap screen
+      include_after_trail: true,  // true | false, assumed included; opt out on the recap screen
       contact_name: '',
       contact_email: '',
       contact_phone: '',
@@ -120,7 +120,7 @@
       cardSelect('q6', 'move', 'How long do you want to be out?', [
         'A few hours (half day)', 'Full day', 'Overnight or multi-day'
       ], true, function (val) {
-        // Overnight/multi-day is inherently bespoke — routes it straight
+        // Overnight/multi-day is inherently bespoke, routes it straight
         // to the Custom Experience tier, which gets built personally
         // rather than auto-priced. Switching away reverts to whichever
         // standard tier the after-trail preference implies.
@@ -131,12 +131,16 @@
         }
       }),
       cardTextarea('q7', 'move', 'Anything else we should know to make this day exactly right?',
-        'Physical considerations, special requests, anything at all — nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
-        'Bad knee on descents, prefer no scrambling, celebrating a milestone — anything like that.', false),
+        'Physical considerations, special requests, anything at all. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
+        'Bad knee on descents, prefer no scrambling, celebrating a milestone, anything like that.', false),
       cardInterests(),
       cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
         "Now let's talk about the other half of your day."),
-      cardRecoveryPreferences(),
+      // cardRecoveryPreferences() removed from the active flow (recovery look-like,
+      // recovery taste, dietary preferences). That question set is moving to the
+      // post-booking experience instead, and shortens this flow from 14 steps to 13.
+      // The function itself is left defined below, unused, as the reference copy for
+      // whoever builds that post-booking flow.
       cardGearList(),
       cardContact(),
       cardRecap(),
@@ -302,7 +306,7 @@
         sync();
       }
 
-      // "Just me" is exactly one person — no adding, no removing.
+      // "Just me" is exactly one person: no adding, no removing.
       function refreshRosterControls() {
         var isSolo = state.answers.q2_who === 'solo';
         addBtn.style.display = isSolo ? 'none' : '';
@@ -329,7 +333,7 @@
             rowsWrap.innerHTML = '';
             for (var i = 0; i < defaultRows; i++) addRow();
           } else if (w.v === 'solo' && state.answers.q2_roster.length > 1) {
-            // "Just me" is unambiguous — trim back down to a single person.
+            // "Just me" is unambiguous: trim back down to a single person.
             while (rowsWrap.children.length > 1) {
               rowsWrap.removeChild(rowsWrap.lastChild);
             }
@@ -544,14 +548,14 @@
   }
 
   // Combines the old "what draws you most" multiselect and "anything
-  // specific to see or do" free text into a single screen — both only
+  // specific to see or do" free text into a single screen. Both only
   // ever fed the guide narrative, never structured routing, so there's no
   // reason to make the guest click through two separate steps for them.
   function cardInterests() {
     var c = cardShell('after', true);
     var OPTIONS = [
       'Big views', 'Solitude and quiet', 'Physical challenge', 'Wildlife and nature', 'Interesting geology',
-      'Water — streams, pools, falls', 'Photography opportunities', 'Learning about the place',
+      'Water (streams, pools, falls)', 'Photography opportunities', 'Learning about the place',
       'Moving fast', 'Moving slow and taking it all in'
     ];
     c.render = function (root) {
@@ -585,12 +589,13 @@
     return c;
   }
 
-  // Combines the old "what does recovery look like" multiselect and
-  // "taste for the recovery experience" select into one screen, and adds
-  // dietary preferences here too — the Trail Database's After the Trail
-  // tab filters restaurant options by its Dietary Notes column, and until
-  // now nothing in this flow ever collected that. All three questions
-  // are about the same half of the day, so one screen covers it.
+  // Not currently used in buildCards() (see the comment there). Kept as
+  // reference: this combines the old "what does recovery look like"
+  // multiselect and "taste for the recovery experience" select into one
+  // screen, plus dietary preferences (the Trail Database's After the Trail
+  // tab filters restaurant options by its Dietary Notes column). All three
+  // questions are about the same half of the day, so one screen covered it.
+  // This is the question set moving to the post-booking experience.
   function cardRecoveryPreferences() {
     var c = cardShell('trail', true);
     var RECOVERY_OPTIONS = [
@@ -720,7 +725,7 @@
     var picks = (state.answers.q13 || []).filter(function (x) {
       return x && x.indexOf('open to whatever') === -1;
     });
-    if (!picks.length) return 'a proper recovery — pool time, good food, somewhere to unwind';
+    if (!picks.length) return 'a proper recovery: pool time, good food, somewhere to unwind';
     var lower = picks.map(function (s) { return s.charAt(0).toLowerCase() + s.slice(1); });
     if (lower.length === 1) return lower[0];
     return lower.slice(0, -1).join(', ') + ' and ' + lower[lower.length - 1];
@@ -755,17 +760,17 @@
       : 'We\'re building ';
     var lines = [];
     lines.push(opener + (duration ? duration + ' of ' : '') + activity + ' for ' + groupPhrase + '.');
-    lines.push('That means ' + gearPhrase + ' — everything delivered and picked up, nothing for you to plan.');
+    lines.push('That means ' + gearPhrase + ', with everything delivered and picked up, nothing for you to plan.');
 
     if (state.answers.include_after_trail === false) {
-      lines.push('You\'ve chosen to keep it trail-only — just the adventure, nothing after.');
+      lines.push('You\'ve chosen to keep it trail-only, just the adventure, nothing after.');
     } else {
       lines.push('Afterward, we\'ll build in ' + recoveryPreviewText() + '.');
     }
     return lines.join(' ');
   }
 
-  // The rational counterpart to the narrative above — a plain-spoken list
+  // The rational counterpart to the narrative above: a plain-spoken list
   // of everything included, re-run alongside the narrative whenever the
   // after-trail toggle changes (it affects both the tier line and whether
   // the after-trail item appears at all).
@@ -791,7 +796,7 @@
     var c = cardShell('kit', true);
     c.nextLabel = 'Reserve My Spot';
     c.render = function (root) {
-      // Local to this render only — collapses back to closed every time the
+      // Local to this render only: collapses back to closed every time the
       // guest (re)enters this card, doesn't need to persist in state.
       var confirmOpen = false;
 
@@ -821,14 +826,14 @@
         refreshRecap();
       }
 
-      // Assumed included by default — no toggle to answer, just a small
+      // Assumed included by default: no toggle to answer, just a small
       // low-key way out. Removing it is a real pricing/tier change, so it
       // gets an inline confirm step rather than executing on first click.
       function renderAfterTrailToggle() {
         if (state.answers.tier === 'custom') {
           afterTrailEl.innerHTML = '<div class="paf-value-item" style="border-bottom:none; padding-top:0;">' +
-            'Since this is a multi-day custom experience, we\'ll build your complete itinerary — trail days, recovery, ' +
-            'everything — and reach out personally to finalize it with you.</div>';
+            'Since this is a multi-day custom experience, we\'ll build your complete itinerary (trail days, recovery, ' +
+            'everything) and reach out personally to finalize it with you.</div>';
           return;
         }
         var included = state.answers.include_after_trail !== false;
@@ -880,12 +885,12 @@
       });
 
       var html = '<div class="paf-q"><span class="paf-req">*</span> Who needs a gear kit?</div>';
-      html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit — ' +
+      html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit: ' +
         BASE_GEAR_COPY + ', plus keepsakes to keep. Turn any off if you\'d like to share.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
         '<div class="paf-kit-details-row"><strong>Rental gear:</strong> ' + BASE_GEAR_COPY + '.</div>' +
-        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few Palm Springs Adventure Club keepsakes — the exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
+        '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few Palm Springs Adventure Club keepsakes. The exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
         '</div>';
       html += '<div class="paf-gear-list" data-field="gear-list"></div>';
       root.innerHTML = html;
@@ -901,7 +906,7 @@
 
       var listEl = root.querySelector('[data-field="gear-list"]');
 
-      // This is a bundle — every booking needs at least one gear kit. Any
+      // This is a bundle: every booking needs at least one gear kit. Any
       // person who is currently the *only* remaining "yes" has their "no"
       // button locked so the total can never drop to zero. Recomputed on
       // every toggle since who counts as "the last one" changes as people
@@ -989,7 +994,7 @@
     return tier.booking + tier.gear * selectedGearCount();
   }
 
-  // Refundable per-kit gear deposit — a card hold, never an actual charge,
+  // Refundable per-kit gear deposit: a card hold, never an actual charge,
   // released once gear comes back complete and in working order. Priced to
   // match the tier's existing gear-kit line item exactly (a deliberate
   // choice, not a coincidence): $65/kit for Trail Guide, $100/kit for Peaks
@@ -1018,11 +1023,11 @@
     var depositEach = depositPerKit(state.answers.tier);
     var depositTotal = depositEach * gearCount;
     // Standard tiers pay inline via the embedded Payment Element below, so
-    // no note is needed there — the payment form itself makes it obvious.
+    // no note is needed there since the payment form itself makes it obvious.
     // Custom Experience still needs the explanation since no card is
     // collected on this screen.
     var priceNote = isCustom
-      ? 'This is a starting estimate for a multi-day custom experience — we\'ll personally reach out within one business day to build your complete itinerary and finalize pricing before anything is charged.'
+      ? 'This is a starting estimate for a multi-day custom experience. We\'ll personally reach out within one business day to build your complete itinerary and finalize pricing before anything is charged.'
       : null;
     var html = '<div class="paf-q">Here\'s your day.</div>';
     html += '<div class="paf-price-card">';
@@ -1034,14 +1039,14 @@
     if (!isCustom) {
       html += '<div class="paf-deposit-card">' +
         '<div class="paf-deposit-line"><span>Refundable gear deposit</span><span>$' + depositTotal + '</span></div>' +
-        '<div class="paf-deposit-explain">This is a hold on your card, not a charge — $' + depositEach + ' per gear kit (' + gearCount + ' kit' + (gearCount === 1 ? '' : 's') + '). ' +
+        '<div class="paf-deposit-explain">This is a hold on your card, not a charge: $' + depositEach + ' per gear kit (' + gearCount + ' kit' + (gearCount === 1 ? '' : 's') + '). ' +
         'It\'s released in full once your gear is returned complete and in working order. If anything is missing, lost, or damaged, its replacement cost is deducted from this hold before the rest is released.</div>' +
         '</div>';
     }
     html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s included? <span data-field="disclosure-icon">+</span></button>';
     html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
       '<div class="paf-kit-details-row">Route selection tailored to your group and the day\'s conditions, built from lived experience on these trails.</div>' +
-      '<div class="paf-kit-details-row">Every logistic handled — no permits, no planning, no guesswork.</div>' +
+      '<div class="paf-kit-details-row">Every logistic handled: no permits, no planning, no guesswork.</div>' +
       '<div class="paf-kit-details-row">No-hassle gear delivery and pickup.</div>' +
       '<div class="paf-kit-details-row"><strong>Your gear kit:</strong> ' + BASE_GEAR_COPY + ', plus ' + keepsakeCopy(state.answers.tier) + ' to keep.</div>' +
       '</div>';
@@ -1081,7 +1086,7 @@
 
   // Kicks off the embedded payment step for standard tiers: asks our
   // serverless endpoint for a PaymentIntent (server recomputes the total
-  // from locked tier prices — never trusts a client-sent dollar amount),
+  // from locked tier prices, never trusts a client-sent dollar amount),
   // then mounts Stripe's Payment Element in place of the reserve button.
   function startStripePayment(root, total, gearCount) {
     var reserveBtn = root.querySelector('[data-field="reserve"]');
@@ -1144,7 +1149,7 @@
             redirect: 'if_required'
           }).then(function (confirmResult) {
             if (confirmResult.error) {
-              showError(confirmResult.error.message || 'Payment failed — please check your card details and try again.');
+              showError(confirmResult.error.message || 'Payment failed. Please check your card details and try again.');
               payBtn.disabled = false;
               payBtn.textContent = 'Pay $' + total + ' & Reserve';
               return;
@@ -1176,7 +1181,7 @@
   }
 
   // Runs right after the main booking charge succeeds. Places the
-  // refundable gear deposit hold on the same card (no second card entry —
+  // refundable gear deposit hold on the same card (no second card entry;
   // the server reuses the saved payment method via the Stripe Customer
   // attached to the main PaymentIntent). The outcome here never blocks the
   // booking itself: the guest already paid, so whatever happens with the
@@ -1207,7 +1212,7 @@
           state.answers.depositPaymentIntentId = data.paymentIntentId;
           state.answers.depositStatus = 'held';
         } else {
-          // 'unavailable' (no saved payment method) or 'failed' — logged
+          // 'unavailable' (no saved payment method) or 'failed', logged
           // server-side already; just record the outcome here.
           state.answers.depositStatus = data.status || 'failed';
         }
@@ -1280,7 +1285,7 @@
       dietary_preferences: state.answers.dietary,
       includeAfterTrail: state.answers.include_after_trail,
       gearKitsSelected: selectedGearCount(),
-      // Shared delivery duffels, not one per kit — 1 duffel covers up to 2
+      // Shared delivery duffels, not one per kit: 1 duffel covers up to 2
       // kits, 2 covers 3-4, 3 covers 5-6, and so on (Math.ceil(n/2)).
       duffelCount: Math.ceil(Math.max(selectedGearCount(), 1) / 2),
       contact: {
@@ -1311,7 +1316,7 @@
           state.answers.bookingId = data.bookingId || null;
         }
       })
-      .catch(function () { /* fail silently — booking/payment already happened, still show closing screen */ })
+      .catch(function () { /* fail silently since booking/payment already happened, still show closing screen */ })
       .then(function () {
         goToStep(cards.length - 1);
       });
@@ -1342,7 +1347,7 @@
     var pct = Math.round((state.step / (cards.length - 1)) * 100);
     els.progressFill.style.width = pct + '%';
 
-    // Labels scroll horizontally on narrow screens instead of wrapping —
+    // Labels scroll horizontally on narrow screens instead of wrapping:
     // keep the active one in view without the guest having to swipe.
     var activeEl = els.progress.querySelector('.paf-progress-section.is-active');
     if (activeEl) activeEl.scrollIntoView({ block: 'nearest', inline: 'center' });
