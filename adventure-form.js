@@ -1472,8 +1472,8 @@
       '?subject=' + encodeURIComponent(email.subject) +
       '&body=' + encodeURIComponent(email.body);
 
-    var html = '<div class="paf-q">Let\'s build this one together.</div>';
-    html += '<div class="paf-sub">Overnight and multi-day adventures are planned personally rather than booked instantly. Send us a note and we will build a complete itinerary with you.</div>';
+    var html = '<div class="paf-q">Let\'s build your adventure together.</div>';
+    html += '<div class="paf-sub">Overnight and multi-day adventures require collaboration to ensure your vision is realized. Send us a note and we will build a complete itinerary with you.</div>';
     html += '<div class="paf-closing-dynamic">';
     html += '<div style="margin-bottom:0.9rem;"><strong>To:</strong> ' + esc(CUSTOM_CONTACT_EMAIL) + '</div>';
     html += '<div style="margin-bottom:0.3rem;"><strong>Subject</strong></div>';
