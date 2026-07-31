@@ -46,15 +46,15 @@
     custom: { key: 'custom', name: 'Custom Experience',         booking: 595, gear: 100 }
   };
 
-  // "What You're After" (id: 'after') removed: its only card, cardInterests(),
-  // is no longer in the active flow (see the comment in buildCards() below), so
-  // this section would never highlight and just sits dead in the progress bar.
-  // Restore this entry alongside re-adding cardInterests() if that ever moves
+  // "What You're After" (id: 'after') and "After the Trail" (id: 'trail') are
+  // both removed: their only cards (cardInterests() and the q12 cardStitch(),
+  // see the comments in buildCards() below) are no longer in the active flow,
+  // so these sections would never highlight and just sit dead in the progress
+  // bar. Restore an entry alongside re-adding its card if either ever moves
   // back into Start My Adventure.
   var SECTIONS = [
     { id: 'adventure', name: 'Your Adventure' },
     { id: 'move',       name: 'How You Move' },
-    { id: 'trail',       name: 'After the Trail' },
     { id: 'kit',         name: 'Your Kit' }
   ];
 
@@ -146,13 +146,18 @@
       // it's moving to the post-booking experience instead, captured after
       // payment rather than blocking the initial reservation. The function
       // stays defined below, unused, as reference for that workstream.
-      cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
-        "Now let's talk about the other half of your day."),
+      // The q12 cardStitch() below ("At the end of this day, I want to feel")
+      // is removed from the active flow: it feels clunky here and doesn't add
+      // much to the experience. Moving to the post-booking experience instead.
+      // Original call, kept for reference:
+      // cardStitch('q12', 'trail', 'At the end of this day, I want to feel', Q12_STARTERS, true, null,
+      //   "Now let's talk about the other half of your day."),
       // cardRecoveryPreferences() removed from the active flow (recovery look-like,
       // recovery taste, dietary preferences). That question set is moving to the
-      // post-booking experience instead, and shortens this flow from 14 steps to 13.
-      // The function itself is left defined below, unused, as the reference copy for
-      // whoever builds that post-booking flow.
+      // post-booking experience instead. The function itself is left defined
+      // below, unused, as the reference copy for whoever builds that post-booking
+      // flow. Between this, cardInterests(), and q12 above, Start My Adventure is
+      // down from its original 14 steps to 11.
       cardGearList(),
       cardContact(),
       cardRecap(),
@@ -904,7 +909,7 @@
 
       var html = '<div class="paf-q"><span class="paf-req">*</span> Who needs a gear kit?</div>';
       html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit: ' +
-        BASE_GEAR_COPY + ', plus keepsakes to keep. Turn any off if you\'d like to share.</div>';
+        BASE_GEAR_COPY + ', plus keepsakes to keep.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
         '<div class="paf-kit-details-row"><strong>Rental gear:</strong> ' + BASE_GEAR_COPY + '.</div>' +
