@@ -63,6 +63,13 @@
     privacy: '2026-07-29'
   };
 
+  // Exact copy shown next to the SMS opt-in checkbox on the contact info
+  // step. Defined once here and reused for both the on-screen label and
+  // buildPayload()'s contact.smsConsentText, so the stored text is
+  // guaranteed to match what the guest actually saw, not a copy that can
+  // drift out of sync with the UI if this ever gets reworded.
+  var SMS_CONSENT_TEXT = 'Text me updates about my reservation, delivery, and deposit. Message and data rates may apply. Reply STOP to opt out.';
+
   // Gear delivery is evening-before-only, no morning-of delivery. Working
   // backward from that (see psac-gear-delivery-timing-for-booking-flow.md):
   // guest's delivery address is due T-3, which leaves a T-2 buffer day for
@@ -125,6 +132,7 @@
       contact_name: '',
       contact_email: '',
       contact_phone: '',
+      contact_sms_consent: false,
       policiesAgreed: false,
       tier: 'trail',
       rating: null,
@@ -1062,12 +1070,22 @@
       html += '<input type="text" class="paf-text-input" data-field="contact_name" placeholder="Name" value="' + esc(state.answers.contact_name) + '" style="margin-bottom:0.9rem;">';
       html += '<input type="email" class="paf-text-input" data-field="contact_email" placeholder="Email *" value="' + esc(state.answers.contact_email) + '" style="margin-bottom:0.9rem;">';
       html += '<input type="tel" class="paf-text-input" data-field="contact_phone" placeholder="Phone *" value="' + esc(state.answers.contact_phone) + '">';
+      // Separate from and unrelated to phone being required: providing a
+      // number is not consent to be texted on it. Unchecked by default,
+      // never wired into isValid() below, so it can never block advancing.
+      html += '<label class="paf-sms-consent">' +
+        '<input type="checkbox" data-field="contact_sms_consent"' + (state.answers.contact_sms_consent ? ' checked' : '') + '>' +
+        '<span>' + esc(SMS_CONSENT_TEXT) + '</span>' +
+        '</label>';
       root.innerHTML = html;
       ['contact_name', 'contact_email', 'contact_phone'].forEach(function (f) {
         root.querySelector('[data-field="' + f + '"]').addEventListener('input', function (e) {
           state.answers[f] = e.target.value;
           refreshNav();
         });
+      });
+      root.querySelector('[data-field="contact_sms_consent"]').addEventListener('change', function (e) {
+        state.answers.contact_sms_consent = e.target.checked;
       });
     };
     c.isValid = function () {
@@ -1391,7 +1409,13 @@
       contact: {
         name: state.answers.contact_name,
         email: state.answers.contact_email,
-        phone: state.answers.contact_phone
+        phone: state.answers.contact_phone,
+        // Explicit true/false, never omitted or null, so it's clear the
+        // guest was shown the choice and either affirmatively opted in or
+        // declined, not that consent simply wasn't asked about.
+        smsConsent: !!state.answers.contact_sms_consent,
+        smsConsentAt: new Date().toISOString(),
+        smsConsentText: SMS_CONSENT_TEXT
       },
       tier: state.answers.tier,
       total: computeTotal(state.answers.tier),

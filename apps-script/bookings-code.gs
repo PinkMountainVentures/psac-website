@@ -24,8 +24,8 @@ var SHEETS = {
 };
 
 var HEADERS = {
-  'People': ['personId', 'name', 'email', 'phone', 'stripeCustomerId', 'membershipTier', 'memberSince', 'renewalDate', 'createdAt'],
-  'Experience Bookings': ['bookingId', 'createdAt', 'personId', 'contactName', 'contactEmail', 'contactPhone', 'tier', 'date', 'timePreference', 'gearKitCount', 'duffelCount', 'total', 'mainPaymentIntentId', 'depositPaymentIntentId', 'depositStatus', 'fullPayloadJson'],
+  'People': ['personId', 'name', 'email', 'phone', 'stripeCustomerId', 'membershipTier', 'memberSince', 'renewalDate', 'createdAt', 'smsConsent', 'smsConsentAt', 'smsConsentText'],
+  'Experience Bookings': ['bookingId', 'createdAt', 'personId', 'contactName', 'contactEmail', 'contactPhone', 'tier', 'date', 'timePreference', 'gearKitCount', 'duffelCount', 'total', 'mainPaymentIntentId', 'depositPaymentIntentId', 'depositStatus', 'smsConsent', 'smsConsentAt', 'smsConsentText', 'fullPayloadJson'],
   'Gear Check Log': ['itemRowId', 'bookingId', 'kitNumber', 'personName', 'itemName', 'itemCost', 'checkedOutAt', 'checkedInAt', 'condition', 'graceDeadline', 'recoveredAt', 'notes']
 };
 
@@ -97,7 +97,8 @@ function handleSaveBooking(payload) {
   lock.waitLock(10000);
   try {
     var contact = payload.contact || {};
-    var personId = findOrCreatePerson(ss, contact.name, contact.email, contact.phone);
+    var personId = findOrCreatePerson(ss, contact.name, contact.email, contact.phone,
+      contact.smsConsent, contact.smsConsentAt, contact.smsConsentText);
     var bookingId = 'BK-' + Utilities.getUuid().slice(0, 8).toUpperCase();
     var now = new Date().toISOString();
 
@@ -118,6 +119,13 @@ function handleSaveBooking(payload) {
       payload.paymentIntentId || '',
       payload.depositPaymentIntentId || '',
       payload.depositStatus || '',
+      // Point-in-time record of what this specific booking's guest agreed
+      // to, distinct from the Person record's latest-wins value below —
+      // see findOrCreatePerson()'s comment for why they're handled
+      // differently.
+      !!contact.smsConsent,
+      contact.smsConsentAt || '',
+      contact.smsConsentText || '',
       JSON.stringify(payload)
     ]);
 
@@ -191,18 +199,30 @@ function findBookingRow(ss, bookingId) {
 
 // Dedup by email, case-insensitive. First write wins for name/phone on
 // repeat bookings — fine for now, worth revisiting once there's a reason
-// to let contact details update on file.
-function findOrCreatePerson(ss, name, email, phone) {
+// to let contact details update on file. SMS consent is handled the
+// opposite way on purpose: always overwritten to the guest's latest
+// answer, since a returning guest's texting preference can genuinely
+// change between bookings, and the Person record should reflect their
+// current stated choice rather than whatever they first said. The
+// point-in-time record of what was actually agreed to on any one specific
+// booking lives on that booking's own row in Experience Bookings instead,
+// which never gets overwritten.
+function findOrCreatePerson(ss, name, email, phone, smsConsent, smsConsentAt, smsConsentText) {
   var sheet = ss.getSheetByName(SHEETS.people);
   var data = sheet.getDataRange().getValues();
   var emailLower = String(email || '').trim().toLowerCase();
   for (var i = 1; i < data.length; i++) {
     if (emailLower && String(data[i][2] || '').trim().toLowerCase() === emailLower) {
+      var rowIndex = i + 1;
+      // smsConsent / smsConsentAt / smsConsentText are columns 10-12
+      // (1-indexed) in the People sheet — see HEADERS above.
+      sheet.getRange(rowIndex, 10, 1, 3).setValues([[!!smsConsent, smsConsentAt || '', smsConsentText || '']]);
       return data[i][0];
     }
   }
   var personId = 'PER-' + Utilities.getUuid().slice(0, 8).toUpperCase();
-  sheet.appendRow([personId, name || '', email || '', phone || '', '', '', '', '', new Date().toISOString()]);
+  sheet.appendRow([personId, name || '', email || '', phone || '', '', '', '', '', new Date().toISOString(),
+    !!smsConsent, smsConsentAt || '', smsConsentText || '']);
   return personId;
 }
 
