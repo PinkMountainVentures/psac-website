@@ -285,7 +285,7 @@
         });
         var fit = document.createElement('select');
         fit.className = 'paf-roster-input paf-roster-fit';
-        ['Fitness level', 'Easygoing pace', 'Comfortable hiker', 'Strong / experienced', 'Athlete'].forEach(function (o, i) {
+        ['Fitness level', 'Easygoing pace', 'Comfortable hiker', 'Strong / experienced'].forEach(function (o, i) {
           var opt = document.createElement('option');
           opt.textContent = o;
           opt.value = i === 0 ? '' : o;
