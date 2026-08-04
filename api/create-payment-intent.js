@@ -125,10 +125,12 @@ module.exports = async function handler(req, res) {
     if (date) params.append('metadata[date]', date);
     if (customerId) {
       params.append('customer', customerId);
-      // on_session: the guest is actively completing this payment right
-      // now, so the saved-card reuse for the deposit hold happens moments
-      // later in the same visit, not as a true unattended future charge.
-      params.append('setup_future_usage', 'on_session');
+      // off_session: the saved card gets reused later, off-session, at T-1
+      // (the day before gear delivery) to place the refundable deposit
+      // hold, not moments later in this same visit. off_session tells
+      // Stripe to request the right authentication upfront so that later,
+      // truly unattended charge behaves correctly.
+      params.append('setup_future_usage', 'off_session');
     }
 
     var stripeRes = await fetch('https://api.stripe.com/v1/payment_intents', {

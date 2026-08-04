@@ -273,7 +273,7 @@
         name.type = 'text'; name.placeholder = 'Name'; name.className = 'paf-roster-input paf-roster-name';
         var age = document.createElement('select');
         age.className = 'paf-roster-input paf-roster-age';
-        ['Age range', 'Under 14', '14–18', '18–25', '26–35', '36–45', '46–55', '56–65', '66+'].forEach(function (o, i) {
+        ['Age range', 'Under 14', '14–17', '18–24', '25–34', '35–44', '45–54', '55–64', '65+'].forEach(function (o, i) {
           var opt = document.createElement('option');
           opt.textContent = o;
           opt.value = i === 0 ? '' : o;
@@ -1112,6 +1112,22 @@
     var reserveLabel = isCustom ? 'Request My Custom Experience' : 'Continue to Payment';
     var depositEach = depositPerKit(state.answers.tier);
     var depositTotal = depositEach * gearCount;
+    // Full retail replacement value per kit (backpack + poles + 2 bottles +
+    // a shared delivery duffel), disclosed as the cap on what could ever be
+    // charged beyond the hold. Same figure across tiers since the physical
+    // rental items don't differ by tier, only the keepsakes do.
+    var retailCapEach = 531;
+    var retailCapTotal = retailCapEach * gearCount;
+    // The hold itself no longer fires today: it moves to T-1 (the day
+    // before gear delivery), placed by the Internal Operations UX. This
+    // copy still discloses full terms at booking, since that's when the
+    // guest is deciding and providing a card, but says plainly the hold
+    // happens later, not now.
+    var depositExplain = 'This is a hold on your card, not a charge. It gets placed the day before your gear is delivered, not today. It\'s released in full once your gear comes back complete and in working order. If something is missing, lost, or damaged, we deduct replacement cost from this hold first. If the damage or loss is significant, we reserve the right to charge the remaining balance directly to the card on file, up to ' +
+      (gearCount === 1
+        ? 'the kit\'s full retail value of $' + retailCapEach
+        : 'each kit\'s full retail value of $' + retailCapEach + ' ($' + retailCapTotal + ' total across your ' + gearCount + ' kits)') +
+      ', to cover it.';
     // Standard tiers pay inline via the embedded Payment Element below, so
     // no note is needed there since the payment form itself makes it obvious.
     // Custom Experience still needs the explanation since no card is
@@ -1119,6 +1135,10 @@
     var priceNote = isCustom
       ? 'This is a starting estimate for a multi-day custom experience. We\'ll personally reach out within one business day to build your complete itinerary and finalize pricing before anything is charged.'
       : null;
+    // Plain-language waiver disclosure, required at the point of payment
+    // even though the actual waiver-signing step happens later during Trip
+    // Prep. Shown for every tier, not just standard ones.
+    var waiverNote = 'Completing a Release of Liability is required before your gear is delivered or your adventure begins. We\'ll send this to you as part of getting your trip ready to go.';
     var html = '<div class="paf-q">Here\'s your day.</div>';
     html += '<div class="paf-price-card">';
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
@@ -1129,9 +1149,10 @@
     if (!isCustom) {
       html += '<div class="paf-deposit-card">' +
         '<div class="paf-deposit-line"><span>Refundable gear deposit</span><span>$' + depositTotal + '</span></div>' +
-        '<div class="paf-deposit-explain">This is a hold on your card, not a charge. It\'s released in full once your gear comes back complete and in working order. If something is missing, lost, or damaged, we deduct replacement cost from this hold first. If the damage or loss is significant, we reserve the right to charge the remaining balance directly to the card on file, up to the kit\'s full retail value of $550, to cover it.</div>' +
+        '<div class="paf-deposit-explain">' + depositExplain + '</div>' +
         '</div>';
     }
+    html += '<div class="paf-price-note">' + waiverNote + '</div>';
     html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s included? <span data-field="disclosure-icon">+</span></button>';
     html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
       '<div class="paf-kit-details-row">Route selection tailored to your group and the day\'s conditions, built from lived experience on these trails.</div>' +
@@ -1248,7 +1269,13 @@
               state.answers.paymentIntentId = pi.id;
               state.answers.paymentStatus = pi.status;
               payBtn.textContent = 'Finalizing your reservation…';
-              placeDepositHoldThenFinish(state.answers.tier, gearCount, pi.id);
+              // The refundable gear deposit hold no longer fires here: Stripe
+              // holds expire in 5-7 days and a booking can happen weeks
+              // before the trip, so the hold moved to T-1 (day before gear
+              // delivery), placed by the Internal Operations UX calling
+              // api/create-deposit-hold.js directly with this booking's id
+              // once it exists. Go straight to submitForm(), same as Custom.
+              submitForm();
             } else {
               showError('Payment did not complete. Please try again.');
               payBtn.disabled = false;
@@ -1266,51 +1293,6 @@
         reserveBtn.textContent = 'Continue to Payment';
         section.style.display = 'block';
         showError(err.message || 'Could not start payment. Please try again.');
-      });
-  }
-
-  // Runs right after the main booking charge succeeds. Places the
-  // refundable gear deposit hold on the same card (no second card entry;
-  // the server reuses the saved payment method via the Stripe Customer
-  // attached to the main PaymentIntent). The outcome here never blocks the
-  // booking itself: the guest already paid, so whatever happens with the
-  // deposit hold just gets recorded and, if it didn't succeed, needs a
-  // manual look before the trip rather than stranding the guest mid-flow.
-  function placeDepositHoldThenFinish(tierKey, gearCount, mainPaymentIntentId) {
-    var stripe = getStripe();
-
-    fetch('/api/create-deposit-hold', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tier: tierKey, gearCount: gearCount, mainPaymentIntentId: mainPaymentIntentId })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.status === 'requires_action' && data.clientSecret && stripe) {
-          return stripe.handleNextAction({ clientSecret: data.clientSecret }).then(function (actionResult) {
-            var pi = actionResult && actionResult.paymentIntent;
-            if (!actionResult.error && pi && pi.status === 'requires_capture') {
-              state.answers.depositPaymentIntentId = pi.id;
-              state.answers.depositStatus = 'held';
-            } else {
-              state.answers.depositStatus = 'failed';
-            }
-          });
-        }
-        if (data.status === 'succeeded') {
-          state.answers.depositPaymentIntentId = data.paymentIntentId;
-          state.answers.depositStatus = 'held';
-        } else {
-          // 'unavailable' (no saved payment method) or 'failed', logged
-          // server-side already; just record the outcome here.
-          state.answers.depositStatus = data.status || 'failed';
-        }
-      })
-      .catch(function () {
-        state.answers.depositStatus = 'error';
-      })
-      .then(function () {
-        submitForm();
       });
   }
 
@@ -1394,7 +1376,12 @@
       paymentIntentId: state.answers.paymentIntentId || null,
       paymentStatus: state.answers.paymentStatus || (state.answers.tier === 'custom' ? 'not_charged_custom_quote' : 'unpaid'),
       depositPaymentIntentId: state.answers.depositPaymentIntentId || null,
-      depositStatus: state.answers.depositStatus || (state.answers.tier === 'custom' ? 'not_applicable' : null)
+      // No hold attempt happens at booking anymore (see startStripePayment()
+      // above): the deposit hold itself fires at T-1, placed by the
+      // Operations UX calling api/create-deposit-hold.js. 'scheduled_t1'
+      // tells the Bookings sheet and Operations UX a hold is expected
+      // later, not already resolved one way or the other.
+      depositStatus: state.answers.depositStatus || (state.answers.tier === 'custom' ? 'not_applicable' : 'scheduled_t1')
     };
   }
 

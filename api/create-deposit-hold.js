@@ -1,15 +1,28 @@
 /* ============================================
    PSAC — Refundable gear deposit hold endpoint
-   Vercel serverless function. Runs immediately after the main booking
-   PaymentIntent succeeds. Places a manual-capture authorization hold for
-   the refundable gear deposit ($65/kit Trail Guide, $100/kit Peaks to
-   Pools) on the same card the guest just used — no second card entry.
+   Vercel serverless function. Shared endpoint called by the Internal
+   Operations UX at T-1 (the morning before gear delivery), not by
+   adventure-form.js at booking time. Stripe authorization holds expire in
+   roughly 5-7 days and a booking can happen weeks before the trip, so the
+   hold itself has to wait until it's actually close to being needed.
 
-   Trusts nothing dollar-related from the client: re-derives the deposit
-   amount from the locked per-tier gear price and gearCount, and re-derives
-   the Stripe Customer + payment method by looking up the already-confirmed
-   main PaymentIntent on Stripe's side, rather than accepting a client-sent
-   customer/payment method id directly.
+   Request shape: { bookingId, secret }. No amount, tier, or kit count is
+   ever accepted from the caller — this endpoint looks all of that up
+   itself from the Bookings & Operations sheet (via the same Apps Script
+   Web App save-booking.js already talks to), the same "never trust a
+   caller-supplied money-adjacent value" posture used in
+   create-payment-intent.js.
+
+   Auth: a shared secret in the request body, same pattern as
+   BOOKINGS_WEBAPP_SECRET's check inside bookings-code.gs's doPost(), just
+   a separate secret (DEPOSIT_HOLD_SHARED_SECRET) since this is a distinct
+   caller (the Operations UX, not this site's own /api/save-booking).
+
+   Places a manual-capture authorization hold for the refundable gear
+   deposit ($65/kit Trail Guide, $100/kit Peaks to Pools) on the card saved
+   against the booking's main PaymentIntent, no second card entry. Once
+   placed, writes the result back to the booking's row in the Bookings
+   sheet so both the sheet and the Operations UX know the outcome.
 
    This hold is released (canceled) or captured — in full or partially —
    later, once gear is checked back in. That resolution is a separate,
@@ -28,15 +41,63 @@ function stripeAuthHeader() {
   return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
 }
 
+// Looks up a booking's tier, gear kit count, and main PaymentIntent id from
+// the Bookings & Operations sheet via the same Apps Script Web App
+// api/save-booking.js already calls. Returns null on any failure so the
+// caller gets a clean error rather than a half-parsed result.
+async function getBookingRecord(bookingId) {
+  var res = await fetch(process.env.BOOKINGS_WEBAPP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'getBooking',
+      bookingId: bookingId,
+      secret: process.env.BOOKINGS_WEBAPP_SECRET
+    })
+  });
+  var text = await res.text();
+  var data;
+  try { data = JSON.parse(text); } catch (e) { return null; }
+  if (!res.ok || !data || data.ok === false) return null;
+  return data;
+}
+
+// Writes the hold outcome back to the booking's row so the Bookings sheet
+// (and anyone reading it, including the Operations UX) reflects the actual
+// result instead of staying on the "scheduled_t1" placeholder written at
+// booking time. Best-effort: a failure here never unwinds the hold that
+// was already placed on Stripe's side, just gets logged for a manual look.
+async function updateBookingDepositStatus(bookingId, depositPaymentIntentId, depositStatus) {
+  try {
+    var res = await fetch(process.env.BOOKINGS_WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'updateDepositStatus',
+        bookingId: bookingId,
+        depositPaymentIntentId: depositPaymentIntentId || '',
+        depositStatus: depositStatus,
+        secret: process.env.BOOKINGS_WEBAPP_SECRET
+      })
+    });
+    var data = await res.json();
+    if (!res.ok || data.ok === false) {
+      console.error('Failed to write back deposit status for', bookingId, data);
+    }
+  } catch (err) {
+    console.error('updateBookingDepositStatus error:', err);
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
-    console.error('Missing STRIPE_SECRET_KEY env var');
-    res.status(500).json({ error: 'Payment is not configured yet.' });
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.BOOKINGS_WEBAPP_URL || !process.env.BOOKINGS_WEBAPP_SECRET || !process.env.DEPOSIT_HOLD_SHARED_SECRET) {
+    console.error('Missing one or more required env vars for create-deposit-hold (STRIPE_SECRET_KEY, BOOKINGS_WEBAPP_URL, BOOKINGS_WEBAPP_SECRET, DEPOSIT_HOLD_SHARED_SECRET)');
+    res.status(500).json({ error: 'Deposit hold endpoint is not configured yet.' });
     return;
   }
 
@@ -47,7 +108,24 @@ module.exports = async function handler(req, res) {
     }
     body = body || {};
 
-    var tierKey = String(body.tier || '');
+    if (body.secret !== process.env.DEPOSIT_HOLD_SHARED_SECRET) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    var bookingId = String(body.bookingId || '').trim();
+    if (!bookingId) {
+      res.status(400).json({ error: 'Missing bookingId.' });
+      return;
+    }
+
+    var booking = await getBookingRecord(bookingId);
+    if (!booking) {
+      res.status(404).json({ error: 'Booking not found.' });
+      return;
+    }
+
+    var tierKey = String(booking.tier || '');
     var tier = TIERS[tierKey];
     if (!tier) {
       // Custom Experience (and anything else) has no deposit hold — nothing
@@ -56,19 +134,19 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    var mainPaymentIntentId = String(body.mainPaymentIntentId || '');
+    var mainPaymentIntentId = String(booking.mainPaymentIntentId || '');
     if (!mainPaymentIntentId) {
-      res.status(400).json({ error: 'Missing mainPaymentIntentId.' });
+      res.status(400).json({ error: 'Booking has no main PaymentIntent on file.' });
       return;
     }
 
-    var gearCount = Math.max(1, Math.min(20, parseInt(body.gearCount, 10) || 1));
+    var gearCount = Math.max(1, Math.min(20, parseInt(booking.gearKitCount, 10) || 1));
     var depositAmountCents = Math.round(tier.gear * gearCount * 100);
 
     // Look up the main PaymentIntent on Stripe's side rather than trust a
-    // client-sent customer/payment method id — this is the same "never
-    // trust client-supplied money-adjacent values" posture already used
-    // for the dollar amount in create-payment-intent.js.
+    // stored customer/payment method id directly — same "never trust a
+    // stale or client-adjacent value" posture used for the dollar amount
+    // above.
     var mainRes = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(mainPaymentIntentId), {
       headers: { 'Authorization': stripeAuthHeader() }
     });
@@ -87,9 +165,9 @@ module.exports = async function handler(req, res) {
     var paymentMethodId = mainData.payment_method;
     if (!customerId || !paymentMethodId) {
       // No saved customer/payment method (e.g. Customer creation failed
-      // silently earlier) — can't place a silent hold. Not a hard failure
-      // of the booking itself, just means the deposit needs manual
-      // follow-up. Caller decides how to surface this.
+      // silently earlier) — can't place a silent hold. Not a hard failure,
+      // just means the deposit needs manual follow-up.
+      await updateBookingDepositStatus(bookingId, null, 'unavailable');
       res.status(200).json({ status: 'unavailable', reason: 'No saved payment method to hold a deposit against.' });
       return;
     }
@@ -101,9 +179,14 @@ module.exports = async function handler(req, res) {
     params.append('payment_method', paymentMethodId);
     params.append('payment_method_types[]', 'card');
     params.append('capture_method', 'manual');
+    // off_session: this fires at T-1, unattended, days after the guest's
+    // browser session ended, using the payment method saved via
+    // setup_future_usage: 'off_session' on the main PaymentIntent.
+    params.append('off_session', 'true');
     params.append('confirm', 'true');
     params.append('description', 'Refundable gear deposit — ' + tier.name + ' — Palm Springs Adventure Club');
     params.append('metadata[kind]', 'gear_deposit');
+    params.append('metadata[bookingId]', bookingId);
     params.append('metadata[tier]', tierKey);
     params.append('metadata[gearCount]', String(gearCount));
     params.append('metadata[mainPaymentIntentId]', mainPaymentIntentId);
@@ -121,17 +204,19 @@ module.exports = async function handler(req, res) {
     if (!depositRes.ok) {
       console.error('Stripe error creating deposit PaymentIntent:', depositData);
       var message = (depositData && depositData.error && depositData.error.message) || 'Could not place the deposit hold.';
+      await updateBookingDepositStatus(bookingId, null, 'failed');
       res.status(200).json({ status: 'failed', error: message });
       return;
     }
 
     if (depositData.status === 'requires_action') {
-      // Rare — the issuer wants an extra authentication step (e.g. 3DS)
-      // before the hold can be placed. Hand the client secret back so the
-      // browser can complete it silently in the background.
+      // The card requires an extra authentication step before the hold can
+      // be placed. Off-session confirmations that hit this can't be
+      // completed silently server-side; record it as needing manual
+      // follow-up rather than leaving it ambiguous.
+      await updateBookingDepositStatus(bookingId, depositData.id, 'requires_action');
       res.status(200).json({
         status: 'requires_action',
-        clientSecret: depositData.client_secret,
         paymentIntentId: depositData.id
       });
       return;
@@ -139,6 +224,7 @@ module.exports = async function handler(req, res) {
 
     if (depositData.status === 'requires_capture') {
       // Success — the hold is placed, nothing captured yet.
+      await updateBookingDepositStatus(bookingId, depositData.id, 'held');
       res.status(200).json({
         status: 'succeeded',
         paymentIntentId: depositData.id,
@@ -148,6 +234,7 @@ module.exports = async function handler(req, res) {
     }
 
     // Any other terminal status (e.g. the card was declined for the hold).
+    await updateBookingDepositStatus(bookingId, depositData.id || null, 'failed');
     res.status(200).json({ status: 'failed', error: 'Deposit hold could not be placed (status: ' + depositData.status + ').' });
   } catch (err) {
     console.error('create-deposit-hold error:', err);

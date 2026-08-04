@@ -70,6 +70,10 @@ function doPost(e) {
     }
     if (body.action === 'saveBooking') {
       out = handleSaveBooking(body);
+    } else if (body.action === 'getBooking') {
+      out = handleGetBooking(body);
+    } else if (body.action === 'updateDepositStatus') {
+      out = handleUpdateDepositStatus(body);
     } else {
       out = { ok: false, error: 'Unknown action' };
     }
@@ -127,6 +131,62 @@ function handleSaveBooking(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Looks up a single booking row by bookingId, for the Internal Operations
+// UX calling api/create-deposit-hold.js at T-1. Returns just the fields
+// that endpoint needs to place the hold itself server-side, never trusting
+// tier/kit count/payment method from the caller.
+function handleGetBooking(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var found = findBookingRow(ss, payload.bookingId);
+  if (!found) {
+    return { ok: false, error: 'Booking not found' };
+  }
+  var row = found.values;
+  return {
+    ok: true,
+    bookingId: row[0],
+    tier: row[6],
+    gearKitCount: row[9],
+    mainPaymentIntentId: row[12],
+    depositPaymentIntentId: row[13],
+    depositStatus: row[14]
+  };
+}
+
+// Writes the outcome of a T-1 deposit hold attempt back onto the booking's
+// row, called by api/create-deposit-hold.js after it resolves the hold
+// with Stripe (held / failed / unavailable / requires_action), so the
+// sheet reflects the real result instead of the "scheduled_t1" placeholder
+// written at booking time.
+function handleUpdateDepositStatus(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var found = findBookingRow(ss, payload.bookingId);
+  if (!found) {
+    return { ok: false, error: 'Booking not found' };
+  }
+  // depositPaymentIntentId is column 14, depositStatus is column 15
+  // (1-indexed) in the Experience Bookings sheet — see HEADERS above.
+  found.sheet.getRange(found.rowIndex, 14).setValue(payload.depositPaymentIntentId || '');
+  found.sheet.getRange(found.rowIndex, 15).setValue(payload.depositStatus || '');
+  return { ok: true };
+}
+
+// Shared lookup: finds a booking's row by bookingId in the Experience
+// Bookings sheet. Returns { sheet, rowIndex, values } (rowIndex is
+// 1-indexed, matching Range APIs) or null if not found.
+function findBookingRow(ss, bookingId) {
+  var id = String(bookingId || '').trim();
+  if (!id) return null;
+  var sheet = ss.getSheetByName(SHEETS.bookings);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0] || '').trim() === id) {
+      return { sheet: sheet, rowIndex: i + 1, values: data[i] };
+    }
+  }
+  return null;
 }
 
 // Dedup by email, case-insensitive. First write wins for name/phone on
