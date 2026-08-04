@@ -12,8 +12,10 @@
    Never blocks a guest on this: the payment already succeeded by the time
    this is called, so a persistence hiccup here should be logged and
    surfaced softly, not turned into a dead end for someone who already
-   paid.
+   paid. Same posture for the confirmation email sent below.
    ============================================ */
+
+var { sendBookingConfirmationEmail } = require('../lib/send-booking-confirmation');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -56,6 +58,19 @@ module.exports = async function handler(req, res) {
       console.error('Apps Script save-booking error:', data);
       res.status(200).json({ ok: false, error: data.error || 'Could not save booking record.' });
       return;
+    }
+
+    // Booking confirmation email (see lib/send-booking-confirmation.js).
+    // Never blocks or fails this response — the booking and payment have
+    // already succeeded by this point, same reasoning as the sheet-save
+    // error handling above. A send failure just gets logged.
+    try {
+      var emailResult = await sendBookingConfirmationEmail(Object.assign({}, body, { bookingId: data.bookingId }));
+      if (emailResult.status !== 'sent') {
+        console.error('Booking confirmation email not sent:', data.bookingId, emailResult);
+      }
+    } catch (emailErr) {
+      console.error('Booking confirmation email threw:', emailErr);
     }
 
     res.status(200).json({
