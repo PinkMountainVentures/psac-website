@@ -826,9 +826,13 @@
     lines.push(opener + (duration ? duration + ' of ' : '') + activity + ' for ' + groupPhrase + '.');
     lines.push('That means ' + gearPhrase + ', with everything delivered and picked up, nothing for you to plan.');
 
-    if (state.answers.include_after_trail === false) {
-      lines.push('You\'ve chosen to keep it trail-only, just the adventure, nothing after.');
-    } else {
+    // Trail Guide (trail-only) is the only launch experience, so there's
+    // nothing to add here right now: no toggle exists for the guest to
+    // have "chosen" trail-only, so a line implying they made that choice
+    // would be misleading. Kept as a live condition, not deleted, so the
+    // after-trail line comes right back once Peaks to Pools relaunches and
+    // include_after_trail can be true again.
+    if (state.answers.include_after_trail !== false) {
       lines.push('Afterward, we\'ll build in ' + recoveryPreviewText() + '.');
     }
     return lines.join(' ');
