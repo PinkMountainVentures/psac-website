@@ -93,8 +93,7 @@
     step: 0,
     answers: {
       q1: null,            // { starter, text }
-      q2_who: null,         // solo | partner | friends | friends_kids | family_kids
-      q2_roster: [],         // [{ name, age, fitness }]
+      q2_roster: [],         // [{ name, age, fitness }], length = chosen party size
       q3_date: '',
       q3_time: null,
       q5: [],
@@ -242,29 +241,34 @@
     return c;
   }
 
+  var MAX_PARTY_SIZE = 12;
+
   function cardWho() {
     var c = cardShell('adventure', true);
-    var WHO = [
-      { v: 'solo', label: 'Just me' },
-      { v: 'partner', label: 'Me and my partner' },
-      { v: 'friends', label: 'A group of friends' },
-      { v: 'friends_kids', label: 'A group of friends, including kids' },
-      { v: 'family_kids', label: 'Family, including kids' }
-    ];
     c.render = function (root) {
       var html = '<div class="paf-q"><span class="paf-req">*</span> Who\'s coming?</div>';
-      html += '<div class="paf-options" data-field="who"></div>';
+      html += '<div class="paf-sub">How many people, including you?</div>';
+      html += '<select class="paf-headcount-select" data-field="headcount"></select>';
       html += '<div class="paf-roster" data-field="roster" style="display:none;">' +
         '<div class="paf-roster-sub">Tell us a little about who\'s coming, including name, age range, and fitness level.</div>' +
         '<div class="paf-roster-rows" data-field="roster_rows"></div>' +
-        '<button type="button" class="paf-add-person" data-field="add_person">+ Add person</button>' +
         '</div>';
       root.innerHTML = html;
 
-      var optWrap = root.querySelector('[data-field="who"]');
+      var headcountSelect = root.querySelector('[data-field="headcount"]');
       var rosterWrap = root.querySelector('[data-field="roster"]');
       var rowsWrap = root.querySelector('[data-field="roster_rows"]');
-      var addBtn = root.querySelector('[data-field="add_person"]');
+
+      var placeholderOpt = document.createElement('option');
+      placeholderOpt.textContent = 'Select';
+      placeholderOpt.value = '';
+      headcountSelect.appendChild(placeholderOpt);
+      for (var n = 1; n <= MAX_PARTY_SIZE; n++) {
+        var countOpt = document.createElement('option');
+        countOpt.textContent = n === 1 ? '1 person' : (n + ' people');
+        countOpt.value = String(n);
+        headcountSelect.appendChild(countOpt);
+      }
 
       function addRow(prefill) {
         var row = document.createElement('div');
@@ -287,8 +291,6 @@
           opt.value = i === 0 ? '' : o;
           fit.appendChild(opt);
         });
-        var del = document.createElement('button');
-        del.type = 'button'; del.className = 'paf-roster-del'; del.textContent = '×'; del.title = 'Remove';
 
         // Gear kit inclusion is decided later, on the "Your Kit" step. It
         // lives on this same roster object, so we carry it forward via
@@ -312,71 +314,48 @@
         name.addEventListener('input', sync);
         age.addEventListener('change', sync);
         fit.addEventListener('change', sync);
-        del.addEventListener('click', function () {
-          var idx = Array.prototype.indexOf.call(rowsWrap.children, row);
-          state.answers.q2_roster.splice(idx, 1);
-          row.remove();
-          refreshNav();
-        });
 
-        row.appendChild(name); row.appendChild(age); row.appendChild(fit); row.appendChild(del);
+        row.appendChild(name); row.appendChild(age); row.appendChild(fit);
         rowsWrap.appendChild(row);
         sync();
       }
 
-      // "Just me" is exactly one person: no adding, no removing.
-      function refreshRosterControls() {
-        var isSolo = state.answers.q2_who === 'solo';
-        addBtn.style.display = isSolo ? 'none' : '';
-        Array.prototype.forEach.call(rowsWrap.querySelectorAll('.paf-roster-del'), function (btn) {
-          btn.style.display = isSolo ? 'none' : '';
-        });
+      // Rebuilds the roster rows to match the chosen headcount, keeping
+      // whatever was already typed for the people who still fit (e.g.
+      // dropping from 4 to 2 keeps the first 2 rows' data rather than
+      // discarding everything) and adding blank rows for the rest.
+      function syncRowsToCount(count) {
+        var existing = state.answers.q2_roster.slice(0, count);
+        rowsWrap.innerHTML = '';
+        state.answers.q2_roster = [];
+        for (var i = 0; i < count; i++) {
+          addRow(existing[i] || null);
+        }
       }
 
-      addBtn.addEventListener('click', function () { addRow(); });
-
-      WHO.forEach(function (w) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'paf-option-btn';
-        b.textContent = w.label;
-        if (state.answers.q2_who === w.v) b.classList.add('is-selected');
-        b.addEventListener('click', function () {
-          Array.prototype.forEach.call(optWrap.children, function (c2) { c2.classList.remove('is-selected'); });
-          b.classList.add('is-selected');
-          state.answers.q2_who = w.v;
-          rosterWrap.style.display = 'block';
-          var defaultRows = (w.v === 'solo') ? 1 : 2;
-          if (state.answers.q2_roster.length === 0) {
-            rowsWrap.innerHTML = '';
-            for (var i = 0; i < defaultRows; i++) addRow();
-          } else if (w.v === 'solo' && state.answers.q2_roster.length > 1) {
-            // "Just me" is unambiguous: trim back down to a single person.
-            while (rowsWrap.children.length > 1) {
-              rowsWrap.removeChild(rowsWrap.lastChild);
-            }
-            state.answers.q2_roster = state.answers.q2_roster.slice(0, 1);
-          }
-          refreshRosterControls();
+      headcountSelect.addEventListener('change', function () {
+        var count = parseInt(headcountSelect.value, 10) || 0;
+        if (!count) {
+          rosterWrap.style.display = 'none';
+          rowsWrap.innerHTML = '';
+          state.answers.q2_roster = [];
           refreshNav();
-        });
-        optWrap.appendChild(b);
+          return;
+        }
+        rosterWrap.style.display = 'block';
+        syncRowsToCount(count);
+        refreshNav();
       });
 
-      if (state.answers.q2_who) {
+      if (state.answers.q2_roster.length) {
+        headcountSelect.value = String(Math.min(state.answers.q2_roster.length, MAX_PARTY_SIZE));
         rosterWrap.style.display = 'block';
-        rowsWrap.innerHTML = '';
-        var defaultRows = (state.answers.q2_who === 'solo') ? 1 : 2;
-        var existing = state.answers.q2_roster.length
-          ? state.answers.q2_roster.slice()
-          : new Array(defaultRows).fill(null);
+        var existing = state.answers.q2_roster.slice();
         state.answers.q2_roster = [];
         existing.forEach(function (p) { addRow(p); });
       }
-      refreshRosterControls();
     };
     c.isValid = function () {
-      if (!state.answers.q2_who) return false;
       var roster = state.answers.q2_roster;
       if (!roster.length) return false;
       return roster.every(function (p) {
@@ -1348,7 +1327,6 @@
     return {
       submittedAt: new Date().toISOString(),
       q1: state.answers.q1,
-      who: state.answers.q2_who,
       roster: state.answers.q2_roster,
       headcount: totalHeadcount(),
       date: state.answers.q3_date,

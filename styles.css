@@ -890,6 +890,27 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 .paf-cal-day.is-disabled { color: rgba(42,71,71,0.22); cursor: default; }
 .paf-cal-day.is-empty { cursor: default; }
 
+.paf-headcount-select {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(42,71,71,0.2);
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    color: var(--dark-pine);
+    background-color: white;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='%232A4747' d='M5.5 7.5l4.5 5 4.5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 12px;
+    padding-right: 2.4rem;
+    cursor: pointer;
+}
+.paf-headcount-select:hover { border-color: var(--mountain-pink); }
+
 .paf-roster { margin-top: 1.3rem; padding-top: 1.2rem; border-top: 1px dashed rgba(42,71,71,0.2); }
 .paf-roster-sub { font-size: 0.78rem; color: rgba(42,71,71,0.6); margin-bottom: 0.9rem; }
 .paf-roster-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
@@ -907,9 +928,6 @@ select.paf-roster-input {
     background-size: 12px;
     padding-right: 1.9rem;
 }
-.paf-roster-del { background: none; border: none; color: var(--sunset-red); font-size: 1.3rem; cursor: pointer; padding: 0 4px; line-height: 1; }
-.paf-add-person { background: none; border: 1px dashed var(--mountain-pink); color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.78rem; padding: 0.55rem 1rem; border-radius: 6px; cursor: pointer; }
-
 .paf-kit-disclosure { background: none; border: none; color: var(--mountain-pink); font-family: 'Montserrat', sans-serif; font-size: 0.8rem; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0.3rem 0; margin-top: 0.2rem; }
 .paf-kit-details { background: var(--sand-beige); border-radius: 8px; padding: 1rem 1.1rem; margin-top: 0.7rem; font-size: 0.82rem; color: var(--dark-pine); line-height: 1.6; }
 .paf-kit-details-row { margin-bottom: 0.4rem; }
@@ -986,7 +1004,6 @@ select.paf-roster-input {
     .paf-roster-name { flex: 1 1 100%; }
     .paf-roster-age { flex: 1 1 32%; width: auto; }
     .paf-roster-fit { flex: 1 1 48%; }
-    .paf-roster-del { flex: 0 0 auto; margin-left: auto; }
 }
 
 /* ── LEGAL / POLICY PAGES ── */
