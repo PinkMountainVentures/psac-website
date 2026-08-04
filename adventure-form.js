@@ -50,6 +50,19 @@
   // checkout (see cardDuration() and showCustomContactOverlay() below).
   var CUSTOM_CONTACT_EMAIL = 'hello@palmspringsadventureclub.com';
 
+  // Recorded per booking alongside the policy-agreement checkbox on the
+  // pricing screen, so it's provable exactly which version of each policy
+  // a given guest agreed to, not just "the policy" as of whenever a
+  // question comes up later. Must be updated in lockstep by hand: any time
+  // refund-policy.html, terms.html, or privacy.html's text changes, bump
+  // its "Last updated" date in that page's <p class="legal-updated"> line
+  // and the matching value here, together, in the same edit.
+  var POLICY_VERSIONS = {
+    refund: '2026-07-29',
+    terms: '2026-07-29',
+    privacy: '2026-07-29'
+  };
+
   // Gear delivery is evening-before-only, no morning-of delivery. Working
   // backward from that (see psac-gear-delivery-timing-for-booking-flow.md):
   // guest's delivery address is due T-3, which leaves a T-2 buffer day for
@@ -1366,6 +1379,11 @@
       dietary_preferences: state.answers.dietary,
       includeAfterTrail: state.answers.include_after_trail,
       policiesAgreed: !!state.answers.policiesAgreed,
+      // Which "Last updated" date was live on each policy page at the
+      // moment of booking (see POLICY_VERSIONS above), independent of
+      // whether the guest actually agreed, same as any other snapshot
+      // field in this payload.
+      policyVersionsAgreed: POLICY_VERSIONS,
       gearKitsSelected: selectedGearCount(),
       // Shared delivery duffels, not one per kit: 1 duffel covers up to 2
       // kits, 2 covers 3-4, 3 covers 5-6, and so on (Math.ceil(n/2)).
