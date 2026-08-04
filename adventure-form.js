@@ -112,6 +112,7 @@
       contact_name: '',
       contact_email: '',
       contact_phone: '',
+      policiesAgreed: false,
       tier: 'trail',
       rating: null,
       paymentIntentId: null,
@@ -1145,6 +1146,10 @@
       '<div class="paf-kit-details-row">No-hassle gear delivery and pickup.</div>' +
       '<div class="paf-kit-details-row"><strong>Your gear kit:</strong> ' + BASE_GEAR_COPY + ', plus ' + keepsakeCopy(state.answers.tier) + ' to keep.</div>' +
       '</div>';
+    html += '<label class="paf-policy-agree">' +
+      '<input type="checkbox" data-field="policy-checkbox"' + (state.answers.policiesAgreed ? ' checked' : '') + '>' +
+      '<span>I agree to the <a href="/refund-policy" target="_blank" rel="noopener">Cancellation &amp; Refund Policy</a>, <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>, and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span>' +
+      '</label>';
     html += '<button type="button" class="paf-reserve-btn" data-field="reserve">' + esc(reserveLabel) + '</button>';
     if (!isCustom) {
       html += '<div class="paf-payment-section" data-field="payment-section" style="display:none;">' +
@@ -1170,7 +1175,21 @@
       iconEl.textContent = isOpen ? '+' : '–';
     });
 
-    root.querySelector('[data-field="reserve"]').addEventListener('click', function () {
+    var reserveBtn = root.querySelector('[data-field="reserve"]');
+    var policyCheckbox = root.querySelector('[data-field="policy-checkbox"]');
+    // Unchecked by default (state.answers.policiesAgreed starts false); the
+    // guest has to actively agree before the reserve button, and with it
+    // the payment step, becomes available. Persisted in state so it stays
+    // checked if they navigate back and forth within the same booking
+    // attempt, rather than resetting on every re-render of this card.
+    reserveBtn.disabled = !state.answers.policiesAgreed;
+    policyCheckbox.addEventListener('change', function () {
+      state.answers.policiesAgreed = policyCheckbox.checked;
+      reserveBtn.disabled = !policyCheckbox.checked;
+    });
+
+    reserveBtn.addEventListener('click', function () {
+      if (!state.answers.policiesAgreed) return;
       if (isCustom) {
         submitForm();
         return;
@@ -1346,6 +1365,7 @@
       q14_taste: state.answers.q14,
       dietary_preferences: state.answers.dietary,
       includeAfterTrail: state.answers.include_after_trail,
+      policiesAgreed: !!state.answers.policiesAgreed,
       gearKitsSelected: selectedGearCount(),
       // Shared delivery duffels, not one per kit: 1 duffel covers up to 2
       // kits, 2 covers 3-4, 3 covers 5-6, and so on (Math.ceil(n/2)).

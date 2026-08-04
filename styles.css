@@ -952,6 +952,10 @@ select.paf-roster-input {
 .paf-price-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.15rem; color: var(--dark-pine); border-top: 1px solid rgba(42,71,71,0.15); margin-top: 0.5rem; padding-top: 0.6rem; }
 .paf-price-switch { font-size: 0.76rem; color: rgba(42,71,71,0.6); margin-bottom: 1.3rem; }
 .paf-price-switch a { color: var(--mountain-pink); text-decoration: underline; cursor: pointer; }
+.paf-policy-agree { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.78rem; color: rgba(42,71,71,0.75); line-height: 1.5; margin: 1.1rem 0; cursor: pointer; }
+.paf-policy-agree input[type="checkbox"] { flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px; accent-color: var(--desert-green); cursor: pointer; }
+.paf-policy-agree a { color: var(--mountain-pink); text-decoration: underline; }
+
 .paf-reserve-btn { width: 100%; background: var(--desert-green); color: white; padding: 0.95rem 1.6rem; border-radius: 30px; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.13em; text-transform: uppercase; border: none; cursor: pointer; }
 .paf-reserve-btn:hover:not(:disabled) { background: #63a677; }
 .paf-reserve-btn:disabled { opacity: 0.6; cursor: not-allowed; }
