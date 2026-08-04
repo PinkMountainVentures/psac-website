@@ -1047,7 +1047,7 @@
       var html = '<div class="paf-q">Almost there. How should we reach you?</div>';
       html += '<input type="text" class="paf-text-input" data-field="contact_name" placeholder="Name" value="' + esc(state.answers.contact_name) + '" style="margin-bottom:0.9rem;">';
       html += '<input type="email" class="paf-text-input" data-field="contact_email" placeholder="Email *" value="' + esc(state.answers.contact_email) + '" style="margin-bottom:0.9rem;">';
-      html += '<input type="tel" class="paf-text-input" data-field="contact_phone" placeholder="Phone" value="' + esc(state.answers.contact_phone) + '">';
+      html += '<input type="tel" class="paf-text-input" data-field="contact_phone" placeholder="Phone *" value="' + esc(state.answers.contact_phone) + '">';
       root.innerHTML = html;
       ['contact_name', 'contact_email', 'contact_phone'].forEach(function (f) {
         root.querySelector('[data-field="' + f + '"]').addEventListener('input', function (e) {
@@ -1057,7 +1057,9 @@
       });
     };
     c.isValid = function () {
-      return !!state.answers.contact_name.trim() && /\S+@\S+\.\S+/.test(state.answers.contact_email);
+      return !!state.answers.contact_name.trim() &&
+        /\S+@\S+\.\S+/.test(state.answers.contact_email) &&
+        !!state.answers.contact_phone.trim();
     };
     return c;
   }
