@@ -68,15 +68,20 @@
   // print line (frequency/rates/HELP-STOP disclosures), matching what
   // Twilio's A2P 10DLC web-form opt-in requirements call for: a consent
   // statement, message-frequency disclosure, rate disclaimer, HELP and
-  // STOP instructions, and links to Terms of Service and Privacy Policy
-  // (added Aug 2026, the original copy had the rate disclaimer and STOP
-  // but was missing frequency and HELP). Defined once here and reused for
-  // both the on-screen label/fine print and buildPayload()'s
+  // STOP instructions, and links to Terms of Service and Privacy Policy.
+  // Revised a second time, Aug 2026, after Twilio's campaign-registration
+  // review flagged the first revision's wording as not explicit enough:
+  // it didn't literally say "text messages from [business]," and didn't
+  // state plainly that opting in is optional and not required to book
+  // (both were already true in isValid() below, which never checks this
+  // field, the copy just didn't say so). This version says both
+  // explicitly rather than leaving either implied. Defined once here and
+  // reused for both the on-screen label/fine print and buildPayload()'s
   // contact.smsConsentText, so the stored text is guaranteed to match
   // what the guest actually saw, not a copy that can drift out of sync
   // with the UI if this ever gets reworded.
-  var SMS_CONSENT_LABEL = 'Text me updates about my reservation, delivery, and deposit.';
-  var SMS_CONSENT_FINEPRINT = 'Message frequency varies by reservation. Message and data rates may apply. Reply HELP for help, STOP to opt out.';
+  var SMS_CONSENT_LABEL = 'Yes, send me text messages from Palm Springs Adventure Club about my reservation, delivery, and deposit.';
+  var SMS_CONSENT_FINEPRINT = 'Optional, not required to book. Message frequency varies by reservation. Message and data rates may apply. Reply STOP to cancel, HELP for help.';
   var SMS_CONSENT_TEXT = SMS_CONSENT_LABEL + ' ' + SMS_CONSENT_FINEPRINT + ' See Terms of Service and Privacy Policy at palmspringsadventureclub.com.';
 
   // Gear delivery is evening-before-only, no morning-of delivery. Working
