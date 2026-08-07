@@ -1,10 +1,10 @@
 /* ============================================
    PSAC — Kit newsletter subscription endpoint
-   Correct V4 two-step flow:
-   1. Create inactive subscriber via POST /v4/subscribers
-   2. Add to form via POST /v4/forms/{form_id}/subscribers
-      (this triggers the double opt-in confirmation email)
-   3. Apply three tags via POST /v4/tags/{tag_id}/subscribers/{id}
+   V4 flow:
+   1. POST /v4/subscribers — create subscriber
+   2. POST /v4/forms/{form_id}/subscribers — add to form,
+      triggers double opt-in confirmation email
+   3. POST /v4/tags/{tag_id}/subscribers/{id} x3 — apply tags
 
    Tags applied:
      interest:adventure  (22310823)
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   const cleanEmail = email.trim().toLowerCase();
 
   try {
-    // Step 1: Create inactive subscriber
+    // Step 1: Create subscriber
     const createRes = await fetch('https://api.kit.com/v4/subscribers', {
       method: 'POST',
       headers: {
@@ -49,7 +49,6 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         email_address: cleanEmail,
-        state: 'inactive',
       }),
     });
 
@@ -81,7 +80,6 @@ export default async function handler(req, res) {
     if (!formRes.ok) {
       const formData = await formRes.json();
       console.error('Kit add to form error:', JSON.stringify(formData));
-      // Non-fatal: subscriber exists, tags will still apply
     }
 
     // Step 3: Apply all three tags
