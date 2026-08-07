@@ -132,7 +132,6 @@
       q3_time: null,
       q5: [],
       q6: null,
-      q7: '',
       q8: [],
       q12: null,
       q13: [],
@@ -174,9 +173,9 @@
         'Hiking', 'Trail running'
       ], null, true),
       cardDuration(),
-      cardTextarea('q7', 'move', 'Anything else we should know to make this day exactly right?',
-        'Physical considerations, special requests, anything at all. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
-        'Bad knee on descents, prefer no scrambling, celebrating a milestone, anything like that.', false),
+      // cardTextarea('q7', 'move', 'Anything else we should know to make this day exactly right?',
+      //  'Physical considerations, special requests, anything at all. Nothing medical required, just what\'s useful for building your day and matching you to the right experience.',
+      //  'Bad knee on descents, prefer no scrambling, celebrating a milestone, anything like that.', false),
       // cardInterests() removed from the active flow ("What draws you most on
       // a great day out?"). Still an important signal for trail selection, but
       // it's moving to the post-booking experience instead, captured after
@@ -1407,7 +1406,6 @@
       timePreference: state.answers.q3_time,
       q5_activity: state.answers.q5,
       q6_duration: state.answers.q6,
-      q7_notes: state.answers.q7,
       q8_draws: state.answers.q8,
       q12: state.answers.q12,
       q13_recovery: state.answers.q13,
