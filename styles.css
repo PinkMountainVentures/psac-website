@@ -659,6 +659,15 @@ section { padding: 6rem 0; }
 /* ── NEWSLETTER ── */
 .newsletter { background: var(--mountain-pink); color: white; text-align: center; }
 
+.formkit-form {
+    margin: 0 auto;
+    max-width: 560px;
+}
+
+.formkit-powered-by-convertkit-container {
+    display: none !important;
+}
+
 .newsletter .section-title h2 {
     font-family: 'Cormorant Garamond', serif;
     color: white;
