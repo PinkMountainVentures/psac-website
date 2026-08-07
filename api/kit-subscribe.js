@@ -10,6 +10,9 @@
    variable (Vercel + .env.local), never exposed to the client.
    No external packages — fetch only, matching the convention
    documented in api/create-payment-intent.js.
+
+   Tag endpoint: POST /v4/tags/{tag_id}/subscribers/{subscriber_id}
+   Body: {} (empty)
    ============================================ */
 
 export default async function handler(req, res) {
@@ -57,16 +60,16 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: 'Could not add you to the list. Please try again.' });
     }
 
-    // Apply all three tags
+    // Apply all three tags — correct V4 endpoint: /v4/tags/{tag_id}/subscribers/{subscriber_id}
     await Promise.all(
       TAG_IDS.map((tagId) =>
-        fetch(`https://api.kit.com/v4/subscribers/${subscriberId}/tags`, {
+        fetch(`https://api.kit.com/v4/tags/${tagId}/subscribers/${subscriberId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-Kit-Api-Key': apiKey,
           },
-          body: JSON.stringify({ tag_id: tagId }),
+          body: JSON.stringify({}),
         })
       )
     );
