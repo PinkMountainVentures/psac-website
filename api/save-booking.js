@@ -12,10 +12,11 @@
    Never blocks a guest on this: the payment already succeeded by the time
    this is called, so a persistence hiccup here should be logged and
    surfaced softly, not turned into a dead end for someone who already
-   paid. Same posture for the confirmation email sent below.
+   paid. Same posture for the confirmation email and text sent below.
    ============================================ */
 
 var { sendBookingConfirmationEmail } = require('../lib/send-booking-confirmation');
+var { sendBookingConfirmationSms } = require('../lib/send-booking-confirmation-sms');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -71,6 +72,20 @@ module.exports = async function handler(req, res) {
       }
     } catch (emailErr) {
       console.error('Booking confirmation email threw:', emailErr);
+    }
+
+    // Booking confirmation text (see lib/send-booking-confirmation-sms.js).
+    // Independent of the email above and equally non-blocking. Skips
+    // itself if the guest didn't opt into texts at Step 8, that check
+    // lives inside sendBookingConfirmationSms so this call site doesn't
+    // need to duplicate the consent logic.
+    try {
+      var smsResult = await sendBookingConfirmationSms(Object.assign({}, body, { bookingId: data.bookingId }));
+      if (smsResult.status !== 'sent' && smsResult.status !== 'skipped') {
+        console.error('Booking confirmation SMS not sent:', data.bookingId, smsResult);
+      }
+    } catch (smsErr) {
+      console.error('Booking confirmation SMS threw:', smsErr);
     }
 
     res.status(200).json({

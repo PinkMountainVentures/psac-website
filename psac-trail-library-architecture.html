@@ -1,0 +1,2334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSAC Trail Library Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mountain-pink: #E27396;
+    --desert-green: #7ABD91;
+    --sunset-red: #E76F51;
+    --sand-beige: #F8F1E9;
+    --dark-pine: #2A4747;
+    --dark-pine-90: rgba(42,71,71,0.9);
+    --muted: #7a8a8a;
+    --rule: rgba(42,71,71,0.12);
+    --card-bg: rgba(255,255,255,0.7);
+  }
+ 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+  body {
+    background-color: var(--sand-beige);
+    color: var(--dark-pine);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+  }
+ 
+  /* ── COVER ── */
+  .cover {
+    min-height: 100vh;
+    background: var(--dark-pine);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 8rem 6rem;
+    position: relative;
+    overflow: hidden;
+  }
+ 
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(226,115,150,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+ 
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    left: 30%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(122,189,145,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+ 
+  .cover-eyebrow {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+    margin-bottom: 2rem;
+  }
+ 
+  .cover h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    font-weight: 300;
+    color: var(--sand-beige);
+    line-height: 1.05;
+    margin-bottom: 1.5rem;
+    max-width: 700px;
+  }
+ 
+  .cover h1 em {
+    color: var(--mountain-pink);
+    font-style: italic;
+  }
+ 
+  .cover-sub {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: rgba(248,241,233,0.5);
+    letter-spacing: 0.08em;
+    max-width: 500px;
+    line-height: 1.8;
+    margin-bottom: 3rem;
+  }
+ 
+  .cover-meta {
+    display: flex;
+    gap: 3rem;
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+ 
+  .cover-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+ 
+  .cover-meta-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+ 
+  .cover-meta-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    color: var(--sand-beige);
+  }
+ 
+  /* ── PAGE LAYOUT ── */
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 6rem 4rem;
+  }
+ 
+  .page + .page {
+    border-top: 1px solid var(--rule);
+  }
+ 
+  .section-eyebrow {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    margin-bottom: 1rem;
+  }
+ 
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300;
+    line-height: 1.1;
+    color: var(--dark-pine);
+    margin-bottom: 1.5rem;
+  }
+ 
+  .section-title em {
+    font-style: italic;
+    color: var(--mountain-pink);
+  }
+ 
+  .section-intro {
+    font-size: 0.85rem;
+    line-height: 1.9;
+    color: var(--muted);
+    max-width: 640px;
+    margin-bottom: 3rem;
+  }
+ 
+  /* ── DIVIDER ── */
+  .divider {
+    width: 40px;
+    height: 1px;
+    background: var(--mountain-pink);
+    margin: 2rem 0;
+  }
+ 
+  /* ── GUIDE STRUCTURE ── */
+  .guide-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+ 
+  .guide-section {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 0 3rem;
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+ 
+  .guide-section:last-child {
+    border-bottom: none;
+  }
+ 
+  .guide-section-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 3rem;
+    font-weight: 300;
+    color: rgba(42,71,71,0.08);
+    line-height: 1;
+    padding-top: 0.2rem;
+  }
+ 
+  .guide-section-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+ 
+  .guide-section-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    line-height: 1.2;
+  }
+ 
+  .guide-section-tag {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2px;
+    display: inline-block;
+    width: fit-content;
+  }
+ 
+  .tag-dynamic { background: rgba(226,115,150,0.12); color: var(--mountain-pink); }
+  .tag-library { background: rgba(122,189,145,0.12); color: var(--desert-green); }
+  .tag-assembled { background: rgba(231,111,81,0.12); color: var(--sunset-red); }
+ 
+  .guide-section-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+ 
+  .guide-section-desc {
+    font-size: 0.83rem;
+    line-height: 1.8;
+    color: var(--dark-pine);
+  }
+ 
+  .guide-section-feeds {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+ 
+  .guide-section-feeds strong {
+    font-weight: 600;
+    color: var(--dark-pine);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+ 
+  /* ── FORM QUESTIONS ── */
+  .form-section-block {
+    margin-bottom: 3rem;
+  }
+ 
+  .form-section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+ 
+  .form-section-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 300;
+    color: rgba(42,71,71,0.2);
+    line-height: 1;
+  }
+ 
+  .form-section-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+  }
+ 
+  .question-block {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 0 1.5rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid rgba(42,71,71,0.06);
+    align-items: start;
+  }
+ 
+  .question-block:last-child {
+    border-bottom: none;
+  }
+ 
+  .q-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--mountain-pink);
+    padding-top: 0.1rem;
+  }
+ 
+  .q-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+ 
+  .q-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    line-height: 1.5;
+  }
+ 
+  .q-mechanic {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  .q-detail {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+ 
+  .q-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+  }
+ 
+  .q-option {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    color: var(--dark-pine);
+    background: white;
+    font-style: italic;
+  }
+ 
+  .q-feeds {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+  }
+ 
+  .q-feeds span {
+    font-weight: 600;
+    color: var(--dark-pine);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+ 
+  /* ── PORTRAIT FORMAT ── */
+  .portrait-format {
+    background: white;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 20px rgba(42,71,71,0.06);
+    margin-bottom: 3rem;
+  }
+ 
+  .portrait-format-header {
+    background: var(--dark-pine);
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+ 
+  .portrait-format-header h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--sand-beige);
+  }
+ 
+  .portrait-format-header .word-count {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  .portrait-paragraphs {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+ 
+  .portrait-para {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 0 2rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+ 
+  .portrait-para:last-child {
+    border-bottom: none;
+  }
+ 
+  .portrait-para-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    padding-top: 0.15rem;
+    line-height: 1.5;
+  }
+ 
+  .portrait-para-desc {
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: var(--dark-pine);
+  }
+ 
+  /* ── BRAIN DUMP PROMPT ── */
+  .brain-dump {
+    background: var(--dark-pine);
+    border-radius: 4px;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+  }
+ 
+  .brain-dump-header {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    font-weight: 400;
+    color: var(--sand-beige);
+    margin-bottom: 0.5rem;
+  }
+ 
+  .brain-dump-sub {
+    font-size: 0.75rem;
+    color: rgba(248,241,233,0.5);
+    margin-bottom: 2rem;
+    line-height: 1.7;
+  }
+ 
+  .brain-dump-questions {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+ 
+  .bdq {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 0 1rem;
+    align-items: start;
+  }
+ 
+  .bdq-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    color: var(--mountain-pink);
+    line-height: 1.3;
+  }
+ 
+  .bdq-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+ 
+  .bdq-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  .bdq-text {
+    font-size: 0.82rem;
+    color: rgba(248,241,233,0.75);
+    line-height: 1.8;
+  }
+ 
+  .lykken-note {
+    background: rgba(226,115,150,0.1);
+    border-left: 2px solid var(--mountain-pink);
+    padding: 1rem 1.5rem;
+    margin-top: 1.5rem;
+    border-radius: 0 2px 2px 0;
+  }
+ 
+  .lykken-note-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    margin-bottom: 0.4rem;
+  }
+ 
+  .lykken-note-text {
+    font-size: 0.8rem;
+    color: rgba(248,241,233,0.7);
+    line-height: 1.7;
+  }
+ 
+  /* ── TAG SYSTEM ── */
+  .tag-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+ 
+  .tag-card {
+    background: white;
+    border-radius: 4px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(42,71,71,0.05);
+  }
+ 
+  .tag-card-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    margin-bottom: 0.75rem;
+  }
+ 
+  .tag-card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    margin-bottom: 0.75rem;
+  }
+ 
+  .tag-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+ 
+  .tag-value {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2px;
+    background: var(--sand-beige);
+    color: var(--dark-pine);
+  }
+ 
+  .tag-card-note {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+  }
+ 
+  /* ── DIFFICULTY TIERS ── */
+  .difficulty-tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 3rem;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 20px rgba(42,71,71,0.06);
+  }
+ 
+  .diff-tier {
+    display: grid;
+    grid-template-columns: 200px 1fr 180px;
+    gap: 0 2rem;
+    padding: 1.5rem 2rem;
+    background: white;
+    align-items: start;
+  }
+ 
+  .diff-tier-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+ 
+  .diff-tier-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+  }
+ 
+  .diff-tier-indicator {
+    display: flex;
+    gap: 3px;
+  }
+ 
+  .diff-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--rule);
+  }
+ 
+  .diff-dot.filled { background: var(--mountain-pink); }
+ 
+  .diff-tier-desc {
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: var(--dark-pine);
+  }
+ 
+  .diff-tier-stat {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.8;
+    text-align: right;
+  }
+ 
+  .diff-tier-stat strong {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+    margin-bottom: 0.25rem;
+  }
+ 
+  /* ── TRAIL LIBRARY ── */
+  .trail-group {
+    margin-bottom: 3rem;
+  }
+ 
+  .trail-group-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--dark-pine);
+  }
+ 
+  .trail-group-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+  }
+ 
+  .trail-group-count {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+ 
+  .trail-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+ 
+  .trail-table th {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+ 
+  .trail-table th:first-child { padding-left: 0; }
+ 
+  .trail-table td {
+    font-size: 0.78rem;
+    padding: 0.85rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+ 
+  .trail-table td:first-child { padding-left: 0; }
+ 
+  .trail-table tr:last-child td { border-bottom: none; }
+ 
+  .trail-name {
+    font-weight: 500;
+    color: var(--dark-pine);
+  }
+ 
+  .trail-type {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 0.2rem;
+  }
+ 
+  .pill {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+ 
+  .pill-family { background: rgba(122,189,145,0.15); color: #3a8a5a; }
+  .pill-accessible { background: rgba(122,189,145,0.25); color: #2a7a4a; }
+  .pill-moderate { background: rgba(231,111,81,0.15); color: #c05a30; }
+  .pill-expert { background: rgba(42,71,71,0.12); color: var(--dark-pine); }
+ 
+  .season-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+ 
+  .season-pill {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+ 
+  .season-optimal { background: rgba(122,189,145,0.2); color: #2a7a4a; }
+  .season-viable { background: rgba(248,241,233,1); color: var(--muted); border: 1px solid var(--rule); }
+  .season-avoid { background: rgba(231,111,81,0.1); color: #c05a30; }
+ 
+  .portrait-status {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+ 
+  .status-priority { color: var(--mountain-pink); }
+  .status-queue { color: var(--muted); }
+  .status-done { color: var(--desert-green); }
+ 
+  /* ── SEASONAL WINDOWS ── */
+  .season-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 20px rgba(42,71,71,0.06);
+    margin-bottom: 3rem;
+  }
+ 
+  .season-card {
+    background: white;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+ 
+  .season-card-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+  }
+ 
+  .season-card-months {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: var(--dark-pine);
+  }
+ 
+  .season-card-desc {
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+ 
+  .season-card-access {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--rule);
+  }
+ 
+  /* ── CLOSING SCREEN ── */
+  .closing-screen-preview {
+    background: var(--dark-pine);
+    border-radius: 4px;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+ 
+  .cs-eyebrow {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  .cs-headline {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--sand-beige);
+    line-height: 1.2;
+  }
+ 
+  .cs-dynamic {
+    font-size: 0.85rem;
+    line-height: 1.9;
+    color: rgba(248,241,233,0.7);
+    max-width: 480px;
+    font-style: italic;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    padding: 1rem 1.5rem;
+  }
+ 
+  .cs-dynamic-label {
+    font-style: normal;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+ 
+  .cs-delivery {
+    font-size: 0.8rem;
+    color: rgba(248,241,233,0.5);
+    letter-spacing: 0.05em;
+  }
+ 
+  .cs-cta {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--sand-beige);
+    border-bottom: 1px solid rgba(248,241,233,0.3);
+    padding-bottom: 0.2rem;
+  }
+ 
+  .cs-rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    width: 100%;
+  }
+ 
+  .cs-rating-label {
+    font-size: 0.65rem;
+    color: rgba(248,241,233,0.35);
+    letter-spacing: 0.1em;
+  }
+ 
+  .cs-stars {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 1.2rem;
+    color: rgba(248,241,233,0.2);
+  }
+ 
+  /* ── WORKFLOW ── */
+  .workflow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 3rem;
+  }
+ 
+  .workflow-step {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 0 2rem;
+    background: white;
+    padding: 1.75rem 2rem;
+    align-items: start;
+  }
+ 
+  .workflow-step-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: rgba(42,71,71,0.1);
+    line-height: 1;
+  }
+ 
+  .workflow-step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+ 
+  .workflow-step-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  .workflow-step-desc {
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: var(--dark-pine);
+  }
+ 
+  .workflow-step-note {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.7;
+    font-style: italic;
+  }
+ 
+  /* ── CONTENT CATEGORIES ── */
+  .content-categories {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 20px rgba(42,71,71,0.06);
+    margin-bottom: 3rem;
+  }
+ 
+  .content-cat {
+    background: white;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+ 
+  .content-cat-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+  }
+ 
+  .content-cat-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    line-height: 1.2;
+  }
+ 
+  .content-cat-desc {
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+ 
+  .content-cat-examples {
+    font-size: 0.72rem;
+    color: var(--dark-pine);
+    line-height: 1.8;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--rule);
+  }
+ 
+  /* ── NEXT STEPS ── */
+  .next-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+ 
+  .next-step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 0 1rem;
+    align-items: start;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+ 
+  .next-step:last-child { border-bottom: none; }
+ 
+  .next-step-check {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    margin-top: 0.1rem;
+  }
+ 
+  .next-step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+ 
+  .next-step-title {
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    line-height: 1.4;
+  }
+ 
+  .next-step-desc {
+    font-size: 0.76rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+ 
+  /* ── FOOTER ── */
+  .doc-footer {
+    background: var(--dark-pine);
+    padding: 2.5rem 4rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+ 
+  .doc-footer-left {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    color: rgba(248,241,233,0.4);
+  }
+ 
+  .doc-footer-right {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  @media (max-width: 768px) {
+    .cover { padding: 4rem 2rem; }
+    .page { padding: 4rem 2rem; }
+    .guide-section { grid-template-columns: 1fr; }
+    .guide-section-num { display: none; }
+    .diff-tier { grid-template-columns: 1fr; }
+    .tag-grid { grid-template-columns: 1fr; }
+    .season-grid { grid-template-columns: 1fr; }
+    .content-categories { grid-template-columns: 1fr; }
+    .trail-table { font-size: 0.72rem; }
+    .doc-footer { flex-direction: column; gap: 1rem; text-align: center; }
+  }
+</style>
+</head>
+<body>
+ 
+<!-- ── COVER ── -->
+<div class="cover">
+  <div class="cover-eyebrow">Palm Springs Adventure Club · Pink Mountain Ventures LLC</div>
+  <h1>Trail Library<br><em>Architecture</em></h1>
+  <div class="cover-sub">
+    The complete system behind the guide experience — consultation structure, portrait format, trail library, tagging taxonomy, seasonal framework, writing workflow, and form design. A working document built to last.
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Version</div>
+      <div class="cover-meta-value">1.0</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Status</div>
+      <div class="cover-meta-value">In Build</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Territory</div>
+      <div class="cover-meta-value">Coachella Valley</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Updated</div>
+      <div class="cover-meta-value">May 2026</div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 1: GUIDE STRUCTURE ── -->
+<div class="page">
+  <div class="section-eyebrow">01 · Guide Structure</div>
+  <h2 class="section-title">The guide is a<br><em>narrative arc.</em></h2>
+  <p class="section-intro">Nine sections. Each one earns the next. The reader should feel the day moving forward before they've laced their boots. Three content types drive the system: fully dynamic content generated fresh from form inputs, library content selected and lightly personalized, and assembled content structured from inputs with fixed scaffolding.</p>
+ 
+  <div style="display: flex; gap: 1.5rem; margin-bottom: 2.5rem; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;"><span class="guide-section-tag tag-dynamic">Dynamic</span><span style="font-size:0.75rem;color:var(--muted)">Generated fresh from form inputs. Hardest to automate. Highest impact.</span></div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;"><span class="guide-section-tag tag-library">Library</span><span style="font-size:0.75rem;color:var(--muted)">Selected from pre-written library. Lightly personalized. Scalable.</span></div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;"><span class="guide-section-tag tag-assembled">Assembled</span><span style="font-size:0.75rem;color:var(--muted)">Fixed structure, dynamic detail slots from form inputs.</span></div>
+  </div>
+ 
+  <div class="guide-sections">
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">01</div>
+        <div class="guide-section-name">Cover</div>
+        <span class="guide-section-tag tag-assembled">Assembled</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Their name. The adventure name. The date. A single hero image of their specific terrain. Nothing else. Announces: this was made for you. Silent — the image does the work.</div>
+        <div class="guide-section-feeds"><strong>Dynamic elements:</strong> Name, adventure name, date, terrain image pulled from library by route selection.</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">02</div>
+        <div class="guide-section-name">The Opening — Your Day</div>
+        <span class="guide-section-tag tag-dynamic">Dynamic</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Three to four sentences written directly to them. References something specific from their intake — why they're doing this, what they're after. The knowledgeable friend sitting down the night before. This section determines whether everything that follows lands. If it reads like a template, the experience collapses here.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q1 (why they're going), Q2 (who's coming), Q3 (date/time), Q8 (what draws them). Entirely personalized — no library content here.</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">03</div>
+        <div class="guide-section-name">The Terrain</div>
+        <span class="guide-section-tag tag-library">Library</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">One rich paragraph. A portrait of the place — what it feels like to be there at their specific time of day, what it looks like, what it smells like, what it asks. Present tense. Sensory without being purple. Ends at the trailhead threshold, handing directly to the route section. Pre-written and maintained as a library — one portrait per trail per time-of-day window. Written once, used indefinitely.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Route selection (Q5, Q9), time of day (Q3). Seasonal variant triggered by date input.</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">04</div>
+        <div class="guide-section-name">Your Route</div>
+        <span class="guide-section-tag tag-library">Library</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Waypoint-by-waypoint narrative. Start point, key waypoints, significant junctions, summit or destination. Each waypoint gets one to three sentences — what happens there, what to notice, what to do. Opinionated and specific. Includes the stop-and-look moment. May include a simple map embed or elevation profile. Route descriptions are pre-written per trail — selected by form, not generated fresh.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q4 (experience), Q5 (activity), Q6 (duration), Q7 (physical considerations), Q8 (interests), Q9 (specific requests).</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">05</div>
+        <div class="guide-section-name">The Moments</div>
+        <span class="guide-section-tag tag-library">Library</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Two to three named experiences within the route worth slowing down for. Each gets a short title and two to three sentences. Set apart visually — pull-quoted or highlighted. Not "viewpoint at mile 3.2" but named, described, anticipated. Each route has three to four pre-written moments. Q8 multi-select surfaces the right two to three for this specific reader.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q8 (what draws them — views, solitude, geology, water, wildlife, photography, etc).</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">06</div>
+        <div class="guide-section-name">Prepare Well</div>
+        <span class="guide-section-tag tag-assembled">Assembled</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Conversational paragraphs, not a checklist. Three short paragraphs — what to bring, when to go, what to expect from conditions. References what they said they're bringing and flags gaps. Adjusts for their specific date, start time, and any physical considerations. Core content is route and season-specific. Personal detail slots in from form inputs. Written as advice from someone who's done it — never as a liability document.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q3 (date/time), Q7 (physical considerations), Q10 (gear checklist), Q11 (gear rental).</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">07</div>
+        <div class="guide-section-name">If the Day Changes</div>
+        <span class="guide-section-tag tag-library">Library</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Three to four short scenarios specific to this route — the things that actually go wrong on this terrain. Each has a trigger and a clear response. Positioned after Prepare Well, before After the Trail. Not labeled "Emergency Procedures" — titled something that fits the voice. Written calm and prepared, never alarming. Communicates that the whole day has been thought through, including the parts the reader hopes never to need. Personalizes based on whether they have a satellite communicator.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q10 (satellite communicator flag), route-specific scenario library. Title options: "If the Day Changes" / "When the Mountain Decides."</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">08</div>
+        <div class="guide-section-name">After the Trail — Your Recovery</div>
+        <span class="guide-section-tag tag-assembled">Assembled</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">The Peaks to Pools handoff. Written as continuation of the same day — not a separate section. The day isn't over yet. Two to three recovery recommendations with brief descriptions. Specific to what they told us recovery looks like — pool, meal, spa, back on the road, surprise me. Taste level signals tone and specificity. As hospitality partnerships formalize, pre-written recommendation descriptions slot in from a recovery library.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q12 (how they want to feel), Q13 (recovery type), Q14 (taste level — simple / comfortable / elevated / surprise me).</div>
+      </div>
+    </div>
+ 
+    <div class="guide-section">
+      <div class="guide-section-left">
+        <div class="guide-section-num">09</div>
+        <div class="guide-section-name">A Note Before You Go</div>
+        <span class="guide-section-tag tag-dynamic">Dynamic</span>
+      </div>
+      <div class="guide-section-right">
+        <div class="guide-section-desc">Three to five sentences. The warmest moment in the document. Pulls the emotional thread from the opening one final time — references what they're going out for, honors it, sends them off ready. Signed simply. Not a legal disclaimer. Not "have fun." Something that recognizes what they're about to do. The guide's voice, one last time.</div>
+        <div class="guide-section-feeds"><strong>Feeds from:</strong> Q1 (why they're going), Q12 (how they want to feel). Bookends the opening. Signed: PSAC, or guide author name when named guides are introduced.</div>
+      </div>
+    </div>
+ 
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 2: FORM QUESTIONS ── -->
+<div class="page">
+  <div class="section-eyebrow">02 · Intake Form</div>
+  <h2 class="section-title">Fifteen questions.<br><em>Seven minutes.</em></h2>
+  <p class="section-intro">The form is the beginning of the experience. The questions themselves — how they're worded, what they offer, the sequence — should feel like talking to someone who already understands your world. A progress indicator shows five named sections at the top. The section names reinforce the brand register with every glance.</p>
+ 
+  <div style="background: var(--sand-beige); border-radius: 4px; padding: 1rem 1.5rem; margin-bottom: 2.5rem; display: flex; gap: 2rem; flex-wrap: wrap;">
+    <div style="font-size:0.72rem; color: var(--muted);">Progress indicator sections:</div>
+    <div style="font-size:0.72rem; font-weight:500; color:var(--dark-pine);">Your Adventure · How You Move · What You're After · Your Kit · After the Trail</div>
+  </div>
+ 
+  <!-- Section 1 -->
+  <div class="form-section-block">
+    <div class="form-section-header">
+      <div class="form-section-num">1</div>
+      <div class="form-section-name">Your Adventure</div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q1</div>
+      <div class="q-body">
+        <div class="q-text">What's bringing you out?</div>
+        <div class="q-mechanic">Fill-in-the-blank — pick a starter, complete it</div>
+        <div class="q-detail">Most important question on the form. Feeds the guide opening and closing note. The starters signal the emotional register PSAC operates in — being seen starts here.</div>
+        <div class="q-options">
+          <span class="q-option">"I need a day that's just mine —"</span>
+          <span class="q-option">"We're celebrating —"</span>
+          <span class="q-option">"I've been wanting to do this and I finally —"</span>
+          <span class="q-option">"I want to push myself —"</span>
+          <span class="q-option">"I'm showing someone I love this place —"</span>
+          <span class="q-option">"I just need to be outside and —"</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> Guide opening (The Opening — Your Day), closing note (A Note Before You Go), closing screen dynamic paragraph.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q2</div>
+      <div class="q-body">
+        <div class="q-text">Who's coming?</div>
+        <div class="q-mechanic">Select + conditional follow-up</div>
+        <div class="q-options">
+          <span class="q-option">Just me</span>
+          <span class="q-option">My partner</span>
+          <span class="q-option">A small group of friends</span>
+          <span class="q-option">Family including kids</span>
+        </div>
+        <div class="q-detail">If group or family selected: short text — "Tell us a little about who's coming — ages, energy levels, anything useful."</div>
+        <div class="q-feeds"><span>Feeds:</span> Route selection, pace calibration, The Moments, Prepare Well. Family flag triggers family-tier routing and portrait variant.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q3</div>
+      <div class="q-body">
+        <div class="q-text">When are you going?</div>
+        <div class="q-mechanic">Date picker + time preference select</div>
+        <div class="q-options">
+          <span class="q-option">Early start (before 7am)</span>
+          <span class="q-option">Morning (7–9am)</span>
+          <span class="q-option">Mid-morning (after 9am)</span>
+          <span class="q-option">Flexible</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> Terrain portrait variant (time-of-day), seasonal check, heat advisory in Prepare Well, recovery timing in After the Trail. Date + trail = seasonal safety check before routing.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Section 2 -->
+  <div class="form-section-block">
+    <div class="form-section-header">
+      <div class="form-section-num">2</div>
+      <div class="form-section-name">How You Move</div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q4</div>
+      <div class="q-body">
+        <div class="q-text">What's the most challenging thing you've done outdoors that felt great?</div>
+        <div class="q-mechanic">Short open text — no starter needed, question is the prompt</div>
+        <div class="q-detail">Placeholder: "Doesn't have to be epic. Could be a trail, a ride, a climb — anything that pushed you and paid off." The sleeper question on the form. What someone answers here tells you more about how to calibrate their guide than any fitness slider ever would.</div>
+        <div class="q-feeds"><span>Feeds:</span> Route difficulty calibration, The Moments, voice of Prepare Well. Primary experience signal.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q5</div>
+      <div class="q-body">
+        <div class="q-text">What activity are you planning?</div>
+        <div class="q-mechanic">Multi-select</div>
+        <div class="q-options">
+          <span class="q-option">Hiking</span>
+          <span class="q-option">Trail running</span>
+          <span class="q-option">Cycling or gravel riding</span>
+          <span class="q-option">Jeep or off-road</span>
+          <span class="q-option">Horseback</span>
+          <span class="q-option">Architecture or cultural tour</span>
+          <span class="q-option">Not sure yet — help me decide</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> Everything. Route library, terrain portrait, gear list, recovery. Primary routing signal alongside Q3 date and Q4 experience.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q6</div>
+      <div class="q-body">
+        <div class="q-text">How long do you want to be out?</div>
+        <div class="q-mechanic">Select one</div>
+        <div class="q-options">
+          <span class="q-option">A few hours (half day)</span>
+          <span class="q-option">Full day</span>
+          <span class="q-option">Sunrise to sunset</span>
+          <span class="q-option">Overnight or multi-day</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> Route scope, pacing notes in Your Route, recovery timing in After the Trail.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q7</div>
+      <div class="q-body">
+        <div class="q-text">Any physical considerations we should know about?</div>
+        <div class="q-mechanic">Short open text — optional, framed carefully</div>
+        <div class="q-detail">Label: "Anything that affects how you move — nothing medical required, just what's useful for building your day." Placeholder: "Bad knee on descents, prefer no scrambling, slower pace is fine — anything like that."</div>
+        <div class="q-feeds"><span>Feeds:</span> Route selection, Prepare Well, If the Day Changes.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Section 3 -->
+  <div class="form-section-block">
+    <div class="form-section-header">
+      <div class="form-section-num">3</div>
+      <div class="form-section-name">What You're After</div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q8</div>
+      <div class="q-body">
+        <div class="q-text">What draws you most on a great day out?</div>
+        <div class="q-mechanic">Multi-select — pick up to three</div>
+        <div class="q-options">
+          <span class="q-option">Big views</span>
+          <span class="q-option">Solitude and quiet</span>
+          <span class="q-option">Physical challenge</span>
+          <span class="q-option">Wildlife and nature</span>
+          <span class="q-option">Interesting geology</span>
+          <span class="q-option">Water — streams, pools, falls</span>
+          <span class="q-option">Photography opportunities</span>
+          <span class="q-option">Learning about the place</span>
+          <span class="q-option">Moving fast</span>
+          <span class="q-option">Moving slow and taking it all in</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> The Moments — which specific waypoints and experiences to surface in their route. Primary signal for moment selection.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q9</div>
+      <div class="q-body">
+        <div class="q-text">Is there anything specific you want to see or do on this adventure?</div>
+        <div class="q-mechanic">Short open text — optional</div>
+        <div class="q-detail">Placeholder: "A summit, a canyon, a specific trail you've heard about — anything on your list."</div>
+        <div class="q-feeds"><span>Feeds:</span> Route customization, The Moments. Overrides library routing if specific trail requested and viable.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Section 4 -->
+  <div class="form-section-block">
+    <div class="form-section-header">
+      <div class="form-section-num">4</div>
+      <div class="form-section-name">Your Kit</div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q10</div>
+      <div class="q-body">
+        <div class="q-text">What gear are you bringing?</div>
+        <div class="q-mechanic">Multi-select checklist</div>
+        <div class="q-options">
+          <span class="q-option">Hiking boots</span>
+          <span class="q-option">Trail runners</span>
+          <span class="q-option">Trekking poles</span>
+          <span class="q-option">Hydration pack</span>
+          <span class="q-option">Daypack</span>
+          <span class="q-option">Navigation device or GPS</span>
+          <span class="q-option">Satellite communicator</span>
+          <span class="q-option">First aid kit</span>
+          <span class="q-option">Sun protection</span>
+          <span class="q-option">Layers for elevation change</span>
+          <span class="q-option">I'm not sure what I need yet</span>
+        </div>
+        <div class="q-detail">Satellite communicator checkbox quietly feeds If the Day Changes without making safety feel like a separate alarming topic. "Not sure" flag triggers fuller gear guidance in Prepare Well.</div>
+        <div class="q-feeds"><span>Feeds:</span> Prepare Well (affirms what they have, flags gaps), If the Day Changes (communication protocol based on communicator status).</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q11</div>
+      <div class="q-body">
+        <div class="q-text">Are you renting any gear from us?</div>
+        <div class="q-mechanic">Select one</div>
+        <div class="q-options">
+          <span class="q-option">Yes</span>
+          <span class="q-option">No</span>
+          <span class="q-option">Not sure yet — what do you have?</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> Operational — triggers gear rental handoff flow if yes. "Not sure" routes to gear rental overview in guide or confirmation email.</div>
+        <div class="q-feeds" style="margin-top:0.5rem; color: var(--mountain-pink);"><span>Gear rental development item:</span> Consider including a trail nutrition kit as an add-on or inclusion in rental packages. Contents: high quality electrolytes (LMNT or similar), nuts, dates, jerky, banana. Solves a real problem for visitors who don't know where to shop and don't have time. High perceived value, low cost, easy to assemble. Available at Whole Foods and similar nearby. Electrolytes especially important — most visitors underestimate desert hydration needs even in cooler months.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Section 5 -->
+  <div class="form-section-block">
+    <div class="form-section-header">
+      <div class="form-section-num">5</div>
+      <div class="form-section-name">After the Trail</div>
+    </div>
+ 
+    <div style="background: var(--sand-beige); border-radius: 4px; padding: 0.75rem 1.25rem; margin-bottom: 1.5rem;">
+      <div style="font-size: 0.72rem; color: var(--muted); font-style: italic;">Transition line before questions: <strong style="font-style:normal; color: var(--dark-pine);">"Now let's talk about the other half of your day."</strong></div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q12</div>
+      <div class="q-body">
+        <div class="q-text">At the end of this day, I want to feel —</div>
+        <div class="q-mechanic">Fill-in-the-blank — pick a starter, complete it</div>
+        <div class="q-detail">Bookend to Q1. The form opens with why they're going and closes with how they want to feel. That arc mirrors the guide's own arc. One of two inputs that drives the dynamic closing screen paragraph.</div>
+        <div class="q-options">
+          <span class="q-option">"Completely emptied out and —"</span>
+          <span class="q-option">"Like I earned something —"</span>
+          <span class="q-option">"Relaxed and —"</span>
+          <span class="q-option">"Proud that I —"</span>
+          <span class="q-option">"Ready to —"</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> After the Trail tone, closing note (A Note Before You Go), closing screen dynamic paragraph.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q13</div>
+      <div class="q-body">
+        <div class="q-text">What does recovery look like for you?</div>
+        <div class="q-mechanic">Multi-select — pick all that apply</div>
+        <div class="q-options">
+          <span class="q-option">A pool somewhere beautiful</span>
+          <span class="q-option">A long cold drink</span>
+          <span class="q-option">A proper meal</span>
+          <span class="q-option">A spa or body treatment</span>
+          <span class="q-option">Back to the hotel and horizontal</span>
+          <span class="q-option">Getting back on the road</span>
+          <span class="q-option">I'm open to whatever you recommend</span>
+        </div>
+        <div class="q-feeds"><span>Feeds:</span> After the Trail recommendations — directs how specific or open-ended the recovery section is written.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q14</div>
+      <div class="q-body">
+        <div class="q-text">How would you describe your taste for the recovery experience?</div>
+        <div class="q-mechanic">Select one</div>
+        <div class="q-options">
+          <span class="q-option">Simple and restorative</span>
+          <span class="q-option">Comfortable and easy</span>
+          <span class="q-option">Elevated and indulgent</span>
+          <span class="q-option">Surprise me</span>
+        </div>
+        <div class="q-detail">Budget signal without asking about budget directly. Tone and specificity of After the Trail section calibrates to this answer.</div>
+        <div class="q-feeds"><span>Feeds:</span> After the Trail tone, recommendation specificity, hospitality partner selection from recovery library.</div>
+      </div>
+    </div>
+ 
+    <div class="question-block">
+      <div class="q-num">Q15</div>
+      <div class="q-body">
+        <div class="q-text">Anything else we should know to make this day exactly right?</div>
+        <div class="q-mechanic">Open text — optional</div>
+        <div class="q-detail">Placeholder: "This is your space. Anything at all." Open enough that some people will naturally comment on the form experience — supplementary feedback without asking for it directly.</div>
+        <div class="q-feeds"><span>Feeds:</span> The Opening, closing note, anywhere specific detail enriches the guide. Catch-all for what the structured questions missed.</div>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 3: CLOSING SCREEN ── -->
+<div class="page">
+  <div class="section-eyebrow">03 · Closing Screen</div>
+  <h2 class="section-title">The form's<br><em>seventh moment.</em></h2>
+  <p class="section-intro">By the time someone reaches this screen they've spent seven to ten minutes thinking about why they're going, how they move, and how they want to feel at the end. They're already in it emotionally. The closing screen meets them there. It reflects their specific choices back in the guide's voice, sets expectation for what's coming, and closes with a one-tap feedback rating.</p>
+ 
+  <div class="closing-screen-preview">
+    <div class="cs-eyebrow">Form Complete</div>
+    <div class="cs-headline">Your adventure is<br>already taking shape.</div>
+    <div class="cs-dynamic">
+      <span class="cs-dynamic-label">Dynamic — generated from Q1 + Q12</span>
+      "We're building a day designed to give you exactly that — just you, the terrain, and enough space to breathe. You'll come back emptied out in the best possible way."
+    </div>
+    <div class="cs-delivery">Your guide will be ready within 48 hours.</div>
+    <div class="cs-cta">Keep an eye on your inbox. We'll take it from here.</div>
+    <div class="cs-rating">
+      <div class="cs-rating-label">How did that feel to fill out?</div>
+      <div class="cs-stars">★ ★ ★ ★ ★</div>
+    </div>
+  </div>
+ 
+  <div style="background: white; border-radius: 4px; padding: 2rem; box-shadow: 0 2px 12px rgba(42,71,71,0.05);">
+    <div style="font-size: 0.65rem; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 1.25rem;">Dynamic paragraph examples — Q1 + Q12 combinations</div>
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+      <div style="padding-bottom: 1.25rem; border-bottom: 1px solid var(--rule);">
+        <div style="font-size: 0.7rem; font-weight: 600; color: var(--muted); margin-bottom: 0.4rem;">Q1: solo reset · Q12: completely emptied out</div>
+        <div style="font-size: 0.82rem; color: var(--dark-pine); line-height: 1.8; font-style: italic;">"We're building a day with exactly that in mind — terrain that earns the quiet, and space to let the noise fall away. You'll come back emptied out in the best possible way."</div>
+      </div>
+      <div style="padding-bottom: 1.25rem; border-bottom: 1px solid var(--rule);">
+        <div style="font-size: 0.7rem; font-weight: 600; color: var(--muted); margin-bottom: 0.4rem;">Q1: celebrating anniversary · Q12: like we earned something together</div>
+        <div style="font-size: 0.82rem; color: var(--dark-pine); line-height: 1.8; font-style: italic;">"Ten years deserves a day worth remembering. We're designing something that earns that feeling — together, out there, in a place that matches the moment."</div>
+      </div>
+      <div>
+        <div style="font-size: 0.7rem; font-weight: 600; color: var(--muted); margin-bottom: 0.4rem;">Q1: push myself / find my edge · Q12: proud that I actually did it</div>
+        <div style="font-size: 0.82rem; color: var(--dark-pine); line-height: 1.8; font-style: italic;">"Good. The desert has a way of showing you what you're made of. We'll build a day that asks something real of you — and delivers on the other side."</div>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 4: PORTRAIT FORMAT ── -->
+<div class="page">
+  <div class="section-eyebrow">04 · Terrain Portrait Format</div>
+  <h2 class="section-title">The section that<br><em>transports them.</em></h2>
+  <p class="section-intro">The terrain portrait is the only section in the guide that does nothing practical. It transports. Written in present tense. Sensory without being purple. Three paragraphs, a closing handoff line, and a time-of-day variant for each trail. Pre-written and maintained as a library — written once, used indefinitely. The competitive asset that cannot be quickly replicated.</p>
+ 
+  <div class="portrait-format">
+    <div class="portrait-format-header">
+      <h3>Portrait Structure</h3>
+      <span class="word-count">200–250 words · Present tense · Two time-of-day variants per trail</span>
+    </div>
+    <div class="portrait-paragraphs">
+      <div class="portrait-para">
+        <div class="portrait-para-label">Paragraph One<br>Arrival</div>
+        <div class="portrait-para-desc">What hits them first when they arrive. Not what they see — what they feel. The quality of the air, the sound, the scale, the specific thing that tells them they're in the right place. Grounds them physically in the place. One strong establishing image, then move. Written specifically to their time of day — the desert at 6am and 9am are genuinely different places.</div>
+      </div>
+      <div class="portrait-para">
+        <div class="portrait-para-label">Paragraph Two<br>Character</div>
+        <div class="portrait-para-desc">The deeper character of the place. Its history, its weight, what makes it distinct from every other trail in the desert. This is where the portrait earns its premium — not describing terrain but telling the truth about the place. The writing that makes someone feel they already know it before they've been. Avoids the generic, the guidebook, the obvious. Goes somewhere the AllTrails review never does.</div>
+      </div>
+      <div class="portrait-para">
+        <div class="portrait-para-label">Paragraph Three<br>What It Asks</div>
+        <div class="portrait-para-desc">What the place asks of the person who walks into it. Not the physical ask — the psychological or emotional one. Does it ask for patience? Attention? Surrender? A willingness to be uncomfortable before it pays off? Shifts the reader from observer to participant. They're not going to look at a canyon. They're going to be in a conversation with it.</div>
+      </div>
+      <div class="portrait-para">
+        <div class="portrait-para-label">Closing Line<br>Handoff</div>
+        <div class="portrait-para-desc">One sentence. Present tense. Hands them to the route section — the portrait ends at the threshold, the route begins on the other side. Should feel like a door opening. Plain and true rather than reaching for profundity. Example: "Step in. The canyon takes it from here." The route section picks up immediately after this line.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <div style="margin-bottom: 2rem;">
+    <div style="font-size: 0.65rem; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 1rem;">Voice filters — apply to every portrait</div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;">
+      <div style="background: white; padding: 1.25rem; font-size: 0.8rem; line-height: 1.8; color: var(--dark-pine);">
+        <strong style="display:block; font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--desert-green); margin-bottom:0.5rem;">Cut</strong>
+        Sentences that explain what the reader should feel rather than making them feel it. Adjective stacking — two adjectives where one is stronger. Scene-setting that runs past the establishing shot. Any sentence that reaches for profundity rather than saying the true thing plainly.
+      </div>
+      <div style="background: white; padding: 1.25rem; font-size: 0.8rem; line-height: 1.8; color: var(--dark-pine);">
+        <strong style="display:block; font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--desert-green); margin-bottom:0.5rem;">Keep</strong>
+        Specific sensory detail over general description. Plain sentences that say the true thing. Present tense throughout. The line that surprises — the detail nobody else mentions. Anything that makes the reader feel they've already arrived.
+      </div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 5: BRAIN DUMP PROMPT ── -->
+<div class="page">
+  <div class="section-eyebrow">05 · Writing Workflow</div>
+  <h2 class="section-title">Brain dump.<br><em>Compress. Truth check.</em></h2>
+  <p class="section-intro">A repeatable three-step process for every portrait. The brain dump is where verbosity is an asset — write fast, don't edit, let it run. The compression pass filters it down to the portrait format. The truth check is the author's alone — nobody else can confirm whether the compressed version still holds the essential truth of the place.</p>
+ 
+  <div class="workflow-steps">
+    <div class="workflow-step">
+      <div class="workflow-step-num">1</div>
+      <div class="workflow-step-body">
+        <div class="workflow-step-title">Brain Dump</div>
+        <div class="workflow-step-desc">Write without constraints. Answer the five questions below in any order, without editing. The goal is to get actual knowledge and feeling about the place onto the page — not to write the portrait yet. Verbosity is an asset here. Let it run.</div>
+        <div class="workflow-step-note">Target time: 15–20 minutes. Medium: Notes app, doc, voice memo transcribed — anything that gets it out fast.</div>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="workflow-step-num">2</div>
+      <div class="workflow-step-body">
+        <div class="workflow-step-title">Compression Pass</div>
+        <div class="workflow-step-desc">Bring the brain dump here. Apply the voice filters — cut over-explanation, adjective stacking, reaching for profundity. Shape into the three-paragraph structure with closing handoff line. Target 200–250 words. Check against time-of-day variant if writing multiple versions.</div>
+        <div class="workflow-step-note">Target time: 20–25 minutes with editorial support. After two or three portraits the compression instinct develops and passes get faster.</div>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="workflow-step-num">3</div>
+      <div class="workflow-step-body">
+        <div class="workflow-step-title">Truth Check</div>
+        <div class="workflow-step-desc">Read the compressed portrait against actual memory of the place. Does it feel true? Does it capture the essential thing — the thing that makes this trail worth recommending? If something essential got cut in compression, it goes back in and something else comes out. This step belongs to the author alone.</div>
+        <div class="workflow-step-note">Target time: 5–10 minutes. The final authority is always: does this feel like the place?</div>
+      </div>
+    </div>
+  </div>
+ 
+  <div class="brain-dump">
+    <div class="brain-dump-header">The Brain Dump Prompt</div>
+    <div class="brain-dump-sub">Five questions for every portrait. Answer freely, in any order, without editing. Write fast. Tell the truth about the place.</div>
+    <div class="brain-dump-questions">
+      <div class="bdq">
+        <div class="bdq-num">1</div>
+        <div class="bdq-body">
+          <div class="bdq-title">The Arrival</div>
+          <div class="bdq-text">What hits you first when you get to this trailhead? Not what you see — what you feel. The quality of the air, the sound, the scale of what's in front of you, the specific thing that tells you you're in the right place. What's the first thirty seconds like before you've taken a single step on trail?</div>
+        </div>
+      </div>
+      <div class="bdq">
+        <div class="bdq-num">2</div>
+        <div class="bdq-body">
+          <div class="bdq-title">What Most People Miss</div>
+          <div class="bdq-text">You've been here more than once. You know something about this trail that someone reading AllTrails wouldn't know. A specific moment, a section, a view, a detail, a time of day, a direction of travel. What's the thing that makes your version of this trail different from the generic version?</div>
+        </div>
+      </div>
+      <div class="bdq">
+        <div class="bdq-num">3</div>
+        <div class="bdq-body">
+          <div class="bdq-title">What It Asks of You</div>
+          <div class="bdq-text">Every trail has a character — something it demands or invites from the person walking it. Not the physical stats. The psychological or emotional ask. Does it ask for patience? Attention? Surrender? A willingness to be uncomfortable before it pays off? What does this trail want from you?</div>
+        </div>
+      </div>
+      <div class="bdq">
+        <div class="bdq-num">4</div>
+        <div class="bdq-body">
+          <div class="bdq-title">The Moment</div>
+          <div class="bdq-text">There's at least one moment on this trail that makes everything worth it. Name it specifically. Where are you on the trail, what are you looking at or feeling, what does it do to you. If you were sending a friend and could only tell them one thing to watch for — what would it be?</div>
+        </div>
+      </div>
+      <div class="bdq">
+        <div class="bdq-num">5</div>
+        <div class="bdq-body">
+          <div class="bdq-title">The Return</div>
+          <div class="bdq-text">How do you feel coming off this trail? Not physically — emotionally. What does the trail leave you with? What's different about you at the trailhead on the way out versus the way in? This is the feeling the portrait is ultimately promising the reader.</div>
+        </div>
+      </div>
+    </div>
+    <div class="lykken-note">
+      <div class="lykken-note-label">Lykken System Only — Question 6</div>
+      <div class="lykken-note-text">Why this door in? This is one of several ways onto this trail system. What does this specific entry point give someone that the others don't? What kind of person or day does this trailhead suit best? Why would you send someone here instead of the other entries?</div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 6: DIFFICULTY TIERS ── -->
+<div class="page">
+  <div class="section-eyebrow">06 · Difficulty Tiers</div>
+  <h2 class="section-title">Four tiers.<br><em>Every customer served.</em></h2>
+  <p class="section-intro">Volume comes from moderate trails. Credibility comes from expert routes. The family tier is the most underserved segment in the Palm Springs outdoor market — and the one with the highest lifetime value. Library mix target: 40% accessible/family, 30% moderate, 20% expert, 10% extended/multi-element.</p>
+ 
+  <div class="difficulty-tiers">
+    <div class="diff-tier" style="border-left: 3px solid var(--desert-green);">
+      <div class="diff-tier-left">
+        <div class="diff-tier-name">Family with Young Children</div>
+        <div class="diff-indicator" style="display:flex;gap:3px;margin-top:0.5rem;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--desert-green);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:rgba(42,71,71,0.15);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:rgba(42,71,71,0.15);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:rgba(42,71,71,0.15);"></div>
+        </div>
+      </div>
+      <div class="diff-tier-desc">Trails validated with young children — written for the parent, not the child. Honest about pace, shade, bailout points, what captures a toddler's attention, actual time at a child's pace. Portrait format adds a sixth question: what does a young child encounter here that's genuinely remarkable? The parent who has a transcendent experience in Andreas Canyon with their three-year-old becomes a customer for life.</div>
+      <div class="diff-tier-stat"><strong>Library target</strong>12–15 trails<br>Two portrait variants<br>Seasonal critical</div>
+    </div>
+    <div class="diff-tier" style="border-left: 3px solid var(--desert-green);">
+      <div class="diff-tier-left">
+        <div class="diff-tier-name">Accessible with Genuine Character</div>
+        <div class="diff-indicator" style="display:flex;gap:3px;margin-top:0.5rem;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--desert-green);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--desert-green);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:rgba(42,71,71,0.15);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:rgba(42,71,71,0.15);"></div>
+        </div>
+      </div>
+      <div class="diff-tier-desc">Fit adults without technical experience. Trails that feel like a real desert experience but won't overwhelm. Not the obvious choices — the ones that surprise a visitor without requiring expert skill. The workhorse tier. Primary consultation volume. The portrait differentiates even known trails — the question is never whether it's been written about, but whether it's been written about the way you would write about it.</div>
+      <div class="diff-tier-stat"><strong>Library target</strong>10–12 trails<br>Two portrait variants<br>Seasonal important</div>
+    </div>
+    <div class="diff-tier" style="border-left: 3px solid var(--sunset-red);">
+      <div class="diff-tier-left">
+        <div class="diff-tier-name">Moderate to Challenging</div>
+        <div class="diff-indicator" style="display:flex;gap:3px;margin-top:0.5rem;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--sunset-red);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--sunset-red);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--sunset-red);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:rgba(42,71,71,0.15);"></div>
+        </div>
+      </div>
+      <div class="diff-tier-desc">Fitness required. Navigation confidence helpful. Comfort with exposure and desert conditions expected. Longer, more committing, more rewarding. Serves experienced hikers and active adventurers. Loop trails in this tier require especially strong route section — navigation confidence matters and the guide has to deliver it. Solid representation without dominating the library.</div>
+      <div class="diff-tier-stat"><strong>Library target</strong>6–8 trails<br>Two portrait variants<br>Seasonal critical</div>
+    </div>
+    <div class="diff-tier" style="border-left: 3px solid var(--dark-pine);">
+      <div class="diff-tier-left">
+        <div class="diff-tier-name">Expert and Committing</div>
+        <div class="diff-indicator" style="display:flex;gap:3px;margin-top:0.5rem;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dark-pine);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dark-pine);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dark-pine);"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--dark-pine);"></div>
+        </div>
+      </div>
+      <div class="diff-tier-desc">Technical navigation. Significant elevation. Real consequence. Serious desert environment — heat, exposure, few people, bighorn territory, snakes. Serves trail runners and experienced desert athletes. Small representation but essential for credibility. A trail runner who gets a guide built for their level becomes the customer who refers other trail runners. The hard routes tell everyone who PSAC really is.</div>
+      <div class="diff-tier-stat"><strong>Library target</strong>4–6 trails<br>Early-start variant only<br>Summer: not recommended</div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 7: TAG SYSTEM ── -->
+<div class="page">
+  <div class="section-eyebrow">07 · Tagging System</div>
+  <h2 class="section-title">Every trail tagged.<br><em>Every customer routed correctly.</em></h2>
+  <p class="section-intro">The tagging system is what allows the form to route correctly before a single word of the guide is written. Date plus trail plus customer profile runs through the tags. Dangerous combinations surface before commitment. The right trail for the right person on the right day is the entire system's job.</p>
+ 
+  <div class="tag-grid">
+    <div class="tag-card">
+      <div class="tag-card-label">Difficulty</div>
+      <div class="tag-card-title">Customer Tier</div>
+      <div class="tag-values">
+        <span class="tag-value">Family</span>
+        <span class="tag-value">Accessible</span>
+        <span class="tag-value">Moderate</span>
+        <span class="tag-value">Expert</span>
+      </div>
+      <div class="tag-card-note">Primary routing filter. Combined with experience signal from Q4 to confirm fit before route is assigned.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Season</div>
+      <div class="tag-card-title">Operating Window</div>
+      <div class="tag-values">
+        <span class="tag-value" style="background:rgba(122,189,145,0.15);color:#2a7a4a;">Optimal</span>
+        <span class="tag-value" style="background:var(--sand-beige);color:var(--muted);border:1px solid var(--rule);">Viable</span>
+        <span class="tag-value" style="background:rgba(231,111,81,0.1);color:#c05a30;">Not Recommended</span>
+      </div>
+      <div class="tag-card-note">Applied per month, not per season label. November optimal ≠ October optimal. Date from Q3 triggers seasonal check before routing.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Start Time</div>
+      <div class="tag-card-title">Time of Day Requirement</div>
+      <div class="tag-values">
+        <span class="tag-value">Early start only</span>
+        <span class="tag-value">Morning window</span>
+        <span class="tag-value">Flexible</span>
+        <span class="tag-value">Avoid midday</span>
+      </div>
+      <div class="tag-card-note">Drives portrait variant selection and Prepare Well timing language. Expert routes in summer: early start only, non-negotiable.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Activity</div>
+      <div class="tag-card-title">Movement Type</div>
+      <div class="tag-values">
+        <span class="tag-value">Hiking</span>
+        <span class="tag-value">Trail running</span>
+        <span class="tag-value">Cycling / gravel</span>
+        <span class="tag-value">Family</span>
+        <span class="tag-value">Cultural</span>
+      </div>
+      <div class="tag-card-note">Portrait voice and route narrative adjust by activity. A cycling portrait reads differently than a hiking portrait of the same corridor.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Exposure</div>
+      <div class="tag-card-title">Shade Profile</div>
+      <div class="tag-values">
+        <span class="tag-value">Fully exposed</span>
+        <span class="tag-value">Partial shade</span>
+        <span class="tag-value">Canyon shade</span>
+        <span class="tag-value">Riparian corridor</span>
+      </div>
+      <div class="tag-card-note">Critical for summer routing and family routing. Canyon shade trails remain viable in shoulder season when exposed routes close.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Water</div>
+      <div class="tag-card-title">Water Availability</div>
+      <div class="tag-values">
+        <span class="tag-value">None</span>
+        <span class="tag-value">Seasonal</span>
+        <span class="tag-value">Year-round</span>
+      </div>
+      <div class="tag-card-note">Informs Prepare Well hydration guidance and — for family tier — the experiential quality of the trail. Water in the desert is a feature, not just logistics.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Duration</div>
+      <div class="tag-card-title">Hiking Pace Range</div>
+      <div class="tag-values">
+        <span class="tag-value">Under 2 hours</span>
+        <span class="tag-value">2–4 hours</span>
+        <span class="tag-value">4–6 hours</span>
+        <span class="tag-value">Full day</span>
+        <span class="tag-value">Multi-day</span>
+      </div>
+      <div class="tag-card-note">Always at hiker's pace, not runner's pace. Expert routes that take 45 minutes running may take 3+ hours hiking — both durations should be documented.</div>
+    </div>
+    <div class="tag-card">
+      <div class="tag-card-label">Wildlife</div>
+      <div class="tag-card-title">Notable Considerations</div>
+      <div class="tag-values">
+        <span class="tag-value">Bighorn territory</span>
+        <span class="tag-value">Snake habitat</span>
+        <span class="tag-value">Bird watching</span>
+        <span class="tag-value">Family wildlife</span>
+      </div>
+      <div class="tag-card-note">Feeds If the Day Changes (bighorn, snake protocol) and The Moments (wildlife as a draw). Family wildlife tag surfaces in family portrait Q6 — what the child will encounter.</div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 8: SEASONAL WINDOWS ── -->
+<div class="page">
+  <div class="section-eyebrow">08 · Seasonal Framework</div>
+  <h2 class="section-title">Four operating<br><em>windows.</em></h2>
+  <p class="section-intro">The desert is not the same place in November and June. Seasonal awareness isn't a safety disclaimer — it's expert knowledge expressed as service. The guide's job is to match the right trail to the right customer on the right day, and that requires honest seasonal routing. In summer, the library shrinks. The guide says so directly, and redirects with confidence.</p>
+ 
+  <div class="season-grid">
+    <div class="season-card">
+      <div class="season-card-label">Window One · Peak</div>
+      <div class="season-card-months">November — February</div>
+      <div class="season-card-desc">The sweet spot. Comfortable temperatures across most of the day. Full library available. Crowds higher but conditions forgiving. This is when you can send almost anyone almost anywhere. Portrait library at its fullest range.</div>
+      <div class="season-card-access">Full library accessible · All tiers available · Time of day flexible</div>
+    </div>
+    <div class="season-card">
+      <div class="season-card-label">Window Two · Shoulder Spring</div>
+      <div class="season-card-months">March — April</div>
+      <div class="season-card-desc">Transitional and often spectacular. Wildflower season in some areas. Mornings still cool but afternoons can surprise. Start time begins to matter more. Bighorn sheep lambing season — worth noting for family portraits. Canyon and shaded routes remain fully viable.</div>
+      <div class="season-card-access">Most library accessible · Morning start recommended · Expert routes viable early</div>
+    </div>
+    <div class="season-card">
+      <div class="season-card-label">Window Three · Shoulder Fall</div>
+      <div class="season-card-months">May · October</div>
+      <div class="season-card-desc">Early starts become non-negotiable on exposed trails. Some routes close as responsible recommendations for moderate hikers. Expert routes accessible for people who know heat management and start before dawn. The desert starts showing its teeth — which is part of the experience for the right customer.</div>
+      <div class="season-card-access">Reduced library · Early start non-negotiable · Expert routes: dawn only</div>
+    </div>
+    <div class="season-card">
+      <div class="season-card-label">Window Four · Summer</div>
+      <div class="season-card-months">June — September</div>
+      <div class="season-card-desc">Genuinely dangerous for most of the library. The guide does not send people into harm's way — it redirects with confidence. Viable options: shaded canyons, higher elevation routes, Whitewater Preserve (year-round river), early morning expert routes for experienced athletes who know desert heat management deeply.</div>
+      <div class="season-card-access">Minimal library · Canyon and riparian only · Whitewater viable · Redirect with confidence</div>
+    </div>
+  </div>
+ 
+  <div style="background: var(--dark-pine); border-radius: 4px; padding: 2rem; color: var(--sand-beige);">
+    <div style="font-size: 0.65rem; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 1rem;">Seasonal routing principle</div>
+    <div style="font-size: 0.85rem; line-height: 1.9; color: rgba(248,241,233,0.8);">When the date + trail combination creates a safety concern, the guide doesn't add a warning label — it reroutes. The knowledgeable friend says: "I hear what you want, and here's what actually serves you on this date." That redirection, delivered with confidence rather than apology, is itself a demonstration of the premium service. A pamphlet warns. A guide redirects.</div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 9: TRAIL LIBRARY ── -->
+<div class="page">
+  <div class="section-eyebrow">09 · Trail Library</div>
+  <h2 class="section-title">The library.<br><em>Built to grow.</em></h2>
+  <p class="section-intro">Every trail tagged across difficulty, season, time of day, activity, shade, water, duration, and wildlife. Priority trails are written first — the ones most likely to be requested and the ones only PSAC can write. The library grows continuously; each new portrait is an asset that pays forward indefinitely. Status: Priority · Queue · Done.</p>
+ 
+  <!-- Lykken System -->
+  <div class="trail-group">
+    <div class="trail-group-header">
+      <div class="trail-group-name">Lykken Trail System</div>
+      <div class="trail-group-count">6 entry points · 6 portraits + Q6 variant each</div>
+    </div>
+    <table class="trail-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Trail / Entry Point</th>
+          <th style="width:12%">Difficulty</th>
+          <th style="width:20%">Season</th>
+          <th style="width:20%">Tags</th>
+          <th style="width:10%">Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="trail-name">South Lykken — South Trailhead</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-accessible">Accessible</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · No water · Views · 2–4hr</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">South Lykken — Middle Entry via Neighborhood</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-accessible">Accessible</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · No water · Local's entry · 1–3hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">South Lykken — North End near Tahquitz Canyon</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-accessible">Accessible</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · No water · Tahquitz connector · 1–3hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">North Lykken — South End at Ramon / Museum Trail</div><div class="trail-type">Hiking · Trail running · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Partial shade · Views · Family viable · 1–3hr</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">North Lykken — Museum Trail Approach</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-accessible">Accessible</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Museum connector · Views · 2–4hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">North Lykken — North End, Little Tuscany</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Local neighborhood · Full system access · 3–5hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- Loops -->
+  <div class="trail-group">
+    <div class="trail-group-header">
+      <div class="trail-group-name">Loop Trails</div>
+      <div class="trail-group-count">5 routes</div>
+    </div>
+    <table class="trail-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Trail</th>
+          <th style="width:12%">Difficulty</th>
+          <th style="width:20%">Season</th>
+          <th style="width:20%">Tags</th>
+          <th style="width:10%">Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="trail-name">Henderson — Shannon — Berns — Garstin</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Route finding · Local's loop · 3–5hr · Bighorn</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Bogert — Berns Loop</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Canyon start · Views · 2–4hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Cathedral Canyon to Dunn Road Loop</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Route finding · Geology · 3–5hr · Bighorn · Snake</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Fern Canyon — Vandeventer — Palm Canyon Loop</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Feb</span><span class="season-pill season-viable">Mar/Oct</span><span class="season-pill season-avoid">Apr–Sep</span></div></td>
+          <td>Partial shade · Seasonal water · Route finding · 4–6hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">West Fork Loop</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Feb</span><span class="season-pill season-viable">Mar/Oct</span><span class="season-pill season-avoid">Apr–Sep</span></div></td>
+          <td>Canyon shade · Seasonal water · Solitude · 3–5hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- Out and Backs -->
+  <div class="trail-group">
+    <div class="trail-group-header">
+      <div class="trail-group-name">Out and Back Routes</div>
+      <div class="trail-group-count">3 routes</div>
+    </div>
+    <table class="trail-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Trail</th>
+          <th style="width:12%">Difficulty</th>
+          <th style="width:20%">Season</th>
+          <th style="width:20%">Tags</th>
+          <th style="width:10%">Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="trail-name">Bogert — Wildhorse — Clara Burgess to Murray Peak</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-expert">Expert</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Feb</span><span class="season-pill season-viable">Mar</span><span class="season-pill season-avoid">Apr–Oct</span></div></td>
+          <td>Exposed · Significant elevation · Route finding · Full day · Bighorn · Snake</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Cathedral Canyon — Art Smith — Desert Riders Oasis</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-expert">Expert</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Feb</span><span class="season-pill season-viable">Mar/Oct</span><span class="season-pill season-avoid">Apr–Sep</span></div></td>
+          <td>Exposed · Route finding · Oasis destination · Full day · Bighorn</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Maynard Mine Trail</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Partial shade · Historical · Discovery feel · 2–4hr · Underdocumented</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- Extended -->
+  <div class="trail-group">
+    <div class="trail-group-header">
+      <div class="trail-group-name">Extended / Multi-Element Routes</div>
+      <div class="trail-group-count">1 route</div>
+    </div>
+    <table class="trail-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Trail</th>
+          <th style="width:12%">Difficulty</th>
+          <th style="width:20%">Season</th>
+          <th style="width:20%">Tags</th>
+          <th style="width:10%">Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="trail-name">Palm Canyon — East Fork — Vandeventer — Palm Canyon Loop</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-expert">Expert</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Feb</span><span class="season-pill season-viable">Mar</span><span class="season-pill season-avoid">Apr–Oct</span></div></td>
+          <td>Canyon + exposed · Seasonal water · Route finding · Full day+ · Bighorn</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- Family Trails -->
+  <div class="trail-group">
+    <div class="trail-group-header">
+      <div class="trail-group-name">Family Trails — Young Children Validated</div>
+      <div class="trail-group-count">12 trails · Q6 child portrait variant each</div>
+    </div>
+    <table class="trail-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Trail</th>
+          <th style="width:12%">Difficulty</th>
+          <th style="width:20%">Season</th>
+          <th style="width:20%">Tags</th>
+          <th style="width:10%">Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="trail-name">Murray Canyon Loop</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Canyon shade · Seasonal water · Wildlife · Palm oasis · 1–2hr</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Victor — Palm Canyon Loop</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Partial shade · Canyon · Views · 1–2hr</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Andreas Canyon Loop</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Canyon shade · Year-round water · Wildlife · Geology · Under 1hr</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Tahquitz Canyon Loop</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Canyon shade · Seasonal waterfall · Cultural · 1–2hr · Fee required</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Oswit Canyon Loop</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Canyon · Solitude · Underdocumented · 1–2hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">North Lykken — Ramon Trailhead</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Partial shade · Views · City backdrop · 1–2hr</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">South Lykken — South Trailhead</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Views · Accessible entry · 1–2hr family pace</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Bogert Out and Back</div><div class="trail-type">Hiking · Family</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Canyon approach · Flexible turnaround · Under 2hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Canyon Loop Trail — Big Morongo Canyon Preserve</div><div class="trail-type">Hiking · Family · Birding</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Oct–Apr</span><span class="season-pill season-viable">May/Sep</span><span class="season-pill season-avoid">Jun–Aug</span></div></td>
+          <td>Riparian · Year-round water · Birding · Wildlife · 1–2hr · Beyond PS city</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Keys Ranch Loop — Joshua Tree</div><div class="trail-type">Hiking · Family · Cultural</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Oct–Apr</span><span class="season-pill season-viable">May/Sep</span><span class="season-pill season-avoid">Jun–Aug</span></div></td>
+          <td>Partial shade · Cultural / historical · Ranger led · 1–2hr · JT park fee</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Painted Canyon Ladder Trail — Mecca Hills</div><div class="trail-type">Hiking · Family · Geology</div></td>
+          <td><span class="pill pill-accessible">Accessible</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Canyon shade · Geology · Unexpected · Ladders · 1–3hr · Beyond PS · Surprising family choice</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+        <tr>
+          <td><div class="trail-name">Whitewater Preserve — River Corridor + Palm Oasis</div><div class="trail-type">Hiking · Family · Birding</div></td>
+          <td><span class="pill pill-family">Family</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Year-round</span></div></td>
+          <td>Year-round river · Riparian · Wildlife · Palm oasis option · Under 2hr · Summer viable · Remarkable in desert context</td>
+          <td><span class="portrait-status status-priority">Priority</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- La Quinta -->
+  <div class="trail-group">
+    <div class="trail-group-header">
+      <div class="trail-group-name">La Quinta / Coachella Valley Extended</div>
+      <div class="trail-group-count">1 trail · library expansion territory</div>
+    </div>
+    <table class="trail-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Trail</th>
+          <th style="width:12%">Difficulty</th>
+          <th style="width:20%">Season</th>
+          <th style="width:20%">Tags</th>
+          <th style="width:10%">Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="trail-name">Boo Hoff Trails — La Quinta</div><div class="trail-type">Hiking · Trail running</div></td>
+          <td><span class="pill pill-moderate">Moderate</span></td>
+          <td><div class="season-pills"><span class="season-pill season-optimal">Nov–Mar</span><span class="season-pill season-viable">Apr/Oct</span><span class="season-pill season-avoid">May–Sep</span></div></td>
+          <td>Exposed · Views · Valley territory expansion · 2–4hr</td>
+          <td><span class="portrait-status status-queue">Queue</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <div style="background: var(--sand-beige); border-radius: 4px; padding: 1.25rem 1.5rem; font-size: 0.78rem; color: var(--muted); line-height: 1.8;">
+    <strong style="color: var(--dark-pine);">Library totals (current):</strong> 29 trails documented · 8 Priority · 13 Queue · 8 family-validated · Lykken system: 6 entry points. Territory: Palm Springs city, Coachella Valley, Joshua Tree, Mecca Hills. <strong style="color: var(--dark-pine);">Expansion territory identified:</strong> Indio Hills, Santa Rosa Mountains above La Quinta, Eisenhower Mountain.
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 10: CONTENT CATEGORIES ── -->
+<div class="page">
+  <div class="section-eyebrow">10 · Content Automation</div>
+  <h2 class="section-title">Three categories.<br><em>Scalable without becoming generic.</em></h2>
+  <p class="section-intro">The guide is not written from scratch for every customer. It's a system that generates the personal parts, selects the right library content, and assembles the structured parts from form inputs. The result feels entirely personal. The effort is sustainable at five hours per week.</p>
+ 
+  <div class="content-categories">
+    <div class="content-cat">
+      <div class="content-cat-label">Category One</div>
+      <div class="content-cat-title">Generate Fresh Every Time</div>
+      <div class="content-cat-desc">Hardest to automate. Highest impact. These are the sections that determine whether the guide feels personal or templated. Eventually AI generation with the right prompt engineering built on form inputs. Human editorial review until the system is reliable.</div>
+      <div class="content-cat-examples">The Opening — Your Day<br>A Note Before You Go<br>Closing screen dynamic paragraph</div>
+    </div>
+    <div class="content-cat">
+      <div class="content-cat-label">Category Two</div>
+      <div class="content-cat-title">Select and Lightly Personalize</div>
+      <div class="content-cat-desc">Pre-written in the library. Selected by form routing. Light personalization stitches them to the customer's specific situation. Written once, used indefinitely. The efficiency engine of the system. Quality of the library determines quality of the guide.</div>
+      <div class="content-cat-examples">Terrain Portrait<br>Your Route<br>The Moments<br>If the Day Changes</div>
+    </div>
+    <div class="content-cat">
+      <div class="content-cat-label">Category Three</div>
+      <div class="content-cat-title">Assemble from Inputs</div>
+      <div class="content-cat-desc">Fixed structure. Dynamic detail slots in from form inputs. The scaffolding is built — the personal specifics fill the gaps automatically. Scales cleanly once the assembly logic is defined. No writing required per guide once the template exists.</div>
+      <div class="content-cat-examples">Prepare Well<br>After the Trail — Your Recovery<br>Cover page</div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 11: NEXT STEPS ── -->
+<div class="page">
+  <div class="section-eyebrow">11 · Next Steps</div>
+  <h2 class="section-title">What gets built<br><em>first.</em></h2>
+  <p class="section-intro">Sequenced by impact and dependency. Portrait writing begins with trails only PSAC can write — the ones where the knowledge is the entire asset. The form is built in parallel with the first portrait batch. The guide template is built once the first five portraits exist.</p>
+ 
+  <div class="next-steps">
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Write Priority Portrait Batch One — Five Trails</div>
+        <div class="next-step-desc">Maynard Mine · Cathedral Canyon — Art Smith — Desert Riders Oasis · South Lykken South Trailhead · Henderson — Shannon — Berns — Garstin · Bogert — Wildhorse — Clara Burgess to Murray Peak. Use brain dump prompt → compression pass workflow. Two time-of-day variants each.</div>
+      </div>
+    </div>
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Write Priority Portrait Batch Two — Family Trails</div>
+        <div class="next-step-desc">Murray Canyon · Victor — Palm Canyon · Andreas Canyon · Tahquitz Canyon · North Lykken Ramon · Big Morongo Canyon · Painted Canyon Ladder · Whitewater Preserve. Family portrait format with Q6 child variant. The most underserved segment in the market.</div>
+      </div>
+    </div>
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Build JotForm Consultation Intake — 15 Questions, 5 Sections</div>
+        <div class="next-step-desc">Card format, progress indicator with section names, fill-in-the-blank mechanics for Q1 and Q12, conditional logic for Q2 group/family follow-up. Closing screen with dynamic paragraph from Q1 + Q12 inputs and one-tap rating.</div>
+      </div>
+    </div>
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Build Guide Template — Document Structure and Visual System</div>
+        <div class="next-step-desc">Nine-section layout in PSAC brand. Cover, Opening, Terrain, Route, Moments, Prepare Well, If the Day Changes, After the Trail, Closing Note. Slots for library content and dynamic content clearly defined. Format that feels premium on screen and in print.</div>
+      </div>
+    </div>
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Define Routing Logic — Form Inputs to Guide Sections</div>
+        <div class="next-step-desc">Map every form input to its guide output. Seasonal check logic. Difficulty routing from Q4 experience signal. Portrait variant selection from Q3 time of day. Q8 to Moments selection. Q12–14 to After the Trail tone and recommendations.</div>
+      </div>
+    </div>
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Build Post-Guide Feedback — 24–48hr Follow-up Email</div>
+        <div class="next-step-desc">Single question: "Did we get it right?" Five-star rating plus optional text. Sent after estimated adventure date. Measures whether the promise landed in the real world — different signal than the form closing screen rating, which measures intake experience only.</div>
+      </div>
+    </div>
+    <div class="next-step">
+      <div class="next-step-check"></div>
+      <div class="next-step-body">
+        <div class="next-step-title">Tag Every Trail in the Library</div>
+        <div class="next-step-desc">Apply all eight tag dimensions to every trail in the current library. Difficulty · Season (per month) · Time of day · Activity · Shade profile · Water · Duration at hiker's pace · Wildlife considerations. Tagging system is what enables correct routing at scale.</div>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── FOOTER ── -->
+<div class="doc-footer">
+  <div class="doc-footer-left">Palm Springs Adventure Club · Pink Mountain Ventures LLC · Trail Library Architecture · v1.0</div>
+  <div class="doc-footer-right">Peaks to Pools · 2026</div>
+</div>
+ 
+</body>
+</html>

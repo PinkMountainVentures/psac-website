@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Adventure Guide — Bogert-Berns Loop</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mountain-pink: #E27396;
+    --desert-green: #7ABD91;
+    --sunset-red: #E76F51;
+    --sand-beige: #F8F1E9;
+    --dark-pine: #2A4747;
+    --muted: #7a8a8a;
+    --rule: rgba(42,71,71,0.1);
+    --morning-mist: #FAF3EB;
+  }
+ 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+  body {
+    background: var(--morning-mist);
+    color: var(--dark-pine);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 300;
+    line-height: 1.8;
+  }
+ 
+  /* ── COVER ── */
+  .cover {
+    min-height: 100vh;
+    background: var(--dark-pine);
+    display: grid;
+    grid-template-rows: 1fr auto;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+ 
+  .cover-bg {
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 70% 30%, rgba(226,115,150,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(122,189,145,0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
+ 
+  .cover-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8rem 7rem 4rem;
+    position: relative;
+    z-index: 1;
+  }
+ 
+  .cover-psac {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+    margin-bottom: 3rem;
+  }
+ 
+  .cover-for {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    font-weight: 300;
+    font-style: italic;
+    color: rgba(248,241,233,0.4);
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+ 
+  .cover-names {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-weight: 300;
+    color: var(--sand-beige);
+    line-height: 1.1;
+    margin-bottom: 3rem;
+  }
+ 
+  .cover-divider {
+    width: 48px;
+    height: 1px;
+    background: var(--mountain-pink);
+    margin-bottom: 3rem;
+  }
+ 
+  .cover-trail {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(3rem, 7vw, 6rem);
+    font-weight: 300;
+    color: var(--sand-beige);
+    line-height: 1.0;
+    margin-bottom: 1rem;
+  }
+ 
+  .cover-trail em {
+    font-style: italic;
+    color: var(--mountain-pink);
+  }
+ 
+  .cover-subtitle {
+    font-size: 0.72rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(248,241,233,0.4);
+    margin-bottom: 4rem;
+  }
+ 
+  .cover-stats {
+    display: flex;
+    gap: 3rem;
+    flex-wrap: wrap;
+  }
+ 
+  .cover-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+ 
+  .cover-stat-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(248,241,233,0.3);
+  }
+ 
+  .cover-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: rgba(248,241,233,0.8);
+  }
+ 
+  .cover-footer {
+    padding: 2rem 7rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+ 
+  .cover-footer-left {
+    font-size: 0.6rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: rgba(248,241,233,0.25);
+    text-transform: uppercase;
+  }
+ 
+  .cover-footer-right {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: rgba(248,241,233,0.25);
+  }
+ 
+  /* ── OPENING NOTE ── */
+  .opening-note {
+    background: var(--mountain-pink);
+    padding: 7rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 60vh;
+  }
+ 
+  .opening-note-salutation {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 2rem;
+    font-style: italic;
+  }
+ 
+  .opening-note-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 300;
+    color: white;
+    line-height: 1.5;
+    max-width: 680px;
+  }
+ 
+  .opening-note-text p {
+    margin-bottom: 1.2rem;
+  }
+ 
+  .opening-note-text p:last-child {
+    margin-bottom: 0;
+  }
+ 
+  /* ── SECTION LAYOUT ── */
+  .section {
+    padding: 6rem 7rem;
+    border-bottom: 1px solid var(--rule);
+  }
+ 
+  .section:last-child {
+    border-bottom: none;
+  }
+ 
+  .section-alt {
+    background: white;
+  }
+ 
+  .section-dark {
+    background: var(--dark-pine);
+    color: var(--sand-beige);
+  }
+ 
+  .section-pine {
+    background: #1e3535;
+    color: var(--sand-beige);
+  }
+ 
+  /* ── SECTION HEADERS ── */
+  .section-eyebrow {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    margin-bottom: 1rem;
+  }
+ 
+  .section-dark .section-eyebrow,
+  .section-pine .section-eyebrow {
+    color: var(--desert-green);
+  }
+ 
+  .section-number {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 5rem;
+    font-weight: 300;
+    color: rgba(42,71,71,0.06);
+    line-height: 1;
+    margin-bottom: -1rem;
+  }
+ 
+  .section-dark .section-number,
+  .section-pine .section-number {
+    color: rgba(248,241,233,0.05);
+  }
+ 
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300;
+    line-height: 1.1;
+    color: var(--dark-pine);
+    margin-bottom: 2.5rem;
+  }
+ 
+  .section-dark .section-title,
+  .section-pine .section-title {
+    color: var(--sand-beige);
+  }
+ 
+  .section-title em {
+    font-style: italic;
+    color: var(--mountain-pink);
+  }
+ 
+  /* ── PROSE ── */
+  .prose {
+    font-size: 0.88rem;
+    line-height: 1.95;
+    color: var(--dark-pine);
+    max-width: 680px;
+  }
+ 
+  .section-dark .prose,
+  .section-pine .prose {
+    color: rgba(248,241,233,0.8);
+  }
+ 
+  .prose p {
+    margin-bottom: 1.4rem;
+  }
+ 
+  .prose p:last-child {
+    margin-bottom: 0;
+  }
+ 
+  .prose strong {
+    font-weight: 600;
+    color: var(--dark-pine);
+  }
+ 
+  .section-dark .prose strong,
+  .section-pine .prose strong {
+    color: var(--sand-beige);
+  }
+ 
+  /* ── HANDOFF LINE ── */
+  .handoff {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-style: italic;
+    color: var(--mountain-pink);
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+ 
+  /* ── ROUTE SECTION ── */
+  .route-header {
+    background: var(--dark-pine);
+    padding: 2rem 2.5rem;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+ 
+  .route-header-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--sand-beige);
+  }
+ 
+  .route-stats {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+ 
+  .route-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    align-items: flex-end;
+  }
+ 
+  .route-stat-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+  }
+ 
+  .route-stat-value {
+    font-size: 0.8rem;
+    color: rgba(248,241,233,0.7);
+  }
+ 
+  .waypoints {
+    border: 1px solid var(--rule);
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    overflow: hidden;
+  }
+ 
+  .waypoint {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    border-bottom: 1px solid var(--rule);
+  }
+ 
+  .waypoint:last-child {
+    border-bottom: none;
+  }
+ 
+  .waypoint-mile {
+    background: var(--sand-beige);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.2rem;
+    border-right: 1px solid var(--rule);
+  }
+ 
+  .waypoint-mile-label {
+    font-size: 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+ 
+  .waypoint-mile-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    font-weight: 400;
+    color: var(--dark-pine);
+    line-height: 1;
+  }
+ 
+  .waypoint-content {
+    padding: 1.5rem 2rem;
+    background: white;
+  }
+ 
+  .waypoint-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    margin-bottom: 0.5rem;
+  }
+ 
+  .waypoint-desc {
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: var(--dark-pine);
+  }
+ 
+  .waypoint-sidequest {
+    background: rgba(122,189,145,0.06);
+    border-left: 2px solid var(--desert-green);
+    padding: 1rem 1.5rem;
+    margin-top: 0.75rem;
+    border-radius: 0 2px 2px 0;
+  }
+ 
+  .waypoint-sidequest-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+    margin-bottom: 0.4rem;
+  }
+ 
+  .waypoint-sidequest-text {
+    font-size: 0.78rem;
+    color: var(--dark-pine);
+    line-height: 1.7;
+  }
+ 
+  /* ── MOMENTS ── */
+  .moments-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2rem;
+  }
+ 
+  .moment-card {
+    background: white;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+ 
+  .moment-mile {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+  }
+ 
+  .moment-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+    line-height: 1.2;
+  }
+ 
+  .moment-desc {
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: var(--dark-pine);
+  }
+ 
+  /* ── PREPARE WELL ── */
+  .prepare-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2rem;
+  }
+ 
+  .prepare-card {
+    background: white;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+ 
+  .prepare-card-full {
+    grid-column: 1 / -1;
+  }
+ 
+  .prepare-card-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+  }
+ 
+  .prepare-card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+  }
+ 
+  .prepare-card-text {
+    font-size: 0.8rem;
+    line-height: 1.85;
+    color: var(--dark-pine);
+  }
+ 
+  .app-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+ 
+  .app-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+ 
+  .app-item:last-child {
+    border-bottom: none;
+  }
+ 
+  .app-name {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--dark-pine);
+  }
+ 
+  .app-note {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+ 
+  .app-price {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+ 
+  .price-free { background: rgba(122,189,145,0.15); color: #2a7a4a; }
+  .price-paid { background: rgba(231,111,81,0.12); color: #c05a30; }
+  .price-recommended { background: var(--dark-pine); color: var(--sand-beige); }
+ 
+  /* ── IF THE DAY CHANGES ── */
+  .contingency-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2rem;
+  }
+ 
+  .contingency-block {
+    background: white;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 0 2rem;
+    align-items: start;
+  }
+ 
+  .contingency-label {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    padding-top: 0.1rem;
+    line-height: 1.6;
+  }
+ 
+  .contingency-text {
+    font-size: 0.82rem;
+    line-height: 1.85;
+    color: var(--dark-pine);
+  }
+ 
+  /* ── AFTER THE TRAIL ── */
+  .recovery-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+    margin-top: 2rem;
+  }
+ 
+  .recovery-block {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+ 
+  .recovery-block-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(248,241,233,0.1);
+  }
+ 
+  .recovery-block-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 300;
+    color: rgba(248,241,233,0.15);
+    line-height: 1;
+  }
+ 
+  .recovery-block-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--sand-beige);
+  }
+ 
+  .recovery-block-text {
+    font-size: 0.83rem;
+    line-height: 1.9;
+    color: rgba(248,241,233,0.75);
+    max-width: 640px;
+  }
+ 
+  .dinner-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: rgba(248,241,233,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 1rem;
+  }
+ 
+  .dinner-option {
+    background: rgba(255,255,255,0.04);
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+ 
+  .dinner-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--sand-beige);
+  }
+ 
+  .dinner-desc {
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: rgba(248,241,233,0.6);
+  }
+ 
+  .recovery-alternatives {
+    background: rgba(248,241,233,0.04);
+    border-left: 2px solid rgba(122,189,145,0.4);
+    padding: 1.25rem 1.5rem;
+    border-radius: 0 2px 2px 0;
+    margin-top: 1rem;
+  }
+ 
+  .recovery-alternatives-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--desert-green);
+    margin-bottom: 0.5rem;
+  }
+ 
+  .recovery-alternatives-text {
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: rgba(248,241,233,0.55);
+  }
+ 
+  /* ── CLOSING NOTE ── */
+  .closing-note {
+    background: var(--dark-pine);
+    padding: 8rem 7rem;
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+ 
+  .closing-note::before {
+    content: '';
+    position: absolute;
+    bottom: -20%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(226,115,150,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+ 
+  .closing-note-salutation {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    font-weight: 400;
+    font-style: italic;
+    color: rgba(248,241,233,0.4);
+    margin-bottom: 2rem;
+  }
+ 
+  .closing-note-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+    font-weight: 300;
+    color: var(--sand-beige);
+    line-height: 1.45;
+    max-width: 700px;
+    margin-bottom: 3rem;
+    position: relative;
+    z-index: 1;
+  }
+ 
+  .closing-note-text p {
+    margin-bottom: 1rem;
+  }
+ 
+  .closing-note-text p:last-child {
+    margin-bottom: 0;
+  }
+ 
+  .closing-note-sig {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--mountain-pink);
+    position: relative;
+    z-index: 1;
+  }
+ 
+  /* ── BACK COVER ── */
+  .back-cover {
+    background: var(--mountain-pink);
+    padding: 5rem 7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+ 
+  .back-cover-logo {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+ 
+  .back-cover-tagline {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 300;
+    font-style: italic;
+    color: white;
+  }
+ 
+  .back-cover-url {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.5);
+    margin-top: 1rem;
+  }
+ 
+  /* ── PRINT / RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .cover-content { padding: 4rem 2.5rem 3rem; }
+    .cover-footer { padding: 1.5rem 2.5rem; }
+    .opening-note { padding: 4rem 2.5rem; }
+    .section { padding: 4rem 2.5rem; }
+    .closing-note { padding: 5rem 2.5rem; }
+    .back-cover { padding: 3rem 2.5rem; }
+    .moments-grid { grid-template-columns: 1fr; }
+    .prepare-grid { grid-template-columns: 1fr; }
+    .dinner-options { grid-template-columns: 1fr; }
+    .waypoint { grid-template-columns: 70px 1fr; }
+    .contingency-block { grid-template-columns: 1fr; gap: 0.5rem; }
+    .cover-stats { gap: 1.5rem; }
+    .route-stats { gap: 1rem; }
+    .route-stat { align-items: flex-start; }
+  }
+ 
+  @media print {
+    body { background: white; }
+    .section { break-inside: avoid; }
+    .waypoint { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+ 
+<!-- ── COVER ── -->
+<div class="cover">
+  <div class="cover-bg"></div>
+  <div class="cover-content">
+    <div class="cover-psac">Palm Springs Adventure Club · Your Personal Guide</div>
+    <div class="cover-for">A day built for</div>
+    <div class="cover-names">Sarah &amp; James</div>
+    <div class="cover-divider"></div>
+    <div class="cover-trail">Bogert<br><em>Berns Loop</em></div>
+    <div class="cover-subtitle">Santa Rosa Mountains · South Palm Springs</div>
+    <div class="cover-stats">
+      <div class="cover-stat">
+        <div class="cover-stat-label">Date</div>
+        <div class="cover-stat-value">November 18, 2026</div>
+      </div>
+      <div class="cover-stat">
+        <div class="cover-stat-label">Distance</div>
+        <div class="cover-stat-value">5.18 miles</div>
+      </div>
+      <div class="cover-stat">
+        <div class="cover-stat-label">Elevation Gain</div>
+        <div class="cover-stat-value">1,268 ft</div>
+      </div>
+      <div class="cover-stat">
+        <div class="cover-stat-label">Allow</div>
+        <div class="cover-stat-value">2.5 to 3 hours</div>
+      </div>
+      <div class="cover-stat">
+        <div class="cover-stat-label">Start Time</div>
+        <div class="cover-stat-value">7:30 — 8:00 am</div>
+      </div>
+    </div>
+  </div>
+  <div class="cover-footer">
+    <div class="cover-footer-left">Pink Mountain Ventures LLC · palmspringsadventureclub.com</div>
+    <div class="cover-footer-right">Peaks to Pools</div>
+  </div>
+</div>
+ 
+ 
+<!-- ── OPENING NOTE ── -->
+<div class="opening-note">
+  <div class="opening-note-salutation">Sarah &amp; James —</div>
+  <div class="opening-note-text">
+    <p>Ten years of choosing each other deserves a day that feels like the two of you. Not managed. Not performed. Just yours.</p>
+    <p>The mountain will do the rest. It always does.</p>
+    <p>Go find out who you are when nobody needs anything from you. The trail is waiting. The afternoon is waiting. And somewhere between the lavender wash and the pool at Colony Palms, you'll remember something you already knew.</p>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 1: THE OPENING ── -->
+<div class="section section-alt">
+  <div class="section-eyebrow">01 · The Opening</div>
+  <div class="section-number">01</div>
+  <div class="section-title">Your <em>day.</em></div>
+  <div class="prose">
+    <p>Congrats on ten years! That's a decade of choosing each other, and you're here, in one of the most beautiful places in the world, celebrating. We're genuinely glad you found us and we want this day to be worthy of what it's marking.</p>
+    <p>You asked for something that feels like it belongs to you. Something you couldn't have found on your own. That's exactly what we're going to give you.</p>
+    <p>One honest thought before we get into it: West Fork is on your list and we love that. It's also nearly ten miles, close to 3,000 feet of gain, and the descent has sections that a knee will remember the next day. That's a big ask for an anniversary. We think we have something better for today, but if West Fork is calling you, say the word and we'll build that guide instead.</p>
+    <p>What we'd love to show you is the Bogert-Berns Loop in the Santa Rosa Mountains. Five miles, about 1,268 feet of gain, and you'll be back at Colony Palms before noon with the whole afternoon still ahead of you. There's a canyon wash at the start that smells of desert lavender on a cool November morning. A ridgeline with San Jacinto lit up behind you and views across Palm Springs, including Bob Hope's famous hilltop home and the Palm Springs Airport. The loop will likely be entirely yours, because almost nobody finds it.</p>
+    <p>If you're going with Bogert-Berns, and we think you'll love it, read on.</p>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 2: THE TERRAIN ── -->
+<div class="section">
+  <div class="section-eyebrow">02 · The Terrain</div>
+  <div class="section-number">02</div>
+  <div class="section-title">The <em>place.</em></div>
+  <div class="prose">
+    <p>The Bogert trailhead sits at the edge of where Palm Springs ends and the Santa Rosa Mountains begin. A dirt parking lot, a Desert Riders trail sign, and then the mountain in front of you asking what you came for. The air at 762 feet in mid-November carries something the resort air doesn't. Cooler. Drier. Faintly scented with sage and something older underneath it. The city is still visible behind you but already it feels like it belongs to a different part of the day.</p>
+    <p>The trail begins as a dirt road. Wide, unhurried, giving you time to settle into your legs and your breathing before it asks anything serious of you. At a third of a mile the road drops into a wash and the world narrows. High rock walls rise on both sides. Flowering plants crowd the trail edges. If you've timed your morning right the sun is just reaching the canyon floor and the dew is still sitting on the leaves. The fragrance that rises from that combination is something you won't find described anywhere because most people move through it too quickly to notice. Stop here. Breathe it in. This is the first gift of the morning.</p>
+    <p>This is not a trail many people find unless they are local. The Santa Rosa Mountains have a character that's different from the drama of 10,000+ foot San Jacinto to the north. More weathered, gentler, and absolutely beautiful. They'll help you find your pace while you focus on each other and enjoy the views.</p>
+  </div>
+  <div class="handoff">Follow the road up from the wash. The mountain takes it from here.</div>
+</div>
+ 
+ 
+<!-- ── SECTION 3: YOUR ROUTE ── -->
+<div class="section section-alt">
+  <div class="section-eyebrow">03 · Your Route</div>
+  <div class="section-number">03</div>
+  <div class="section-title">The <em>way.</em></div>
+ 
+  <div class="route-header">
+    <div class="route-header-title">Bogert-Berns Loop</div>
+    <div class="route-stats">
+      <div class="route-stat">
+        <div class="route-stat-label">Distance</div>
+        <div class="route-stat-value">5.18 miles</div>
+      </div>
+      <div class="route-stat">
+        <div class="route-stat-label">Elevation Gain</div>
+        <div class="route-stat-value">1,268 ft</div>
+      </div>
+      <div class="route-stat">
+        <div class="route-stat-label">Duration</div>
+        <div class="route-stat-value">2.5 to 3 hours</div>
+      </div>
+      <div class="route-stat">
+        <div class="route-stat-label">Type</div>
+        <div class="route-stat-value">Loop</div>
+      </div>
+    </div>
+  </div>
+ 
+  <div class="waypoints">
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">0</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Trailhead</div>
+        <div class="waypoint-desc">Park in the dirt lot at the end of Bogert Trail Road. Look for the iron Desert Riders trail sign at the far end of the lot. Take a moment here before you move. The city is behind you. The mountains are in front of you. This is the transition.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Miles</div>
+        <div class="waypoint-mile-num">0–0.5</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Approach and The Wash</div>
+        <div class="waypoint-desc">Follow the dirt road beyond the trail sign. The grade is gentle and the footing is easy. Let your legs warm up and your breathing settle. At 0.5 miles the road drops into the wash. The walls rise on both sides. Flowering plants crowd the edges. Stop before you cross. The desert lavender warming in the morning sun with overnight dew still on the leaves produces a fragrance you won't find described anywhere because most people move through it too quickly to notice. Breathe it in. This moment won't last long. Cross the wash, turn a sharp left, and rejoin the road on the other side.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Miles</div>
+        <div class="waypoint-mile-num">0.72–1.2</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Single Track Climb</div>
+        <div class="waypoint-desc">The trail transitions from dirt road to single track and the switchbacks begin. This section asks something real of you. The footing is loose in places and the grade is consistent. Find a pace you can both hold comfortably and stay there. This is not a section to push. Talk if you want to. Or don't. The trail is good company on its own. At the top of the switchbacks stop and turn around. The San Jacinto range fills the view behind you, morning light warming its face. At over 10,000 feet it is an extraordinary thing to look at. Take your time here. You've earned this already and the best of the trail is still ahead.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Miles</div>
+        <div class="waypoint-mile-num">1.2–1.6</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">Twists, Turns and the Wildhorse Junction</div>
+        <div class="waypoint-desc">The trail curves and winds before arriving at the junction with the Wildhorse Trail. Continue straight through the junction. The trail bends left and the terrain opens up around you.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">1.78</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The T Intersection</div>
+        <div class="waypoint-desc">You'll arrive at a T intersection with no markings. Take a right. This is the turn most people miss. Trust it.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">2.1</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">Stay on the Dirt Road</div>
+        <div class="waypoint-desc">The trail arrives at what appears to be a dirt road bending left. Do not take the single track trail to the right. Follow the dirt road up and to the left. The summit is ahead of you.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">2.42</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Overlook</div>
+        <div class="waypoint-desc">The views open fully here. Palm Springs spreads out below you. Bob Hope's former residence sits perched on its hilltop, visible and unmistakable. The Palm Springs Airport lies beyond it, the valley floor stretching out in the morning light. This is also where the Araby Trail tops out, though you won't see many people arriving from that direction either. You are unlikely to share this spot with anyone. Stay as long as you want. This is one of the quieter places in the desert.</div>
+        <div class="waypoint-sidequest">
+          <div class="waypoint-sidequest-label">Optional Side Quest — Cahuilla Hills Peak, 1,522 ft</div>
+          <div class="waypoint-sidequest-text">A trail continues straight toward the next summit. Follow it to the top where you'll find a cairn built stone by stone by everyone who has made it this far. Add yours if you like. Then turn around and return to mile 2.42 before continuing the loop. Do not continue past the cairn.</div>
+        </div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">2.46</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Berns Trail</div>
+        <div class="waypoint-desc">Veer left onto the Berns Trail. The switchbacks descend into the valley below. The footing requires attention here, particularly on the steeper sections. Take your time on the descent and let the knee set the pace. There is no rush and the trail will reward patience.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">2.73</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Quiet Wash</div>
+        <div class="waypoint-desc">At the bottom of the valley you'll cross a wash. This is one of the more peaceful spots on the entire loop. The views open toward the Palm Springs Airport and the valley beyond. Few people ever stand here. It has a stillness to it in the morning that is worth pausing for, even briefly. From the wash the trail climbs again through another set of switchbacks on the opposite side of the valley.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">3.16</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">Unmarked Left Turn</div>
+        <div class="waypoint-desc">At the top of the switchbacks you'll reach a trail intersection. Take the left turn onto the unmarked trail. This is easy to miss. Look for it before you assume the trail continues straight.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">3.31</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">Garstin Trail Junction</div>
+        <div class="waypoint-desc">Take another left onto the Garstin Trail.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">3.48</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">Stay Right</div>
+        <div class="waypoint-desc">Stay right as the trail descends toward the valley below. This puts you back toward the Wildhorse and Bogert junction.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">3.56</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">Back to Bogert</div>
+        <div class="waypoint-desc">Turn right onto the Bogert Trail. From here retrace your steps back down the switchbacks, through the canyon wash and its lavender fragrance one more time, and along the dirt road back to the parking lot.</div>
+      </div>
+    </div>
+ 
+    <div class="waypoint">
+      <div class="waypoint-mile">
+        <div class="waypoint-mile-label">Mile</div>
+        <div class="waypoint-mile-num">5.18</div>
+      </div>
+      <div class="waypoint-content">
+        <div class="waypoint-name">The Parking Lot</div>
+        <div class="waypoint-desc">On the way down the San Jacinto range will be fully lit behind you, the morning well underway. You'll arrive back at your vehicle having seen something most visitors to Palm Springs never find, and with the whole day still ahead of you.</div>
+      </div>
+    </div>
+ 
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 4: THE MOMENTS ── -->
+<div class="section">
+  <div class="section-eyebrow">04 · The Moments</div>
+  <div class="section-number">04</div>
+  <div class="section-title">What to <em>slow down for.</em></div>
+  <div class="moments-grid">
+ 
+    <div class="moment-card">
+      <div class="moment-mile">Mile 0.5</div>
+      <div class="moment-name">The Lavender Wash</div>
+      <div class="moment-desc">Stop at the wash before you cross. The desert lavender warming in the early sun with overnight dew still on the leaves produces a fragrance that is entirely specific to this place and this hour. It won't be here when you return in the afternoon. This one belongs to the morning.</div>
+    </div>
+ 
+    <div class="moment-card">
+      <div class="moment-mile">Mile 1.2</div>
+      <div class="moment-name">San Jacinto Viewpoint</div>
+      <div class="moment-desc">The trail flattens here after the switchback climb and the San Jacinto range appears in full. At over 10,000 feet it doesn't just fill the view — it overwhelms it. Indian Canyons spreads below, the southern end of Palm Springs visible beyond it, the scale of the mountain above everything. In morning light the range is glorious. This is a place to slow down together and simply look. The trail will wait.</div>
+    </div>
+ 
+    <div class="moment-card">
+      <div class="moment-mile">Mile 2.42</div>
+      <div class="moment-name">The Overlook</div>
+      <div class="moment-desc">Turn one direction and San Jacinto fills the sky. Turn the other and the entire Coachella Valley opens to the horizon, Palm Springs below you, the valley stretching east toward the Little San Bernardino Mountains, the desert floor glowing in the morning light. This is a place where the scale of things becomes suddenly and quietly apparent. Almost nobody stands here. Take your time.</div>
+    </div>
+ 
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 5: PREPARE WELL ── -->
+<div class="section section-alt">
+  <div class="section-eyebrow">05 · Prepare Well</div>
+  <div class="section-number">05</div>
+  <div class="section-title">Before you <em>go.</em></div>
+ 
+  <div class="prepare-grid">
+ 
+    <div class="prepare-card">
+      <div class="prepare-card-label">Footwear</div>
+      <div class="prepare-card-title">Trail Running Shoes</div>
+      <div class="prepare-card-text">Leave the hiking boots at home if you don't wear them regularly. Stiff boots on unfamiliar feet create more problems than they solve on a trail like this. What works best here is a trail running shoe with good grip and a protective outsole. Altra Lone Peak, Hoka Speedgoat, and Nike Trail runners are all excellent choices. If ankle support matters, Altra makes a mid-boot version that gives you stability without the weight and stiffness of a traditional hiking boot.</div>
+    </div>
+ 
+    <div class="prepare-card">
+      <div class="prepare-card-label">Gear</div>
+      <div class="prepare-card-title">Trekking Poles</div>
+      <div class="prepare-card-text">Worth having, particularly for the Berns Trail descent. If you don't own a pair, we rent them. The loose footing on the downhill section is manageable without them, but poles give the knee something to lean on and take real load off the legs over five miles. If you'd like to add them to your day, reply to this email and we'll have them ready for you.</div>
+    </div>
+ 
+    <div class="prepare-card">
+      <div class="prepare-card-label">Hydration</div>
+      <div class="prepare-card-title">Water and Electrolytes</div>
+      <div class="prepare-card-text">Two liters each, minimum. There is no water on this trail. Even on a cool November morning the elevation gain will have you working, and the desert air is drier than most people expect. Drink before you feel thirsty. Add a quality electrolyte packet to your water — it makes a meaningful difference on the back half of the trail. If you rented gear from us, electrolytes are already in your bag.</div>
+    </div>
+ 
+    <div class="prepare-card">
+      <div class="prepare-card-label">Food</div>
+      <div class="prepare-card-title">Trail Snacks</div>
+      <div class="prepare-card-text">Eat before you feel like you need to. The elevation gain will have you burning more than a morning walk. Simple whole foods work best — nuts, dates, a banana, some jerky. All easily found at any grocery store on the way. If you rented gear from us, snacks are already in your bag.</div>
+    </div>
+ 
+    <div class="prepare-card">
+      <div class="prepare-card-label">Clothing</div>
+      <div class="prepare-card-title">What to Wear</div>
+      <div class="prepare-card-text">Expect temperatures in the low to mid fifties at the trailhead, warming through the sixties as the morning progresses. A light layer at the start that can tie around your waist by mile one is ideal. Sun protection matters even in November — sunscreen, sunglasses, and a hat.</div>
+    </div>
+ 
+    <div class="prepare-card">
+      <div class="prepare-card-label">Personal</div>
+      <div class="prepare-card-title">A Note for James</div>
+      <div class="prepare-card-text">The steepest and loosest section of the entire loop is the Berns Trail descent from mile 2.46 to the wash. Short steps, weight back slightly, slow and deliberate pace through here. Poles make this section significantly easier. The quiet valley and the rest of the loop are just ahead.</div>
+    </div>
+ 
+    <div class="prepare-card prepare-card-full">
+      <div class="prepare-card-label">Navigation</div>
+      <div class="prepare-card-title">Finding Your Way</div>
+      <div class="prepare-card-text">The route section of this guide covers every junction with distances. Read it once the night before and you'll feel confident on trail. For navigation on your phone, we've attached the GPX file for this route to this email. A GPX file is a digital map of the exact route that shows your position as you walk it. Download it to your phone before you leave the hotel, then open it in a navigation app. Cell service is generally good on this trail — but download the route before you go regardless.</div>
+      <div class="app-list">
+        <div class="app-item">
+          <div>
+            <div class="app-name">Gaia GPS</div>
+            <div class="app-note">Imports GPX files at no cost. Works offline.</div>
+          </div>
+          <span class="app-price price-recommended">Recommended · Free</span>
+        </div>
+        <div class="app-item">
+          <div>
+            <div class="app-name">Wikiloc</div>
+            <div class="app-note">Works offline. Handles GPX import well.</div>
+          </div>
+          <span class="app-price price-free">Free</span>
+        </div>
+        <div class="app-item">
+          <div>
+            <div class="app-name">Komoot</div>
+            <div class="app-note">Clean interface. Works offline.</div>
+          </div>
+          <span class="app-price price-free">Free</span>
+        </div>
+        <div class="app-item">
+          <div>
+            <div class="app-name">Maps.me</div>
+            <div class="app-note">Fully offline. Straightforward GPX import.</div>
+          </div>
+          <span class="app-price price-free">Free</span>
+        </div>
+        <div class="app-item">
+          <div>
+            <div class="app-name">AllTrails</div>
+            <div class="app-note">Familiar interface. GPX import requires Pro subscription.</div>
+          </div>
+          <span class="app-price price-paid">Paid</span>
+        </div>
+      </div>
+      <div style="margin-top: 1rem; font-size: 0.78rem; color: var(--muted); line-height: 1.7;">A printed map with key mile markers is also on the following page. It works without cell service, without a charge, and without an account. Bring it regardless of which app you choose.</div>
+    </div>
+ 
+    <div class="prepare-card prepare-card-full" style="background: var(--sand-beige);">
+      <div class="prepare-card-label">Timing</div>
+      <div class="prepare-card-title">When to Start</div>
+      <div class="prepare-card-text">A 7:30 to 8am start puts you on trail with the morning light on San Jacinto at its best and the temperature at its most comfortable. You'll be back at the trailhead well before noon.</div>
+    </div>
+ 
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 6: IF THE DAY CHANGES ── -->
+<div class="section">
+  <div class="section-eyebrow">06 · If the Day Changes</div>
+  <div class="section-number">06</div>
+  <div class="section-title">When to <em>adjust.</em></div>
+  <div class="prose" style="margin-bottom: 2rem;">
+    <p>This trail is well within your reach and November mornings in the Santa Rosas are forgiving. That said, a few things worth knowing before you head out.</p>
+  </div>
+  <div class="contingency-blocks">
+    <div class="contingency-block">
+      <div class="contingency-label">The Knee</div>
+      <div class="contingency-text">If James's knee becomes genuinely painful rather than just present, stop and assess before continuing. Retracing back down the Bogert Trail to the parking lot is always the simplest option from any point on the loop. If you've reached the overlook at mile 2.42 or beyond, the Araby Trail descends from just past that point into the southern end of Palm Springs, and the main dirt road further along the loop connects down to Highway 111 — both are reasonable alternatives. Uber can get you back to your car at the Bogert trailhead from either exit point.</div>
+    </div>
+    <div class="contingency-block">
+      <div class="contingency-label">Weather</div>
+      <div class="contingency-text">Check the forecast the night before. November in Palm Springs is reliably clear but the mountains can surprise. If clouds are building unusually fast or the wind picks up significantly at the overlook, head back toward the trailhead rather than continuing the loop.</div>
+    </div>
+    <div class="contingency-block">
+      <div class="contingency-label">If You Need Help</div>
+      <div class="contingency-text">Cell service is generally good on this trail. In an emergency call 911. If signal is weak, try 760-836-3220, the Riverside County Sheriff's desert dispatch line. Share your planned route and expected return time with the hotel concierge before you leave — a simple text works fine.</div>
+    </div>
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 7: AFTER THE TRAIL ── -->
+<div class="section section-dark">
+  <div class="section-eyebrow">07 · After the Trail</div>
+  <div class="section-number">07</div>
+  <div class="section-title">The other half of<br><em>your day.</em></div>
+  <div class="prose" style="margin-bottom: 3rem;">
+    <p>You'll be back at Colony Palms before noon. The whole afternoon is yours.</p>
+  </div>
+ 
+  <div class="recovery-sections">
+ 
+    <div class="recovery-block">
+      <div class="recovery-block-header">
+        <div class="recovery-block-num">1</div>
+        <div class="recovery-block-title">First — The Spa</div>
+      </div>
+      <div class="recovery-block-text">Book the Colony Palms Spa before you go out on the trail. Not after. Treatments fill up and an anniversary deserves a guaranteed afternoon rather than a waitlist.</div>
+      <div class="recovery-block-text">Walk through the garden when you arrive. Stop at the fountain. Don't rush this part. The path from the lobby to the spa building is doing something to you before the massage even begins — the palms, the mountains, the red tile roofs, the pool appearing on your right. This is the Peaks to Pools moment. Let it land.</div>
+      <div class="recovery-block-text">You have a full hour in the facilities before your massage — dry sauna, steam sauna, a large hot tub. Arrive early enough to use it. Then the massage itself, with staff who are experienced and attentive and know when not to talk. Afterward, two hours of pool access. Lounge chairs, daybeds, cabanas, food and drink service. Watch for the popsicle cart. The afternoon has no agenda beyond this.</div>
+      <div class="recovery-alternatives">
+        <div class="recovery-alternatives-label">If the Colony Palms Spa isn't available</div>
+        <div class="recovery-alternatives-text">The Parker Palm Springs Yacht Club Spa for a more theatrical experience. Grounded Body Works in North Palm Springs for excellent quality without the resort production. Both are worth knowing about.</div>
+      </div>
+    </div>
+ 
+    <div class="recovery-block">
+      <div class="recovery-block-header">
+        <div class="recovery-block-num">2</div>
+        <div class="recovery-block-title">Then — The Pool</div>
+      </div>
+      <div class="recovery-block-text">The Colony Palms pool is one of the genuinely beautiful places to be horizontal in Palm Springs. You've earned it twice over — once on the mountain and once on the table. Stay as long as the afternoon allows.</div>
+    </div>
+ 
+    <div class="recovery-block">
+      <div class="recovery-block-header">
+        <div class="recovery-block-num">3</div>
+        <div class="recovery-block-title">The Evening</div>
+      </div>
+      <div class="recovery-block-text">When the appetite for something more arrives, three dinner experiences are worth the occasion.</div>
+      <div class="dinner-options">
+        <div class="dinner-option">
+          <div class="dinner-name">Miro's</div>
+          <div class="dinner-desc">Elegant in the classical sense. The kind of restaurant that makes a night feel like a memory before it's over. Right for ten years.</div>
+        </div>
+        <div class="dinner-option">
+          <div class="dinner-name">4 Saints at the Rowan</div>
+          <div class="dinner-desc">A proper steakhouse. Well deserved after a morning in the mountains and an afternoon at the pool. Order something substantial.</div>
+        </div>
+        <div class="dinner-option">
+          <div class="dinner-name">Canopy</div>
+          <div class="dinner-desc">A wine bar and bistro with warmth to it. More relaxed but still considered. Right for two people who want to keep talking rather than perform a celebration.</div>
+        </div>
+      </div>
+      <div class="recovery-block-text" style="margin-top: 1.5rem;">Any of the three delivers on the feeling you described. Like you earned something together. Because you did.</div>
+    </div>
+ 
+  </div>
+</div>
+ 
+ 
+<!-- ── SECTION 8: CLOSING NOTE ── -->
+<div class="closing-note">
+  <div class="closing-note-salutation">Sarah &amp; James —</div>
+  <div class="closing-note-text">
+    <p>Ten years of choosing each other deserves a day that feels like the two of you. Not managed. Not performed. Just yours.</p>
+    <p>The mountain will do the rest. It always does.</p>
+    <p>Go find out who you are when nobody needs anything from you. The trail is waiting. The afternoon is waiting. And somewhere between the lavender wash and the pool at Colony Palms, you'll remember something you already knew.</p>
+    <p>Happy anniversary.</p>
+  </div>
+  <div class="closing-note-sig">Palm Springs Adventure Club</div>
+</div>
+ 
+ 
+<!-- ── BACK COVER ── -->
+<div class="back-cover">
+  <div class="back-cover-logo">Palm Springs Adventure Club · Pink Mountain Ventures LLC</div>
+  <div class="back-cover-tagline">Peaks to Pools.<br>Built for the way you want to feel at 4pm.</div>
+  <div class="back-cover-url">palmspringsadventureclub.com</div>
+</div>
+ 
+ 
+</body>
+</html>

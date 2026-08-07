@@ -1,0 +1,40 @@
+# Palm Springs Adventure Club — robots.txt
+#
+# Everything on this site today is public marketing and booking content, so
+# it's open to search engines and AI crawlers alike. Each crawler gets its
+# own block below (rather than one blanket rule) so that if gated,
+# members-only content is added later, a Disallow line can be added under
+# just that section without restructuring this file.
+
+User-agent: *
+Allow: /
+
+# AI assistants / answer engines — allowed for discoverability and citation.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://www.palmspringsadventureclub.com/sitemap.xml
