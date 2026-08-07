@@ -659,13 +659,20 @@ section { padding: 6rem 0; }
 /* ── NEWSLETTER ── */
 .newsletter { background: var(--mountain-pink); color: white; text-align: center; }
 
-.formkit-form {
-    margin: 0 auto;
-    max-width: 560px;
+.newsletter-message {
+  margin-top: 1rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 400;
+  min-height: 1.4rem;
 }
-
-.formkit-powered-by-convertkit-container {
-    display: none !important;
+ 
+.newsletter-message--success {
+  color: white;
+}
+ 
+.newsletter-message--error {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .newsletter .section-title h2 {

@@ -275,17 +275,74 @@
     </div>
 </section>
 
-<!-- Newsletter Section -->
-<section class="newsletter">
-    <div class="container">
-        <div class="section-title">
-            <h2>Opening September 2026.</h2>
-            <p>Get early access before we open. Desert trails, gear delivered, nothing left to figure out.</p>
-        </div>
-        <!-- Kit Pre-Launch Waitlist Form -->
-        <script async data-uid="59205e4543" src="https://palm-springs-adventure-club.kit.com/59205e4543/index.js"></script>
+<!-- ── NEWSLETTER — Pre-Launch Waitlist ── -->
+<section class="newsletter" id="waitlist">
+  <div class="container">
+    <div class="section-title">
+      <h2>Opening September 2026.</h2>
+      <p>Get early access before we open. Desert trails, gear delivered, nothing left to figure out.</p>
     </div>
+    <form class="newsletter-form" id="waitlist-form" novalidate>
+      <input
+        type="email"
+        id="waitlist-email"
+        name="email"
+        placeholder="Your email address"
+        autocomplete="email"
+        required
+      >
+      <button type="submit" id="waitlist-submit">Get early access</button>
+    </form>
+    <p class="newsletter-message" id="waitlist-message" aria-live="polite"></p>
+  </div>
 </section>
+ 
+<script>
+  (function () {
+    var form = document.getElementById('waitlist-form');
+    var input = document.getElementById('waitlist-email');
+    var button = document.getElementById('waitlist-submit');
+    var message = document.getElementById('waitlist-message');
+ 
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+ 
+      var email = input.value.trim();
+      if (!email) return;
+ 
+      button.disabled = true;
+      button.textContent = 'Adding you...';
+      message.textContent = '';
+      message.className = 'newsletter-message';
+ 
+      try {
+        var res = await fetch('/api/kit-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email }),
+        });
+ 
+        var data = await res.json();
+ 
+        if (res.ok && data.success) {
+          form.style.display = 'none';
+          message.textContent = "You're on the list. We'll be in touch before we open.";
+          message.className = 'newsletter-message newsletter-message--success';
+        } else {
+          message.textContent = data.error || 'Something went wrong. Please try again.';
+          message.className = 'newsletter-message newsletter-message--error';
+          button.disabled = false;
+          button.textContent = 'Get early access';
+        }
+      } catch (err) {
+        message.textContent = 'Something went wrong. Please try again.';
+        message.className = 'newsletter-message newsletter-message--error';
+        button.disabled = false;
+        button.textContent = 'Get early access';
+      }
+    });
+  })();
+</script>
 
 <!-- ── FOOTER ── -->
 <footer id="contact">
