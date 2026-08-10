@@ -1116,14 +1116,8 @@ select.paf-roster-input {
   font-weight: 300;
   color: rgba(248,241,233,0.9);
   max-width: 560px;
-  margin: 0 auto 0.75rem;
+  margin: 0 auto;
   line-height: 1.85;
-}
-
-.hiw-hero-sub + .hiw-hero-sub {
-  color: rgba(248,241,233,0.6);
-  font-size: 0.95rem;
-  margin-top: 0.5rem;
 }
 
 /* Shared section */
