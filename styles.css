@@ -179,6 +179,19 @@ section { padding: 6rem 0; }
     margin-right: auto;
 }
 
+/* secondary hero link — "How does this work?" */
+.hero-hiw-link {
+    display: inline-block;
+    margin-top: 1rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: rgba(248,241,233,0.5);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.hero-hiw-link:hover { color: rgba(248,241,233,0.85); text-decoration: underline; }
+
 /* ── THE OTHER SIDE ── */
 .other-side {
     background: var(--dark-pine);

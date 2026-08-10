@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How It Works | Palm Springs Adventure Club</title>
+  <meta name="description" content="Trail selected for your group. Gear delivered the evening before. Route on your phone before you leave. Palm Springs Adventure Club handles everything.">
+  <meta property="og:title" content="How It Works — Palm Springs Adventure Club">
+  <meta property="og:description" content="Trail selected for your group. Gear delivered the evening before. Route on your phone before you leave. Palm Springs Adventure Club handles everything.">
+  <meta property="og:image" content="https://www.palmspringsadventureclub.com/images/hero.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.palmspringsadventureclub.com/how-it-works">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://www.palmspringsadventureclub.com/how-it-works">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    /* ── PAGE-SPECIFIC STYLES ── */
+
+    /* Hero */
+    .hiw-hero {
+      padding: 7rem 0 5rem;
+      background: var(--dark-pine);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hiw-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 75% 25%, rgba(245,130,113,0.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 20% 80%, rgba(122,189,145,0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .hiw-hero .container {
+      position: relative;
+      z-index: 1;
+    }
+
+    .hiw-eyebrow {
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--mountain-pink);
+      margin-bottom: 1.2rem;
+    }
+
+    .hiw-hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.8rem, 6.5vw, 5rem);
+      font-weight: 400;
+      line-height: 1.06;
+      color: var(--sand-beige);
+      margin-bottom: 1.5rem;
+      max-width: 700px;
+    }
+
+    .hiw-hero-sub {
+      font-size: 1.05rem;
+      font-weight: 300;
+      color: rgba(248,241,233,0.62);
+      max-width: 480px;
+      line-height: 1.75;
+    }
+
+    /* Section shared */
+    .hiw-section {
+      padding: 6rem 0;
+    }
+
+    .hiw-section-eyebrow {
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      color: var(--mountain-pink);
+    }
+
+    .hiw-section-headline {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.9rem, 3.8vw, 2.8rem);
+      font-weight: 400;
+      line-height: 1.12;
+      margin-bottom: 2.5rem;
+      color: var(--dark-pine);
+    }
+
+    .hiw-section-headline.light {
+      color: var(--sand-beige);
+    }
+
+    /* Section 1 — Problem */
+    .hiw-problem {
+      background: var(--sand-beige);
+    }
+
+    .hiw-problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+    }
+
+    .hiw-problem-text p {
+      font-size: 1rem;
+      line-height: 1.9;
+      color: var(--dark-pine);
+      margin-bottom: 1.4rem;
+    }
+
+    .hiw-problem-text p:last-child { margin-bottom: 0; }
+
+    .hiw-problem-image {
+      aspect-ratio: 3/4;
+      border-radius: 3px;
+      overflow: hidden;
+      background: var(--dark-pine);
+    }
+
+    .hiw-problem-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .img-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, rgba(245,130,113,0.10), rgba(122,189,145,0.07));
+    }
+
+    .img-placeholder-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(248,241,233,0.25);
+      text-align: center;
+      line-height: 2.2;
+    }
+
+    /* Section 2 — How It Works */
+    .hiw-steps {
+      background: var(--dark-pine);
+    }
+
+    .hiw-steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid rgba(248,241,233,0.08);
+      margin-top: 1rem;
+    }
+
+    .hiw-step {
+      padding: 2.5rem 2rem 2.5rem 0;
+      border-bottom: 1px solid rgba(248,241,233,0.08);
+      border-right: 1px solid rgba(248,241,233,0.08);
+    }
+
+    .hiw-step:nth-child(3n) { border-right: none; }
+    .hiw-step:nth-child(4),
+    .hiw-step:nth-child(5),
+    .hiw-step:nth-child(6) { border-bottom: none; }
+
+    .hiw-step-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.6rem;
+      font-weight: 300;
+      color: var(--mountain-pink);
+      opacity: 0.45;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+
+    .hiw-step-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--sand-beige);
+      margin-bottom: 0.8rem;
+    }
+
+    .hiw-step-body {
+      font-size: 0.88rem;
+      font-weight: 300;
+      color: rgba(248,241,233,0.55);
+      line-height: 1.85;
+    }
+
+    /* Section 3 — Gear Kit */
+    .hiw-gear {
+      background: var(--sand-beige);
+    }
+
+    .hiw-gear-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      margin-top: 0.5rem;
+    }
+
+    .hiw-gear-col h3 {
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(42,71,71,0.45);
+      margin-bottom: 1rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid rgba(42,71,71,0.1);
+    }
+
+    .hiw-gear-col p {
+      font-size: 0.92rem;
+      line-height: 1.9;
+      color: var(--dark-pine);
+      margin-bottom: 1rem;
+    }
+
+    .hiw-gear-col p:last-child { margin-bottom: 0; }
+
+    .hiw-gear-value {
+      margin-top: 3rem;
+      padding: 1.4rem 2rem;
+      background: var(--dark-pine);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+    }
+
+    .hiw-gear-value p {
+      font-size: 0.8rem;
+      font-weight: 300;
+      color: rgba(248,241,233,0.55);
+      line-height: 1.6;
+    }
+
+    .hiw-gear-value strong {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--desert-green);
+      white-space: nowrap;
+    }
+
+    /* Section 4 — Route */
+    .hiw-route {
+      background: white;
+    }
+
+    .hiw-route-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+    }
+
+    .hiw-route-text p {
+      font-size: 0.95rem;
+      line-height: 1.9;
+      color: var(--dark-pine);
+      margin-bottom: 1.2rem;
+    }
+
+    .hiw-route-text p:last-child { margin-bottom: 0; }
+
+    .hiw-pull {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1.45;
+      color: var(--dark-pine);
+      border-left: 2px solid var(--mountain-pink);
+      padding-left: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .hiw-route-image {
+      aspect-ratio: 4/5;
+      border-radius: 3px;
+      overflow: hidden;
+      background: var(--dark-pine);
+    }
+
+    .hiw-route-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Section 5 — Who It's For */
+    .hiw-who {
+      background: var(--dark-pine);
+      text-align: center;
+    }
+
+    .hiw-who .container {
+      max-width: 680px;
+    }
+
+    .hiw-who p {
+      font-size: 1rem;
+      font-weight: 300;
+      color: rgba(248,241,233,0.65);
+      line-height: 1.85;
+      margin-bottom: 1.2rem;
+    }
+
+    .hiw-who-close {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-style: italic;
+      font-weight: 400;
+      color: var(--mountain-pink);
+      margin-top: 2rem;
+      display: block;
+    }
+
+    /* Section 6 — FAQ */
+    .hiw-faq {
+      background: var(--sand-beige);
+    }
+
+    .hiw-faq-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem 5rem;
+      margin-top: 0.5rem;
+    }
+
+    .hiw-faq-q {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--dark-pine);
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+
+    .hiw-faq-a {
+      font-size: 0.88rem;
+      font-weight: 300;
+      color: rgba(42,71,71,0.65);
+      line-height: 1.85;
+    }
+
+    /* Section 7 — CTA */
+    .hiw-cta {
+      background: white;
+      text-align: center;
+      padding: 8rem 0;
+    }
+
+    .hiw-cta h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 400;
+      line-height: 1.08;
+      color: var(--dark-pine);
+      margin-bottom: 0.8rem;
+    }
+
+    .hiw-cta-sub {
+      font-size: 1rem;
+      font-weight: 300;
+      color: rgba(42,71,71,0.5);
+      margin-bottom: 3rem;
+    }
+
+    .hiw-cta-secondary {
+      display: block;
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(42,71,71,0.45);
+    }
+
+    .hiw-cta-secondary a {
+      color: var(--mountain-pink);
+      text-decoration: none;
+    }
+
+    .hiw-cta-secondary a:hover { text-decoration: underline; }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .hiw-problem-grid,
+      .hiw-route-grid { grid-template-columns: 1fr; gap: 3rem; }
+
+      .hiw-problem-image,
+      .hiw-route-image { aspect-ratio: 4/3; }
+
+      .hiw-steps-grid { grid-template-columns: 1fr; }
+
+      .hiw-step { border-right: none; padding-right: 0; }
+      .hiw-step:nth-child(4),
+      .hiw-step:nth-child(5) { border-bottom: 1px solid rgba(248,241,233,0.08); }
+      .hiw-step:nth-child(6) { border-bottom: none; }
+
+      .hiw-gear-cols { grid-template-columns: 1fr; gap: 2.5rem; }
+      .hiw-gear-value { flex-direction: column; align-items: flex-start; }
+
+      .hiw-faq-grid { grid-template-columns: 1fr; gap: 2rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER — matches live site exactly -->
+  <header>
+    <div class="container">
+      <nav>
+        <a href="/" class="logo">
+          <img src="/images/logo.svg" alt="Palm Springs Adventure Club" height="40">
+        </a>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="/#adventures">On the Trail</a></li>
+          <li><a href="/after-the-trail-experience">After the Trail</a></li>
+          <li><a href="/membership">The Club</a></li>
+          <li><a href="/how-it-works" class="active">How It Works</a></li>
+          <li><a href="#" class="nav-cta start-adventure-btn">Start My Adventure</a></li>
+        </ul>
+        <button class="hamburger" id="hamburger" aria-label="Open menu">&#9776;</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hiw-hero">
+    <div class="container">
+      <p class="hiw-eyebrow">Your adventure, handled</p>
+      <h1>The mountain<br>is right there.</h1>
+      <p class="hiw-hero-sub">Most people in Palm Springs never go up it. You can. Here's how it works.</p>
+    </div>
+  </section>
+
+  <!-- SECTION 1 — THE PROBLEM -->
+  <section class="hiw-section hiw-problem">
+    <div class="container">
+      <div class="hiw-problem-grid">
+        <div class="hiw-problem-text">
+          <p>You're in Palm Springs. The Coachella Valley is spread out below you, the pool is perfect, the restaurants are right. And somewhere between the first morning coffee and the second day, you look up.</p>
+          <p>The mountains are enormous. They're close. And there's a version of this trip that happens up there. Quieter, sharper, more yours. One that most visitors never find.</p>
+          <p>Not because it's hard to find. Because nobody handed them a way in.</p>
+        </div>
+        <div class="hiw-problem-image">
+          <!-- Replace with real image: ridgeline from valley floor, morning light -->
+          <!-- <img src="/images/valley-ridgeline.jpg" alt="The San Jacinto ridgeline above the Coachella Valley at sunrise"> -->
+          <div class="img-placeholder">
+            <p class="img-placeholder-label">Photo<br>Ridgeline from valley<br>Morning light</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2 — HOW IT WORKS -->
+  <section class="hiw-section hiw-steps">
+    <div class="container">
+      <p class="hiw-section-eyebrow">How it works</p>
+      <h2 class="hiw-section-headline light">We handle everything.<br>You bring yourself.</h2>
+      <div class="hiw-steps-grid">
+        <div class="hiw-step">
+          <div class="hiw-step-num">01</div>
+          <p class="hiw-step-title">Tell us about your group</p>
+          <p class="hiw-step-body">Who's coming, how you like to move, what you're after. A few questions. Five minutes. Everything else follows from your answers.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-step-num">02</div>
+          <p class="hiw-step-title">We select your trail</p>
+          <p class="hiw-step-body">Not from a list you scroll through. From lived experience on these specific trails: the junctions, the views, the right time of day, the terrain that fits your group. The route is chosen for you.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-step-num">03</div>
+          <p class="hiw-step-title">Your gear arrives the evening before</p>
+          <p class="hiw-step-body">A Gregory daypack, Leki trekking poles, two laser-engraved Hydro Flask bottles, and a first aid kit. Plus LMNT electrolytes, Rancho Meladuco dates, Blue Lizard mineral sunscreen, and a bandana to keep. Packed. Delivered. Waiting for you.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-step-num">04</div>
+          <p class="hiw-step-title">Your route is already on your phone</p>
+          <p class="hiw-step-body">Your trail loads through RideWithGPS before you leave. Turn-by-turn navigation, waypoints, terrain detail. Works without cell service. No signal required.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-step-num">05</div>
+          <p class="hiw-step-title">You go</p>
+          <p class="hiw-step-body">That's the whole morning. No planning. No rentals. No strangers on someone else's itinerary. Just your group and a trail that was chosen for you.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-step-num">06</div>
+          <p class="hiw-step-title">We pick everything up</p>
+          <p class="hiw-step-body">When you're done, leave the gear. We take care of the rest.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3 — GEAR KIT -->
+  <section class="hiw-section hiw-gear">
+    <div class="container">
+      <p class="hiw-section-eyebrow">Your gear kit</p>
+      <h2 class="hiw-section-headline">Everything you need.<br>Nothing you have to find.</h2>
+      <div class="hiw-gear-cols">
+        <div class="hiw-gear-col">
+          <h3>Rental gear</h3>
+          <p>Every kit includes a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles laser-engraved with the Palm Springs Adventure Club mark, and a first aid kit.</p>
+          <p>Packed the day before. Delivered to your hotel or property the evening before your trail day. Picked up after.</p>
+        </div>
+        <div class="hiw-gear-col">
+          <h3>Yours to keep</h3>
+          <p>LMNT electrolytes, Rancho Meladuco Medjool dates, Blue Lizard mineral sunscreen, and a Palm Springs Adventure Club bandana.</p>
+          <p>Trail fuel, sun protection, and something to remember the morning by.</p>
+        </div>
+      </div>
+      <div class="hiw-gear-value">
+        <p>The gear in your kit has a retail value of over $550.</p>
+        <strong>Your gear fee is $65.</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 4 — ROUTE EXPERIENCE -->
+  <section class="hiw-section hiw-route">
+    <div class="container">
+      <div class="hiw-route-grid">
+        <div class="hiw-route-text">
+          <p class="hiw-section-eyebrow">Your route guide</p>
+          <h2 class="hiw-section-headline">The trail,<br>before you're on it.</h2>
+          <p>The night before you go, your route guide is ready. It's built for your specific trail, your specific group, the time of year. It covers the terrain, the waypoints, what to expect at each one, and the moments worth slowing down for.</p>
+          <p class="hiw-pull">Works without cell service.<br>No bars required.</p>
+          <p>It loads to your phone through RideWithGPS. There's also a printed route card in your kit with waypoints and landmarks for the trail.</p>
+          <p>You'll know exactly where you're going before you take a single step.</p>
+        </div>
+        <div class="hiw-route-image">
+          <!-- Replace with real image: phone showing RideWithGPS on trail -->
+          <!-- <img src="/images/route-on-phone.jpg" alt="RideWithGPS trail navigation on a phone screen, mid-trail"> -->
+          <div class="img-placeholder">
+            <p class="img-placeholder-label">Photo<br>Phone on trail<br>RideWithGPS navigation</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5 — WHO IT'S FOR -->
+  <section class="hiw-section hiw-who">
+    <div class="container">
+      <p class="hiw-section-eyebrow">Is this for you</p>
+      <h2 class="hiw-section-headline light">You don't need<br>to be a hiker.</h2>
+      <p>You need to want a morning that feels different from the rest of the trip.</p>
+      <p>Palm Springs Adventure Club was built for people who are curious about the mountain but don't have the gear, the knowledge, or the time to piece together a plan. People who want the experience without the research. Solo travelers, couples, families, and groups of up to twelve who don't want a guided tour with strangers on a route they didn't choose.</p>
+      <span class="hiw-who-close">If you've looked up at the ridgeline and thought about it, this is for you.</span>
+    </div>
+  </section>
+
+  <!-- SECTION 6 — FAQ -->
+  <section class="hiw-section hiw-faq">
+    <div class="container">
+      <p class="hiw-section-eyebrow">Good to know</p>
+      <h2 class="hiw-section-headline">A few practical things.</h2>
+      <div class="hiw-faq-grid">
+        <div>
+          <p class="hiw-faq-q">When does the gear arrive?</p>
+          <p class="hiw-faq-a">The evening before your trail day. We deliver to your hotel front desk or property. You pick it up that evening or grab it on your way out in the morning.</p>
+        </div>
+        <div>
+          <p class="hiw-faq-q">What about the gear deposit?</p>
+          <p class="hiw-faq-a">A refundable hold is placed on your card the day before delivery. It is not a charge. It's released in full when the gear comes back complete. The hold is $65 per kit for Trail Guide.</p>
+        </div>
+        <div>
+          <p class="hiw-faq-q">Do I need any experience?</p>
+          <p class="hiw-faq-a">No. Your trail is selected based on how your group moves and what you're looking for. There are trails here that are genuinely easy and genuinely extraordinary. We'll find the right one.</p>
+        </div>
+        <div>
+          <p class="hiw-faq-q">What if I haven't booked my hotel yet?</p>
+          <p class="hiw-faq-a">Book your experience now. We'll collect your accommodation details separately once you have them. No rush.</p>
+        </div>
+        <div>
+          <p class="hiw-faq-q">What do I need to bring?</p>
+          <p class="hiw-faq-a">Hiking shoes or trail runners with good grip. Sun protection for your face and arms. Everything else is in your kit.</p>
+        </div>
+        <div>
+          <p class="hiw-faq-q">How many people can book together?</p>
+          <p class="hiw-faq-a">Up to twelve. Solo travelers, couples, families, friend groups. The trail is selected for whoever is coming.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 7 — CTA -->
+  <section class="hiw-cta">
+    <div class="container">
+      <h2>The trail is already up there.</h2>
+      <p class="hiw-cta-sub">The only thing left is the morning.</p>
+      <a href="#" class="btn start-adventure-btn">Start My Adventure</a>
+      <p class="hiw-cta-secondary">Questions? <a href="mailto:hello@palmspringsadventureclub.com">hello@palmspringsadventureclub.com</a></p>
+    </div>
+  </section>
+
+  <!-- FOOTER — matches live site exactly -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-column">
+          <h3>Palm Springs Adventure Club</h3>
+          <p style="font-size:0.82rem; line-height:1.8; color:rgba(255,255,255,0.6);">
+            Operated by Pink Mountain Ventures LLC, DBA Palm Springs Adventure Club<br>
+            301 N Palm Canyon Drive, Suite 103179<br>
+            Palm Springs, CA 92262
+          </p>
+          <p style="margin-top:1rem; font-size:0.82rem;">
+            <a href="mailto:hello@palmspringsadventureclub.com" style="color:rgba(255,255,255,0.6); text-decoration:none;">hello@palmspringsadventureclub.com</a>
+          </p>
+        </div>
+        <div class="footer-column">
+          <h3>Explore</h3>
+          <ul>
+            <li><a href="/#adventures">On the Trail</a></li>
+            <li><a href="/after-the-trail-experience">After the Trail</a></li>
+            <li><a href="/membership">The Club</a></li>
+            <li><a href="/how-it-works">How It Works</a></li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h3>Policies</h3>
+          <ul>
+            <li><a href="/refund-policy">Cancellation &amp; Refund Policy</a></li>
+            <li><a href="/terms">Terms of Service</a></li>
+            <li><a href="/privacy">Privacy Policy</a></li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h3>Connect</h3>
+          <div class="social-links">
+            <a href="#" aria-label="Instagram">IG</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Peaks to Pools. Earn your peace.</p>
+        <p style="margin-top:0.5rem;">&copy; 2026 Palm Springs Adventure Club &middot; Pink Mountain Ventures LLC &middot; All Rights Reserved</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const hamburger = document.getElementById('hamburger');
+    const navLinks = document.getElementById('navLinks');
+    if (hamburger && navLinks) {
+      hamburger.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+      });
+    }
+  </script>
+
+  <!-- ── PLAN YOUR DAY MODAL ── -->
+  <style>
+    #adventure-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; }
+    #adventure-modal-inner { position:relative; width:92%; max-width:640px; max-height:90vh; background:white; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.4); display:flex; flex-direction:column; }
+    #adventure-modal-header { background:#2A4747; padding:0.9rem 1.4rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    #adventure-modal-header img { height:36px; width:auto; }
+    #adventure-modal-close { background:none; border:none; font-size:1.6rem; cursor:pointer; color:rgba(255,255,255,0.7); line-height:1; padding:0; transition:color 0.2s; }
+    #adventure-modal-close:hover { color:white; }
+    #adventure-form-root { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:1.8rem 1.8rem 1.4rem; background:white; }
+    @media (max-width: 768px) {
+      #adventure-modal { align-items:stretch; justify-content:stretch; }
+      #adventure-modal-inner { width:100%; max-width:100%; height:100%; max-height:100%; border-radius:0; box-shadow:none; }
+      #adventure-modal-close { font-size:2rem; }
+    }
+  </style>
+
+  <div id="adventure-modal">
+    <div id="adventure-modal-inner">
+      <div id="adventure-modal-header">
+        <img src="/images/logo.svg" alt="Palm Springs Adventure Club">
+        <button id="adventure-modal-close" onclick="document.getElementById('adventure-modal').style.display='none'">&times;</button>
+      </div>
+      <div id="adventure-form-root"></div>
+    </div>
+  </div>
+
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="/adventure-form.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      var modal = document.getElementById('adventure-modal');
+      var mounted = false;
+      document.querySelectorAll('.start-adventure-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          if (!mounted) {
+            PSACAdventureForm.mount(document.getElementById('adventure-form-root'));
+            mounted = true;
+          }
+          modal.style.display = 'flex';
+        });
+      });
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.style.display = 'none';
+      });
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') modal.style.display = 'none';
+      });
+    });
+  </script>
+
+</body>
+</html>
