@@ -1062,3 +1062,392 @@ select.paf-roster-input {
 .legal-body strong { color: var(--dark-pine); }
 .legal-contact { margin-top: 2.5rem; padding: 1.3rem 1.5rem; background: var(--sand-beige); border-radius: 8px; font-size: 0.88rem; }
 .legal-contact a { font-weight: 600; }
+
+
+/* ============================================
+   /how-it-works — Page-specific styles
+   ============================================ */
+
+/* Hero */
+.hiw-hero {
+  min-height: 88vh;
+  display: flex;
+  align-items: center;
+  padding: 10rem 0 7rem;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 100%),
+    url('/images/hero-trail-sunset.jpg') no-repeat center 60% / cover;
+  position: relative;
+  overflow: hidden;
+}
+
+.hiw-eyebrow {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mountain-pink);
+  margin-bottom: 1.2rem;
+}
+
+.hiw-hero h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.8rem, 6.5vw, 5rem);
+  font-weight: 400;
+  line-height: 1.06;
+  color: var(--sand-beige);
+  margin-bottom: 1.5rem;
+  max-width: 700px;
+}
+
+.hiw-hero-sub {
+  font-size: 1.05rem;
+  font-weight: 300;
+  color: rgba(248,241,233,0.62);
+  max-width: 480px;
+  line-height: 1.75;
+}
+
+/* Shared section */
+.hiw-section { padding: 5rem 0; }
+
+.hiw-section-eyebrow {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  color: var(--mountain-pink);
+}
+
+.hiw-section-headline {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.9rem, 3.8vw, 2.8rem);
+  font-weight: 400;
+  line-height: 1.12;
+  margin-bottom: 2.5rem;
+  color: var(--dark-pine);
+}
+
+.hiw-section-headline.light { color: var(--sand-beige); }
+
+/* Section 1 — Problem */
+.hiw-problem { background: var(--sand-beige); }
+
+.hiw-problem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: center;
+}
+
+.hiw-problem-text p {
+  font-size: 1rem;
+  line-height: 1.9;
+  color: var(--dark-pine);
+  margin-bottom: 1.4rem;
+}
+
+.hiw-problem-text p:last-child { margin-bottom: 0; }
+
+.hiw-problem-image {
+  aspect-ratio: 3/4;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--dark-pine);
+}
+
+.hiw-problem-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 70%;
+}
+
+/* Section 2 — Steps */
+.hiw-steps { background: var(--dark-pine); }
+
+.hiw-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid rgba(248,241,233,0.08);
+  margin-top: 1rem;
+}
+
+.hiw-step {
+  padding: 2.5rem 2rem 2.5rem 0;
+  border-bottom: 1px solid rgba(248,241,233,0.08);
+  border-right: 1px solid rgba(248,241,233,0.08);
+}
+
+.hiw-step:nth-child(3n) { border-right: none; }
+.hiw-step:nth-child(4),
+.hiw-step:nth-child(5),
+.hiw-step:nth-child(6) { border-bottom: none; }
+
+.hiw-step-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.6rem;
+  font-weight: 300;
+  color: var(--mountain-pink);
+  opacity: 0.45;
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.hiw-step-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sand-beige);
+  margin-bottom: 0.8rem;
+}
+
+.hiw-step-body {
+  font-size: 0.88rem;
+  font-weight: 300;
+  color: rgba(248,241,233,0.55);
+  line-height: 1.85;
+}
+
+/* Section 3 — Gear Kit */
+.hiw-gear { background: var(--sand-beige); }
+
+.hiw-gear-header {
+  text-align: center;
+  margin-bottom: 0.6rem;
+}
+
+.hiw-gear-header .hiw-section-eyebrow { margin-bottom: 1rem; }
+.hiw-gear-header .hiw-section-headline { margin-bottom: 0; }
+
+.hiw-gear-subtext {
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 300;
+  color: rgba(42,71,71,0.55);
+  margin-bottom: 3rem;
+}
+
+.hiw-gear-subtext strong {
+  font-weight: 600;
+  color: var(--dark-pine);
+}
+
+.hiw-gear-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: start;
+}
+
+.hiw-gear-image {
+  aspect-ratio: 3/4;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hiw-gear-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.hiw-gear-right {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.hiw-gear-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.hiw-gear-col h3 {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(42,71,71,0.45);
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(42,71,71,0.1);
+}
+
+.hiw-gear-col p {
+  font-size: 0.92rem;
+  line-height: 1.9;
+  color: var(--dark-pine);
+  margin-bottom: 1rem;
+}
+
+.hiw-gear-col p:last-child { margin-bottom: 0; }
+
+/* Section 4 — Route */
+.hiw-route { background: white; }
+
+.hiw-route-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: center;
+}
+
+.hiw-route-text p {
+  font-size: 0.95rem;
+  line-height: 1.9;
+  color: var(--dark-pine);
+  margin-bottom: 1.2rem;
+}
+
+.hiw-route-text p:last-child { margin-bottom: 0; }
+
+.hiw-pull {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--dark-pine);
+  border-left: 2px solid var(--mountain-pink);
+  padding-left: 1.5rem;
+  margin: 2rem 0;
+}
+
+.hiw-route-image {
+  aspect-ratio: 4/5;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--dark-pine);
+}
+
+.hiw-route-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Section 5 — Who It's For */
+.hiw-who {
+  background: var(--dark-pine);
+  text-align: center;
+}
+
+.hiw-who .container { max-width: 680px; }
+
+.hiw-who p {
+  font-size: 1rem;
+  font-weight: 300;
+  color: rgba(248,241,233,0.65);
+  line-height: 1.85;
+  margin-bottom: 1.2rem;
+}
+
+.hiw-who-image {
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 4/3;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 2.5rem auto;
+}
+
+.hiw-who-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.hiw-who-close {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.4rem;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--mountain-pink);
+  margin-top: 2rem;
+  display: block;
+}
+
+/* Section 6 — FAQ */
+.hiw-faq { background: var(--sand-beige); }
+
+.hiw-faq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem 5rem;
+  margin-top: 0.5rem;
+}
+
+.hiw-faq-q {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--dark-pine);
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.hiw-faq-a {
+  font-size: 0.88rem;
+  font-weight: 300;
+  color: rgba(42,71,71,0.65);
+  line-height: 1.85;
+}
+
+/* Section 7 — CTA */
+.hiw-cta {
+  background: white;
+  text-align: center;
+  padding: 8rem 0;
+}
+
+.hiw-cta h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 400;
+  line-height: 1.08;
+  color: var(--dark-pine);
+  margin-bottom: 0.8rem;
+}
+
+.hiw-cta-sub {
+  font-size: 1rem;
+  font-weight: 300;
+  color: rgba(42,71,71,0.5);
+  margin-bottom: 3rem;
+}
+
+.hiw-cta-secondary {
+  display: block;
+  margin-top: 1.5rem;
+  font-size: 0.75rem;
+  color: rgba(42,71,71,0.45);
+}
+
+.hiw-cta-secondary a { color: var(--mountain-pink); text-decoration: none; }
+.hiw-cta-secondary a:hover { text-decoration: underline; }
+
+/* /how-it-works mobile */
+@media (max-width: 768px) {
+  .hiw-problem-grid,
+  .hiw-route-grid { grid-template-columns: 1fr; gap: 3rem; }
+
+  .hiw-problem-image,
+  .hiw-route-image { aspect-ratio: 4/3; }
+
+  .hiw-steps-grid { grid-template-columns: 1fr; }
+
+  .hiw-step { border-right: none; padding-right: 0; }
+  .hiw-step:nth-child(4),
+  .hiw-step:nth-child(5) { border-bottom: 1px solid rgba(248,241,233,0.08); }
+  .hiw-step:nth-child(6) { border-bottom: none; }
+
+  .hiw-gear-layout { grid-template-columns: 1fr; gap: 3rem; }
+  .hiw-gear-image { aspect-ratio: 4/3; }
+
+  .hiw-faq-grid { grid-template-columns: 1fr; gap: 2rem; }
+}
