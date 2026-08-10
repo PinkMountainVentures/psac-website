@@ -1346,10 +1346,18 @@ select.paf-roster-input {
 /* Section 5 — Who It's For */
 .hiw-who {
   background: var(--dark-pine);
-  text-align: center;
 }
 
-.hiw-who .container { max-width: 680px; }
+.hiw-who-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: center;
+}
+
+.hiw-who-text { text-align: left; }
+
+.hiw-who-text .hiw-section-eyebrow { text-align: left; }
 
 .hiw-who p {
   font-size: 1rem;
@@ -1361,11 +1369,9 @@ select.paf-roster-input {
 
 .hiw-who-image {
   width: 100%;
-  max-width: 420px;
-  aspect-ratio: 3/4;
+  aspect-ratio: 4/5;
   border-radius: 3px;
   overflow: hidden;
-  margin: 2.5rem auto;
 }
 
 .hiw-who-image img {
@@ -1460,6 +1466,10 @@ select.paf-roster-input {
 
   .hiw-gear-layout { grid-template-columns: 1fr; gap: 3rem; }
   .hiw-gear-image { aspect-ratio: 4/3; }
+
+  .hiw-who-grid { grid-template-columns: 1fr; gap: 3rem; }
+  .hiw-who-text { text-align: center; }
+  .hiw-who-text .hiw-section-eyebrow { text-align: center; }
 
   .hiw-faq-grid { grid-template-columns: 1fr; gap: 2rem; }
 }
