@@ -196,26 +196,37 @@
       background: var(--sand-beige);
     }
 
+    .hiw-gear-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: start;
+      margin-top: 0.5rem;
+    }
+
     .hiw-gear-image {
-      width: 100%;
-      aspect-ratio: 4/3;
+      aspect-ratio: 3/4;
       border-radius: 3px;
       overflow: hidden;
-      margin: 0 0 3.5rem;
     }
 
     .hiw-gear-image img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      object-position: center top;
+      object-position: center center;
+    }
+
+    .hiw-gear-right {
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
     }
 
     .hiw-gear-cols {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 4rem;
-      margin-top: 0.5rem;
+      gap: 2.5rem;
     }
 
     .hiw-gear-col h3 {
@@ -432,7 +443,9 @@
       .hiw-step:nth-child(5) { border-bottom: 1px solid rgba(248,241,233,0.08); }
       .hiw-step:nth-child(6) { border-bottom: none; }
 
-      .hiw-gear-cols { grid-template-columns: 1fr; gap: 2.5rem; }
+      .hiw-gear-layout { grid-template-columns: 1fr; gap: 3rem; }
+      .hiw-gear-image { aspect-ratio: 4/3; }
+      .hiw-gear-cols { grid-template-columns: 1fr; gap: 2rem; }
       .hiw-gear-value { flex-direction: column; align-items: flex-start; }
 
       .hiw-faq-grid { grid-template-columns: 1fr; gap: 2rem; }
@@ -534,24 +547,28 @@
     <div class="container">
       <p class="hiw-section-eyebrow">Your gear kit</p>
       <h2 class="hiw-section-headline">Everything you need.<br>Nothing you have to find.</h2>
-      <div class="hiw-gear-image">
-        <img src="/images/gear-kit-flatlay.jpg" alt="Palm Springs Adventure Club gear kit: Gregory daypack, Leki trekking poles, two Hydro Flask bottles, and first aid kit laid out on desert rock">
-      </div>
-      <div class="hiw-gear-cols">
-        <div class="hiw-gear-col">
-          <h3>Rental gear</h3>
-          <p>Every kit includes a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles laser-engraved with the Palm Springs Adventure Club mark, and a first aid kit.</p>
-          <p>Packed the day before. Delivered to your hotel or property the evening before your trail day. Picked up after.</p>
+      <div class="hiw-gear-layout">
+        <div class="hiw-gear-image">
+          <img src="/images/gear-kit-flatlay.jpg" alt="Palm Springs Adventure Club gear kit: Gregory daypack, Leki trekking poles, two Hydro Flask bottles, and first aid kit laid out on desert rock">
         </div>
-        <div class="hiw-gear-col">
-          <h3>Yours to keep</h3>
-          <p>LMNT electrolytes, Rancho Meladuco Medjool dates, Blue Lizard mineral sunscreen, and a Palm Springs Adventure Club bandana.</p>
-          <p>Trail fuel, sun protection, and something to remember the morning by.</p>
+        <div class="hiw-gear-right">
+          <div class="hiw-gear-cols">
+            <div class="hiw-gear-col">
+              <h3>Rental gear</h3>
+              <p>Every kit includes a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles laser-engraved with the Palm Springs Adventure Club mark, and a first aid kit.</p>
+              <p>Packed the day before. Delivered to your hotel or property the evening before your trail day. Picked up after.</p>
+            </div>
+            <div class="hiw-gear-col">
+              <h3>Yours to keep</h3>
+              <p>LMNT electrolytes, Rancho Meladuco Medjool dates, Blue Lizard mineral sunscreen, and a Palm Springs Adventure Club bandana.</p>
+              <p>Trail fuel, sun protection, and something to remember the morning by.</p>
+            </div>
+          </div>
+          <div class="hiw-gear-value">
+            <p>The gear in your kit has a retail value of over $550.</p>
+            <strong>Your gear fee starts at $65.</strong>
+          </div>
         </div>
-      </div>
-      <div class="hiw-gear-value">
-        <p>The gear in your kit has a retail value of over $550.</p>
-        <strong>Your gear fee starts at $65.</strong>
       </div>
     </div>
   </section>
