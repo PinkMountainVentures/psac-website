@@ -20,20 +20,16 @@
 
     /* Hero */
     .hiw-hero {
-      padding: 7rem 0 5rem;
-      background: var(--dark-pine);
+      padding: 9rem 0 7rem;
+      background:
+        linear-gradient(rgba(0,0,0,0.52), rgba(0,0,0,0.52)),
+        url('/images/hero-trail-sunset.jpg') no-repeat center center / cover;
       position: relative;
       overflow: hidden;
     }
 
     .hiw-hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse at 75% 25%, rgba(245,130,113,0.10) 0%, transparent 55%),
-        radial-gradient(ellipse at 20% 80%, rgba(122,189,145,0.06) 0%, transparent 50%);
-      pointer-events: none;
+      content: none;
     }
 
     .hiw-hero .container {
@@ -201,6 +197,26 @@
       background: var(--sand-beige);
     }
 
+    .hiw-gear-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: start;
+    }
+
+    .hiw-gear-image {
+      aspect-ratio: 3/4;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .hiw-gear-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+    }
+
     .hiw-gear-cols {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -317,6 +333,22 @@
       margin-bottom: 1.2rem;
     }
 
+    .hiw-who-image {
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 4/3;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 2.5rem auto;
+    }
+
+    .hiw-who-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 30%;
+    }
+
     .hiw-who-close {
       font-family: 'Cormorant Garamond', serif;
       font-size: 1.4rem;
@@ -406,6 +438,8 @@
       .hiw-step:nth-child(5) { border-bottom: 1px solid rgba(248,241,233,0.08); }
       .hiw-step:nth-child(6) { border-bottom: none; }
 
+      .hiw-gear-layout { grid-template-columns: 1fr; gap: 3rem; }
+      .hiw-gear-image { aspect-ratio: 4/3; }
       .hiw-gear-cols { grid-template-columns: 1fr; gap: 2.5rem; }
       .hiw-gear-value { flex-direction: column; align-items: flex-start; }
 
@@ -457,11 +491,7 @@
           <p>Not because it's hard to find. Because nobody handed them a way in.</p>
         </div>
         <div class="hiw-problem-image">
-          <!-- Replace with real image: ridgeline from valley floor, morning light -->
-          <!-- <img src="/images/valley-ridgeline.jpg" alt="The San Jacinto ridgeline above the Coachella Valley at sunrise"> -->
-          <div class="img-placeholder">
-            <p class="img-placeholder-label">Photo<br>Ridgeline from valley<br>Morning light</p>
-          </div>
+          <img src="/images/valley-from-trail.jpg" alt="The Coachella Valley spread below, viewed from the desert mountain trail above Palm Springs">
         </div>
       </div>
     </div>
@@ -512,21 +542,28 @@
     <div class="container">
       <p class="hiw-section-eyebrow">Your gear kit</p>
       <h2 class="hiw-section-headline">Everything you need.<br>Nothing you have to find.</h2>
-      <div class="hiw-gear-cols">
-        <div class="hiw-gear-col">
-          <h3>Rental gear</h3>
-          <p>Every kit includes a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles laser-engraved with the Palm Springs Adventure Club mark, and a first aid kit.</p>
-          <p>Packed the day before. Delivered to your hotel or property the evening before your trail day. Picked up after.</p>
+      <div class="hiw-gear-layout">
+        <div class="hiw-gear-image">
+          <img src="/images/gear-kit-flatlay.jpg" alt="Palm Springs Adventure Club gear kit: Gregory daypack, Leki trekking poles, two Hydro Flask bottles, and first aid kit laid out on desert rock">
         </div>
-        <div class="hiw-gear-col">
-          <h3>Yours to keep</h3>
-          <p>LMNT electrolytes, Rancho Meladuco Medjool dates, Blue Lizard mineral sunscreen, and a Palm Springs Adventure Club bandana.</p>
-          <p>Trail fuel, sun protection, and something to remember the morning by.</p>
+        <div>
+          <div class="hiw-gear-cols">
+            <div class="hiw-gear-col">
+              <h3>Rental gear</h3>
+              <p>Every kit includes a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles laser-engraved with the Palm Springs Adventure Club mark, and a first aid kit.</p>
+              <p>Packed the day before. Delivered to your hotel or property the evening before your trail day. Picked up after.</p>
+            </div>
+            <div class="hiw-gear-col">
+              <h3>Yours to keep</h3>
+              <p>LMNT electrolytes, Rancho Meladuco Medjool dates, Blue Lizard mineral sunscreen, and a Palm Springs Adventure Club bandana.</p>
+              <p>Trail fuel, sun protection, and something to remember the morning by.</p>
+            </div>
+          </div>
+          <div class="hiw-gear-value">
+            <p>The gear in your kit has a retail value of over $550.</p>
+            <strong>Your gear fee starts at $65.</strong>
+          </div>
         </div>
-      </div>
-      <div class="hiw-gear-value">
-        <p>The gear in your kit has a retail value of over $550.</p>
-        <strong>Your gear fee is $65.</strong>
       </div>
     </div>
   </section>
@@ -544,11 +581,7 @@
           <p>You'll know exactly where you're going before you take a single step.</p>
         </div>
         <div class="hiw-route-image">
-          <!-- Replace with real image: phone showing RideWithGPS on trail -->
-          <!-- <img src="/images/route-on-phone.jpg" alt="RideWithGPS trail navigation on a phone screen, mid-trail"> -->
-          <div class="img-placeholder">
-            <p class="img-placeholder-label">Photo<br>Phone on trail<br>RideWithGPS navigation</p>
-          </div>
+          <img src="/images/gear-at-trail-sign.jpg" alt="Gregory pack, Leki poles, and Hydro Flask bottle resting at a Palm Springs trail sign, Coachella Valley below">
         </div>
       </div>
     </div>
@@ -561,6 +594,9 @@
       <h2 class="hiw-section-headline light">You don't need<br>to be a hiker.</h2>
       <p>You need to want a morning that feels different from the rest of the trip.</p>
       <p>Palm Springs Adventure Club was built for people who are curious about the mountain but don't have the gear, the knowledge, or the time to piece together a plan. People who want the experience without the research. Solo travelers, couples, families, and groups of up to twelve who don't want a guided tour with strangers on a route they didn't choose.</p>
+      <div class="hiw-who-image">
+        <img src="/images/hiker-ascending.jpg" alt="Hiker with Gregory pack and trekking pole ascending a desert trail above Palm Springs">
+      </div>
       <span class="hiw-who-close">If you've looked up at the ridgeline and thought about it, this is for you.</span>
     </div>
   </section>
