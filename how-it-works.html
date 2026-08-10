@@ -20,21 +20,19 @@
 
     /* Hero */
     .hiw-hero {
-      padding: 9rem 0 7rem;
+      min-height: 88vh;
+      display: flex;
+      align-items: center;
+      padding: 10rem 0 7rem;
       background:
-        linear-gradient(rgba(0,0,0,0.52), rgba(0,0,0,0.52)),
-        url('/images/hero-trail-sunset.jpg') no-repeat center center / cover;
+        linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 100%),
+        url('/images/hero-trail-sunset.jpg') no-repeat center 60% / cover;
       position: relative;
       overflow: hidden;
     }
 
     .hiw-hero::before {
       content: none;
-    }
-
-    .hiw-hero .container {
-      position: relative;
-      z-index: 1;
     }
 
     .hiw-eyebrow {
@@ -66,7 +64,7 @@
 
     /* Section shared */
     .hiw-section {
-      padding: 6rem 0;
+      padding: 5rem 0;
     }
 
     .hiw-section-eyebrow {
@@ -123,6 +121,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      object-position: center 70%;
     }
 
     .img-placeholder {
