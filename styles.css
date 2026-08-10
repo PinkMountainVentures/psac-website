@@ -1088,6 +1088,10 @@ select.paf-roster-input {
   padding: 2rem;
 }
 
+.hiw-hero-content .btn {
+  margin-top: 2rem;
+}
+
 .hiw-eyebrow {
   font-size: 0.68rem;
   font-weight: 600;
