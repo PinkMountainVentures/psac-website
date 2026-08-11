@@ -113,7 +113,28 @@
             color: rgba(248,241,233,0.9);
             line-height: 1.85;
             max-width: 560px;
-            margin: 0 auto;
+            margin: 0 auto 2.4rem;
+        }
+
+        .att-hero-cta {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .att-hero-secondary {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            color: rgba(248,241,233,0.55);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .att-hero-secondary:hover {
+            color: rgba(248,241,233,0.88);
         }
 
         /* ── TRANSITION SECTION ── */
@@ -490,6 +511,10 @@
         <p class="att-hero-eyebrow">Peaks to Pools</p>
         <h1>The pool hits differently after miles.</h1>
         <p class="att-hero-body">You'll return to exactly where you started. It will feel like somewhere new. So will you.</p>
+        <div class="att-hero-cta">
+            <a href="#" class="btn start-adventure-btn">Start My Adventure</a>
+            <a href="#how-it-feels" class="att-hero-secondary">See what a Peaks to Pools day looks like</a>
+        </div>
     </div>
 </section>
 
@@ -543,9 +568,9 @@
 </section>
 
 <!-- ── HOW IT WORKS ── -->
-<section class="att-how">
+<section class="att-how" id="how-it-feels">
     <div class="att-how-inner">
-        <p class="att-how-eyebrow">How it works</p>
+        <p class="att-how-eyebrow">How it feels</p>
         <h2>One day. Two Palm Springs.</h2>
         <div class="att-how-steps">
             <div class="att-how-step">
