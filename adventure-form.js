@@ -776,7 +776,7 @@
     return Math.max(n, 0);
   }
 
-  var BASE_GEAR_COPY = 'a daypack, trekking poles, 2 Hydro Flask water bottles, electrolytes, trail snacks, sunscreen, and a first aid kit';
+  var BASE_GEAR_COPY = 'Gregory daypack, Leki trekking poles, two laser-engraved Hydro Flask bottles, LMNT electrolytes, Rancho Meladuco dates, Blue Lizard mineral sunscreen, and a first aid kit';
 
   function keepsakeCopy(tierKey) {
     return tierKey === 'trail'
@@ -882,17 +882,16 @@
     var gearCount = selectedGearCount();
     var gearWord = gearCount === 1 ? 'gear kit' : 'gear kits';
     var items = [
-      'Personalized ' + tier.name + ', built from lived experience on these trails',
-      'Every logistic handled: no permits, no planning, no guesswork',
-      'Digital route guide with detailed information about your route',
-      'Printed route cards with waypoints and landmarks',
-      gearCount + ' ' + gearWord + ', including essential gear, snacks, sunscreen, and more for a successful experience',
-      'All rental gear delivered and picked up'
+      'Nothing for you to plan, source, or figure out',
+      'Trail selected for your group, built from lived experience on these trails',
+      'Every logistic handled: no permits, no research, no guesswork',
+      'Your route loads to your phone before you leave. Works without cell service.',
+      'Printed route card with waypoints and landmarks',
+      'All gear delivered the evening before and picked up after'
     ];
     if (state.answers.include_after_trail !== false) {
       items.push('An "after the trail" experience that rewards your effort and helps you recover in Palm Springs style');
     }
-    items.push('Nothing more for you to plan');
     return items;
   }
 
@@ -993,11 +992,11 @@
       });
 
       var html = '<div class="paf-q"><span class="paf-req">*</span> Who needs a gear kit?</div>';
-      html += '<div class="paf-sub">Every booking includes at least one. We default everyone 14 and up to their own kit: ' +
-        BASE_GEAR_COPY + ', plus keepsakes to keep.</div>';
+      html += '<div class="paf-sub">Every booking includes at least one. Everyone 14 and up gets their own: ' +
+        BASE_GEAR_COPY + '. Everything you need for the trail. Nothing for you to source.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
-        '<div class="paf-kit-details-row"><strong>Rental gear:</strong> ' + BASE_GEAR_COPY + '.</div>' +
+        '<div class="paf-kit-details-row"><strong>Rental gear:</strong> ' + BASE_GEAR_COPY + '. Packed and delivered the evening before your trail day.</div>' +
         '<div class="paf-kit-details-row"><strong>Yours to keep:</strong> a few Palm Springs Adventure Club keepsakes. The exact list depends on your experience, and you\'ll see it spelled out before you reserve.</div>' +
         '</div>';
       html += '<div class="paf-gear-list" data-field="gear-list"></div>';
@@ -1174,9 +1173,23 @@
     // Prep. Shown for every tier, not just standard ones.
     var waiverNote = 'Completing a Release of Liability is required before your gear is delivered or your adventure begins. We\'ll send this to you as part of getting your trip ready to go.';
     var html = '<div class="paf-q">Here\'s your day.</div>';
+    // Early Guest discount: Trail Guide booking fee displays as $125 with
+    // a -$25 discount applied automatically, netting to $100 charged.
+    // Active through October 2026. No code required, no guest action needed.
+    // In November 2026: remove the discount display lines below and update
+    // TIERS.trail.booking to 125 (and update api/create-payment-intent.js
+    // to match). Do not surface this discount in marketing copy or Instagram.
+    var EARLY_GUEST_DISCOUNT = (!isCustom && state.answers.tier === 'trail') ? 25 : 0;
+    var displayBookingFee = tier.booking + EARLY_GUEST_DISCOUNT;
+
     html += '<div class="paf-price-card">';
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
-    html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span>$' + tier.booking + '</span></div>';
+    if (EARLY_GUEST_DISCOUNT > 0) {
+      html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span><s style="opacity:0.45;">$' + displayBookingFee + '</s> $' + tier.booking + '</span></div>';
+      html += '<div class="paf-price-line" style="color:var(--clr-pine, #2A4747);"><span>Early Guest discount</span><span>-$' + EARLY_GUEST_DISCOUNT + '</span></div>';
+    } else {
+      html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span>$' + tier.booking + '</span></div>';
+    }
     html += '<div class="paf-price-line"><span>Gear kit × ' + gearCount + '</span><span>$' + (tier.gear * gearCount) + '</span></div>';
     html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + total + '</span></div>';
     html += '</div>';
