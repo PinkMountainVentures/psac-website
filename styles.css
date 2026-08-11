@@ -448,7 +448,7 @@ section { padding: 6rem 0; }
     color: white;
 }
 
-.after-subhead {
+.after-trail .after-subhead {
     font-family: 'Montserrat', sans-serif;
     font-size: 1rem;
     font-style: normal;
