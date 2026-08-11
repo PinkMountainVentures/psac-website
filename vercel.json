@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/after-the-trail-experience",
+      "destination": "/peaks-to-pools",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
