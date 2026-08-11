@@ -446,24 +446,6 @@ section { padding: 6rem 0; }
 
 .after-trail .section-title h2 {
     color: white;
-    font-style: italic;
-    font-weight: 400;
-}
-
-.after-trail-statement {
-    text-align: center;
-    margin-bottom: 3.5rem;
-}
-
-.after-trail-statement p {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.35rem;
-    font-weight: 400;
-    font-style: normal;
-    line-height: 1.9;
-    color: rgba(255,255,255,0.82);
-    max-width: 640px;
-    margin: 0 auto;
 }
 
 .after-cards {
@@ -530,7 +512,24 @@ section { padding: 6rem 0; }
     line-height: 1.85;
     color: rgba(255,255,255,0.72);
     max-width: 520px;
-    margin: 0 auto 1.6rem;
+    margin: 0 auto 1rem;
+}
+
+.after-cta-link {
+    display: inline-block;
+    color: var(--desert-green);
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    border-bottom: 1px solid rgba(122, 189, 145, 0.45);
+    padding-bottom: 1px;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.after-cta-link:hover {
+    color: #a8d8b5;
+    border-color: rgba(122, 189, 145, 0.85);
 }
 
 /* ── THE CLUB ── */
