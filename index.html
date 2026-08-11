@@ -95,6 +95,53 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+
+    <style>
+        /* Two-card segment grid: side-by-side on desktop, stacked on mobile */
+        .segment-grid--two {
+            grid-template-columns: repeat(2, 1fr);
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        /* Re-map accent colors: card 1 = Curious (sunset-red), card 2 = Athletes (mountain-pink) */
+        .segment-grid--two .segment-card:nth-child(1) .segment-card-header { border-color: var(--sunset-red); }
+        .segment-grid--two .segment-card:nth-child(2) .segment-card-header { border-color: var(--mountain-pink); }
+        .segment-grid--two .segment-card:nth-child(1) .segment-label { color: var(--sunset-red); }
+        .segment-grid--two .segment-card:nth-child(2) .segment-label { color: var(--mountain-pink); }
+        .segment-grid--two .segment-card:nth-child(1) .segment-trail-label { color: var(--sunset-red); }
+        .segment-grid--two .segment-card:nth-child(2) .segment-trail-label { color: var(--mountain-pink); }
+
+        @media (max-width: 768px) {
+            .segment-grid--two {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Membership section body copy */
+        .club-body {
+            max-width: 660px;
+            margin: 0 auto 2.4rem;
+            text-align: center;
+        }
+
+        .club-body p {
+            font-size: 1rem;
+            line-height: 1.9;
+            color: rgba(42,71,71,0.78);
+            margin-bottom: 1.1rem;
+        }
+
+        .club-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Italic in section h2 */
+        .section-title h2 em {
+            font-style: italic;
+            font-weight: inherit;
+        }
+    </style>
 </head>
 <body>
 
@@ -119,7 +166,6 @@
 <!-- ── HERO ── -->
 <section class="hero">
     <div class="hero-content">
-        <p class="hero-eyebrow">Peaks to Pools</p>
         <h1>The pool is perfect.<br>And it's not enough.</h1>
         <p>Just past the pool deck, past the restaurants and the long golden afternoons, adventure is waiting.</p>
 
@@ -143,7 +189,7 @@
             <span class="section-eyebrow">Find Yourself Here</span>
             <h2>Everyone Arrives Differently.</h2>
         </div>
-        <div class="segment-grid">
+        <div class="segment-grid segment-grid--two">
 
             <div class="segment-card">
                 <div class="segment-card-header">
@@ -160,19 +206,6 @@
 
             <div class="segment-card">
                 <div class="segment-card-header">
-                    <span class="segment-label">For Parents</span>
-                </div>
-                <div class="segment-card-body">
-                    <p>You love Palm Springs. Your kids love it too, mostly. But between the adults-only pool and the restaurant without a kids menu, you start wondering if there's a version of this trip that's actually for all of you.</p>
-                </div>
-                <div class="segment-trail-moment">
-                    <span class="segment-trail-label">On the Trail</span>
-                    <p>Your child stops every few feet to pick up a rock and hand it to you for safekeeping. Somewhere up the trail, they find their favorite boulder, climb it, and sit down to eat an apple. You linger. There's nowhere else to be.</p>
-                </div>
-            </div>
-
-            <div class="segment-card">
-                <div class="segment-card-header">
                     <span class="segment-label">For Athletes</span>
                 </div>
                 <div class="segment-card-body">
@@ -180,7 +213,7 @@
                 </div>
                 <div class="segment-trail-moment">
                     <span class="segment-trail-label">On the Trail</span>
-                    <p>Past the canyon walls, scrambling up rock ledge after rock ledge, you turn around and catch it — Mount San Jacinto perfectly framed between the walls of the wash. The awe hits before the thought does. Skin rising, breath short. That's what the miles are for.</p>
+                    <p>Past the canyon walls, scrambling up rock ledge after rock ledge, you turn around and catch it. Mount San Jacinto perfectly framed between the walls of the wash. The awe hits before the thought does. Skin rising, breath short. That's what the miles are for.</p>
                 </div>
             </div>
 
@@ -214,7 +247,7 @@
 <section class="after-trail" id="after-trail">
     <div class="container">
         <div class="section-title">
-            <span class="section-eyebrow">Peaks to Pools</span>
+            <span class="section-eyebrow">After the Trail</span>
             <h2>Palm Springs has two versions. Most people only find one.</h2>
             <p class="after-subhead">The trails come down out of the mountains and land you at the edge of something the hiking world rarely offers. Adventure and recovery in the same afternoon. Most places make you choose.</p>
         </div>
@@ -258,16 +291,21 @@
 <section class="the-club" id="the-club">
     <div class="container">
         <div class="section-title">
-            <span class="section-eyebrow">Membership</span>
-            <h2>You felt the pull and went. That's the Peaks to Pools life. The Club is yours.</h2>
+            <span class="section-eyebrow">The Club</span>
+            <h2>Membership is how Palm Springs stops being a destination<em> and starts being yours.</em></h2>
+        </div>
+
+        <div class="club-body">
+            <p>One great day on the trail has a way of changing the question. You stop wondering if Palm Springs is worth the trip and start wondering how soon you can be back. The Club is built for that version of you.</p>
+            <p>Twice-monthly trail events. Members-only dinners. Marquee experiences that require permits, logistics, and an early alarm. A community of people who take this place seriously. And a hat that only ever goes to members.</p>
         </div>
 
         <div class="club-tagline">
-            The desert is where you find yourself.<br>The club is where you find each other.
+            The desert is where you find yourself.<br>The Club is where you find each other.
         </div>
 
         <div style="text-align: center; margin-bottom: 2rem;">
-            <a href="/membership" class="btn btn-pine">Explore the Club</a>
+            <a href="/membership" class="btn btn-pine">Explore Membership</a>
         </div>
     </div>
 </section>
