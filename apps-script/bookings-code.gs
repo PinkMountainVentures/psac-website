@@ -14,7 +14,14 @@
    - doPost(e): receives booking data from the site's /api/save-booking
      endpoint, finds-or-creates the Person by email, appends an
      Experience Booking row, and generates the Gear Check Log item rows
-     (per-kit items + shared delivery duffels).
+     (per-kit items + shared delivery duffels). Also dispatches the five
+     Trail Selection Logic actions (getAdventurePrepContext,
+     getTrailDatabase, getParkAccess, writeCandidateTrails,
+     openTrailSwapRequest) — those five functions themselves live in the
+     separate apps-script/trail-selection-actions.gs file, pasted into
+     this same Apps Script project as an additional .gs file (Apps Script
+     projects share one global scope across files, no merge needed).
+     Updated Aug 2026 when Trail Selection Logic (bucket 2.2) shipped.
    ============================================ */
 
 var SHEETS = {
@@ -74,6 +81,16 @@ function doPost(e) {
       out = handleGetBooking(body);
     } else if (body.action === 'updateDepositStatus') {
       out = handleUpdateDepositStatus(body);
+    } else if (body.action === 'getAdventurePrepContext') {
+      out = trailSelection_getAdventurePrepContext(body.bookingId);
+    } else if (body.action === 'getTrailDatabase') {
+      out = trailSelection_getTrailDatabase();
+    } else if (body.action === 'getParkAccess') {
+      out = trailSelection_getParkAccess();
+    } else if (body.action === 'writeCandidateTrails') {
+      out = trailSelection_writeCandidateTrails(body);
+    } else if (body.action === 'openTrailSwapRequest') {
+      out = trailSelection_openTrailSwapRequest(body);
     } else {
       out = { ok: false, error: 'Unknown action' };
     }
