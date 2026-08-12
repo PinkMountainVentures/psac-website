@@ -15,12 +15,21 @@
    (Vercel + .env.local), never exposed to the client.
    No external packages — fetch only, matching the convention
    documented in api/create-payment-intent.js.
+
+   FIXED (build review, Aug 2026): was `export default async function
+   handler(...)`, ES Module syntax, the only file in this repo written that
+   way — every other api/*.js file uses `module.exports = async function
+   handler(...)` (CommonJS). Vercel's build was silently compiling this one
+   file from ESM to CommonJS on every deploy (logged as a warning: "Node.js
+   functions are compiled from ESM to CommonJS"), harmless but a real
+   inconsistency, not something to leave papered over now that it's been
+   spotted. Converted to match the rest of the codebase; no logic changed.
    ============================================ */
 
 const KIT_FORM_ID = '9777195';
 const TAG_IDS = [22310823, 22310825, 22310831];
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -102,4 +111,4 @@ export default async function handler(req, res) {
     console.error('Kit subscription error:', err);
     return res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
-}
+};
