@@ -1351,6 +1351,13 @@ select.paf-roster-input {
 
 .hiw-route-text p:last-child { margin-bottom: 0; }
 
+.hiw-route-text p.hiw-section-eyebrow {
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--mountain-pink);
+  margin-bottom: 1rem;
+}
+
 .hiw-pull {
   font-family: 'Cormorant Garamond', serif;
   font-size: 1.85rem;
@@ -2147,53 +2154,4 @@ select.paf-roster-input {
   .btn-mem-primary,
   .btn-mem-secondary,
   .btn-mem-dark { width: 100%; max-width: 320px; text-align: center; }
-}
-
-/* ── MOBILE READABILITY: bump paragraph/subtext sizes across all pages ── */
-/* Eyebrows and section headlines are fine. This targets body copy only.  */
-@media (max-width: 768px) {
-
-  /* ── Shared / homepage ── */
-  .section-title p               { font-size: 1.05rem; }
-  .segment-card-body p           { font-size: 1.05rem; }
-  .segment-trail-moment p        { font-size: 0.97rem; }
-  .consult-tagline               { font-size: 0.85rem; }
-  .consult-body p                { font-size: 0.95rem; }
-  .after-card-desc               { font-size: 0.93rem; }
-  .after-cta p                   { font-size: 1.05rem; }
-  .tier-tagline                  { font-size: 0.84rem; }
-  .tier-features li              { font-size: 0.93rem; }
-  .founding-banner p             { font-size: 0.95rem; }
-  .gear-desc                     { font-size: 0.95rem; }
-  .gear-addon p                  { font-size: 0.95rem; }
-  .newsletter .section-title p   { font-size: 1.05rem; }
-
-  /* ── How It Works ── */
-  .hiw-hero-sub                  { font-size: 1rem; }
-  .hiw-problem-text p            { font-size: 1.05rem; }
-  .hiw-step-body                 { font-size: 0.95rem; }
-  .hiw-gear-subtext              { font-size: 1.05rem; }
-  .hiw-gear-col p                { font-size: 0.97rem; }
-  .hiw-route-text p              { font-size: 1rem; }
-  .hiw-faq-q                     { font-size: 0.88rem; }
-  .hiw-faq-a                     { font-size: 0.97rem; }
-
-  /* ── Peaks to Pools ── */
-  .p2p-hero-sub                  { font-size: 1rem; }
-
-  /* ── Membership ── */
-  .mem-hero-body p               { font-size: 0.97rem; line-height: 1.8; }
-  .mem-why p                     { font-size: 1.05rem; }
-  .mem-vignette-card p           { font-size: 0.95rem; }
-  .mem-tiers-header p            { font-size: 1rem; }
-  .mem-tier-card-row             { font-size: 0.9rem; }
-  .mem-tier-card-value           { font-size: 0.9rem; }
-  .mem-cta p                     { font-size: 0.97rem; }
-  .mem-cta p.cta-founding-note   { font-size: 0.9rem; }
-  .mem-cta p.cta-upgrade-note    { font-size: 0.86rem; }
-  .mem-founding p                { font-size: 0.97rem; }
-
-  /* ── Footer ── */
-  .footer-column p               { font-size: 0.92rem; }
-  .footer-column ul li a         { font-size: 0.92rem; }
 }
