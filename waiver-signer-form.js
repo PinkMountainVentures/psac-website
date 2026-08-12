@@ -57,7 +57,7 @@
 
   function boot() {
     if (!SIGNER_TOKEN) { renderMessage('This link isn’t quite right', 'We couldn’t find a waiver to sign here. Ask whoever added you to resend the link, or reach out to us directly.'); return; }
-    apiGet('/api/get-signer?signerToken=' + encodeURIComponent(SIGNER_TOKEN)).then(function (res) {
+    apiGet('/api/waiver?signerToken=' + encodeURIComponent(SIGNER_TOKEN)).then(function (res) {
       if (!res.ok) { renderMessage('This link isn’t quite right', 'We couldn’t find that link. Ask whoever added you to resend it, or reach out to us directly.'); return; }
       state.ctx = res.body;
       state.signerName = res.body.signer && res.body.signer.signerName || '';
@@ -190,7 +190,8 @@
 
   function submitWaiver(errorEl, onSuccess) {
     var participantsCovered = [state.signerName].concat(state.guardianForChildren);
-    apiPost('/api/save-waiver-signature', {
+    apiPost('/api/waiver', {
+      action: 'saveWaiverSignature',
       signerToken: SIGNER_TOKEN,
       rosterRef: state.ctx.signer && state.ctx.signer.rosterRef,
       signerName: state.signerName,
@@ -231,7 +232,8 @@
 
       var tasks = [];
       if (phone || smsConsent) {
-        tasks.push(apiPost('/api/save-waiver-signature', {
+        tasks.push(apiPost('/api/waiver', {
+          action: 'saveWaiverSignature',
           signerToken: SIGNER_TOKEN,
           signerName: state.signerName,
           signerPhone: phone,
@@ -240,7 +242,7 @@
         }));
       }
       if (ecName || ecPhone) {
-        tasks.push(apiPost('/api/save-emergency-contact', { signerToken: SIGNER_TOKEN, contactName: ecName, contactPhone: ecPhone }));
+        tasks.push(apiPost('/api/waiver', { action: 'saveEmergencyContact', signerToken: SIGNER_TOKEN, contactName: ecName, contactPhone: ecPhone }));
       }
       Promise.all(tasks).then(function () {
         state.step = 'done';

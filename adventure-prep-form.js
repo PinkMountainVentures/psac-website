@@ -129,7 +129,7 @@
   }
 
   function saveFields(fields) {
-    return apiPost('/api/save-adventure-prep', { token: TOKEN, fields: fields });
+    return apiPost('/api/adventure-prep', { action: 'saveFields', token: TOKEN, fields: fields });
   }
 
   // ---------------------------------------------------------------------
@@ -197,7 +197,7 @@
       renderMessage('This link isn’t quite right', 'We couldn’t find an adventure to set up here. If you followed a link from your confirmation email, try copying and pasting the full address, or reply to that email and we’ll send you a fresh one.');
       return;
     }
-    apiGet('/api/get-adventure-prep?token=' + encodeURIComponent(TOKEN)).then(function (res) {
+    apiGet('/api/adventure-prep?token=' + encodeURIComponent(TOKEN)).then(function (res) {
       if (!res.ok) {
         renderMessage('This link isn’t quite right', 'We couldn’t find an adventure for this link. Reply to your confirmation email and we’ll send you a fresh one.');
         return;
@@ -715,7 +715,7 @@
       Array.prototype.forEach.call(contentEl.querySelectorAll('.trail-card-cta:not(.is-current)'), function (btn) {
         btn.addEventListener('click', function () {
           btn.disabled = true;
-          apiPost('/api/select-trail', { token: TOKEN, trailId: btn.getAttribute('data-trail-id') }).then(function (res) {
+          apiPost('/api/adventure-prep', { action: 'selectTrail', token: TOKEN, trailId: btn.getAttribute('data-trail-id') }).then(function (res) {
             if (res.ok) {
               ap.selectedTrailId = res.body.selectedTrailId;
               ap.assignmentMethod = res.body.assignmentMethod;
@@ -736,7 +736,7 @@
         return;
       }
       renderPacing();
-      apiPost('/api/run-trail-assignment', { token: TOKEN, operation: ap.assignedAt ? 'refresh' : 'initial' }).then(function (res) {
+      apiPost('/api/adventure-prep', { action: 'runTrailAssignment', token: TOKEN, operation: ap.assignedAt ? 'refresh' : 'initial' }).then(function (res) {
         if (!res.ok) {
           if (res.body && res.body.status === 'refused') {
             contentEl.innerHTML = '<p class="ap-sub">' + escapeHtml(res.body.message || 'We need to take a closer look at this booking before assigning a trail. Our team has been notified.') + '</p>';
@@ -918,7 +918,8 @@
         return;
       }
       var participantsCovered = [state.waiverName].concat(state.guardianForChildren);
-      apiPost('/api/save-waiver-signature', {
+      apiPost('/api/waiver', {
+        action: 'saveWaiverSignature',
         token: TOKEN,
         signerName: state.waiverName,
         signerEmail: state.ctx.experienceBooking.contactEmail,
@@ -928,7 +929,7 @@
       }).then(function (res) {
         if (!res.ok) { wrap.querySelector('#ap-waiver-error').textContent = 'Something went wrong saving your signature, try again.'; return; }
         var ecDone = state.ecName || state.ecPhone
-          ? apiPost('/api/save-emergency-contact', { token: TOKEN, contactName: state.ecName, contactPhone: state.ecPhone })
+          ? apiPost('/api/waiver', { action: 'saveEmergencyContact', token: TOKEN, contactName: state.ecName, contactPhone: state.ecPhone })
           : Promise.resolve({ ok: true });
         ecDone.then(function () {
           state.step = 'review';
@@ -990,7 +991,8 @@
 
     wrap.querySelector('#ap-confirm-send').addEventListener('click', function (e) {
       e.target.disabled = true;
-      apiPost('/api/send-signer-links', {
+      apiPost('/api/adventure-prep', {
+        action: 'sendSignerLinks',
         token: TOKEN,
         signers: signers.map(function (s, i) { return { rosterRef: String(state.roster.indexOf(s)), name: s.name, email: s.email }; }),
       }).then(function (res) {
