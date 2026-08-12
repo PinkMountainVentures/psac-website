@@ -746,6 +746,23 @@ section { padding: 6rem 0; }
 
 .newsletter-form button:hover { background: #d45e40; }
 
+@media (max-width: 480px) {
+  .newsletter-form {
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .newsletter-form input {
+    border-radius: 0;
+    text-align: center;
+    padding: 1.1rem 1.4rem;
+  }
+  .newsletter-form button {
+    padding: 1.1rem 1.4rem;
+    font-size: 0.78rem;
+  }
+}
+
 /* ── FOOTER ── */
 footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 
