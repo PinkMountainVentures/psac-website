@@ -1,0 +1,187 @@
+/* ============================================
+   PSAC — Adventure Prep stylesheet (Surface A + Surface B)
+   Loaded ALONGSIDE the main styles.css (which defines the shared brand
+   variables and every reused .paf-* component from adventure-form.js),
+   never instead of it. Everything here is new, .ap-* / .sb-* / .trail-* /
+   .cancel-* prefixed, matching the four confirmed UX mockups this build
+   was built against verbatim:
+     - psac-surface-a-06-trail-reveal.html
+     - psac-surface-a-remaining-steps.html
+     - psac-surface-a-cancelled-reservation.html
+     - psac-surface-b-non-owner-signer.html
+   ============================================ */
+
+/* ── Surface A task-page shell (not the marketing site header) ── */
+.ap-header { background-color: var(--dark-pine); padding: 1rem 0; }
+.ap-header .container { display: flex; align-items: center; justify-content: space-between; }
+.ap-logo { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--sand-beige); text-decoration: none; }
+.ap-header-right { font-size: 0.72rem; color: rgba(248,241,233,0.5); }
+.ap-header-right a { color: rgba(248,241,233,0.75); text-decoration: none; border-bottom: 1px solid rgba(248,241,233,0.3); }
+
+.ap-shell { padding: 2.6rem 0 5rem; }
+.ap-progress-bar { height: 4px; background: rgba(42,71,71,0.12); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; max-width: 640px; }
+.ap-progress-fill { height: 100%; background: var(--mountain-pink); transition: width 0.3s ease; }
+.ap-progress-labels { display: flex; gap: 1.4rem; margin-bottom: 2.2rem; flex-wrap: wrap; }
+.ap-progress-section { font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; color: rgba(42,71,71,0.38); }
+.ap-progress-section.is-active { color: var(--mountain-pink); }
+
+.ap-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.8rem; }
+.ap-q { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: var(--dark-pine); line-height: 1.2; margin-bottom: 0.7rem; max-width: 720px; }
+.ap-sub { font-size: 0.92rem; color: rgba(42,71,71,0.65); max-width: 640px; line-height: 1.7; margin-bottom: 2rem; }
+
+.ap-card { background: white; border-radius: 14px; padding: 2rem 2.2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 1.4rem; }
+.ap-cutoff-note { display: flex; align-items: center; gap: 0.6rem; background: rgba(245,130,113,0.09); border: 1px solid rgba(245,130,113,0.25); border-radius: 8px; padding: 0.7rem 1rem; font-size: 0.78rem; color: #8a3d2c; margin-bottom: 1.6rem; max-width: 640px; }
+
+.ap-form-row { margin-bottom: 1rem; }
+.ap-form-row label { display: block; font-size: 0.76rem; font-weight: 600; color: rgba(42,71,71,0.6); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+.ap-form-row input, .ap-form-row select, .ap-form-row textarea { width: 100%; border: 1px solid rgba(42,71,71,0.18); border-radius: 6px; padding: 0.75rem 0.85rem; font-family: 'Montserrat', sans-serif; font-size: 0.88rem; background: var(--sand-beige); color: var(--dark-pine); }
+.ap-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.ap-helper { font-size: 0.74rem; color: rgba(42,71,71,0.45); margin-top: 0.35rem; font-style: italic; }
+.ap-error { font-size: 0.78rem; color: var(--sunset-red); margin-top: 0.5rem; }
+
+.ap-checklist { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1rem; }
+.ap-checklist-item { display: flex; align-items: flex-start; gap: 0.5rem; }
+.ap-checklist-item svg { flex-shrink: 0; margin-top: 2px; width: 16px; height: 16px; }
+
+.ap-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 1.6rem; }
+.ap-nav-prev { background: none; border: none; color: var(--dark-pine); opacity: 0.7; font-weight: 600; font-size: 0.8rem; letter-spacing: 0.04em; cursor: pointer; }
+.ap-nav-next { background: var(--desert-green); color: white; border: none; border-radius: 30px; padding: 0.85rem 2rem; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; }
+.ap-nav-next:hover { background: #63a677; }
+.ap-nav-next:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── trail reveal grid (Step 6) ── */
+.reveal-picks-echo { background: white; border: 1px solid rgba(42,71,71,0.1); border-radius: 10px; padding: 1rem 1.3rem; margin-bottom: 2.2rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; max-width: 820px; }
+.reveal-picks-echo-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; color: rgba(42,71,71,0.5); margin-right: 0.4rem; }
+.pick-tag { background: var(--sand-beige); color: var(--dark-pine); font-size: 0.76rem; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: 20px; border: 1px solid rgba(42,71,71,0.12); }
+
+.trail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; }
+.trail-grid.is-thin { grid-template-columns: repeat(2, 1fr); max-width: 820px; }
+.trail-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); display: flex; flex-direction: column; position: relative; border: 2px solid transparent; transition: border-color 0.2s, transform 0.2s; }
+.trail-card:hover { transform: translateY(-3px); }
+.trail-card.is-selected { border-color: var(--desert-green); }
+
+.trail-card-photo { height: 150px; background-size: cover; background-position: center; background-color: #6a7a6a; position: relative; }
+.trail-card-slotlabel { position: absolute; top: 0.8rem; left: 0.8rem; background: rgba(42,71,71,0.85); color: var(--sand-beige); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.32rem 0.7rem; border-radius: 20px; }
+.trail-card-diffbadge { position: absolute; top: 0.8rem; right: 0.8rem; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 20px; }
+.diff-easier { background: var(--desert-green); color: white; }
+.diff-harder { background: var(--sunset-red); color: white; }
+
+.trail-card-body { padding: 1.3rem 1.4rem 1.5rem; flex: 1; display: flex; flex-direction: column; }
+.trail-card-name { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 700; color: var(--dark-pine); margin-bottom: 0.5rem; line-height: 1.2; }
+.trail-card-overview { font-size: 0.85rem; color: rgba(42,71,71,0.72); line-height: 1.7; margin-bottom: 0.9rem; }
+.trail-card-tip { font-size: 0.78rem; color: rgba(42,71,71,0.6); line-height: 1.6; margin-bottom: 0.9rem; font-style: italic; }
+
+.trail-card-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+.trail-card-tag { background: rgba(122,189,145,0.14); color: #2a7a4a; font-size: 0.68rem; font-weight: 600; padding: 0.28rem 0.6rem; border-radius: 20px; }
+.trail-card-tag.is-none { background: rgba(42,71,71,0.06); color: rgba(42,71,71,0.45); font-style: italic; font-weight: 400; }
+.trail-card-tag.is-team-pick { background: rgba(245,130,113,0.14); color: #b04a2a; }
+
+.trail-card-fee { font-size: 0.72rem; color: rgba(42,71,71,0.55); font-style: italic; margin-bottom: 1.1rem; margin-top: auto; }
+
+.trail-card-cta { width: 100%; background: var(--desert-green); color: white; border: none; padding: 0.75rem 1rem; border-radius: 30px; font-weight: 600; font-size: 0.74rem; letter-spacing: 0.09em; text-transform: uppercase; cursor: pointer; }
+.trail-card-cta:hover { background: #63a677; }
+.trail-card-cta.is-current { background: transparent; border: 1.5px solid var(--desert-green); color: #2a7a4a; cursor: default; }
+.trail-card-cta.is-current:hover { background: transparent; }
+.trail-card-cta:disabled { opacity: 0.6; cursor: wait; }
+
+.reveal-footnote { max-width: 820px; margin-top: 1.6rem; font-size: 0.78rem; color: rgba(42,71,71,0.5); line-height: 1.7; }
+.reveal-footnote a { color: var(--mountain-pink); text-decoration: underline; cursor: pointer; }
+
+/* ── pacing transition (before reveal) ── */
+.transition-wrap { max-width: 560px; margin: 3rem auto; text-align: center; padding: 3rem 2rem; }
+.transition-spinner { width: 46px; height: 46px; margin: 0 auto 2rem; border-radius: 50%; border: 3px solid rgba(245,130,113,0.18); border-top-color: var(--mountain-pink); animation: ap-spin 1s linear infinite; }
+@keyframes ap-spin { to { transform: rotate(360deg); } }
+.transition-line { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-style: italic; color: var(--dark-pine); line-height: 1.5; min-height: 2.2em; }
+.transition-line em { color: var(--mountain-pink); font-style: italic; }
+
+/* ── RideWithGPS deferred-access beat ── */
+.prep-guide-card { max-width: 640px; background: white; border-radius: 12px; padding: 1.6rem 1.8rem; display: flex; gap: 1.2rem; align-items: flex-start; box-shadow: 0 4px 18px rgba(0,0,0,0.06); border: 1px dashed rgba(42,71,71,0.25); }
+.prep-guide-icon { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; background: rgba(245,130,113,0.12); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+.prep-guide-title { font-weight: 600; font-size: 0.92rem; color: var(--dark-pine); margin-bottom: 0.35rem; }
+.prep-guide-body { font-size: 0.82rem; color: rgba(42,71,71,0.65); line-height: 1.7; }
+
+/* ── thin / zero-candidate placeholder ── */
+.placeholder-wrap { max-width: 640px; background: white; border-radius: 14px; padding: 3rem 2.6rem; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+.placeholder-icon { font-size: 2.6rem; margin-bottom: 1rem; }
+.placeholder-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; color: var(--dark-pine); margin-bottom: 0.9rem; line-height: 1.3; }
+.placeholder-body { font-size: 0.9rem; color: rgba(42,71,71,0.68); line-height: 1.8; margin-bottom: 1rem; }
+.placeholder-sub { font-size: 0.78rem; color: rgba(42,71,71,0.45); font-style: italic; }
+.placeholder-dots { display: flex; gap: 0.4rem; justify-content: center; margin: 1rem 0; }
+.placeholder-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(245,130,113,0.35); animation: ap-pulse 1.4s ease-in-out infinite; }
+.placeholder-dot:nth-child(2) { animation-delay: 0.2s; }
+.placeholder-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes ap-pulse { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+.thin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.4rem; max-width: 820px; margin-bottom: 1.6rem; }
+
+/* ── review / done screen ── */
+.review-row { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 0; border-bottom: 1px solid rgba(42,71,71,0.08); }
+.review-row:last-child { border-bottom: none; }
+.review-row-label { font-size: 0.78rem; color: rgba(42,71,71,0.5); }
+.review-row-value { font-size: 0.88rem; font-weight: 600; color: var(--dark-pine); text-align: right; }
+.review-recipient { display: flex; justify-content: space-between; align-items: center; padding: 0.7rem 0.9rem; background: var(--sand-beige); border-radius: 8px; margin-bottom: 0.5rem; }
+.review-recipient-name { font-weight: 600; font-size: 0.86rem; }
+.review-recipient-email { font-size: 0.78rem; color: rgba(42,71,71,0.5); }
+.review-recipient-tag { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #b04a2a; background: rgba(245,130,113,0.15); padding: 0.25rem 0.55rem; border-radius: 20px; }
+
+.done-wrap { max-width: 560px; margin: 2rem auto; text-align: center; padding: 3rem 2.5rem; background: white; border-radius: 16px; box-shadow: 0 6px 26px rgba(0,0,0,0.07); }
+.done-badge { width: 56px; height: 56px; margin: 0 auto 1.4rem; border-radius: 50%; background: rgba(122,189,145,0.15); display: flex; align-items: center; justify-content: center; }
+.done-headline { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 700; margin-bottom: 0.8rem; }
+.done-body { font-size: 0.9rem; color: rgba(42,71,71,0.68); line-height: 1.8; }
+
+/* ── cancelled-reservation terminal state (real site header/footer around it) ── */
+.cancel-shell { padding: 5rem 0 6rem; display: flex; align-items: center; justify-content: center; }
+.cancel-card { max-width: 640px; margin: 0 auto; background: white; border-radius: 16px; padding: 3.4rem 3.2rem; text-align: center; box-shadow: 0 6px 28px rgba(0,0,0,0.08); }
+.cancel-badge { width: 56px; height: 56px; margin: 0 auto 1.6rem; border-radius: 50%; background: rgba(122,189,145,0.15); display: flex; align-items: center; justify-content: center; }
+.cancel-badge svg { width: 26px; height: 26px; }
+.cancel-headline { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: var(--dark-pine); line-height: 1.25; margin-bottom: 1.1rem; }
+.cancel-body { font-size: 0.95rem; color: rgba(42,71,71,0.72); line-height: 1.8; max-width: 480px; margin: 0 auto 1.8rem; }
+.cancel-body strong { color: var(--dark-pine); }
+.cancel-detail { background: var(--sand-beige); border: 1px solid rgba(42,71,71,0.08); border-radius: 10px; padding: 1.1rem 1.4rem; margin: 0 auto 1.8rem; max-width: 420px; text-align: left; }
+.cancel-detail-row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.35rem 0; }
+.cancel-detail-row + .cancel-detail-row { border-top: 1px solid rgba(42,71,71,0.07); }
+.cancel-detail-row span:first-child { color: rgba(42,71,71,0.55); }
+.cancel-detail-row span:last-child { font-weight: 600; color: var(--dark-pine); }
+.cancel-ctas { display: flex; gap: 0.9rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.6rem; }
+.cancel-footnote { font-size: 0.76rem; color: rgba(42,71,71,0.42); font-style: italic; }
+
+/* ── Surface B — deliberately distinct shell, no task-page chrome ── */
+.sb-page { padding: 0 0 4rem; }
+.sb-hero { background: linear-gradient(135deg, rgba(245,130,113,0.16), rgba(248,241,233,1) 65%); padding: 3rem 0 2.4rem; text-align: center; }
+.sb-hero-brand { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(42,71,71,0.45); margin-bottom: 1.6rem; }
+.sb-hero-quote { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-style: italic; font-weight: 500; color: var(--dark-pine); line-height: 1.55; max-width: 520px; margin: 0 auto; }
+.sb-hero-quote strong { font-style: normal; font-weight: 700; color: #b04a2a; }
+.sb-hero-sub { margin-top: 1.4rem; font-size: 0.8rem; color: rgba(42,71,71,0.5); }
+
+.sb-section { padding: 2.2rem 0; border-bottom: 1px solid rgba(42,71,71,0.08); }
+.sb-section:last-child { border-bottom: none; }
+.sb-section-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.7rem; }
+.sb-section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 700; color: var(--dark-pine); margin-bottom: 0.6rem; }
+.sb-section-sub { font-size: 0.85rem; color: rgba(42,71,71,0.6); line-height: 1.7; margin-bottom: 1.2rem; }
+
+.sb-additive { background: rgba(122,189,145,0.1); border-left: 3px solid var(--desert-green); border-radius: 0 8px 8px 0; padding: 0.9rem 1.1rem; font-size: 0.85rem; color: rgba(42,71,71,0.8); line-height: 1.7; margin-bottom: 1.4rem; font-style: italic; }
+
+.sb-waiver-text { background: white; border: 1px solid rgba(42,71,71,0.1); border-radius: 8px; padding: 1rem 1.2rem; max-height: 130px; overflow-y: auto; font-size: 0.78rem; color: rgba(42,71,71,0.7); line-height: 1.7; margin-bottom: 1.1rem; }
+.sb-waiver-text a { color: var(--mountain-pink); }
+
+.sb-guardian-q { display: flex; gap: 0.8rem; }
+.sb-guardian-btn { flex: 1; border: 1.5px solid rgba(42,71,71,0.18); background: white; color: var(--dark-pine); font-family: 'Montserrat', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 0.85rem 1rem; border-radius: 8px; cursor: pointer; }
+.sb-guardian-btn.is-selected { background: var(--mountain-pink); border-color: var(--mountain-pink); color: white; }
+
+.sb-cta { display: block; width: 100%; background: var(--desert-green); color: white; border: none; border-radius: 30px; padding: 1rem; font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; margin-top: 0.6rem; }
+.sb-cta:hover { background: #63a677; }
+.sb-cta:disabled { opacity: 0.6; cursor: not-allowed; }
+.sb-cta-outline { display: block; width: 100%; background: transparent; color: var(--dark-pine); border: 1.5px solid rgba(42,71,71,0.25); border-radius: 30px; padding: 1rem; font-weight: 600; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; margin-top: 0.6rem; }
+
+.sb-done { text-align: center; padding: 3.5rem 1rem; }
+.sb-done-badge { width: 52px; height: 52px; margin: 0 auto 1.2rem; border-radius: 50%; background: rgba(122,189,145,0.15); display: flex; align-items: center; justify-content: center; }
+.sb-done-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 700; margin-bottom: 0.7rem; }
+.sb-done-body { font-size: 0.88rem; color: rgba(42,71,71,0.65); line-height: 1.8; max-width: 440px; margin: 0 auto; }
+
+@media (max-width: 960px) {
+  .trail-grid, .thin-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .ap-form-grid { grid-template-columns: 1fr; }
+  .ap-card { padding: 1.5rem 1.5rem; }
+  .cancel-card { padding: 2.6rem 1.8rem; }
+}

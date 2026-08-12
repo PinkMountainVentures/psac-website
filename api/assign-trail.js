@@ -30,19 +30,7 @@
 
 'use strict';
 
-const { runTrailSelection } = require('../lib/trail-selection-engine');
-const { normalizeTrailRow, normalizeParkAccessRow, normalizeBookingContext } = require('../lib/normalize');
-const { callBookingsWebApp } = require('../lib/apps-script-client');
-
-function parseMaybeJson(value, fallback) {
-  if (value == null) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value);
-  } catch (err) {
-    return fallback;
-  }
-}
+const { runTrailAssignmentForBooking } = require('../lib/run-trail-assignment');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -65,87 +53,37 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // The actual fetch/normalize/engine/write-back sequence lives in
+  // lib/run-trail-assignment.js so this exact secret-authenticated contract
+  // (already live in production, verified end to end at the auth/routing
+  // level) and the guest-facing api/run-trail-assignment.js wrapper Surface
+  // A calls both go through one implementation, never two that could drift
+  // apart. This refactor changes nothing about this endpoint's request or
+  // response shape.
   try {
-    // 1. Fetch everything this run needs: the booking's own 1.2a inputs and
-    //    current Adventure Prep state, the full Trail Database, and Park
-    //    Access. See apps-script/trail-selection-actions.gs for what these
-    //    three actions actually do on the Sheet side.
-    const ctx = await callBookingsWebApp('getAdventurePrepContext', { bookingId });
-    if (!ctx || ctx.notFound) {
+    const result = await runTrailAssignmentForBooking({ bookingId, operation });
+
+    if (result.outcome === 'not_found') {
       res.status(404).json({ error: 'booking_not_found' });
       return;
     }
-    if (!ctx.adventurePrep || !ctx.experienceBooking) {
+    if (result.outcome === 'missing_1_2a_inputs') {
       res.status(400).json({ error: 'missing_1_2a_inputs' });
       return;
     }
-
-    const [trailDb, parkAccess] = await Promise.all([
-      callBookingsWebApp('getTrailDatabase', {}),
-      callBookingsWebApp('getParkAccess', {}),
-    ]);
-
-    // 2. Normalize. Roster currently lives on Experience Bookings'
-    //    fullPayloadJson.roster, not on the Adventure Prep tab — see README
-    //    "Where roster data actually lives," an open question for Airey.
-    const fullPayload = parseMaybeJson(ctx.experienceBooking.fullPayloadJson, {});
-    const bookingTimeRoster = fullPayload.roster || [];
-    const booking = normalizeBookingContext(ctx.adventurePrep, ctx.experienceBooking, bookingTimeRoster);
-    const trails = (trailDb.rows || []).map(normalizeTrailRow);
-    const parkAccessRows = (parkAccess.rows || []).map(normalizeParkAccessRow);
-    const existingCandidateTrails = parseMaybeJson(ctx.adventurePrep.candidateTrails, []);
-    const existingSelectedTrailId = ctx.adventurePrep.selectedTrailId || null;
-
-    // 3. Run the engine. Pure function, no I/O — see lib/trail-selection-engine.js.
-    const result = runTrailSelection({
-      operation,
-      booking,
-      trails,
-      parkAccessRows,
-      existingCandidateTrails,
-      existingSelectedTrailId,
-    });
-
-    if (result.refused) {
+    if (result.outcome === 'refused') {
       res.status(409).json({ status: 'refused', reason: result.reason, message: result.message });
       return;
     }
 
-    // 4. Write back. Two writes, both idempotent to retry: the candidate
-    //    set itself, and — only if needed — the system-generated Trail Swap
-    //    Requests row (PRD Section 8). Never blocks the primary write on
-    //    the swap-request write failing; that failure gets logged, not
-    //    surfaced as this request's own failure, since the assignment
-    //    itself already succeeded by that point.
-    await callBookingsWebApp('writeCandidateTrails', {
-      bookingId,
-      candidateTrails: result.candidateTrails,
-      assignedAt: result.assignedAt,
-      assignmentMethod: result.assignmentMethod,
-    });
-
-    if (result.swapRequestNeeded) {
-      try {
-        await callBookingsWebApp('openTrailSwapRequest', {
-          bookingId,
-          guestConcernSummary: result.swapRequestGuestConcernSummary,
-          receivedAt: result.assignedAt,
-          status: 'Open',
-        });
-      } catch (swapErr) {
-        // eslint-disable-next-line no-console
-        console.error('assign-trail: swap-request write failed, primary assignment already succeeded', bookingId, swapErr);
-      }
-    }
-
     res.status(200).json({
       status: 'assigned',
-      bookingId,
+      bookingId: result.bookingId,
       candidateTrails: result.candidateTrails,
       assignedAt: result.assignedAt,
       assignmentMethod: result.assignmentMethod,
       qualifyingCandidateCount: result.qualifyingCandidateCount,
-      swapRequestOpened: result.swapRequestNeeded,
+      swapRequestOpened: result.swapRequestOpened,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

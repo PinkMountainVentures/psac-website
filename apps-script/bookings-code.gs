@@ -22,6 +22,18 @@
      this same Apps Script project as an additional .gs file (Apps Script
      projects share one global scope across files, no merge needed).
      Updated Aug 2026 when Trail Selection Logic (bucket 2.2) shipped.
+     Updated again Aug 2026 when Adventure Prep (Surface A/B) shipped —
+     dispatches thirteen more actions, all implemented in
+     apps-script/adventure-prep-actions.gs (also pasted in as an
+     additional .gs file). That file also appends new columns to
+     Experience Bookings (adventurePrepToken, bookingStatus, cancelledAt,
+     refundAmount, cancellationReasons) and to Adventure Prep
+     (reconfirmedRosterJson, linksSentAt, createdAt) via its own
+     adventurePrep_setup() — the HEADERS constant below is NOT updated to
+     list them, since every read/write those new columns need goes through
+     adventurePrep-actions.gs's own live-header-lookup helpers, never this
+     file's hardcoded HEADERS array. Run adventurePrep_setup() once after
+     pasting that file in, per its own install instructions.
    ============================================ */
 
 var SHEETS = {
@@ -91,6 +103,32 @@ function doPost(e) {
       out = trailSelection_writeCandidateTrails(body);
     } else if (body.action === 'openTrailSwapRequest') {
       out = trailSelection_openTrailSwapRequest(body);
+    } else if (body.action === 'adventurePrep_getContextByToken') {
+      out = adventurePrep_getContextByToken(body);
+    } else if (body.action === 'adventurePrep_saveFields') {
+      out = adventurePrep_saveFields(body);
+    } else if (body.action === 'adventurePrep_selectTrail') {
+      out = adventurePrep_selectTrail(body);
+    } else if (body.action === 'adventurePrep_saveWaiverSignature') {
+      out = adventurePrep_saveWaiverSignature(body);
+    } else if (body.action === 'adventurePrep_saveEmergencyContact') {
+      out = adventurePrep_saveEmergencyContact(body);
+    } else if (body.action === 'adventurePrep_sendSignerLinks') {
+      out = adventurePrep_sendSignerLinks(body);
+    } else if (body.action === 'adventurePrep_getSignerContext') {
+      out = adventurePrep_getSignerContext(body);
+    } else if (body.action === 'adventurePrep_markSignerOpened') {
+      out = adventurePrep_markSignerOpened(body);
+    } else if (body.action === 'adventurePrep_getKitContext') {
+      out = adventurePrep_getKitContext(body);
+    } else if (body.action === 'adventurePrep_setPendingKitChange') {
+      out = adventurePrep_setPendingKitChange(body);
+    } else if (body.action === 'adventurePrep_finalizeKitChange') {
+      out = adventurePrep_finalizeKitChange(body);
+    } else if (body.action === 'adventurePrep_listPendingKitChanges') {
+      out = adventurePrep_listPendingKitChanges(body);
+    } else if (body.action === 'adventurePrep_ensureToken') {
+      out = adventurePrep_ensureToken(body);
     } else {
       out = { ok: false, error: 'Unknown action' };
     }
