@@ -16,8 +16,8 @@
  * The caller (Surface A / its save path) takes this response and persists
  * it via the existing `adventurePrep_saveFields` action (already whitelists
  * deliveryAddressLine1/2, deliveryCity, deliveryState, deliveryZip,
- * deliveryAddressRaw, deliveryAddressValidated, and — after this session's
- * fix to adventure-prep-actions.gs — deliveryLat/deliveryLng). Keeping this
+ * deliveryAddressRaw, deliveryAddressValidated, and now deliveryLat/
+ * deliveryLng too, per this round's fix to that whitelist). Keeping this
  * endpoint side-effect-free means a validation call that never gets saved
  * (guest navigates away mid-edit) never leaves stray state behind.
  *
@@ -39,24 +39,17 @@
  * spends Google Maps quota on their behalf. An invalid or cancelled-booking
  * token is rejected; a valid one from an active booking proceeds.
  *
- * ============================================================================
- * Built against Google's Address Validation API v1 (addressvalidation.
- * googleapis.com) — a stable, publicly documented API. Requires
- * GOOGLE_MAPS_API_KEY (Address Validation API + Places API enabled on that
- * key/project). This session has no network egress or a live key to test
- * against, so — unlike the RideWithGPS/Uber Direct placeholders elsewhere in
- * this project, which are genuinely unconfirmed API shapes — this is a
- * real implementation against the documented request/response shape, not a
- * guess, but it's still worth one live smoke test against a real address
- * before Surface A depends on it in production.
- * ============================================================================
+ * NOTE (this round): the actual Google-calling/standardization logic now
+ * lives in lib/validate-address.js, shared with api/apply-manual-
+ * adjustment.js's new `update_delivery_address` type (staff correcting an
+ * address after a phone/SMS/email interaction with the guest) — one source
+ * of truth instead of two copies that could drift.
  */
 
 'use strict';
 
 const { callBookingsWebApp } = require('../lib/apps-script-client');
-
-const VALIDATE_ENDPOINT = 'https://addressvalidation.googleapis.com/v1:validateAddress';
+const { validateAddress } = require('../lib/validate-address');
 
 /**
  * Reuses the existing adventurePrep_getContextByToken action purely as an
@@ -74,26 +67,6 @@ async function tokenIsActiveBooking(token) {
   return status === 'active';
 }
 
-/**
- * Maps Google's verdict object to this project's single boolean,
- * `deliveryAddressValidated`. Deliberately conservative: only a match
- * Google reports as complete AND with no unconfirmed components counts as
- * validated. Anything else (partial match, inferred components, an
- * address Google flat-out couldn't parse) reads as `false` and routes to
- * the soft-fail path — matching Section 10's own posture that a
- * legitimately unusual address a geocoder chokes on shouldn't be treated
- * as a guest error, just an unresolved one.
- */
-function isFullyValidated(verdict) {
-  if (!verdict) return false;
-  return verdict.addressComplete === true && !verdict.hasUnconfirmedComponents;
-}
-
-function extractComponent(components, type) {
-  const match = (components || []).find((c) => (c.componentType === type));
-  return match ? match.componentName?.text || '' : '';
-}
-
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -107,92 +80,13 @@ module.exports = async function handler(req, res) {
     }
 
     const input = body.addressInput || {};
-    const addressLines = [input.line1, input.line2].filter(Boolean);
-    if (!addressLines.length) {
+    if (!input.line1) {
       res.status(400).json({ error: 'bad_request', detail: 'addressInput.line1 is required' });
       return;
     }
 
-    if (!process.env.GOOGLE_MAPS_API_KEY) {
-      // Config problem, not a guest-facing one — soft-fail exactly like a
-      // real validation miss, so the caller's fallback path (guest
-      // proceeds, booking flags for staff review) works identically
-      // whether Google said no or we couldn't ask.
-      res.status(200).json({
-        validated: false,
-        standardized: null,
-        rawEcho: input,
-        error: 'GOOGLE_MAPS_API_KEY not configured',
-      });
-      return;
-    }
-
-    const requestBody = {
-      address: {
-        regionCode: 'US',
-        postalCode: input.zip || undefined,
-        administrativeArea: input.state || undefined,
-        locality: input.city || undefined,
-        addressLines,
-      },
-    };
-
-    let googleRes, googleJson;
-    try {
-      googleRes = await fetch(`${VALIDATE_ENDPOINT}?key=${process.env.GOOGLE_MAPS_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-      googleJson = await googleRes.json();
-    } catch (fetchErr) {
-      res.status(200).json({
-        validated: false,
-        standardized: null,
-        rawEcho: input,
-        error: 'address validation request failed: ' + fetchErr.message,
-      });
-      return;
-    }
-
-    if (!googleRes.ok) {
-      res.status(200).json({
-        validated: false,
-        standardized: null,
-        rawEcho: input,
-        error: 'Google Address Validation API error: ' + (googleJson?.error?.message || googleRes.status),
-      });
-      return;
-    }
-
-    const result = googleJson.result || {};
-    const verdict = result.verdict || {};
-    const postalAddress = result.address?.postalAddress || {};
-    const components = result.address?.addressComponents || [];
-    const location = result.geocode?.location || {};
-
-    const standardized = {
-      line1: (postalAddress.addressLines || [])[0] || input.line1 || '',
-      line2: (postalAddress.addressLines || [])[1] || input.line2 || '',
-      city: postalAddress.locality || extractComponent(components, 'locality') || input.city || '',
-      state: postalAddress.administrativeArea || input.state || '',
-      zip: postalAddress.postalCode || input.zip || '',
-      lat: location.latitude != null ? location.latitude : null,
-      lng: location.longitude != null ? location.longitude : null,
-    };
-
-    const validated = isFullyValidated(verdict);
-
-    res.status(200).json({
-      validated,
-      standardized,
-      rawEcho: input,
-      verdict: {
-        addressComplete: !!verdict.addressComplete,
-        hasUnconfirmedComponents: !!verdict.hasUnconfirmedComponents,
-        hasInferredComponents: !!verdict.hasInferredComponents,
-      },
-    });
+    const result = await validateAddress(input);
+    res.status(200).json(result);
   } catch (err) {
     // Even an unexpected internal error here should soft-fail toward the
     // guest, not block them — but it's still surfaced as a real 500 so

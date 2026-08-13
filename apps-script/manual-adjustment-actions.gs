@@ -8,9 +8,11 @@
  * api/write-manual-trail-override.js directly, nothing new needed here —
  * and 8c post-hold-failure gear return), consolidated behind Section 13's
  * "constrained form for the three off-system playbooks... not an open-ended
- * cell edit."
+ * cell edit," plus a fifth type added Aug 2026 at Airey's direct request
+ * (see manualAdjustment_updateDeliveryAddress below).
  *
- * Four adjustment types, matching Section 13's own list exactly:
+ * Five adjustment types, matching api/apply-manual-adjustment.js's own
+ * list exactly:
  *   - kit_count_correction     (8a, reduction path: corrected kit count
  *                                after staff manually processes the Stripe
  *                                refund elsewhere)
@@ -24,6 +26,15 @@
  *   - gear_returned_uncleaned  (8c: gear pulled for a booking that then
  *                                cancels via the T-1 hold-clearance failure
  *                                gets checked back in unused)
+ *   - update_delivery_address  (Aug 2026, not in the original locked PRD:
+ *                                staff need to enter or correct a guest's
+ *                                delivery address after a phone/SMS/email
+ *                                interaction, not just through Surface A's
+ *                                own self-service field. Writes the same
+ *                                columns adventurePrep_saveFields writes,
+ *                                just keyed by bookingId instead of the
+ *                                guest's token, since staff work from the
+ *                                booking record, not a token.)
  *
  * ============================================================================
  * WHAT THIS FILE DELIBERATELY DOES NOT DO
@@ -48,9 +59,13 @@
  *
  * 1. Paste everything below the marker into Code.gs (or its own .gs file).
  *    Requires apps-script/adventure-prep-actions.gs already pasted in
- *    (reuses its shared helpers, same convention as every other patch).
+ *    (reuses its shared helpers, same convention as every other patch), AND
+ *    requires that file's ADVENTURE_PREP_WRITABLE_FIELDS to include
+ *    'deliveryLat' and 'deliveryLng' (added this same round — the Adventure
+ *    Prep tab already has both columns per trail-selection-actions.gs's own
+ *    header list, they just weren't in the writable-fields whitelist yet).
  *
- * 2. Wire the four new actions into the existing doPost's action dispatch:
+ * 2. Wire the five new actions into the existing doPost's action dispatch:
  *
  *      } else if (body.action === 'manualAdjustment_kitCountCorrection') {
  *        out = manualAdjustment_kitCountCorrection(body);
@@ -60,6 +75,8 @@
  *        out = manualAdjustment_changeLogNote(body);
  *      } else if (body.action === 'manualAdjustment_gearReturnedUncleaned') {
  *        out = manualAdjustment_gearReturnedUncleaned(body);
+ *      } else if (body.action === 'manualAdjustment_updateDeliveryAddress') {
+ *        out = manualAdjustment_updateDeliveryAddress(body);
  *
  * No new setup() function needed — this patch writes only to tabs/columns
  * that already exist (Adventure Prep, Gear Check Log, Adventure Prep
@@ -165,4 +182,51 @@ function manualAdjustment_gearReturnedUncleaned(payload) {
     staffNotes: payload.staffNotes || '',
   });
   return { ok: true, bookingId: payload.bookingId };
+}
+
+/**
+ * Aug 2026, added at Airey's direct request (not in the original locked
+ * PRD): staff need to enter or correct a guest's delivery address after a
+ * phone/SMS/email interaction, not just through Surface A's own
+ * self-service field. Writes the exact same columns
+ * adventurePrep_saveFields writes for the address group, just keyed by
+ * bookingId (via adventurePrep_getOrCreateRow_, same helper
+ * kit_count_correction above already uses) instead of a guest token,
+ * since staff work from the booking record, not a token. Deliberately its
+ * own small fixed whitelist (not the full ADVENTURE_PREP_WRITABLE_FIELDS
+ * list) — this endpoint should only ever touch address fields, matching
+ * the "constrained form, not an open-ended cell edit" posture the rest of
+ * this file follows.
+ *
+ * Does NOT auto-log a Change Log row, same convention as
+ * kit_count_correction above — staff run manualAdjustment_changeLogNote as
+ * its own explicit step if this correction should be recorded there too.
+ */
+function manualAdjustment_updateDeliveryAddress(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var target = adventurePrep_getOrCreateRow_(ss, payload.bookingId);
+    var writable = [
+      'deliveryAddressLine1', 'deliveryAddressLine2', 'deliveryCity',
+      'deliveryState', 'deliveryZip', 'deliveryAddressRaw',
+      'deliveryAddressValidated', 'deliveryLat', 'deliveryLng',
+    ];
+    var written = [];
+    writable.forEach(function (key) {
+      if (!(key in payload)) return; // caller may omit line2, lat/lng, etc.
+      var col = target.headerMap[key];
+      if (!col) return; // column doesn't exist on this sheet — skip, don't throw
+      var value = payload[key];
+      target.sheet.getRange(target.rowIndex, col).setValue(
+        (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value
+      );
+      written.push(key);
+    });
+
+    return { ok: true, bookingId: payload.bookingId, writtenFields: written };
+  } finally {
+    lock.releaseLock();
+  }
 }

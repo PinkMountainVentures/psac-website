@@ -369,12 +369,25 @@ function adventurePrep_getContextByToken(payload) {
 // jobs), and confirmedKitCount (that's adjust-gear-kit-count.js's job,
 // via its own dedicated debounce actions below — never a direct write from
 // this generic save, so a client can never bypass the debounce/Stripe path).
+// BUG FIX (Aug 2026): 'deliveryLat'/'deliveryLng' were long described (in
+// api/validate-delivery-address.js's own header comment) as already
+// whitelisted here, but they never actually were — the column exists on
+// the live Adventure Prep tab (see trail-selection-actions.gs's
+// TRAIL_SELECTION_ADVENTURE_PREP_HEADERS, confirmed against the real
+// sheet), so a real geocode result had nowhere to land through
+// adventurePrep_saveFields: setFields() silently rejected both keys
+// (falls into the `if (!col)`... wait, no — it fell into the "key not in
+// ADVENTURE_PREP_WRITABLE_FIELDS" branch above and got silently added to
+// `rejectedFields` instead of ever reaching the column-lookup at all).
+// Added now that Surface A's address step actually calls the validation
+// endpoint and has real lat/lng to save.
 var ADVENTURE_PREP_WRITABLE_FIELDS = [
   'isParticipating', 'participatingRosterRef', 'reconfirmedRosterJson',
   'technicalComfort', 'heatComfort', 'bestForAttributes',
   'propertyType', 'deliveryAddressLine1', 'deliveryAddressLine2',
   'deliveryCity', 'deliveryState', 'deliveryZip', 'deliveryAddressRaw',
-  'deliveryAddressValidated', 'deliveryWindow', 'returnPreference',
+  'deliveryAddressValidated', 'deliveryLat', 'deliveryLng',
+  'deliveryWindow', 'returnPreference',
 ];
 
 function adventurePrep_saveFields(payload) {

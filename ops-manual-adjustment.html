@@ -11,8 +11,15 @@
   checkout.html's "Page D" mockup — the constrained, fixed-type form
   Section 13 calls for ("not an open-ended field-write endpoint"), wired to
   /api/ops-proxy -> api/apply-manual-adjustment.js. The dropdown only ever
-  offers the four types that endpoint accepts; there is deliberately no
+  offers the types that endpoint accepts; there is deliberately no
   free-form "field name / new value" pair anywhere on this page.
+
+  Aug 2026: added "Update delivery address" as a fifth type, at Airey's
+  direct request — staff need to enter/correct a guest's delivery address
+  after a phone/SMS/email interaction, not just through Surface A's own
+  self-service field. Not in the original locked PRD; added as a fifth
+  fixed type rather than an open-ended edit, to keep this page's whole
+  design intent intact.
 
   Page E (Gear Assembly/Checkout extensions) from that same mockup isn't
   built here — it's explicitly a different, pre-existing tool per
@@ -86,7 +93,7 @@
         <div class="ops-title">Manual Adjustment</div>
         <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
       </div>
-      <div class="ops-subtitle">For the off-system playbooks only (Section 8). Every submission calls api/apply-manual-adjustment.js, never a direct sheet edit.</div>
+      <div class="ops-subtitle">For the off-system playbooks only (Section 8) plus manual address entry. Every submission calls api/apply-manual-adjustment.js, never a direct sheet edit.</div>
 
       <div id="banner-container"></div>
 
@@ -100,6 +107,7 @@
               <option value="gear_check_log_adjustment">Gear Check Log adjustment</option>
               <option value="change_log_note">Change log note</option>
               <option value="gear_returned_uncleaned">Gear returned, uncleaned</option>
+              <option value="update_delivery_address">Update delivery address</option>
             </select>
           </div>
         </div>
@@ -153,6 +161,15 @@
       el.innerHTML = '<div class="ops-form-row"><label>Kit numbers to remove (comma-separated)</label><input class="ops-input" id="field-kit-numbers" placeholder="GP-0142, LK-0311"></div>';
     } else if (type === 'change_log_note') {
       el.innerHTML = '<div class="ops-form-row"><label>Change type label</label><input class="ops-input" id="field-change-type" placeholder="kit_count"></div>';
+    } else if (type === 'update_delivery_address') {
+      el.innerHTML =
+        '<div class="ops-form-row"><label>Delivery address</label><input class="ops-input" id="field-address-line1" placeholder="Property name or street address"></div>' +
+        '<div class="ops-form-row"><label>Address line 2 (optional)</label><input class="ops-input" id="field-address-line2" placeholder="Unit, suite, etc."></div>' +
+        '<div class="ops-form-grid">' +
+        '<div class="ops-form-row"><label>City</label><input class="ops-input" id="field-address-city" placeholder="Palm Springs"></div>' +
+        '<div class="ops-form-row"><label>ZIP</label><input class="ops-input" id="field-address-zip" placeholder="92262"></div>' +
+        '</div>' +
+        '<div class="ops-helper" style="margin-top:-0.2rem;">Runs through the same Google address validation Surface A uses. An unconfirmed match still saves, just flagged as unvalidated for staff review.</div>';
     } else {
       el.innerHTML = '<div class="ops-helper" style="margin-top:0.4rem;">No additional fields — this just logs the audit-trail note for gear checked back in unused after a hold-clearance cancellation (Section 8c).</div>';
     }
@@ -198,6 +215,16 @@
       payload.kitNumbersToRemove = kitNumbers;
     } else if (type === 'change_log_note') {
       payload.changeType = document.getElementById('field-change-type').value.trim() || 'kit_count';
+    } else if (type === 'update_delivery_address') {
+      var line1 = document.getElementById('field-address-line1').value.trim();
+      if (!line1) { showBanner('error', 'A delivery address is required.'); return; }
+      payload.addressInput = {
+        line1: line1,
+        line2: document.getElementById('field-address-line2').value.trim(),
+        city: document.getElementById('field-address-city').value.trim(),
+        state: 'CA',
+        zip: document.getElementById('field-address-zip').value.trim(),
+      };
     }
 
     document.getElementById('form-submit').disabled = true;
@@ -207,7 +234,13 @@
         showBanner('error', (result.data && result.data.detail) || 'Could not apply that adjustment.');
         return;
       }
-      showBanner('success', 'Adjustment applied for #' + bookingId + '.');
+      var msg = 'Adjustment applied for #' + bookingId + '.';
+      if (type === 'update_delivery_address') {
+        msg += result.data.addressValidated
+          ? ' Address confirmed by Google.'
+          : ' Saved, but the address could not be fully confirmed — worth a double check before dispatch.';
+      }
+      showBanner('success', msg);
       resetForm();
       loadRecentLog();
     });

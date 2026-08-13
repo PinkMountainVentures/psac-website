@@ -882,25 +882,69 @@
         wrap.querySelector('#ap-planning-error').textContent = 'Let us know where you’re staying and your delivery address.';
         return;
       }
-      // deliveryAddressValidated is always false from this build — real
-      // address validation (Google Places or similar) is Operations UX's
-      // own future work, not built here. This intentionally degrades into
-      // that PRD's own already-designed "soft-fail, staff review" path
-      // rather than inventing validation logic in this chat's scope.
-      saveFields({
-        propertyType: state.propertyType,
-        deliveryAddressLine1: state.deliveryAddressLine1,
-        deliveryCity: state.deliveryCity,
-        deliveryState: 'CA',
-        deliveryZip: state.deliveryZip,
-        deliveryAddressRaw: [state.deliveryAddressLine1, state.deliveryCity, 'CA', state.deliveryZip].filter(Boolean).join(', '),
-        deliveryAddressValidated: false,
-        deliveryWindow: state.deliveryWindow,
-        returnPreference: state.returnPreference,
+
+      // BUG FIX (Aug 2026, Airey's direct request): this used to always
+      // send deliveryAddressValidated: false and never actually call
+      // Google's Address Validation API — real validation existed as a
+      // built, smoke-tested endpoint (api/validate-delivery-address.js)
+      // but nothing in this flow ever called it. Now wired in: validate
+      // first, save the standardized result if Google confirms it, fall
+      // back to the guest's own typed values (still saved, just flagged
+      // unvalidated) on a soft-fail. Never blocks the guest either way —
+      // matches Section 18 item 17's "guest proceeds after a retry
+      // prompt; booking flags for staff review" posture.
+      var nextBtn = wrap.querySelector('#ap-next');
+      var errorEl = wrap.querySelector('#ap-planning-error');
+      errorEl.textContent = '';
+      nextBtn.disabled = true;
+      var originalLabel = nextBtn.textContent;
+      nextBtn.textContent = 'Checking address…';
+
+      apiPost('/api/validate-delivery-address', {
+        token: TOKEN,
+        addressInput: {
+          line1: state.deliveryAddressLine1,
+          city: state.deliveryCity,
+          state: 'CA',
+          zip: state.deliveryZip,
+        },
+      }).then(function (validationRes) {
+        var v = validationRes.body || {};
+        var std = v.standardized || null;
+        var fields = {
+          propertyType: state.propertyType,
+          deliveryAddressLine1: (std && std.line1) || state.deliveryAddressLine1,
+          deliveryCity: (std && std.city) || state.deliveryCity,
+          deliveryState: 'CA',
+          deliveryZip: (std && std.zip) || state.deliveryZip,
+          deliveryAddressRaw: [
+            (std && std.line1) || state.deliveryAddressLine1,
+            (std && std.city) || state.deliveryCity, 'CA',
+            (std && std.zip) || state.deliveryZip,
+          ].filter(Boolean).join(', '),
+          deliveryAddressValidated: !!v.validated,
+          deliveryWindow: state.deliveryWindow,
+          returnPreference: state.returnPreference,
+        };
+        if (std && std.lat != null) fields.deliveryLat = std.lat;
+        if (std && std.lng != null) fields.deliveryLng = std.lng;
+
+        if (!v.validated) {
+          // Soft-fail, non-blocking: show a brief note but still advance.
+          errorEl.textContent = 'We couldn’t fully confirm that address — you can continue, we’ll double check before delivery.';
+        }
+
+        return saveFields(fields);
       }).then(function (res) {
-        if (!res.ok) { wrap.querySelector('#ap-planning-error').textContent = 'Something went wrong saving that, try again.'; return; }
+        nextBtn.disabled = false;
+        nextBtn.textContent = originalLabel;
+        if (!res.ok) { errorEl.textContent = 'Something went wrong saving that, try again.'; return; }
         state.step = 'deposit';
         render();
+      }).catch(function () {
+        nextBtn.disabled = false;
+        nextBtn.textContent = originalLabel;
+        errorEl.textContent = 'Something went wrong saving that, try again.';
       });
     });
 

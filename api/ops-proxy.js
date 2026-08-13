@@ -15,7 +15,7 @@
  *   2. For read-only list/lookup actions, calls the Apps Script backend
  *      directly (it already holds BOOKINGS_WEBAPP_SECRET via
  *      lib/apps-script-client.js).
- *   3. For the three write actions that already have fully-validated,
+ *   3. For the write actions that already have fully-validated,
  *      already-smoke-tested handlers, REUSES those handler functions
  *      directly (in-process, not another HTTP hop) rather than
  *      reimplementing their validation here — each handler is invoked with
@@ -53,7 +53,17 @@ const READ_ACTIONS = {
   getTrailSwapRequestContext: (body) => callBookingsWebApp('trailSwap_getRequestContext', { swapRequestId: body.swapRequestId }),
 };
 
-const MANUAL_ADJUSTMENT_TYPES = ['kit_count_correction', 'gear_check_log_adjustment', 'change_log_note', 'gear_returned_uncleaned'];
+// Aug 2026: added 'update_delivery_address' — staff correcting/entering a
+// guest's delivery address after a phone/SMS/email interaction, per
+// Airey's direct request. Same fixed-type, no-open-ended-edit posture as
+// the original four; see api/apply-manual-adjustment.js's own header.
+const MANUAL_ADJUSTMENT_TYPES = [
+  'kit_count_correction',
+  'gear_check_log_adjustment',
+  'change_log_note',
+  'gear_returned_uncleaned',
+  'update_delivery_address',
+];
 
 module.exports = async function handler(req, res) {
   try {
