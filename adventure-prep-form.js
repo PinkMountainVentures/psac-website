@@ -61,9 +61,30 @@
     { value: 'prefers_shade_or_cooler_start', label: 'I’d rather have shade, or an early, cooler start' },
     { value: 'heat_doesnt_slow_me_down', label: 'Heat doesn’t slow me down' },
   ];
-  var AGE_BUCKETS = ['Under 14', '14-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
-  var MINOR_BUCKETS = { 'Under 14': true, '14-17': true };
-  var FITNESS_OPTIONS = ['Easygoing', 'Comfortable', 'Strong'];
+  // BUG FIX (Aug 2026, independent bug pass): these bucket strings used
+  // ASCII hyphens ('14-17', '18-24', ...), but adventure-form.js's roster
+  // step (the only place these values actually get written) generates
+  // them with an EN DASH ('14–17', U+2013), not a hyphen (U+002D) — see
+  // adventure-form.js's cardWho(), the age <select> option values. Every
+  // bucket past "Under 14" silently never matched here, so
+  // MINOR_BUCKETS['14–17'] was always undefined: a real 14-17-year-old on
+  // the roster was never recognized as a minor anywhere in this file (the
+  // review screen would try to send them their own waiver-signer link
+  // instead of covering them under the owner's guardian certification).
+  // Same bug class apps-script/trail-swap-actions.gs's own header comment
+  // already documents fixing in its local copy of an equivalent check —
+  // this is the same fix, plus the matching one applied to
+  // apps-script/adventure-prep-actions.gs's getSignerContext minors filter
+  // and lib/trail-selection-engine.js's family-tier eligibility check,
+  // which had the identical mismatch.
+  var AGE_BUCKETS = ['Under 14', '14–17', '18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
+  var MINOR_BUCKETS = { 'Under 14': true, '14–17': true };
+  // Matches adventure-form.js's roster step exactly (the only place these
+  // get written). Previously held short labels ('Easygoing'/'Comfortable'/
+  // 'Strong') that don't match any value this system actually stores —
+  // corrected to the real stored strings so the editable fitness dropdown
+  // below (rosterRowHtml) round-trips correctly against existing data.
+  var FITNESS_OPTIONS = ['Easygoing pace', 'Comfortable hiker', 'Strong / experienced'];
 
   var state = {
     ctx: null,
@@ -397,16 +418,36 @@
   // Step: Are you joining? + roster reconfirmation + gear kit toggle
   // ---------------------------------------------------------------------
 
+  // BUG FIX (Aug 2026): name/age/fitness used to render as permanently
+  // `disabled` inputs, with a "email us to change this" note as the only
+  // way to correct a typo or an age bucket picked wrong at booking time.
+  // Airey's call: these should be editable right here. Name stays a plain
+  // text input (updates on 'input', no re-render, same as the email field
+  // below, so typing doesn't lose focus). Age is a <select> — changing it
+  // can flip isMinor (which changes whether the email field or the
+  // "Minor" tag renders at all), so its 'change' handler re-runs
+  // renderRosterRows() to rebuild the row correctly; a <select> has no
+  // cursor position to lose, so that's safe. Fitness is also a <select>,
+  // doesn't affect layout, so it just updates state.
   function rosterRowHtml(person, index, isOwnerRow) {
     var age = person.age || person.ageRange || '';
     var isMinor = !!MINOR_BUCKETS[age];
     var emailField = (!isMinor && !isOwnerRow)
       ? '<input class="ap-roster-email" data-idx="' + index + '" type="email" placeholder="' + escapeHtml((person.name || 'Their') + '’s email, for their waiver link') + '" value="' + escapeHtml(person.email || '') + '" style="flex:2; min-width:180px; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">'
       : '';
+    // Unlike adventure-form.js's own age <select> (which prepends a
+    // non-selectable "Age range" placeholder), every entry in AGE_BUCKETS
+    // is itself a real, selectable value — no placeholder needed here.
+    var ageOptionsHtml = AGE_BUCKETS.map(function (bucket) {
+      return '<option value="' + escapeHtml(bucket) + '"' + (age === bucket ? ' selected' : '') + '>' + escapeHtml(bucket) + '</option>';
+    }).join('');
+    var fitnessOptionsHtml = '<option value="">Fitness level</option>' + FITNESS_OPTIONS.map(function (f) {
+      return '<option value="' + escapeHtml(f) + '"' + ((person.fitness || '') === f ? ' selected' : '') + '>' + escapeHtml(f) + '</option>';
+    }).join('');
     return '<div class="paf-roster-row">' +
-      '<input class="paf-roster-input paf-roster-name" value="' + escapeHtml(person.name || '') + '" disabled>' +
-      '<input class="paf-roster-input paf-roster-age" value="' + escapeHtml(age) + '" disabled>' +
-      (isMinor ? '<span class="paf-roster-tag">Minor</span>' : '<input class="paf-roster-input paf-roster-fit" value="' + escapeHtml(person.fitness || '') + '" disabled>') +
+      '<input class="paf-roster-input paf-roster-name" data-idx="' + index + '" value="' + escapeHtml(person.name || '') + '" placeholder="Name">' +
+      '<select class="paf-roster-input paf-roster-age" data-idx="' + index + '">' + ageOptionsHtml + '</select>' +
+      (isMinor ? '<span class="paf-roster-tag">Minor</span>' : '<select class="paf-roster-input paf-roster-fit" data-idx="' + index + '">' + fitnessOptionsHtml + '</select>') +
       (isOwnerRow ? '<span class="paf-roster-tag is-you">You</span>' : emailField) +
       '</div>';
   }
@@ -462,6 +503,35 @@
       wrap.querySelector('#ap-roster-rows').innerHTML = state.roster.map(function (p, i) {
         return rosterRowHtml(p, i, i === oi);
       }).join('');
+      // Name: plain text input, update state on 'input' only, no
+      // re-render — matches the existing email field's pattern below, so
+      // typing a correction doesn't lose cursor focus mid-word.
+      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-name'), function (input) {
+        input.addEventListener('input', function () {
+          var idx = Number(input.getAttribute('data-idx'));
+          state.roster[idx].name = input.value;
+        });
+      });
+      // Age: a <select>, no cursor position to lose, so a full
+      // re-render is safe here — needed because changing age can flip
+      // isMinor, which changes whether this row shows an email field, a
+      // fitness dropdown, or a "Minor" tag. Also refreshes the "which one
+      // is you" labels above, which embed age too.
+      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-age'), function (select) {
+        select.addEventListener('change', function () {
+          var idx = Number(select.getAttribute('data-idx'));
+          state.roster[idx].age = select.value;
+          renderRosterRows();
+          renderWhoIsYou();
+        });
+      });
+      // Fitness: doesn't affect layout or minor status, just update state.
+      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-fit'), function (select) {
+        select.addEventListener('change', function () {
+          var idx = Number(select.getAttribute('data-idx'));
+          state.roster[idx].fitness = select.value;
+        });
+      });
       Array.prototype.forEach.call(wrap.querySelectorAll('.ap-roster-email'), function (input) {
         input.addEventListener('change', function () {
           var idx = Number(input.getAttribute('data-idx'));

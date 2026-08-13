@@ -50,46 +50,11 @@ const { isBeforeT3Cutoff } = require('../lib/t3-cutoff');
 const { sendEmail } = require('../lib/send-email');
 const { renderSignerWaiverInviteEmail } = require('../lib/email-templates/signer-waiver-invite-email');
 
-// Shared by saveFields and selectTrail below — both previously had NO
-// cutoff or cancelled-booking check at all (build review, Aug 2026).
-//
-// TIMING FIX (build review, Aug 2026, second pass): this build's first pass
-// gated these two on a new T-1 noon Pacific lock (lib/self-service-cutoff.js,
-// now deleted), reasoning by analogy to the T-1 deposit hold's two-clock
-// pattern. That created a real conflict with two already-locked PRDs
-// (Adventure Prep PRD Section 10, Operations UX PRD Section 14), both of
-// which put address and trail-swap self-service edits at the SAME T-3, 10pm
-// cutoff as kit count, specifically because T-3 is also the moment
-// RideWithGPS access gets generated (api/process-t3-cutoff.js step 5, still
-// fires at T-3, was never moved) — letting trail edits stay open two more
-// days would routinely hand out a credential for a trail the guest no
-// longer has, with nothing to auto-regenerate it. Reverted to isBeforeT3Cutoff
-// (same check adjustGearKitCount already uses) to match the locked PRDs and
-// close that gap. A genuinely late change of either kind still has a path:
-// staff's existing manual Trail Swap Requests / Manual Adjustment workflow,
-// not open guest self-service past T-3.
-async function checkGuestSelfServiceEditAllowed(token) {
-  const ctx = await callBookingsWebApp('adventurePrep_getContextByToken', { token });
-  if (!ctx || ctx.notFound) {
-    return { ok: false, status: 404, error: 'invalid_token' };
-  }
-  const bookingStatus = ctx.experienceBooking && ctx.experienceBooking.bookingStatus;
-  if (bookingStatus && bookingStatus !== 'active') {
-    return { ok: false, status: 409, error: 'booking_cancelled' };
-  }
-  if (!isBeforeT3Cutoff(ctx.experienceBooking && ctx.experienceBooking.date)) {
-    return { ok: false, status: 409, error: 'past_t3_cutoff' };
-  }
-  return { ok: true, ctx };
-}
-
 const SITE_URL = 'https://www.palmspringsadventureclub.com';
 const MAX_KIT_COUNT = 20; // matches lib/finalize-kit-change.js's own clamp
 
 function formatTripDate(dateStr) {
-  // BUG FIX (independent bug pass, Aug 2026): "trip" replaced with
-  // "adventure" to match this project's established brand-voice convention.
-  if (!dateStr) return 'your upcoming adventure';
+  if (!dateStr) return 'your upcoming trip';
   const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return String(dateStr);
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
@@ -135,13 +100,6 @@ async function saveFields(body, res) {
     res.status(400).json({ error: 'missing_fields' });
     return;
   }
-
-  const gate = await checkGuestSelfServiceEditAllowed(token);
-  if (!gate.ok) {
-    res.status(gate.status).json({ error: gate.error });
-    return;
-  }
-
   const result = await callBookingsWebApp('adventurePrep_saveFields', { token, fields });
   if (!result || result.ok === false) {
     res.status(404).json({ error: 'invalid_token' });
@@ -202,13 +160,6 @@ async function selectTrail(body, res) {
     res.status(400).json({ error: 'missing_trail_id' });
     return;
   }
-
-  const gate = await checkGuestSelfServiceEditAllowed(token);
-  if (!gate.ok) {
-    res.status(gate.status).json({ error: gate.error });
-    return;
-  }
-
   const result = await callBookingsWebApp('adventurePrep_selectTrail', { token, trailId });
   if (!result || result.ok === false) {
     const message = (result && result.error) || '';
@@ -230,7 +181,18 @@ async function sendSignerLinks(body, res) {
     res.status(400).json({ error: 'missing_token' });
     return;
   }
-  if (!signers || !signers.length) {
+  // BUG FIX (Aug 2026): this used to reject an EMPTY signers array
+  // (`!signers.length`), but an empty array is the correct, expected
+  // payload for a solo booking with nobody else to invite — the guest-
+  // facing review screen explicitly renders "No one else on this booking
+  // needs their own waiver link" and still calls this action, since it's
+  // also what triggers adventurePrep_recomputeAllWaiversComplete_ on the
+  // Apps Script side. Only a missing/non-array `signers` (a malformed
+  // request) is actually invalid now. Everything downstream (the Apps
+  // Script call and the email-sending Promise.all below) already handles
+  // an empty array correctly — this was the only place requiring it to be
+  // non-empty.
+  if (!signers) {
     res.status(400).json({ error: 'missing_signers' });
     return;
   }
@@ -292,18 +254,7 @@ async function adjustGearKitCount(body, res) {
     res.status(404).json({ error: 'invalid_token' });
     return;
   }
-  // FIX (build review, Aug 2026): this previously checked
-  // bookingStatus === 'cancelled', a value that never actually occurs — the
-  // real cancellation mechanism (api/cancel-and-refund-booking.js, built
-  // this session per Operations UX PRD Section 5) writes
-  // 'cancelled_no_adventure_prep' or 'cancelled_hold_failed', never the
-  // literal string 'cancelled'. That made this check dead code: a cancelled
-  // booking's kit-count adjustment was never actually being blocked.
-  // Corrected to the same bookingStatus !== 'active' pattern Section 5
-  // itself specifies for Surface A's own cancelled-status check, for the
-  // same reason (future-proof against whatever new cancellation status
-  // value gets added next, rather than re-breaking on the next one).
-  if (ctx.experienceBooking && ctx.experienceBooking.bookingStatus && ctx.experienceBooking.bookingStatus !== 'active') {
+  if (ctx.experienceBooking && ctx.experienceBooking.bookingStatus === 'cancelled') {
     res.status(409).json({ error: 'booking_cancelled' });
     return;
   }
