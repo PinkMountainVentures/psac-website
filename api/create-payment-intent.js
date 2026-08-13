@@ -11,13 +11,113 @@
 
 // Standard tiers only. Custom Experience is bespoke-priced and never
 // charged through this endpoint — that flow stays a personal follow-up.
+// NOTE: booking fee here is the CURRENT CHARGED amount, not the anchor
+// price shown struck through in the UI. The Early Guest discount lives
+// entirely in adventure-form.js's display layer ($125 shown crossed out,
+// $100 net) — this file only ever needs to know the real number to
+// charge. In November 2026, when the discount ends, this becomes 125 to
+// match adventure-form.js's own TIERS.trail.booking flip (see that
+// file's comment at the discount block).
 var TIERS = {
   trail: { name: 'Trail Guide Experience', booking: 100, gear: 65 },
   p2p:   { name: 'Peaks to Pools Experience', booking: 195, gear: 100 }
 };
 
+/* ============================================================================
+   CA SALES TAX (Stripe Tax) — Option A from psac-tax-and-stripe-implementation.md
+   ============================================================================
+   Tax the full combined transaction (booking + gear) at whatever the real
+   California/Riverside County rate is for the sourcing address below — no
+   attempt to split the booking fee (service) from the gear fee (rental) by
+   tax code. This is the deliberately conservative launch posture: over-
+   collecting isn't a legal problem, under-collecting is. Revisit after a
+   CPA opinion confirms whether the booking fee is actually non-taxable
+   (Option B in that doc), which would need a second, gear-only calculation
+   call instead of this single combined one.
+
+   SOURCING ADDRESS: every kit is delivered to and used inside Palm Springs
+   — that's true regardless of where the guest actually lives, and most
+   guests are visiting from somewhere else entirely. So the correct address
+   for Stripe Tax purposes is PSAC's own Palm Springs delivery area, not the
+   guest's home/billing address. This also means no guest address is needed
+   just to calculate tax at checkout — a real simplification, not a corner
+   cut (confirmed against Stripe's own current docs, docs.stripe.com/tax/
+   payment-intent/simplified, which pass a destination address exactly this
+   way via address_source: 'shipping').
+
+   PRE-FLIGHT REQUIREMENT — READ BEFORE DEPLOYING:
+   Stripe Tax returns $0 tax with a normal HTTP 200 (no error at all) for any
+   jurisdiction where this Stripe account has no active tax registration.
+   California MUST be added as a registration under Settings > Tax in the
+   Stripe Dashboard before this goes live, or every booking will look
+   completely normal while silently collecting zero tax — the exact same
+   "200 OK but wrong" failure class this project has hit before (the Apps
+   Script doPost gap, the TRAIL_DATABASE_SHEED_ID typo). calculateTax()
+   below logs loudly if this happens on a real charge so it doesn't go
+   unnoticed the way those did.
+   ============================================================================ */
+var TAX_CODE_CATCH_ALL = 'txcd_99999999'; // Option A: tax everything, no service/rental split
+var PSAC_TAX_SOURCE_ADDRESS = {
+  city: 'Palm Springs',
+  state: 'CA',
+  postal_code: '92262',
+  country: 'US'
+};
+
 function stripeAuthHeader() {
   return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
+}
+
+// Calls Stripe's Tax Calculation API on the pre-tax amount actually being
+// charged (already discount-aware — this is whatever TIERS resolves to
+// today, so it needs zero changes when the Early Guest discount ends in
+// November). Returns the Calculation object on success, or null if the
+// call itself fails (network error, bad request, etc.) — the caller falls
+// back to a manual flat-rate calculation in that case rather than blocking
+// checkout on a Tax API hiccup. Returning null is NOT the same as the
+// silent $0-tax case described above (that returns a normal 200 with a
+// real Calculation object, just one whose tax_amount_exclusive is 0) —
+// this function logs that case explicitly so it's distinguishable in
+// Vercel's logs from an ordinary API failure.
+async function calculateTax(amountCents, reference) {
+  try {
+    var params = new URLSearchParams();
+    params.append('currency', 'usd');
+    params.append('line_items[0][amount]', String(amountCents));
+    params.append('line_items[0][reference]', reference);
+    params.append('line_items[0][tax_code]', TAX_CODE_CATCH_ALL);
+    params.append('customer_details[address][city]', PSAC_TAX_SOURCE_ADDRESS.city);
+    params.append('customer_details[address][state]', PSAC_TAX_SOURCE_ADDRESS.state);
+    params.append('customer_details[address][postal_code]', PSAC_TAX_SOURCE_ADDRESS.postal_code);
+    params.append('customer_details[address][country]', PSAC_TAX_SOURCE_ADDRESS.country);
+    params.append('customer_details[address_source]', 'shipping');
+
+    var taxRes = await fetch('https://api.stripe.com/v1/tax/calculations', {
+      method: 'POST',
+      headers: { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+    var taxData = await taxRes.json();
+
+    if (!taxRes.ok) {
+      console.error('Stripe Tax calculation error:', taxData);
+      return null;
+    }
+
+    if (amountCents > 0 && (!taxData.tax_amount_exclusive || taxData.tax_amount_exclusive === 0)) {
+      console.error(
+        'Stripe Tax returned $0 tax on a non-zero charge — this almost always means ' +
+        'California is not yet registered under Settings > Tax in the Stripe Dashboard. ' +
+        'Verify before assuming this booking is genuinely tax-exempt.',
+        { calculationId: taxData.id, amountCents: amountCents }
+      );
+    }
+
+    return taxData;
+  } catch (err) {
+    console.error('calculateTax error:', err);
+    return null;
+  }
 }
 
 // Finds an existing Stripe Customer by exact email match, or creates one.
@@ -96,6 +196,33 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Tax the pre-tax amount actually being charged today (see the block
+    // comment above TIERS/PSAC_TAX_SOURCE_ADDRESS for the full reasoning).
+    var taxCalc = await calculateTax(amountCents, 'psac-booking-' + tierKey);
+    var finalAmountCents = amountCents;
+    var taxAmountCents = 0;
+    var taxFallbackApplied = false;
+    if (taxCalc) {
+      finalAmountCents = taxCalc.amount_total;
+      taxAmountCents = taxCalc.tax_amount_exclusive || 0;
+    } else {
+      // The Tax API call itself failed (not the silent-$0-registration
+      // case above, which still returns a normal 200 — this is a genuine
+      // network/API error). Don't block a guest's checkout on a Stripe Tax
+      // outage: fall back to the documented flat Palm Springs rate so the
+      // charge is still correct, but flag it clearly since this booking
+      // won't get an automatic Stripe Tax transaction record and needs to
+      // be included by hand in quarterly CDTFA reconciliation.
+      taxAmountCents = Math.round(amountCents * 0.0875);
+      finalAmountCents = amountCents + taxAmountCents;
+      taxFallbackApplied = true;
+      console.error(
+        'Tax calculation API call failed — applied manual 8.75% fallback. ' +
+        'Flag this booking for manual CDTFA reconciliation (no Stripe Tax transaction record exists for it).',
+        { tier: tierKey, amountCents: amountCents, fallbackTaxAmountCents: taxAmountCents }
+      );
+    }
+
     var email = String(body.email || '').slice(0, 200);
     var name = String(body.name || '').slice(0, 200);
     var date = String(body.date || '').slice(0, 40);
@@ -108,7 +235,7 @@ module.exports = async function handler(req, res) {
     var customerId = await findOrCreateCustomer(email, name);
 
     var params = new URLSearchParams();
-    params.append('amount', String(amountCents));
+    params.append('amount', String(finalAmountCents));
     params.append('currency', 'usd');
     // Restricted to card-rail methods only (card entry, Apple Pay, Google
     // Pay) — all settle instantly, matching the immediate "Reserved"
@@ -132,6 +259,17 @@ module.exports = async function handler(req, res) {
       // truly unattended charge behaves correctly.
       params.append('setup_future_usage', 'off_session');
     }
+    if (taxCalc) {
+      // Links this PaymentIntent to the Tax Calculation above so Stripe
+      // automatically records the tax transaction on success and handles
+      // reversals on refund — see docs.stripe.com/tax/payment-intent/simplified.
+      // Only set when the real Stripe Tax call succeeded; the manual-
+      // fallback path above has no calculation to link, hence taxFallbackApplied.
+      params.append('hooks[inputs][tax][calculation]', taxCalc.id);
+    }
+    if (taxFallbackApplied) {
+      params.append('metadata[tax_fallback]', 'true');
+    }
 
     var stripeRes = await fetch('https://api.stripe.com/v1/payment_intents', {
       method: 'POST',
@@ -153,7 +291,13 @@ module.exports = async function handler(req, res) {
 
     res.status(200).json({
       clientSecret: data.client_secret,
-      amount: totalDollars,
+      // Authoritative, tax-inclusive dollar figure — this is what the card
+      // actually gets charged. subtotal/taxAmount are broken out so the
+      // front-end can show a clear line-item breakdown instead of just a
+      // bigger number appearing after the fact.
+      amount: finalAmountCents / 100,
+      subtotal: totalDollars,
+      taxAmount: taxAmountCents / 100,
       customerId: customerId || null
     });
   } catch (err) {

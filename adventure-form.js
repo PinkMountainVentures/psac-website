@@ -63,6 +63,27 @@
     custom: { key: 'custom', name: 'Custom Experience',         booking: 595, gear: 100 }
   };
 
+  // CA sales tax (Palm Springs / Riverside County), Option A from
+  // psac-tax-and-stripe-implementation.md: applied to the full combined
+  // booking + gear total, no service/rental split. This is a DISPLAY
+  // ESTIMATE only, computed the same way api/create-payment-intent.js's
+  // real Stripe Tax call resolves it, so the guest sees the true total
+  // before paying instead of a number that jumps after they click through.
+  // The server-side calculation via Stripe Tax remains the authoritative
+  // figure that's actually charged — this constant exists purely so this
+  // screen doesn't have to wait on a network round trip just to show an
+  // accurate-looking total. Not charged through this endpoint for Custom
+  // Experience, so no tax is shown there (see isCustom checks below).
+  var TAX_RATE = 0.0875;
+
+  function taxCentsFor(subtotalDollars) {
+    return Math.round(subtotalDollars * 100 * TAX_RATE);
+  }
+
+  function formatDollars(cents) {
+    return (cents / 100).toFixed(2);
+  }
+
   // Multi-day trips route to a personal email inquiry instead of instant
   // checkout (see cardDuration() and showCustomContactOverlay() below).
   var CUSTOM_CONTACT_EMAIL = 'hello@palmspringsadventureclub.com';
@@ -1208,7 +1229,18 @@
       html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span>$' + tier.booking + '</span></div>';
     }
     html += '<div class="paf-price-line"><span>Gear kit × ' + gearCount + '</span><span>$' + (tier.gear * gearCount) + '</span></div>';
-    html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + total + '</span></div>';
+    if (!isCustom) {
+      // Custom Experience isn't charged through this endpoint (personal
+      // follow-up quote), so no tax is calculated or shown for it — the
+      // "Starting estimate" total stays exactly what it was.
+      var taxCents = taxCentsFor(total);
+      var grandTotalCents = Math.round(total * 100) + taxCents;
+      html += '<div class="paf-price-line"><span>Subtotal</span><span>$' + total + '</span></div>';
+      html += '<div class="paf-price-line"><span>CA sales tax (8.75%)</span><span>$' + formatDollars(taxCents) + '</span></div>';
+      html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + formatDollars(grandTotalCents) + '</span></div>';
+    } else {
+      html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + total + '</span></div>';
+    }
     html += '</div>';
     if (!isCustom) {
       html += '<div class="paf-deposit-card">' +
@@ -1230,10 +1262,15 @@
       '</label>';
     html += '<button type="button" class="paf-reserve-btn" data-field="reserve">' + esc(reserveLabel) + '</button>';
     if (!isCustom) {
+      // Estimated tax-inclusive figure for the initial label — reconciled
+      // with the authoritative server-calculated amount as soon as
+      // /api/create-payment-intent responds (see startStripePaymentWithKey),
+      // so this never drifts from what the card actually gets charged.
+      var payBtnEstimate = formatDollars(Math.round(total * 100) + taxCentsFor(total));
       html += '<div class="paf-payment-section" data-field="payment-section" style="display:none;">' +
         '<div class="paf-payment-element" data-field="payment-element"></div>' +
         '<div class="paf-payment-error" data-field="payment-error" style="display:none;"></div>' +
-        '<button type="button" class="paf-reserve-btn" data-field="pay-btn" disabled>Pay $' + total + ' &amp; Reserve</button>' +
+        '<button type="button" class="paf-reserve-btn" data-field="pay-btn" disabled>Pay $' + payBtnEstimate + ' &amp; Reserve</button>' +
         '</div>';
     }
     if (priceNote) {
@@ -1338,6 +1375,21 @@
         reserveBtn.style.display = 'none';
         section.style.display = 'block';
 
+        // result.data.amount is the authoritative, tax-inclusive figure
+        // from Stripe's actual Tax calculation, computed server-side —
+        // this replaces the client-side estimate the button showed before
+        // this fetch resolved. In virtually every case these match to the
+        // penny (same fixed 8.75% rate, same rounding), but this line
+        // ensures the button never lies about the real charge even if
+        // they ever diverge.
+        var chargeTotal = (typeof result.data.amount === 'number') ? result.data.amount : total;
+        payBtn.textContent = 'Pay $' + chargeTotal.toFixed(2) + ' & Reserve';
+        // Persisted so buildPayload() records what was actually charged
+        // (tax-inclusive) rather than the pre-tax total, and so the
+        // confirmation email/Sheet can show the real sales-tax line item.
+        state.answers.chargedTotal = chargeTotal;
+        state.answers.taxAmount = (typeof result.data.taxAmount === 'number') ? result.data.taxAmount : (chargeTotal - total);
+
         stripeElementsInstance = stripe.elements({
           clientSecret: result.data.clientSecret,
           appearance: STRIPE_APPEARANCE
@@ -1358,7 +1410,7 @@
             if (confirmResult.error) {
               showError(confirmResult.error.message || 'Payment failed. Please check your card details and try again.');
               payBtn.disabled = false;
-              payBtn.textContent = 'Pay $' + total + ' & Reserve';
+              payBtn.textContent = 'Pay $' + (state.answers.chargedTotal || total).toFixed(2) + ' & Reserve';
               return;
             }
             var pi = confirmResult.paymentIntent;
@@ -1376,7 +1428,7 @@
             } else {
               showError('Payment did not complete. Please try again.');
               payBtn.disabled = false;
-              payBtn.textContent = 'Pay $' + total + ' & Reserve';
+              payBtn.textContent = 'Pay $' + (state.answers.chargedTotal || total).toFixed(2) + ' & Reserve';
             }
           }).catch(function () {
             showError('Something went wrong confirming your payment. Please try again.');
@@ -1492,7 +1544,13 @@
         smsConsentText: SMS_CONSENT_TEXT
       },
       tier: state.answers.tier,
-      total: computeTotal(state.answers.tier),
+      // Custom Experience never charges through create-payment-intent.js
+      // (personal follow-up quote), so it has no chargedTotal/taxAmount —
+      // computeTotal() alone is still correct there ("Starting estimate").
+      // Standard tiers use the actual tax-inclusive amount charged, set in
+      // startStripePaymentWithKey once /api/create-payment-intent responds.
+      total: (typeof state.answers.chargedTotal === 'number') ? state.answers.chargedTotal : computeTotal(state.answers.tier),
+      taxAmount: state.answers.taxAmount || 0,
       paymentIntentId: state.answers.paymentIntentId || null,
       paymentStatus: state.answers.paymentStatus || (state.answers.tier === 'custom' ? 'not_charged_custom_quote' : 'unpaid'),
       depositPaymentIntentId: state.answers.depositPaymentIntentId || null,
