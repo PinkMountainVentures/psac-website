@@ -12,11 +12,14 @@
 
   // Stripe publishable key: safe to expose client-side (it can only
   // create charges against the PaymentIntent our server creates, never
-  // move money on its own). Get this from the Stripe Dashboard →
-  // Developers → API keys. The matching *secret* key must never appear
-  // in this file. It lives only in the STRIPE_SECRET_KEY environment
-  // variable read by api/create-payment-intent.js.
-  var STRIPE_PUBLISHABLE_KEY = "pk_test_51TybOaPXYXpja2zMN06eY38zPQz7gtuqeY2fRrGmCc0nUNS3AH6fa4sZCs0sbxBOwBQLBOTFYBRRFaJcXpompn9l00ArdCLihA";
+  // move money on its own). NEW (Aug 2026): fetched at runtime from
+  // /api/stripe-config (backed by the STRIPE_PUBLISHABLE_KEY env var)
+  // instead of being hardcoded here — see that endpoint's header comment.
+  // Not a security change (this key was never secret), a maintenance one:
+  // going live now only needs an env var change, not a hand-edit of this
+  // file too. The matching *secret* key must never appear in this file —
+  // it lives only in STRIPE_SECRET_KEY, read server-side by
+  // api/create-payment-intent.js.
 
   // Card element theming to match brand tokens in styles.css.
   var STRIPE_APPEARANCE = {
@@ -32,12 +35,26 @@
 
   var stripeInstance = null;
   var stripeElementsInstance = null;
+  var stripeKeyPromise = null;
 
+  // Returns a Promise<Stripe|null> instead of a synchronous value, since
+  // the key now comes from a fetch. Cached after the first successful
+  // call (stripeInstance) and de-duped while in flight (stripeKeyPromise),
+  // so a guest re-entering the pricing step twice doesn't refetch.
   function getStripe() {
-    if (!stripeInstance && window.Stripe) {
-      stripeInstance = window.Stripe(STRIPE_PUBLISHABLE_KEY);
+    if (stripeInstance) return Promise.resolve(stripeInstance);
+    if (!window.Stripe) return Promise.resolve(null);
+    if (!stripeKeyPromise) {
+      stripeKeyPromise = fetch('/api/stripe-config')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data || !data.publishableKey) return null;
+          stripeInstance = window.Stripe(data.publishableKey);
+          return stripeInstance;
+        })
+        .catch(function () { return null; });
     }
-    return stripeInstance;
+    return stripeKeyPromise;
   }
 
   var TIERS = {
@@ -1268,22 +1285,37 @@
     var section = root.querySelector('[data-field="payment-section"]');
     var errorEl = root.querySelector('[data-field="payment-error"]');
     var payBtn = root.querySelector('[data-field="pay-btn"]');
-    var stripe = getStripe();
 
     function showError(msg) {
       errorEl.textContent = msg;
       errorEl.style.display = 'block';
     }
 
-    if (!stripe) {
-      section.style.display = 'block';
-      showError("Payment isn't available right now. Please refresh and try again, or reach out to us directly.");
-      return;
-    }
-
     reserveBtn.disabled = true;
     reserveBtn.textContent = 'Loading payment…';
 
+    // getStripe() now fetches the publishable key from /api/stripe-config
+    // (see that function's own comment above) — everything that used to
+    // run synchronously right after `var stripe = getStripe();` moves
+    // inside this .then() unchanged, just gated on that fetch resolving
+    // first.
+    getStripe().then(function (stripe) {
+      if (!stripe) {
+        reserveBtn.disabled = false;
+        reserveBtn.textContent = 'Continue to Payment';
+        section.style.display = 'block';
+        showError("Payment isn't available right now. Please refresh and try again, or reach out to us directly.");
+        return;
+      }
+
+      startStripePaymentWithKey(stripe, root, total, gearCount, reserveBtn, section, errorEl, payBtn, showError);
+    });
+  }
+
+  // Split out from startStripePayment() so the fetch-the-key step above
+  // stays easy to read — this is the original synchronous body, unchanged
+  // apart from taking `stripe` as a parameter instead of a closure var.
+  function startStripePaymentWithKey(stripe, root, total, gearCount, reserveBtn, section, errorEl, payBtn, showError) {
     fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1385,6 +1417,19 @@
       html += '</div>';
       html += '<div class="paf-closing-sub">How did that feel?</div>';
       html += '<div class="paf-rating" data-field="rating"></div>';
+      if (state.answers.adventurePrepUrl) {
+        // NEW (Aug 2026): "Finish setting up your adventure" (PRD Section
+        // 11's locked guest-facing name and URL for Surface A). Inline-
+        // styled rather than a new paf-* class + matching styles.css rule,
+        // since this is one small, isolated addition and everything else
+        // on this card already exists in styles.css. First-draft copy —
+        // not yet design-reviewed, same caveat as the matching CTA added
+        // to booking-confirmation-email.js.
+        html += '<div style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid rgba(42,71,71,0.12); text-align:center;">';
+        html += '<div style="font-size:0.85rem; color:#2A4747; opacity:0.75; margin-bottom:0.75rem;">A few more details whenever you\'re ready: delivery address, waivers, and your gear kit.</div>';
+        html += '<a href="' + esc(state.answers.adventurePrepUrl) + '" style="display:inline-block; background-color:#F58271; color:#FFFFFF; font-weight:600; text-decoration:none; padding:0.85rem 1.75rem; border-radius:8px;">Finish setting up your adventure &rarr;</a>';
+        html += '</div>';
+      }
       root.innerHTML = html;
       var ratingWrap = root.querySelector('[data-field="rating"]');
       for (var i = 1; i <= 5; i++) {
@@ -1472,6 +1517,12 @@
         if (data && data.ok) {
           state.answers.personId = data.personId || null;
           state.answers.bookingId = data.bookingId || null;
+          // NEW (Aug 2026): renders as the "Finish setting up your
+          // adventure" CTA on cardClosing() below, when present. May be
+          // null if adventurePrep_ensureToken soft-failed on the Apps
+          // Script side — cardClosing() already handles that by simply
+          // not rendering the CTA.
+          state.answers.adventurePrepUrl = data.adventurePrepUrl || null;
         }
       })
       .catch(function () { /* fail silently since booking/payment already happened, still show closing screen */ })

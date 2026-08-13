@@ -150,11 +150,12 @@ function handleSaveBooking(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
+  var personId, bookingId, gearRowsCreated;
   try {
     var contact = payload.contact || {};
-    var personId = findOrCreatePerson(ss, contact.name, contact.email, contact.phone,
+    personId = findOrCreatePerson(ss, contact.name, contact.email, contact.phone,
       contact.smsConsent, contact.smsConsentAt, contact.smsConsentText);
-    var bookingId = 'BK-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+    bookingId = 'BK-' + Utilities.getUuid().slice(0, 8).toUpperCase();
     var now = new Date().toISOString();
 
     var bookingsSheet = ss.getSheetByName(SHEETS.bookings);
@@ -189,11 +190,53 @@ function handleSaveBooking(payload) {
       var gearSheet = ss.getSheetByName(SHEETS.gearLog);
       gearSheet.getRange(gearSheet.getLastRow() + 1, 1, gearRows.length, gearRows[0].length).setValues(gearRows);
     }
-
-    return { ok: true, personId: personId, bookingId: bookingId, gearLogRowsCreated: gearRows.length };
+    gearRowsCreated = gearRows.length;
   } finally {
     lock.releaseLock();
   }
+
+  // NEW (Aug 2026): mint this booking's Adventure Prep token inline, right
+  // here at booking time, instead of leaving every booking without one
+  // until someone manually runs adventurePrep_ensureToken() as a backfill.
+  // Per that function's own doc comment and the Adventure Prep build
+  // handoff, token generation at booking time was explicitly deferred to
+  // "the booking-flow chat's job" — this is that.
+  //
+  // Deliberately called AFTER releasing the lock above, not nested inside
+  // it. adventurePrep_ensureToken() acquires its own LockService.
+  // getScriptLock() — and Apps Script's script lock is scoped to the whole
+  // script, not to a specific sheet/resource, so calling it while this
+  // execution still held the lock above would just be this same execution
+  // waiting on a lock only it could release: a guaranteed timeout, not a
+  // real concurrency race. The tiny gap between releasing the lock and this
+  // call is safe: the booking row already exists in the sheet by this
+  // point, and ensureToken is idempotent (PRD-required: "stable,
+  // non-rotating"), so nothing is lost even if something else touched this
+  // booking in between.
+  var adventurePrepToken = '';
+  try {
+    var tokenResult = adventurePrep_ensureToken({ bookingId: bookingId });
+    if (tokenResult && tokenResult.ok) {
+      adventurePrepToken = tokenResult.token;
+    } else {
+      console.error('adventurePrep_ensureToken did not return ok for booking ' + bookingId + ':', tokenResult);
+    }
+  } catch (tokenErr) {
+    // Never fail the booking save over this — the guest already paid and
+    // the booking row is already written. A missing token here just means
+    // the confirmation email/SMS/closing screen won't have an Adventure
+    // Prep link yet; adventurePrep_ensureToken can still be re-run for this
+    // bookingId later (via the webapp) to backfill it.
+    console.error('adventurePrep_ensureToken threw for booking ' + bookingId + ':', tokenErr);
+  }
+
+  return {
+    ok: true,
+    personId: personId,
+    bookingId: bookingId,
+    gearLogRowsCreated: gearRowsCreated,
+    adventurePrepToken: adventurePrepToken
+  };
 }
 
 // Looks up a single booking row by bookingId, for the Internal Operations

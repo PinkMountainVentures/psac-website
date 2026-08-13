@@ -18,6 +18,12 @@
 var { sendBookingConfirmationEmail } = require('../lib/send-booking-confirmation');
 var { sendBookingConfirmationSms } = require('../lib/send-booking-confirmation-sms');
 
+// Same constant/pattern as api/adventure-prep.js's own SITE_URL (kept
+// local rather than shared, matching this repo's existing convention of
+// each api/*.js file declaring what it needs rather than importing a
+// shared constants module).
+var SITE_URL = 'https://www.palmspringsadventureclub.com';
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -61,12 +67,23 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // NEW (Aug 2026): bookings-code.gs's handleSaveBooking() now mints an
+    // adventurePrepToken inline and returns it here — build the guest-
+    // facing URL once and hand it to the email/SMS senders below and back
+    // to the client. data.adventurePrepToken can legitimately be blank
+    // (adventurePrep_ensureToken is soft-failed on the Apps Script side,
+    // never blocking the booking save itself), so this degrades to `null`
+    // rather than shipping a broken link.
+    var adventurePrepUrl = data.adventurePrepToken
+      ? SITE_URL + '/complete-adventure-prep?token=' + encodeURIComponent(data.adventurePrepToken)
+      : null;
+
     // Booking confirmation email (see lib/send-booking-confirmation.js).
     // Never blocks or fails this response — the booking and payment have
     // already succeeded by this point, same reasoning as the sheet-save
     // error handling above. A send failure just gets logged.
     try {
-      var emailResult = await sendBookingConfirmationEmail(Object.assign({}, body, { bookingId: data.bookingId }));
+      var emailResult = await sendBookingConfirmationEmail(Object.assign({}, body, { bookingId: data.bookingId, adventurePrepUrl: adventurePrepUrl }));
       if (emailResult.status !== 'sent') {
         console.error('Booking confirmation email not sent:', data.bookingId, emailResult);
       }
@@ -80,7 +97,7 @@ module.exports = async function handler(req, res) {
     // lives inside sendBookingConfirmationSms so this call site doesn't
     // need to duplicate the consent logic.
     try {
-      var smsResult = await sendBookingConfirmationSms(Object.assign({}, body, { bookingId: data.bookingId }));
+      var smsResult = await sendBookingConfirmationSms(Object.assign({}, body, { bookingId: data.bookingId, adventurePrepUrl: adventurePrepUrl }));
       if (smsResult.status !== 'sent' && smsResult.status !== 'skipped') {
         console.error('Booking confirmation SMS not sent:', data.bookingId, smsResult);
       }
@@ -92,7 +109,8 @@ module.exports = async function handler(req, res) {
       ok: true,
       personId: data.personId || null,
       bookingId: data.bookingId || null,
-      gearLogRowsCreated: data.gearLogRowsCreated || 0
+      gearLogRowsCreated: data.gearLogRowsCreated || 0,
+      adventurePrepUrl: adventurePrepUrl
     });
   } catch (err) {
     console.error('save-booking error:', err);
