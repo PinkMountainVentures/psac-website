@@ -10,24 +10,47 @@
  * the Stripe charge/refund and Gear Check Log regeneration actually
  * happen. Rows still inside their debounce window are left untouched.
  *
- * NOT WIRED UP YET — flagged for Airey, two things still need doing
- * outside this chat's reach (no Vercel/GitHub access from here):
+ * WIRED UP, Aug 2026, with one deliberate compromise from the PRD's original
+ * 10-15 minute polling suggestion:
  *
- *   1. Add a `crons` entry to vercel.json pointing at this path. PRD
- *      Section 1 suggests checking every 10-15 minutes; NOTE Vercel's
- *      Hobby plan only allows once-daily cron invocations, a paid plan is
- *      required for anything more frequent. Confirm which plan this
- *      project is on before assuming a 10-15 minute schedule will actually
- *      run that often. Example entry once confirmed:
- *        "crons": [{ "path": "/api/process-pending-kit-changes", "schedule": "(every 15 min cron expression)" }]
+ *   1. `vercel.json` now has a `crons` entry: "15 5 * * *" (05:15 UTC =
+ *      10:15pm Pacific during PDT). This project is confirmed on the Vercel
+ *      Hobby plan (same plan that hit the 12-serverless-function cap during
+ *      the Adventure Prep deploy), and Hobby only allows once-daily cron
+ *      invocations — 10-15 minute polling needs a Pro plan. 10:15pm Pacific
+ *      was chosen because it's shortly after the fixed 10pm Pacific T-3
+ *      cutoff every booking's `computeT3CutoffUtc` resolves to, so one run
+ *      per day still catches every booking whose cutoff landed that day,
+ *      just later than the original design intended.
  *
- *   2. Set a CRON_SECRET env var in Vercel (Production). Vercel
- *      automatically attaches `Authorization: Bearer $CRON_SECRET` to its
- *      own cron-triggered requests when that env var exists, which this
- *      handler checks below. No such env var exists yet as of this build.
- *      Until it's set, this endpoint has no auth at all beyond being an
- *      unguessable-ish path — acceptable to leave open just long enough to
- *      hand-test it, not to leave live in production.
+ *      Real consequence of once-daily instead of every 10-15 minutes: a
+ *      guest's kit-count change now sits in `pending` for up to ~24 hours
+ *      before the Stripe charge/refund and Gear Check Log regen actually
+ *      happen, not the ~1 hour debounce window the PRD assumed, unless it
+ *      also happens to cross a T-3 cutoff. Nothing breaks (each row is
+ *      still evaluated correctly whenever the cron does run), it's just
+ *      slower than designed. Worth revisiting if that delay ever becomes a
+ *      real guest-facing problem — upgrading to Pro is the fix, not more
+ *      code here. Also note: this fixed UTC time is not DST-aware, so it
+ *      drifts to 9:15pm Pacific during PST (Nov-Mar), a day-level slop this
+ *      system already tolerates, not a new risk.
+ *
+ *   2. CRON_SECRET is now confirmed set in Vercel (Production) and the app
+ *      redeployed to pick it up.
+ *
+ * BUG FIX (independent bug pass, Aug 2026): this handler used to wrap its
+ * auth check in `if (process.env.CRON_SECRET) { ... }`, unlike its four
+ * sibling cron endpoints (process-t3-cutoff.js, check-adventure-prep-
+ * cadence.js, trigger-deposit-holds.js, check-hold-clearance-deadline.js),
+ * which all check unconditionally (`header === 'Bearer ' + process.env.
+ * CRON_SECRET`, which is also false — and therefore also rejects — when the
+ * env var is unset, since no real caller ever sends the literal string
+ * "Bearer undefined"). That meant THIS endpoint — the one of the five that
+ * moves real money via Stripe — was the only one that failed OPEN (no auth
+ * check ran at all) rather than failed CLOSED if CRON_SECRET were ever
+ * unset (a misconfigured redeploy, an accidentally-removed env var, a new
+ * environment without it copied over). Now matches its siblings' fail-
+ * closed pattern.
  */
 
 'use strict';
@@ -39,19 +62,10 @@ const { computeT3CutoffUtc } = require('../lib/t3-cutoff');
 const DEBOUNCE_WINDOW_MS = 60 * 60 * 1000; // 1 hour, per PRD Section 1
 
 module.exports = async function handler(req, res) {
-  // See header comment #2 — fails OPEN (no check at all) until CRON_SECRET
-  // is actually set in Vercel, so this can still be hand-tested with a
-  // plain curl before that's configured. Once CRON_SECRET exists, every
-  // request without the matching bearer token is rejected, including
-  // Vercel's own cron invocations if the secret is ever misconfigured —
-  // that fails safe (a missed tick is recoverable next tick; an
-  // unauthenticated money-moving endpoint left open is not).
-  if (process.env.CRON_SECRET) {
-    const authHeader = req.headers['authorization'] || '';
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      res.status(401).json({ error: 'unauthorized' });
-      return;
-    }
+  const authHeader = req.headers['authorization'] || '';
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
   }
 
   const now = new Date();

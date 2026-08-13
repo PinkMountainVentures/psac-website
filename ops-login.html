@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In — PSAC Ops</title>
+<!--
+  ops-login.html
+
+  The internal ops app's sign-in gate. Real, functional Google Identity
+  Services integration — the ONE thing it can't do from this session is
+  supply a live GOOGLE_OAUTH_CLIENT_ID, since that only exists inside
+  Airey's own Google Cloud Console project. See api/ops-auth.js's header
+  for the exact five setup steps still needed before this actually works.
+
+  Flow: Google's own button renders and handles the OAuth handshake
+  entirely client-side (no client secret ever touches this page, by
+  design). On success it calls handleCredentialResponse with a signed ID
+  token, which this page POSTs to /api/ops-auth {action:'login', idToken}.
+  That endpoint verifies the token server-side, checks the allowlist, and
+  sets the session cookie — this page never decides who's allowed in
+  itself, it only relays the token.
+-->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root { --pine: #2A4747; --pink: #F58271; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #F4F5F6; font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+    color: var(--pine);
+  }
+  .panel { background: #fff; border: 1px solid #DDE1E3; border-radius: 8px; padding: 40px 36px; max-width: 360px; text-align: center; }
+  .brand { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.55; margin-bottom: 18px; }
+  h1 { font-size: 1.1rem; margin: 0 0 8px; }
+  p { font-size: 0.82rem; color: #6B7378; margin: 0 0 24px; line-height: 1.6; }
+  #g_id_button_container { display: flex; justify-content: center; }
+  #login-error { margin-top: 16px; font-size: 0.8rem; color: #B3453A; display: none; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="brand">PSAC Ops</div>
+  <h1>Staff sign-in</h1>
+  <p>Sign in with your Palm Springs Adventure Club Google account.</p>
+
+  <!--
+    REPLACE data-client_id below with the real OAuth Client ID once created
+    (see api/ops-auth.js's header, step 3). Left as an obvious placeholder
+    rather than a plausible-looking fake value, so it fails loudly instead
+    of silently if someone forgets to swap it in.
+  -->
+  <div id="g_id_onload"
+       data-client_id="REPLACE_WITH_REAL_GOOGLE_OAUTH_CLIENT_ID"
+       data-callback="handleCredentialResponse"
+       data-auto_prompt="false">
+  </div>
+  <div id="g_id_button_container" class="g_id_signin"
+       data-type="standard" data-size="large" data-theme="outline"
+       data-text="signin_with" data-shape="pill">
+  </div>
+
+  <div id="login-error"></div>
+</div>
+
+<script>
+  function handleCredentialResponse(response) {
+    var errorEl = document.getElementById('login-error');
+    errorEl.style.display = 'none';
+
+    fetch('/api/ops-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ action: 'login', idToken: response.credential }),
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          errorEl.textContent = result.data && result.data.error === 'not_allowlisted'
+            ? 'That Google account isn’t authorized for the ops app. Contact Airey if this seems wrong.'
+            : 'Sign-in failed. Please try again.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        window.location.href = '/ops-alerts.html';
+      })
+      .catch(function () {
+        errorEl.textContent = 'Sign-in failed. Please try again.';
+        errorEl.style.display = 'block';
+      });
+  }
+</script>
+</body>
+</html>

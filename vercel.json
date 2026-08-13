@@ -1,6 +1,28 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "crons": [
+    {
+      "path": "/api/process-t3-cutoff",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/check-adventure-prep-cadence",
+      "schedule": "7,22,37,52 * * * *"
+    },
+    {
+      "path": "/api/trigger-deposit-holds",
+      "schedule": "*/15 15,16,17,18 * * *"
+    },
+    {
+      "path": "/api/check-hold-clearance-deadline",
+      "schedule": "*/15 18,19,20,21 * * *"
+    },
+    {
+      "path": "/api/process-pending-kit-changes",
+      "schedule": "10,25,40,55 * * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/after-the-trail-experience",

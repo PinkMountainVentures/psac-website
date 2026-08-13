@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Update Payment Method — Palm Springs Adventure Club</title>
+<!--
+  update-payment-method.html
+
+  Standalone, no-build-tool guest page (matches adventure-form.js's own
+  convention: vanilla JS, no framework, no bundler). Reached from the
+  deposit-hold-failed email's "UPDATE PAYMENT METHOD" button
+  (?bookingId=...&token=...), the adventurePrepToken already minted for
+  this booking, same low-stakes guest-auth pattern used by
+  complete-adventure-prep for Surface A.
+
+  Flow:
+    1. On load, POST /api/create-payment-update-session {bookingId, token}
+       -> {clientSecret, publishableKey}
+    2. Mount Stripe Elements (Payment Element, setup mode) against that
+       client secret.
+    3. On submit, stripe.confirmSetup(...). On success, POST
+       /api/save-updated-payment-method {bookingId, token, setupIntentId}
+       to persist the new card as the Customer's default.
+    4. Show a plain confirmation. Per the email's own copy, staff/the
+       system re-attempts the actual hold next cycle — this page's only
+       job is making sure the card on file works when that happens.
+
+  Font/color tokens match the rest of the brand (psac-brand-design-system):
+  teal #2A4747, Mountain Pink #F58271 accent, Cormorant Garamond / Montserrat.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+  :root {
+    --pine: #2A4747;
+    --pink: #F58271;
+    --sand: #F8F1E9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--sand);
+    font-family: Montserrat, Helvetica, Arial, sans-serif;
+    color: var(--pine);
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+  .brand {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--pine);
+    opacity: 0.6;
+    margin-bottom: 28px;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 300;
+    font-size: 1.9rem;
+    line-height: 1.25;
+    margin: 0 0 12px;
+  }
+  h1 em { font-style: italic; }
+  p.lede {
+    font-size: 0.92rem;
+    line-height: 1.7;
+    font-weight: 300;
+    margin: 0 0 28px;
+  }
+  .card-panel {
+    background: #fff;
+    border-radius: 6px;
+    padding: 28px 24px;
+    box-shadow: 0 1px 3px rgba(42,71,71,0.08);
+  }
+  #payment-element { margin-bottom: 20px; }
+  button.submit {
+    width: 100%;
+    background: var(--pink);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 14px;
+    font-family: Montserrat, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  button.submit:disabled { opacity: 0.55; cursor: default; }
+  #status-message {
+    margin-top: 16px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  #status-message.error { color: #B3453A; }
+  #status-message.success { color: #2A4747; }
+  .state-panel { text-align: center; padding: 40px 20px; }
+  .hidden { display: none !important; }
+  .spinner {
+    width: 22px; height: 22px; margin: 0 auto 16px;
+    border: 3px solid rgba(42,71,71,0.15);
+    border-top-color: var(--pine);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Palm Springs Adventure Club</div>
+
+  <div id="loading-state" class="state-panel">
+    <div class="spinner"></div>
+    <p class="lede">Loading your payment update…</p>
+  </div>
+
+  <div id="form-state" class="hidden">
+    <h1>Update your <em>payment method.</em></h1>
+    <p class="lede">Add a new card below. Once saved, we'll be able to place the hold for your upcoming adventure right away.</p>
+    <div class="card-panel">
+      <form id="payment-form">
+        <div id="payment-element"></div>
+        <button type="submit" id="submit-btn" class="submit">Save Payment Method</button>
+        <div id="status-message"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="success-state" class="state-panel hidden">
+    <h1>You're all set.</h1>
+    <p class="lede">Your new payment method is saved. We'll use it for the next step of getting your adventure ready — no need to do anything else here.</p>
+  </div>
+
+  <div id="error-state" class="state-panel hidden">
+    <h1>We hit a snag.</h1>
+    <p class="lede" id="error-detail">This link may have expired or already been used. Please reply to the email you received, or reach us at reservations@palmspringsadventureclub.com and we'll get it sorted directly.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function qs(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  var bookingId = qs('bookingId');
+  var token = qs('token');
+
+  var loadingState = document.getElementById('loading-state');
+  var formState = document.getElementById('form-state');
+  var successState = document.getElementById('success-state');
+  var errorState = document.getElementById('error-state');
+  var errorDetail = document.getElementById('error-detail');
+
+  function showError(message) {
+    if (message) errorDetail.textContent = message;
+    loadingState.classList.add('hidden');
+    formState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+  }
+
+  if (!bookingId || !token) {
+    showError('This link is missing some information. Please use the link from your email, or reach us at reservations@palmspringsadventureclub.com.');
+    return;
+  }
+
+  var stripe = null;
+  var elements = null;
+
+  fetch('/api/create-payment-update-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId: bookingId, token: token }),
+  })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok || !result.data || !result.data.clientSecret) {
+        showError(null);
+        return;
+      }
+      if (!result.data.publishableKey) {
+        showError('This page isn’t fully configured yet. Please reply to the email you received and we’ll take care of it directly.');
+        return;
+      }
+
+      stripe = Stripe(result.data.publishableKey);
+      elements = stripe.elements({ clientSecret: result.data.clientSecret });
+      var paymentElement = elements.create('payment');
+      paymentElement.mount('#payment-element');
+
+      loadingState.classList.add('hidden');
+      formState.classList.remove('hidden');
+    })
+    .catch(function () { showError(null); });
+
+  document.getElementById('payment-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    var submitBtn = document.getElementById('submit-btn');
+    var statusEl = document.getElementById('status-message');
+    submitBtn.disabled = true;
+    statusEl.className = '';
+    statusEl.textContent = 'Saving…';
+
+    stripe.confirmSetup({
+      elements: elements,
+      redirect: 'if_required',
+    }).then(function (result) {
+      if (result.error) {
+        statusEl.className = 'error';
+        statusEl.textContent = result.error.message || 'Something went wrong saving your card. Please try again.';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      var setupIntentId = result.setupIntent && result.setupIntent.id;
+      if (!setupIntentId) {
+        statusEl.className = 'error';
+        statusEl.textContent = 'Something went wrong saving your card. Please try again.';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      return fetch('/api/save-updated-payment-method', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: bookingId, token: token, setupIntentId: setupIntentId }),
+      })
+        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        .then(function (saveResult) {
+          if (!saveResult.ok) {
+            statusEl.className = 'error';
+            statusEl.textContent = 'Your card was saved with Stripe, but we couldn’t finish updating your booking. Please reply to the email you received so we can confirm it directly.';
+            submitBtn.disabled = false;
+            return;
+          }
+          formState.classList.add('hidden');
+          successState.classList.remove('hidden');
+        });
+    }).catch(function () {
+      statusEl.className = 'error';
+      statusEl.textContent = 'Something went wrong. Please try again, or reply to the email you received.';
+      submitBtn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

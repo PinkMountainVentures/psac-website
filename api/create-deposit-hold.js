@@ -130,6 +130,17 @@ module.exports = async function handler(req, res) {
     if (!tier) {
       // Custom Experience (and anything else) has no deposit hold — nothing
       // to do, not an error.
+      // BUG FIX (independent bug pass, Aug 2026): this used to return
+      // without ever calling updateBookingDepositStatus, so the Sheet's
+      // depositStatus stayed at its booking-time default ('scheduled_t1')
+      // forever for every Custom-tier booking. api/check-hold-clearance-
+      // deadline.js's noon check only special-cases the literal string
+      // 'skipped', not 'scheduled_t1' — so every Custom Experience booking
+      // fell through to that check's cancel-and-refund branch the day
+      // before the trip, despite never having had a deposit hold to begin
+      // with. Writing 'skipped' here is what that downstream check was
+      // always assuming would happen.
+      await updateBookingDepositStatus(bookingId, null, 'skipped');
       res.status(200).json({ status: 'skipped', reason: 'No deposit hold for this tier.' });
       return;
     }
@@ -163,6 +174,33 @@ module.exports = async function handler(req, res) {
 
     var customerId = mainData.customer;
     var paymentMethodId = mainData.payment_method;
+
+    // BUG FIX (independent bug pass, Aug 2026): prefer the Stripe Customer's
+    // CURRENT default payment method over the one frozen on the original
+    // main PaymentIntent. Without this, a guest who fixes a failed hold via
+    // the "update payment method" page (api/save-updated-payment-method.js,
+    // which sets invoice_settings.default_payment_method on the Customer)
+    // had that fix silently ignored: a retry of this endpoint kept charging
+    // the same, already-declined card off mainData.payment_method, and the
+    // booking got auto-cancelled at noon anyway despite the guest doing
+    // everything asked. Falls back to the original PaymentIntent's payment
+    // method if the Customer has no default set yet (the normal
+    // first-attempt case, where nobody's had to update anything) or if this
+    // lookup itself fails — never hard-fails the hold attempt over it.
+    if (customerId) {
+      try {
+        var customerRes = await fetch('https://api.stripe.com/v1/customers/' + encodeURIComponent(customerId), {
+          headers: { 'Authorization': stripeAuthHeader() }
+        });
+        var customerData = await customerRes.json();
+        if (customerRes.ok && customerData && customerData.invoice_settings && customerData.invoice_settings.default_payment_method) {
+          paymentMethodId = customerData.invoice_settings.default_payment_method;
+        }
+      } catch (custErr) {
+        console.error('create-deposit-hold: Customer default-payment-method lookup failed, falling back to the main PaymentIntent\'s payment method', custErr);
+      }
+    }
+
     if (!customerId || !paymentMethodId) {
       // No saved customer/payment method (e.g. Customer creation failed
       // silently earlier) — can't place a silent hold. Not a hard failure,

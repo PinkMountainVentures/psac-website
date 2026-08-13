@@ -122,10 +122,45 @@
 
 var ADVENTURE_PREP_NEW_COLUMNS = [
   'reconfirmedRosterJson', 'linksSentAt', 'createdAt',
+  // ADDED (build review, Aug 2026): api/process-t3-cutoff.js needs a place
+  // to write the T-3 RideWithGPS Experience link (PRD Section 14 step 5)
+  // and the manual-exception playbook (Section 8b) reads it to check
+  // whether a credential already went out. adventurePrep_appendColumnsIfMissing_
+  // is idempotent, so if this column already exists on the live sheet from
+  // an earlier, unseen build, this is a no-op.
+  'rideWithGpsExperienceAccess',
+  // FIX (build review, Aug 2026): Section 10's structured address fields
+  // already included deliveryAddressLine1/2, deliveryCity, deliveryState,
+  // deliveryZip, deliveryAddressValidated, and deliveryAddressRaw in
+  // ADVENTURE_PREP_WRITABLE_FIELDS below (an earlier build must have added
+  // those), but deliveryLat/deliveryLng — also explicitly required by
+  // Section 10 ("it returns geocoded coordinates that pair naturally with
+  // whatever eventually calls Uber Direct") — were missing from BOTH this
+  // column list and the writable-fields whitelist. Without this fix,
+  // api/validate-delivery-address.js could compute a lat/lng from Google's
+  // Address Validation API and it would have nowhere to be saved: saveFields
+  // silently rejects any field not in ADVENTURE_PREP_WRITABLE_FIELDS. Fixed
+  // in both places (see that list below too).
+  'deliveryLat', 'deliveryLng',
 ];
 
 var EXPERIENCE_BOOKINGS_NEW_COLUMNS = [
-  'adventurePrepToken', 'bookingStatus', 'cancelledAt', 'refundAmount', 'cancellationReasons',
+  'adventurePrepToken', 'bookingStatus', 'cancelledAt',
+  // FIX (build review, Aug 2026): 'refundId' was missing from this list even
+  // though the live Sheet already has the column (per the build checklist's
+  // own report of the six columns created there) and the finalized
+  // Operations UX PRD's Section 5 writes it on every cancellation. Harmless
+  // today since adventurePrep_headerMap_ reads the live header row directly
+  // rather than trusting this constant, but this list is also what
+  // idempotently (re)creates the column via adventurePrep_appendColumnsIfMissing_
+  // — without 'refundId' here, a fresh sheet or environment that re-runs
+  // adventurePrep_setup() from scratch would silently never get this column.
+  'refundId', 'refundAmount', 'cancellationReasons',
+  // ADDED (build review, Aug 2026): api/process-t3-cutoff.js's own
+  // idempotency marker — set once a booking has cleared all three
+  // cancellation gates and had steps 2-5 of the T-3 sequence applied, so a
+  // 15-minute cron tick never reprocesses an already-fully-handled booking.
+  't3CutoffProcessedAt',
 ];
 
 var WAIVER_SIGNATURES_HEADERS = [
@@ -375,6 +410,10 @@ var ADVENTURE_PREP_WRITABLE_FIELDS = [
   'propertyType', 'deliveryAddressLine1', 'deliveryAddressLine2',
   'deliveryCity', 'deliveryState', 'deliveryZip', 'deliveryAddressRaw',
   'deliveryAddressValidated', 'deliveryWindow', 'returnPreference',
+  // FIX (build review, Aug 2026): see ADVENTURE_PREP_NEW_COLUMNS' comment
+  // above — required by Section 10 so api/validate-delivery-address.js's
+  // geocoded result has somewhere to land via this same saveFields path.
+  'deliveryLat', 'deliveryLng',
 ];
 
 function adventurePrep_saveFields(payload) {
@@ -791,6 +830,12 @@ function adventurePrep_getKitContext(payload) {
     pendingKitCount: ap ? ap.pendingKitCount : '',
     pendingSince: ap ? ap.pendingSince : '',
     reconfirmedRosterJson: ap ? ap.reconfirmedRosterJson : '',
+    // ADDED (build review, Aug 2026): lib/finalize-kit-change.js needs these
+    // to notify the guest directly when a kit-count delta charge fails
+    // (Operations UX PRD Section 6 / Section 15's charge-failure notice) —
+    // previously this context had no way to reach the guest at all.
+    contactEmail: booking.contactEmail,
+    contactName: booking.contactName,
   };
 }
 

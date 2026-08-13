@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Adjustment | PSAC Ops</title>
+<!--
+  ops-manual-adjustment.html
+
+  Real, working version of claude/psac-ops-manual-adjustment-gear-
+  checkout.html's "Page D" mockup — the constrained, fixed-type form
+  Section 13 calls for ("not an open-ended field-write endpoint"), wired to
+  /api/ops-proxy -> api/apply-manual-adjustment.js. The dropdown only ever
+  offers the four types that endpoint accepts; there is deliberately no
+  free-form "field name / new value" pair anywhere on this page.
+
+  Page E (Gear Assembly/Checkout extensions) from that same mockup isn't
+  built here — it's explicitly a different, pre-existing tool per
+  psac-internal-ops-ux-brief.md, not one of this project's Section 13
+  endpoints.
+-->
+<style>
+  :root {
+    --mountain-pink: #F58271; --dark-pine: #2A4747;
+    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
+
+  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
+  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
+  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
+  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
+  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
+  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
+
+  .ops-main { padding:1.6rem 1.8rem; }
+  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
+  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
+  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
+  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
+  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
+
+  .ops-select, .ops-input { width:100%; padding:0.65rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; color:var(--ops-text); background:white; margin-bottom:0.9rem; }
+  .ops-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
+  .ops-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .ops-textarea { width:100%; border:1px solid var(--ops-border); border-radius:5px; padding:0.65rem 0.8rem; font-size:0.82rem; font-family:inherit; min-height:64px; margin-bottom:0.9rem; }
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-top:0.4rem; }
+  .ops-panel-title { font-size:0.95rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
+  .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.5rem; }
+  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
+  .ops-btn:disabled { opacity:0.4; cursor:default; }
+  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
+  .ops-helper { font-size:0.74rem; color:var(--ops-text-mid); font-style:italic; margin-top:-0.4rem; margin-bottom:0.9rem; }
+
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.65rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .ops-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; background:#E7ECEE; color:#3E4A50; }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+
+  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar">
+      <div class="ops-sidebar-brand">PSAC Ops</div>
+      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
+      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
+      <a class="ops-nav-item is-active" href="ops-manual-adjustment.html">Manual Adjustment</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Owned by the separate gear checkout/check-in tool, per psac-internal-ops-ux-brief.md">Gear Assembly &amp; Checkout</a>
+    </div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title">Manual Adjustment</div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div class="ops-subtitle">For the off-system playbooks only (Section 8). Every submission calls api/apply-manual-adjustment.js, never a direct sheet edit.</div>
+
+      <div id="banner-container"></div>
+
+      <div class="ops-panel">
+        <div class="ops-form-grid">
+          <div class="ops-form-row"><label>Booking ID</label><input class="ops-input" id="booking-id" placeholder="BK-10502"></div>
+          <div class="ops-form-row">
+            <label>Adjustment type</label>
+            <select class="ops-select" id="adjustment-type">
+              <option value="kit_count_correction">Kit count correction</option>
+              <option value="gear_check_log_adjustment">Gear Check Log adjustment</option>
+              <option value="change_log_note">Change log note</option>
+              <option value="gear_returned_uncleaned">Gear returned, uncleaned</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="type-specific-fields"></div>
+
+        <div class="ops-form-row"><label>Staff notes (required)</label><textarea class="ops-textarea" id="staff-notes" placeholder="Any context for the record..."></textarea></div>
+
+        <div class="ops-panel-footer">
+          <button class="ops-btn-secondary" id="form-reset">Clear</button>
+          <button class="ops-btn" id="form-submit">Apply Adjustment</button>
+        </div>
+      </div>
+
+      <div style="margin-top:1.4rem;">
+        <div class="ops-panel-title" style="font-size:0.85rem;">Recent Change Log entries</div>
+        <div class="ops-helper">Not filtered to only this page's adjustments — this tab is shared with every other change-logging write path in the project.</div>
+        <div id="recent-log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function opsCall(action, payload) {
+    return fetch('/api/ops-proxy', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function showBanner(kind, message) {
+    var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
+  }
+
+  function renderTypeFields(type) {
+    var el = document.getElementById('type-specific-fields');
+    if (type === 'kit_count_correction') {
+      el.innerHTML = '<div class="ops-form-row"><label>New confirmed kit count</label><input class="ops-input" id="field-new-kit-count" type="number" min="0" placeholder="2"></div>';
+    } else if (type === 'gear_check_log_adjustment') {
+      el.innerHTML = '<div class="ops-form-row"><label>Kit numbers to remove (comma-separated)</label><input class="ops-input" id="field-kit-numbers" placeholder="GP-0142, LK-0311"></div>';
+    } else if (type === 'change_log_note') {
+      el.innerHTML = '<div class="ops-form-row"><label>Change type label</label><input class="ops-input" id="field-change-type" placeholder="kit_count"></div>';
+    } else {
+      el.innerHTML = '<div class="ops-helper" style="margin-top:0.4rem;">No additional fields — this just logs the audit-trail note for gear checked back in unused after a hold-clearance cancellation (Section 8c).</div>';
+    }
+  }
+
+  function loadRecentLog() {
+    opsCall('listChangeLogRecent', {}).then(function (result) {
+      var container = document.getElementById('recent-log');
+      if (!result.ok) { container.innerHTML = '<div class="ops-empty">Could not load recent activity.</div>'; return; }
+      var entries = result.data.entries || [];
+      if (!entries.length) { container.innerHTML = '<div class="ops-empty">No change log entries yet.</div>'; return; }
+      var rows = entries.map(function (e) {
+        return '<tr><td>#' + escapeHtml(e.bookingId) + '</td><td><span class="ops-tag">' + escapeHtml(e.changeType) + '</span></td>'
+          + '<td>' + escapeHtml(e.staffNotes || '') + '</td><td>' + escapeHtml(e.timestamp || '') + '</td></tr>';
+      }).join('');
+      container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Type</th><th>Notes</th><th>When</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    });
+  }
+
+  function resetForm() {
+    document.getElementById('booking-id').value = '';
+    document.getElementById('staff-notes').value = '';
+    renderTypeFields(document.getElementById('adjustment-type').value);
+  }
+
+  function submitForm() {
+    var bookingId = document.getElementById('booking-id').value.trim();
+    var type = document.getElementById('adjustment-type').value;
+    var staffNotes = document.getElementById('staff-notes').value.trim();
+
+    if (!bookingId) { showBanner('error', 'Booking ID is required.'); return; }
+    if (!staffNotes) { showBanner('error', 'Staff notes are required for every manual adjustment.'); return; }
+
+    var payload = { type: type, bookingId: bookingId, staffNotes: staffNotes };
+
+    if (type === 'kit_count_correction') {
+      var newCount = document.getElementById('field-new-kit-count').value;
+      if (newCount === '' || isNaN(Number(newCount))) { showBanner('error', 'A new confirmed kit count is required.'); return; }
+      payload.newConfirmedKitCount = Number(newCount);
+    } else if (type === 'gear_check_log_adjustment') {
+      var kitNumbers = document.getElementById('field-kit-numbers').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!kitNumbers.length) { showBanner('error', 'At least one kit number is required.'); return; }
+      payload.kitNumbersToRemove = kitNumbers;
+    } else if (type === 'change_log_note') {
+      payload.changeType = document.getElementById('field-change-type').value.trim() || 'kit_count';
+    }
+
+    document.getElementById('form-submit').disabled = true;
+    opsCall('applyManualAdjustment', payload).then(function (result) {
+      document.getElementById('form-submit').disabled = false;
+      if (!result.ok) {
+        showBanner('error', (result.data && result.data.detail) || 'Could not apply that adjustment.');
+        return;
+      }
+      showBanner('success', 'Adjustment applied for #' + bookingId + '.');
+      resetForm();
+      loadRecentLog();
+    });
+  }
+
+  function initShell(email) {
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('loading-gate').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.getElementById('signout-btn').addEventListener('click', function () {
+      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
+        .then(function () { window.location.href = 'ops-login.html'; });
+    });
+
+    renderTypeFields('kit_count_correction');
+    document.getElementById('adjustment-type').addEventListener('change', function (e) { renderTypeFields(e.target.value); });
+    document.getElementById('form-reset').addEventListener('click', resetForm);
+    document.getElementById('form-submit').addEventListener('click', submitForm);
+
+    loadRecentLog();
+  }
+
+  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
+      initShell(result.data.email);
+    })
+    .catch(function () { window.location.href = 'ops-login.html'; });
+})();
+</script>
+</body>
+</html>

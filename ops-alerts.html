@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops Alerts | PSAC Ops</title>
+<!--
+  ops-alerts.html
+
+  Real, working version of claude/psac-ops-alerts-stalled-cancellations.html's
+  "Page B" mockup — same visual shell/tokens, wired to /api/ops-proxy instead
+  of static rows. Everything here (list, Resolve) round-trips through the
+  proxy, which checks the staff session cookie on every call and holds the
+  actual OPS_ALERT_SHARED_SECRET server-side (see api/ops-proxy.js).
+
+  Stalled Bookings and Cancellations (the mockup's Pages A and C) are NOT
+  wired up in this pass — no list-read Apps Script action exists yet for
+  either (cadence_listActiveBookings returns bookings to nudge, not a
+  stalled-with-track-detail view shaped for this page; a cancellations
+  audit reader was never built). Shown in the sidebar as visibly disabled
+  rather than silently missing, so nobody mistakes "not on the nav" for
+  "forgotten" versus "a real follow-up item" — see the Aug 2026 build-review
+  addendum for the honest status of each.
+-->
+<style>
+  :root {
+    --mountain-pink: #F58271; --desert-green: #7ABD91; --sunset-red: #E76F51;
+    --dark-pine: #2A4747;
+    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
+
+  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
+  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
+  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
+  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
+  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
+  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
+
+  .ops-main { padding:1.6rem 1.8rem; }
+  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
+  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
+  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
+  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
+
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .ops-table tr:hover td { background:#FAFBFB; }
+
+  .ops-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; }
+  .ops-tag.callnow { background:var(--sunset-red); color:white; }
+  .ops-tag.hr24 { background:#FFF3D6; color:#8a6300; }
+  .ops-tag.hr48, .ops-tag.other { background:#E7ECEE; color:#3E4A50; }
+  .ops-tag.open { background:rgba(245,130,113,0.15); color:#b04a2a; }
+  .ops-tag.resolved { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+
+  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
+  .ops-btn:hover { background:#1e3535; }
+  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.4rem 0.75rem; font-size:0.76rem; cursor:pointer; }
+  .ops-btn:disabled, .ops-btn-secondary:disabled { opacity:0.4; cursor:default; }
+
+  .ops-callout { display:flex; align-items:center; gap:0.6rem; background:var(--sunset-red); color:white; border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.85rem; font-weight:600; }
+  .ops-empty { text-align:center; padding:2.5rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+
+  .resolve-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-top:1rem; }
+  .resolve-panel textarea { width:100%; min-height:56px; border:1px solid var(--ops-border); border-radius:5px; padding:0.6rem 0.8rem; font-size:0.82rem; font-family:inherit; margin-top:0.6rem; }
+  .resolve-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.8rem; }
+
+  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar">
+      <div class="ops-sidebar-brand">PSAC Ops</div>
+      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
+      <a class="ops-nav-item is-active" href="ops-alerts.html">Ops Alerts</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
+      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Owned by the separate gear checkout/check-in tool, per psac-internal-ops-ux-brief.md">Gear Assembly &amp; Checkout</a>
+    </div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title">Ops Alerts</div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+      <div id="callout-row"></div>
+      <div id="table-container"></div>
+      <div id="resolve-container"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function opsCall(action, payload) {
+    return fetch('/api/ops-proxy', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function urgencyTag(urgency) {
+    if (urgency === 'same_day_2hr') return '<span class="ops-tag callnow">same-day, 2hr</span>';
+    if (urgency === '24hr') return '<span class="ops-tag hr24">24hr</span>';
+    if (urgency === '48hr') return '<span class="ops-tag hr48">48hr</span>';
+    return '<span class="ops-tag other">' + escapeHtml(urgency || '—') + '</span>';
+  }
+
+  function formatMoney(amount) {
+    if (amount === '' || amount == null) return '—';
+    var n = Number(amount);
+    if (isNaN(n)) return escapeHtml(amount);
+    // amount is stored in the sheet as whatever unit create-deposit-hold.js
+    // itself writes — this project's Stripe integration was never confirmed
+    // to store cents vs. whole dollars in this specific field, so this
+    // renders the raw stored value rather than guessing a /100 conversion.
+    return '$' + n.toFixed(2);
+  }
+
+  function showError(message) {
+    var el = document.getElementById('error-banner');
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  function renderAlerts(alerts) {
+    var callout = document.getElementById('callout-row');
+    var urgent = alerts.filter(function (a) { return a.status === 'Open' && a.urgency === 'same_day_2hr'; });
+    callout.innerHTML = urgent.map(function (a) {
+      return '<div class="ops-callout">⚠ #' + escapeHtml(a.bookingId) + ' — ' + escapeHtml(a.alertType)
+        + (a.amount ? ', ' + formatMoney(a.amount) : '') + '. Call now.</div>';
+    }).join('');
+
+    var container = document.getElementById('table-container');
+    if (!alerts.length) {
+      container.innerHTML = '<div class="ops-empty">No alerts on record yet.</div>';
+      return;
+    }
+
+    var rows = alerts.map(function (a) {
+      var statusTag = a.status === 'Resolved'
+        ? '<span class="ops-tag resolved">Resolved</span>'
+        : '<span class="ops-tag open">Open</span>';
+      var action = a.status === 'Resolved'
+        ? '<span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(a.resolvedBy || '') + (a.resolvedAt ? (' — ' + escapeHtml(String(a.resolvedAt).slice(0, 10))) : '') + '</span>'
+        : '<button class="ops-btn-secondary" data-resolve-alert="' + escapeHtml(a.alertId) + '">Resolve</button>';
+      return '<tr>'
+        + '<td>#' + escapeHtml(a.bookingId) + '</td>'
+        + '<td>' + escapeHtml(a.alertType) + '</td>'
+        + '<td>' + urgencyTag(a.urgency) + '</td>'
+        + '<td>' + formatMoney(a.amount) + '</td>'
+        + '<td>' + escapeHtml(a.createdAt || '') + '</td>'
+        + '<td>' + statusTag + '</td>'
+        + '<td>' + action + '</td>'
+        + '</tr>';
+    }).join('');
+
+    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Urgency</th><th>Amount</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+    container.querySelectorAll('[data-resolve-alert]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openResolvePanel(btn.getAttribute('data-resolve-alert')); });
+    });
+  }
+
+  function openResolvePanel(alertId) {
+    var container = document.getElementById('resolve-container');
+    container.innerHTML = '<div class="resolve-panel">'
+      + '<strong>Resolve — #' + escapeHtml(alertId) + '</strong>'
+      + '<div style="font-size:0.8rem; color:var(--ops-text-mid); margin-top:0.4rem;">Confirm the underlying issue is actually fixed before resolving — this does not retry any charge or hold itself, it only records that it\'s been handled.</div>'
+      + '<textarea id="resolve-notes" placeholder="Notes (optional)"></textarea>'
+      + '<div class="resolve-panel-footer">'
+      + '<button class="ops-btn-secondary" id="resolve-cancel">Cancel</button>'
+      + '<button class="ops-btn" id="resolve-confirm">Mark Resolved</button>'
+      + '</div></div>';
+
+    document.getElementById('resolve-cancel').addEventListener('click', function () { container.innerHTML = ''; });
+    document.getElementById('resolve-confirm').addEventListener('click', function () {
+      var notes = document.getElementById('resolve-notes').value;
+      opsCall('resolveOpsAlert', { alertId: alertId, notes: notes }).then(function (result) {
+        if (!result.ok) { showError('Could not resolve that alert. Please try again.'); return; }
+        container.innerHTML = '';
+        loadAlerts();
+      });
+    });
+  }
+
+  function loadAlerts() {
+    opsCall('listOpsAlerts', {}).then(function (result) {
+      if (!result.ok) { showError('Could not load Ops Alerts.'); return; }
+      renderAlerts(result.data.alerts || []);
+    });
+  }
+
+  function initShell(email) {
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('loading-gate').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.getElementById('signout-btn').addEventListener('click', function () {
+      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
+        .then(function () { window.location.href = 'ops-login.html'; });
+    });
+    loadAlerts();
+  }
+
+  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
+      initShell(result.data.email);
+    })
+    .catch(function () { window.location.href = 'ops-login.html'; });
+})();
+</script>
+</body>
+</html>
