@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Return Check-In | PSAC Ops</title>
+<!--
+  ops-gear-checkin.html
+
+  Real, working version of claude/psac-ops-gear-return-checkin.html's
+  mockup — Gear Inventory PRD Section 5/9. Per-item condition entry
+  (Good/Damaged/Missing/Recovered), the damage-severity rubric rendered
+  VERBATIM per itemType (Section 9, not paraphrased), required photo
+  upload for Damaged/Missing, and the 48-hour grace-period countdown for
+  Missing items. Wired to /api/ops-proxy -> api/check-in-gear-item.js.
+
+  Photos are captured via a plain file input with capture="environment"
+  (opens the device camera directly on mobile, per Section 5/11 — check-in
+  happens on a phone in the field), base64-encoded client-side, and posted
+  as a data URL to the uploadPhoto action, which stores it in Vercel Blob
+  and returns the public URL used on the actual checkIn call.
+-->
+<style>
+  :root {
+    --mountain-pink: #F58271; --dark-pine: #2A4747;
+    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
+    --amber-bg: rgba(154,91,30,0.12); --amber-text: #9A5B1E; --amber-border: rgba(154,91,30,0.35);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
+
+  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
+  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
+  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
+  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
+  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
+  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
+
+  .ops-main { padding:1.6rem 1.8rem; }
+  .ops-breadcrumb { font-size:0.78rem; margin-bottom:0.8rem; }
+  .ops-breadcrumb a { color:var(--mountain-pink); text-decoration:none; cursor:pointer; }
+  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
+  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
+  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
+  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
+  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
+
+  .ops-input, .ops-select { padding:0.6rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; background:white; }
+  .ops-textarea { width:100%; border:1px solid var(--ops-border); border-radius:5px; padding:0.6rem 0.8rem; font-size:0.82rem; font-family:inherit; min-height:56px; margin-top:0.5rem; }
+  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
+  .ops-btn:disabled { opacity:0.4; cursor:default; }
+  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
+  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.6rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+
+  .item-card { border:1px solid var(--ops-border); border-radius:8px; padding:1.1rem 1.3rem; margin-bottom:1rem; }
+  .item-card-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem; }
+  .item-card-name { font-weight:700; color:var(--dark-pine); font-size:0.92rem; }
+  .unit-chip { display:inline-block; background:var(--ops-bg); border:1px solid var(--ops-border); border-radius:4px; padding:0.15rem 0.5rem; font-size:0.74rem; font-family:monospace; }
+
+  .cond-seg { display:flex; gap:0.4rem; }
+  .cond-seg button { border:1px solid var(--ops-border); background:white; border-radius:4px; padding:0.35rem 0.7rem; font-size:0.76rem; cursor:pointer; }
+  .cond-seg button.sel-good { background:rgba(122,189,145,0.2); border-color:#2a7a4a; color:#2a7a4a; }
+  .cond-seg button.sel-damaged { background:rgba(231,111,81,0.15); border-color:#a8341c; color:#a8341c; }
+  .cond-seg button.sel-missing { background:var(--amber-bg); border-color:var(--amber-border); color:var(--amber-text); }
+  .cond-seg button.sel-recovered { background:rgba(122,189,145,0.2); border-color:#2a7a4a; color:#2a7a4a; }
+
+  .rubric-toggle { font-size:0.76rem; color:var(--mountain-pink); cursor:pointer; display:inline-block; margin-top:0.4rem; }
+  .rubric-box { display:none; margin-top:0.5rem; padding:0.8rem; background:var(--ops-bg); border-radius:6px; display:grid; grid-template-columns:1fr 1fr; gap:1rem; font-size:0.78rem; }
+  .rubric-box.show { display:grid; }
+  .rubric-col-hdr { font-weight:700; font-size:0.72rem; text-transform:uppercase; margin-bottom:0.3rem; }
+  .rubric-col-hdr.damaged { color:#a8341c; }
+  .rubric-col-hdr.normal { color:#2a7a4a; }
+  .rubric-box ul { padding-left:1.1rem; }
+
+  .photo-drop { display:none; margin-top:0.6rem; border:1px dashed var(--ops-border); border-radius:6px; padding:0.9rem; text-align:center; font-size:0.8rem; color:var(--ops-text-mid); }
+  .photo-drop.show { display:block; }
+  .take-photo-btn { margin-top:0.5rem; background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.45rem 0.9rem; font-size:0.76rem; cursor:pointer; }
+  .photo-thumb { display:inline-block; margin-top:0.5rem; font-size:0.72rem; color:#2a7a4a; }
+
+  .grace-box { background:var(--amber-bg); border:1px solid var(--amber-border); color:var(--amber-text); border-radius:6px; padding:0.7rem 0.9rem; margin-top:0.6rem; font-size:0.8rem; }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+
+  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
+  .hidden { display:none !important; }
+
+  @media (max-width: 760px) {
+    .ops-app { grid-template-columns:1fr; margin:0.8rem; min-height:auto; }
+    .ops-sidebar { display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0.6rem 0.4rem; gap:0.2rem; }
+    .ops-sidebar-brand { display:none; }
+    .ops-nav-item { border-left:none; border-bottom:3px solid transparent; white-space:nowrap; padding:0.6rem 0.8rem; }
+    .ops-nav-item.is-active { border-left-color:transparent; border-bottom-color:var(--mountain-pink); }
+    .ops-main { padding:1.1rem 1rem; }
+    .rubric-box { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar">
+      <div class="ops-sidebar-brand">PSAC Ops</div>
+      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
+      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
+      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
+      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
+      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
+      <a class="ops-nav-item is-active" href="ops-gear-checkin.html">Return Check-In</a>
+      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
+    </div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title">Return Check-In</div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+
+      <div id="banner-container"></div>
+
+      <div id="queue-view">
+        <div class="ops-subtitle">Bookings whose gear has been delivered for the selected trail day.</div>
+        <div style="margin-bottom:1rem;">
+          <label style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-right:0.5rem;">Trip date</label>
+          <input class="ops-input" id="queue-trip-date" type="date">
+        </div>
+        <div id="queue-list"><div class="ops-empty">Pick a date to load the check-in queue.</div></div>
+      </div>
+
+      <div id="detail-view" class="hidden">
+        <div class="ops-breadcrumb"><a id="back-to-queue">&larr; Return Check-In queue</a></div>
+        <div id="detail-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Section 9 — rendered verbatim, never paraphrased.
+  var RUBRIC = {
+    backpack_standard: { label: 'Backpack', damaged: ['Broken buckle or clip', 'Torn seam over 2 inches', 'Broken zipper pull or non-functional zipper', 'Snapped or bent frame stay', 'Strap tear or detachment'], normal: ['Fabric fading, minor scuffing', 'Loose thread', 'Dirt/dust', 'Minor odor'] },
+    backpack_plus: { label: 'Backpack', damaged: ['Broken buckle or clip', 'Torn seam over 2 inches', 'Broken zipper pull or non-functional zipper', 'Snapped or bent frame stay', 'Strap tear or detachment'], normal: ['Fabric fading, minor scuffing', 'Loose thread', 'Dirt/dust', 'Minor odor'] },
+    poles: { label: 'Trekking poles', damaged: ['Bent or cracked shaft', "Broken locking mechanism (won't hold length under load)", 'Missing or shredded tip/basket', 'Broken or missing handle grip'], normal: ['Scratched paint', 'Loose (but functional) grip tape', 'Minor dirt'] },
+    bottle: { label: 'Water bottle', damaged: ['Dented body that affects function', 'Cracked or missing lid/cap', 'Broken or missing straw lid mechanism'], normal: ['Scratches', 'Faded printing', 'Minor odor, water spots'] },
+    first_aid_kit: { label: 'Hard-shell first aid kit', damaged: ['Cracked or broken case (no longer closes/protects contents)', 'Missing latch', 'Missing supplies beyond normal single-use consumption (bandages/gauze are expected to be used, that is not damage, it is restocking)'], normal: ['Scuffed exterior', 'Faded labeling'] },
+    duffel: { label: 'Duffel', damaged: ['Broken zipper', 'Torn seam over 2 inches', 'Broken or detached strap/handle', 'Non-functional closure'], normal: ['Fabric fading, minor scuffing', 'Dirt'] },
+  };
+
+  var currentBookingId = null;
+
+  function opsCall(action, payload) {
+    return fetch('/api/ops-proxy', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function showBanner(kind, message) {
+    var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
+  }
+
+  function loadQueue() {
+    var tripDate = document.getElementById('queue-trip-date').value;
+    if (!tripDate) return;
+    document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('gearCheckin_getQueue', { tripDate: tripDate }).then(function (result) {
+      if (!result.ok) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Could not load the check-in queue.</div>'; return; }
+      var bookings = result.data.bookings || [];
+      if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No delivered bookings for this trail day.</div>'; return; }
+      var rows = bookings.map(function (b) {
+        return '<tr><td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
+          + '<td>Delivered ' + escapeHtml(b.gearDeliveredAt || '') + '</td>'
+          + '<td><button class="ops-btn" style="padding:0.35rem 0.7rem;" data-open="' + escapeHtml(b.bookingId) + '">Open</button></td></tr>';
+      }).join('');
+      document.getElementById('queue-list').innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.querySelectorAll('button[data-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () { openBooking(btn.getAttribute('data-open')); });
+      });
+    });
+  }
+
+  function openBooking(bookingId) {
+    currentBookingId = bookingId;
+    document.getElementById('queue-view').classList.add('hidden');
+    document.getElementById('detail-view').classList.remove('hidden');
+    document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Loading…</div>';
+    loadContext();
+  }
+
+  function loadContext() {
+    opsCall('gearCheckin_getContext', { bookingId: currentBookingId }).then(function (result) {
+      if (!result.ok) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load this booking.</div>'; return; }
+      renderItems(result.data.items || []);
+    });
+  }
+
+  function renderItems(items) {
+    if (!items.length) {
+      document.getElementById('detail-content').innerHTML = '<div class="ops-empty">No trackable gear on this booking.</div>';
+      return;
+    }
+    var allSettled = items.every(function (i) { return i.condition === 'Good' || i.condition === 'Damaged' || i.condition === 'Recovered' || (i.condition === 'Missing' && i.graceDeadline && new Date(i.graceDeadline).getTime() <= Date.now()); });
+
+    var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem; margin-bottom:1rem;"><strong>#' + escapeHtml(currentBookingId) + '</strong></div>';
+
+    items.forEach(function (item) {
+      var rubric = RUBRIC[item.itemType] || null;
+      var isSettled = item.condition === 'Good' || item.condition === 'Damaged' || item.condition === 'Recovered' || (item.condition === 'Missing' && item.graceDeadline && new Date(item.graceDeadline).getTime() <= Date.now());
+      html += '<div class="item-card" data-unit="' + escapeHtml(item.unitId) + '">'
+        + '<div class="item-card-hdr">'
+        + '<div class="item-card-name">' + escapeHtml(item.itemName) + ' — <span class="unit-chip">' + escapeHtml(item.unitId) + '</span></div>'
+        + '<div class="cond-seg" data-cond-group>'
+        + ['Good', 'Damaged', 'Missing', 'Recovered'].map(function (c) {
+            var sel = item.condition === c ? ' sel-' + c.toLowerCase() : '';
+            return '<button class="' + sel.trim() + '" data-cond="' + c + '"' + (isSettled && item.condition !== c ? '' : '') + '>' + c + '</button>';
+          }).join('')
+        + '</div></div>';
+
+      if (rubric) {
+        html += '<span class="rubric-toggle" data-rubric-toggle>&#9662; Damage rubric — ' + escapeHtml(rubric.label) + '</span>'
+          + '<div class="rubric-box">'
+          + '<div><div class="rubric-col-hdr damaged">Damaged</div><ul>' + rubric.damaged.map(function (d) { return '<li>' + escapeHtml(d) + '</li>'; }).join('') + '</ul></div>'
+          + '<div><div class="rubric-col-hdr normal">Normal wear (not damage)</div><ul>' + rubric.normal.map(function (d) { return '<li>' + escapeHtml(d) + '</li>'; }).join('') + '</ul></div>'
+          + '</div>';
+      }
+
+      html += '<textarea class="ops-textarea" placeholder="Notes (optional)" data-notes>' + escapeHtml(item.notes || '') + '</textarea>';
+
+      html += '<div class="photo-drop' + (item.condition === 'Damaged' || item.condition === 'Missing' ? ' show' : '') + '" data-photo-drop>'
+        + 'Required for Damaged/Missing<br>'
+        + '<input type="file" accept="image/*" capture="environment" style="display:none;" data-photo-input>'
+        + '<button class="take-photo-btn" data-take-photo>Take Photo</button>'
+        + '<div class="photo-thumb" data-photo-status>' + (item.photoUrl ? 'Photo attached' : '') + '</div>'
+        + '</div>';
+
+      if (item.condition === 'Missing' && item.graceDeadline) {
+        var deadlineMs = new Date(item.graceDeadline).getTime();
+        var remaining = deadlineMs - Date.now();
+        html += '<div class="grace-box">' + (remaining > 0
+          ? 'Grace period open — deadline ' + new Date(item.graceDeadline).toLocaleString()
+          : 'Grace period has passed — eligible for reconciliation.') + '</div>';
+      }
+
+      html += '<input type="hidden" data-photo-url value="' + escapeHtml(item.photoUrl || '') + '">'
+        + '<div style="margin-top:0.6rem; text-align:right;"><button class="ops-btn-secondary" data-save-item>Save</button></div>'
+        + '</div>';
+    });
+
+    html += '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem;">'
+      + (allSettled
+        ? '<div style="color:#2a7a4a; font-weight:600;">Every trackable item is settled. This booking is ready for reconciliation.</div>'
+        + '<button class="ops-btn" style="margin-top:0.6rem;" data-go-reconcile>Go to Reconciliation Review</button>'
+        : '<div style="color:var(--ops-text-mid);">Reconciliation is blocked until every item above is Good, Damaged, Recovered, or Missing past its grace deadline.</div>')
+      + '</div>';
+
+    document.getElementById('detail-content').innerHTML = html;
+    wireItemEvents();
+  }
+
+  function wireItemEvents() {
+    document.querySelectorAll('[data-rubric-toggle]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var box = el.nextElementSibling;
+        box.classList.toggle('show');
+      });
+    });
+
+    document.querySelectorAll('.item-card').forEach(function (card) {
+      card.querySelectorAll('[data-cond]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          card.querySelectorAll('[data-cond]').forEach(function (b) { b.className = ''; });
+          btn.className = 'sel-' + btn.getAttribute('data-cond').toLowerCase();
+          var cond = btn.getAttribute('data-cond');
+          var photoDrop = card.querySelector('[data-photo-drop]');
+          if (cond === 'Damaged' || cond === 'Missing') photoDrop.classList.add('show');
+          else photoDrop.classList.remove('show');
+        });
+      });
+
+      var fileInput = card.querySelector('[data-photo-input]');
+      card.querySelector('[data-take-photo]').addEventListener('click', function () { fileInput.click(); });
+      fileInput.addEventListener('change', function () {
+        var file = fileInput.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var unitId = card.getAttribute('data-unit');
+          card.querySelector('[data-photo-status]').textContent = 'Uploading…';
+          opsCall('gearCheckin_uploadPhoto', { bookingId: currentBookingId, unitId: unitId, dataUrl: reader.result }).then(function (result) {
+            if (!result.ok) { card.querySelector('[data-photo-status]').textContent = 'Upload failed.'; return; }
+            card.querySelector('[data-photo-url]').value = result.data.photoUrl;
+            card.querySelector('[data-photo-status]').textContent = 'Photo attached';
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+
+      card.querySelector('[data-save-item]').addEventListener('click', function () { saveItem(card); });
+    });
+
+    var reconcileBtn = document.querySelector('[data-go-reconcile]');
+    if (reconcileBtn) reconcileBtn.addEventListener('click', function () { window.location.href = 'ops-reconciliation-review.html'; });
+  }
+
+  function saveItem(card) {
+    var unitId = card.getAttribute('data-unit');
+    var selectedBtn = card.querySelector('[data-cond].sel-good, [data-cond].sel-damaged, [data-cond].sel-missing, [data-cond].sel-recovered');
+    if (!selectedBtn) { showBanner('error', 'Select a condition before saving.'); return; }
+    var condition = selectedBtn.getAttribute('data-cond');
+    var notes = card.querySelector('[data-notes]').value.trim();
+    var photoUrl = card.querySelector('[data-photo-url]').value.trim();
+
+    if ((condition === 'Damaged' || condition === 'Missing') && !photoUrl) {
+      showBanner('error', 'A photo is required for Damaged or Missing items.');
+      return;
+    }
+
+    opsCall('gearCheckin_checkIn', { bookingId: currentBookingId, unitId: unitId, condition: condition, notes: notes, photoUrl: photoUrl }).then(function (result) {
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not save this item.'); return; }
+      showBanner('success', unitId + ' checked in as ' + condition + '.');
+      loadContext();
+    });
+  }
+
+  function initShell(email) {
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('loading-gate').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.getElementById('signout-btn').addEventListener('click', function () {
+      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
+        .then(function () { window.location.href = 'ops-login.html'; });
+    });
+
+    document.getElementById('queue-trip-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('queue-trip-date').addEventListener('change', loadQueue);
+    document.getElementById('back-to-queue').addEventListener('click', function () {
+      document.getElementById('detail-view').classList.add('hidden');
+      document.getElementById('queue-view').classList.remove('hidden');
+      loadQueue();
+    });
+    loadQueue();
+  }
+
+  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
+      initShell(result.data.email);
+    })
+    .catch(function () { window.location.href = 'ops-login.html'; });
+})();
+</script>
+</body>
+</html>

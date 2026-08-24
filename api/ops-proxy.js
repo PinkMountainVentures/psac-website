@@ -35,6 +35,18 @@ const { callBookingsWebApp } = require('../lib/apps-script-client');
 const resolveOpsAlertHandler = require('./resolve-ops-alert');
 const applyManualAdjustmentHandler = require('./apply-manual-adjustment');
 const writeManualTrailOverrideHandler = require('./write-manual-trail-override');
+// Gear Inventory, Checkout & Deposit Reconciliation build (Aug 2026) — same
+// in-process reuse pattern as the three handlers above: each of these
+// holds its own real GEAR_OPS_SHARED_SECRET, injected server-side below,
+// never exposed to the browser.
+const manageGearUnitsHandler = require('./manage-gear-units');
+const allocateGearUnitsHandler = require('./allocate-gear-units');
+const checkoutGearHandler = require('./checkout-gear');
+const checkInGearItemHandler = require('./check-in-gear-item');
+const reconcileGearDepositHandler = require('./reconcile-gear-deposit');
+const chargeGearShortfallHandler = require('./charge-gear-shortfall');
+const refundGearChargeHandler = require('./refund-gear-charge');
+const checkGearAvailabilityHandler = require('./check-gear-availability');
 
 function captureResponse() {
   const result = { statusCode: 200, body: null };
@@ -64,6 +76,59 @@ const MANUAL_ADJUSTMENT_TYPES = [
   'gear_returned_uncleaned',
   'update_delivery_address',
 ];
+
+// Gear Inventory build: each entry proxies straight through to its handler
+// with GEAR_OPS_SHARED_SECRET injected — these handlers already do their
+// own action-specific validation (see each file's own header), this proxy
+// only adds the staff-session gate and the real secret.
+const GEAR_OPS_PROXY_ACTIONS = {
+  // api/manage-gear-units.js
+  gearUnits_list: manageGearUnitsHandler,
+  gearUnits_add: manageGearUnitsHandler,
+  gearUnits_retire: manageGearUnitsHandler,
+  gearUnits_markClean: manageGearUnitsHandler,
+  gearUnits_markDeepCleaned: manageGearUnitsHandler,
+  // api/allocate-gear-units.js
+  gearAllocation_allocate: allocateGearUnitsHandler,
+  gearAllocation_get: allocateGearUnitsHandler,
+  gearAllocation_recordShortageResolution: allocateGearUnitsHandler,
+  // api/checkout-gear.js
+  gearCheckout_getQueue: checkoutGearHandler,
+  gearCheckout_confirmScan: checkoutGearHandler,
+  gearCheckout_markDelivered: checkoutGearHandler,
+  // api/check-in-gear-item.js
+  gearCheckin_getQueue: checkInGearItemHandler,
+  gearCheckin_getContext: checkInGearItemHandler,
+  gearCheckin_uploadPhoto: checkInGearItemHandler,
+  gearCheckin_checkIn: checkInGearItemHandler,
+  // api/reconcile-gear-deposit.js
+  gearReconcile_run: reconcileGearDepositHandler,
+  gearReconcile_list: reconcileGearDepositHandler,
+  gearReconcile_getContext: reconcileGearDepositHandler,
+  // api/charge-gear-shortfall.js (single action)
+  gearShortfall_charge: chargeGearShortfallHandler,
+  // api/refund-gear-charge.js (single action)
+  gearRefund_issue: refundGearChargeHandler,
+  // api/check-gear-availability.js (single action)
+  gearAvailability_check: checkGearAvailabilityHandler,
+};
+
+// Maps this proxy's own action name back to the inner handler's own
+// `action` field, for the handful of files that are themselves small
+// dispatchers (manage-gear-units.js, allocate-gear-units.js,
+// checkout-gear.js, check-in-gear-item.js). Single-action files
+// (reconcile/charge/refund/availability) need no mapping — the inner
+// handler doesn't read body.action at all.
+const GEAR_OPS_INNER_ACTION = {
+  gearUnits_list: 'listUnits', gearUnits_add: 'addUnit', gearUnits_retire: 'retireUnit',
+  gearUnits_markClean: 'markClean', gearUnits_markDeepCleaned: 'markDeepCleaned',
+  gearAllocation_allocate: 'allocate', gearAllocation_get: 'getAllocation',
+  gearAllocation_recordShortageResolution: 'recordShortageResolution',
+  gearCheckout_getQueue: 'getQueue', gearCheckout_confirmScan: 'confirmScan', gearCheckout_markDelivered: 'markDelivered',
+  gearCheckin_getQueue: 'getQueue', gearCheckin_getContext: 'getContext',
+  gearCheckin_uploadPhoto: 'uploadPhoto', gearCheckin_checkIn: 'checkIn',
+  gearReconcile_list: 'list', gearReconcile_getContext: 'context',
+};
 
 module.exports = async function handler(req, res) {
   try {
@@ -134,6 +199,21 @@ module.exports = async function handler(req, res) {
           secret: process.env.TRAIL_OVERRIDE_SHARED_SECRET,
           action: innerAction,
           reviewedBy: session.email,
+        }),
+      }, innerRes);
+      res.status(result.statusCode).json(result.body);
+      return;
+    }
+
+    if (GEAR_OPS_PROXY_ACTIONS[action]) {
+      const innerHandler = GEAR_OPS_PROXY_ACTIONS[action];
+      const innerAction = GEAR_OPS_INNER_ACTION[action]; // undefined for single-action files, which is fine — they never read body.action
+      const { res: innerRes, result } = captureResponse();
+      await innerHandler({
+        method: 'POST',
+        body: Object.assign({}, body, {
+          secret: process.env.GEAR_OPS_SHARED_SECRET,
+          action: innerAction,
         }),
       }, innerRes);
       res.status(result.statusCode).json(result.body);

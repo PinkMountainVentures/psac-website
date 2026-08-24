@@ -54,7 +54,14 @@ var ITEM_COSTS = {
   'Gregory Miko 20L Backpack': 159,
   'Hydro Flask Big Mouth 32oz Bottle': 42,
   'Leki Khumbu Lite Trekking Poles': 129,
-  'REI Pack Mule 90L Duffel': 159
+  'REI Pack Mule 90L Duffel': 159,
+  // Added Aug 2026 (gear inventory/checkout/reconciliation build): hard-shell
+  // first aid kit, one per gear kit, case-cost-only replacement value per
+  // Airey (confirmed 2026-08-15) at $9.99 pretax. NOTE: the guest-facing
+  // "full kit retail value $531" copy predates this line item — true sum is
+  // $540.99. That's a copy decision, not an engineering one; flagged to
+  // Airey in this build's handoff, not changed here.
+  'Hard-Shell First Aid Kit': 9.99
 };
 
 // Run this once from the Apps Script editor (select "setup" in the
@@ -339,6 +346,10 @@ function buildGearLogRows(bookingId, payload) {
     rows.push(gearRow(bookingId, k + 1, personName, 'Hydro Flask Big Mouth 32oz Bottle'));
     rows.push(gearRow(bookingId, k + 1, personName, 'Hydro Flask Big Mouth 32oz Bottle'));
     rows.push(gearRow(bookingId, k + 1, personName, 'Leki Khumbu Lite Trekking Poles'));
+    // Added Aug 2026 (gear inventory/checkout/reconciliation build): one
+    // hard-shell first aid kit per gear kit, same per-kit cardinality as the
+    // backpack/poles rows above.
+    rows.push(gearRow(bookingId, k + 1, personName, 'Hard-Shell First Aid Kit'));
   }
   for (var d = 0; d < duffelCount; d++) {
     rows.push(gearRow(bookingId, '', 'Shared', 'REI Pack Mule 90L Duffel'));

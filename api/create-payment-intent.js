@@ -213,11 +213,13 @@ module.exports = async function handler(req, res) {
       // charge is still correct, but flag it clearly since this booking
       // won't get an automatic Stripe Tax transaction record and needs to
       // be included by hand in quarterly CDTFA reconciliation.
-      taxAmountCents = Math.round(amountCents * 0.0875);
+      taxAmountCents = Math.round(amountCents * 0.0925);
       finalAmountCents = amountCents + taxAmountCents;
       taxFallbackApplied = true;
       console.error(
-        'Tax calculation API call failed — applied manual 8.75% fallback. ' +
+        'Tax calculation API call failed — applied manual 9.25% fallback (Palm Springs\'s actual combined ' +
+        'rate, confirmed against palmspringsca.gov — NOT the 8.75% this project assumed until Aug 2026, ' +
+        'which expired in 2018 when Measure D took effect). ' +
         'Flag this booking for manual CDTFA reconciliation (no Stripe Tax transaction record exists for it).',
         { tier: tierKey, amountCents: amountCents, fallbackTaxAmountCents: taxAmountCents }
       );

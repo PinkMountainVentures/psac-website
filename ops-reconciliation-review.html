@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reconciliation Review | PSAC Ops</title>
+<!--
+  ops-reconciliation-review.html
+
+  Real, working version of claude/psac-ops-reconciliation-review.html's
+  mockup — Gear Inventory PRD Section 7/10/11. This page only ever shows
+  Scenario 4 bookings (itemized loss exceeds the hold) — Scenarios 1-3
+  resolve automatically inside api/reconcile-gear-deposit.js with no staff
+  action. Staff review photos, optionally adjust the computed shortfall
+  (a required note unlocks the button when adjusted, same "required reason
+  unlocks the button" interaction as Trail Swap Requests), and trigger the
+  follow-up charge. The refund/partial-refund entry point below closes the
+  gap the design pass flagged: there was previously no staff-facing way to
+  reverse a deposit capture or a shortfall charge at all.
+
+  Wired to /api/ops-proxy -> api/reconcile-gear-deposit.js (list/context),
+  api/charge-gear-shortfall.js, and api/refund-gear-charge.js.
+-->
+<style>
+  :root {
+    --mountain-pink: #F58271; --dark-pine: #2A4747;
+    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
+
+  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
+  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
+  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
+  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
+  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
+  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
+
+  .ops-main { padding:1.6rem 1.8rem; }
+  .ops-breadcrumb { font-size:0.78rem; margin-bottom:0.8rem; }
+  .ops-breadcrumb a { color:var(--mountain-pink); text-decoration:none; cursor:pointer; }
+  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
+  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
+  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
+  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
+  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
+
+  .ops-input, .ops-select { padding:0.6rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; background:white; }
+  .ops-textarea { width:100%; border:1px solid var(--ops-border); border-radius:5px; padding:0.6rem 0.8rem; font-size:0.82rem; font-family:inherit; min-height:56px; margin-top:0.5rem; }
+  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
+  .ops-btn:disabled { opacity:0.4; cursor:default; }
+  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
+  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.6rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-bottom:1.2rem; }
+  .ops-panel-title { font-size:0.9rem; font-weight:700; margin-bottom:0.7rem; color:var(--dark-pine); }
+  .ops-field-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; margin-bottom:1rem; }
+  .ops-field-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); margin-bottom:0.2rem; }
+  .ops-field-value { font-size:1rem; font-weight:700; color:var(--dark-pine); }
+
+  .settle-summary { display:flex; justify-content:space-between; padding:0.4rem 0; font-size:0.85rem; }
+  .settle-summary.total { font-weight:700; border-top:1px solid var(--ops-border); margin-top:0.3rem; padding-top:0.6rem; }
+
+  .amount-row { display:flex; align-items:center; gap:0.8rem; margin:1rem 0; }
+  .amount-row input { width:140px; font-size:1.1rem; font-weight:700; text-align:right; }
+  .amount-note { display:none; margin-top:0.6rem; }
+  .amount-note.show { display:block; }
+
+  .item-row-photo { display:inline-block; font-size:0.7rem; background:var(--ops-bg); border:1px solid var(--ops-border); border-radius:3px; padding:0.1rem 0.4rem; text-decoration:none; color:var(--ops-text); }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+
+  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
+  .hidden { display:none !important; }
+
+  @media (max-width: 760px) {
+    .ops-app { grid-template-columns:1fr; margin:0.8rem; min-height:auto; }
+    .ops-sidebar { display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0.6rem 0.4rem; gap:0.2rem; }
+    .ops-sidebar-brand { display:none; }
+    .ops-nav-item { border-left:none; border-bottom:3px solid transparent; white-space:nowrap; padding:0.6rem 0.8rem; }
+    .ops-nav-item.is-active { border-left-color:transparent; border-bottom-color:var(--mountain-pink); }
+    .ops-main { padding:1.1rem 1rem; }
+    .ops-field-grid { grid-template-columns:1fr 1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .amount-row { flex-wrap:wrap; }
+    .amount-row input { width:120px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar">
+      <div class="ops-sidebar-brand">PSAC Ops</div>
+      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
+      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
+      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
+      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
+      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
+      <a class="ops-nav-item" href="ops-gear-checkin.html">Return Check-In</a>
+      <a class="ops-nav-item is-active" href="ops-reconciliation-review.html">Reconciliation Review</a>
+    </div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title">Reconciliation Review</div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+
+      <div id="banner-container"></div>
+
+      <div id="queue-view">
+        <div class="ops-subtitle">Scenario 4 only — itemized loss/damage exceeded the deposit hold and needs a human decision before the follow-up charge fires.</div>
+        <div id="queue-list"><div class="ops-empty">Loading…</div></div>
+      </div>
+
+      <div id="detail-view" class="hidden">
+        <div class="ops-breadcrumb"><a id="back-to-queue">&larr; Reconciliation Review</a></div>
+        <div id="detail-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var currentBookingId = null;
+  var currentCtx = null;
+
+  function opsCall(action, payload) {
+    return fetch('/api/ops-proxy', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function centsToDollars(cents) {
+    return ((Number(cents) || 0) / 100).toFixed(2);
+  }
+
+  function showBanner(kind, message) {
+    var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
+  }
+
+  function loadQueue() {
+    document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('gearReconcile_list', {}).then(function (result) {
+      if (!result.ok) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Could not load the reconciliation queue.</div>'; return; }
+      var bookings = result.data.bookings || [];
+      if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Nothing pending review right now.</div>'; return; }
+      var rows = bookings.map(function (b) {
+        var statusLabel = b.depositStatus === 'shortfall_charged' ? 'Shortfall charged' : 'Pending review';
+        return '<tr><td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
+          + '<td>' + escapeHtml(b.tripDate || '') + '</td>'
+          + '<td>' + statusLabel + '</td>'
+          + '<td>$' + centsToDollars(b.gearShortfallCents) + '</td>'
+          + '<td><button class="ops-btn" style="padding:0.35rem 0.7rem;" data-open="' + escapeHtml(b.bookingId) + '">Review</button></td></tr>';
+      }).join('');
+      document.getElementById('queue-list').innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Trail day</th><th>Status</th><th>Shortfall</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.querySelectorAll('button[data-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () { openBooking(btn.getAttribute('data-open')); });
+      });
+    });
+  }
+
+  function openBooking(bookingId) {
+    currentBookingId = bookingId;
+    document.getElementById('queue-view').classList.add('hidden');
+    document.getElementById('detail-view').classList.remove('hidden');
+    document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('gearReconcile_getContext', { bookingId: bookingId }).then(function (result) {
+      if (!result.ok || result.data.notFound) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load this booking.</div>'; return; }
+      currentCtx = result.data;
+      renderDetail();
+    });
+  }
+
+  function renderDetail() {
+    var ctx = currentCtx;
+    var holdCents = ctx.reconciledAmountCents || 0;
+    var shortfallCents = ctx.gearShortfallCents || 0;
+    var itemizedCents = holdCents + shortfallCents;
+    var chargeableItems = (ctx.items || []).filter(function (i) { return i.condition === 'Damaged' || i.condition === 'Missing'; });
+    var alreadyCharged = ctx.depositStatus === 'shortfall_charged';
+
+    var html = '<div class="ops-panel">'
+      + '<div class="ops-field-grid">'
+      + '<div><div class="ops-field-label">Deposit hold</div><div class="ops-field-value">$' + centsToDollars(holdCents) + '</div></div>'
+      + '<div><div class="ops-field-label">Already captured</div><div class="ops-field-value">$' + centsToDollars(holdCents) + ' (full hold)</div></div>'
+      + '<div><div class="ops-field-label">Itemized total</div><div class="ops-field-value">$' + centsToDollars(itemizedCents) + '</div></div>'
+      + '<div><div class="ops-field-label">Computed shortfall</div><div class="ops-field-value">$' + centsToDollars(shortfallCents) + '</div></div>'
+      + '</div>'
+      + '<div class="ops-panel-title" style="font-size:0.85rem;">Itemized Damaged / Missing</div>'
+      + '<table class="ops-table"><thead><tr><th>Item</th><th>Condition</th><th>Photo</th><th>Replacement cost</th></tr></thead><tbody>'
+      + chargeableItems.map(function (i) {
+          return '<tr><td>' + escapeHtml(i.itemName) + ' — ' + escapeHtml(i.unitId) + '</td>'
+            + '<td>' + escapeHtml(i.condition) + '</td>'
+            + '<td>' + (i.photoUrl ? '<a class="item-row-photo" href="' + escapeHtml(i.photoUrl) + '" target="_blank" rel="noopener">View</a>' : '&mdash;') + '</td>'
+            + '<td>$' + centsToDollars(i.replacementCostCents) + '</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+      + '<div class="settle-summary total"><span>Itemized total</span><span>$' + centsToDollars(itemizedCents) + '</span></div>'
+      + '<div class="settle-summary"><span>&minus; Already captured from hold</span><span>$' + centsToDollars(holdCents) + '</span></div>'
+      + '<div class="settle-summary total"><span>Shortfall</span><span>$' + centsToDollars(shortfallCents) + '</span></div>'
+      + '</div>';
+
+    if (alreadyCharged) {
+      html += '<div class="ops-panel"><div class="ops-panel-title">Shortfall already charged</div>'
+        + '<p style="font-size:0.85rem;">Charged $' + centsToDollars(ctx.shortfallChargedAmountCents) + ' on ' + escapeHtml(ctx.shortfallChargedAt || '') + ' (PaymentIntent ' + escapeHtml(ctx.shortfallChargeId || '') + ').</p></div>';
+    } else {
+      html += '<div class="ops-panel">'
+        + '<div class="ops-panel-title">Charge the shortfall</div>'
+        + '<div class="amount-row"><label style="font-size:0.78rem; color:var(--ops-text-mid);">Amount to charge</label>'
+        + '<input class="ops-input" id="charge-amount" type="number" step="0.01" min="0.01" value="' + centsToDollars(shortfallCents) + '"></div>'
+        + '<div class="amount-note" id="charge-note-wrap"><textarea class="ops-textarea" id="charge-note" placeholder="Required — why does this differ from the computed shortfall?"></textarea></div>'
+        + '<div class="ops-panel-footer" style="display:flex; justify-content:flex-end;"><button class="ops-btn" id="charge-submit">Charge $' + centsToDollars(shortfallCents) + '</button></div>'
+        + '</div>';
+    }
+
+    html += '<div class="ops-panel">'
+      + '<div class="ops-panel-title">Issue a refund</div>'
+      + '<p style="font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:0.8rem;">For a recovered item, or a charge that needs to be reversed or partially reversed.</p>'
+      + '<div class="ops-field-grid" style="grid-template-columns:1fr 1fr;">'
+      + '<div class="ops-form-row"><label style="font-size:0.72rem; text-transform:uppercase; color:var(--ops-text-mid);">Refund target</label>'
+      + '<select class="ops-select" id="refund-target" style="width:100%;"><option value="deposit">Deposit capture</option><option value="shortfall"' + (alreadyCharged ? '' : ' disabled') + '>Shortfall charge' + (alreadyCharged ? '' : ' (not charged yet)') + '</option></select></div>'
+      + '<div class="ops-form-row"><label style="font-size:0.72rem; text-transform:uppercase; color:var(--ops-text-mid);">Amount (blank = full remaining)</label>'
+      + '<input class="ops-input" id="refund-amount" type="number" step="0.01" min="0.01" style="width:100%;"></div>'
+      + '</div>'
+      + '<textarea class="ops-textarea" id="refund-note" placeholder="Reason for this refund (required)"></textarea>'
+      + '<div class="ops-panel-footer" style="display:flex; justify-content:flex-end;"><button class="ops-btn-secondary" id="refund-submit">Issue Refund</button></div>'
+      + '</div>';
+
+    document.getElementById('detail-content').innerHTML = html;
+    wireDetailEvents(shortfallCents);
+  }
+
+  function wireDetailEvents(computedShortfallCents) {
+    var chargeAmountInput = document.getElementById('charge-amount');
+    var chargeSubmitBtn = document.getElementById('charge-submit');
+    if (chargeAmountInput) {
+      chargeAmountInput.addEventListener('input', function () {
+        var enteredCents = Math.round(Number(chargeAmountInput.value || 0) * 100);
+        var differs = enteredCents !== computedShortfallCents;
+        document.getElementById('charge-note-wrap').classList.toggle('show', differs);
+        chargeSubmitBtn.textContent = 'Charge $' + (Number(chargeAmountInput.value || 0)).toFixed(2);
+      });
+      chargeSubmitBtn.addEventListener('click', function () {
+        var enteredCents = Math.round(Number(chargeAmountInput.value || 0) * 100);
+        var differs = enteredCents !== computedShortfallCents;
+        var note = document.getElementById('charge-note').value.trim();
+        if (differs && !note) { showBanner('error', 'A note is required when the charge amount is adjusted from the computed shortfall.'); return; }
+        if (!enteredCents || enteredCents <= 0) { showBanner('error', 'Enter a positive charge amount.'); return; }
+        chargeSubmitBtn.disabled = true;
+        opsCall('gearShortfall_charge', { bookingId: currentBookingId, amountCents: enteredCents, staffNotes: note }).then(function (result) {
+          chargeSubmitBtn.disabled = false;
+          if (!result.ok || result.data.ok === false) { showBanner('error', (result.data && result.data.detail) || 'Could not process this charge.'); return; }
+          showBanner('success', 'Shortfall charged.');
+          openBooking(currentBookingId);
+        });
+      });
+    }
+
+    document.getElementById('refund-submit').addEventListener('click', function () {
+      var target = document.getElementById('refund-target').value;
+      var amountStr = document.getElementById('refund-amount').value;
+      var note = document.getElementById('refund-note').value.trim();
+      if (!note) { showBanner('error', 'A reason is required to issue a refund.'); return; }
+      var payload = { bookingId: currentBookingId, refundTarget: target, staffNotes: note };
+      if (amountStr !== '') payload.amountCents = Math.round(Number(amountStr) * 100);
+      opsCall('gearRefund_issue', payload).then(function (result) {
+        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not issue this refund.'); return; }
+        showBanner('success', 'Refund issued for $' + centsToDollars(result.data.refundAmountCents) + '.');
+        openBooking(currentBookingId);
+      });
+    });
+  }
+
+  function initShell(email) {
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('loading-gate').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.getElementById('signout-btn').addEventListener('click', function () {
+      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
+        .then(function () { window.location.href = 'ops-login.html'; });
+    });
+    document.getElementById('back-to-queue').addEventListener('click', function () {
+      document.getElementById('detail-view').classList.add('hidden');
+      document.getElementById('queue-view').classList.remove('hidden');
+      loadQueue();
+    });
+    loadQueue();
+  }
+
+  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
+      initShell(result.data.email);
+    })
+    .catch(function () { window.location.href = 'ops-login.html'; });
+})();
+</script>
+</body>
+</html>

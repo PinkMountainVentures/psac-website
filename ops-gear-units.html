@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gear Units | PSAC Ops</title>
+<!--
+  ops-gear-units.html
+
+  Real, working version of claude/psac-ops-gear-units.html's mockup —
+  Gear Inventory PRD Section 2/11. The standing inventory list (grouped by
+  itemType), Add Unit (with a backpack-size selector), Retire Unit, Mark
+  Clean, and Mark Deep-Cleaned, wired to /api/ops-proxy ->
+  api/manage-gear-units.js. No unit is ever deleted here — retiredAt/
+  retiredReason keep the row for audit history.
+-->
+<style>
+  :root {
+    --mountain-pink: #F58271; --dark-pine: #2A4747;
+    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
+
+  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
+  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
+  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
+  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
+  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
+  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
+
+  .ops-main { padding:1.6rem 1.8rem; }
+  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
+  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
+  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
+  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
+  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
+
+  .ops-select, .ops-input { width:100%; padding:0.65rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; color:var(--ops-text); background:white; margin-bottom:0.9rem; }
+  .ops-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
+  .ops-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-top:0.4rem; margin-bottom:1.4rem; }
+  .ops-panel-title { font-size:0.95rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
+  .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.5rem; }
+  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
+  .ops-btn:disabled { opacity:0.4; cursor:default; }
+  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
+  .ops-btn-small { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; margin-right:0.3rem; }
+  .ops-btn-small:hover { border-color:var(--mountain-pink); }
+  .ops-helper { font-size:0.74rem; color:var(--ops-text-mid); font-style:italic; margin-top:-0.4rem; margin-bottom:0.9rem; }
+
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.55rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .item-group-hdr { font-size:0.78rem; font-weight:700; color:var(--dark-pine); background:var(--ops-bg); padding:0.5rem 0.8rem; }
+
+  .status-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; }
+  .st-available { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .st-allocated { background:rgba(245,130,113,0.18); color:#a8341c; }
+  .st-checked-out { background:rgba(154,91,30,0.15); color:#9A5B1E; }
+  .st-needs-cleaning { background:rgba(107,115,120,0.15); color:#3E4A50; }
+  .st-needs-deep-clean { background:rgba(154,91,30,0.15); color:#9A5B1E; }
+  .st-damaged { background:rgba(231,111,81,0.15); color:#a8341c; }
+  .st-retired { background:#E7ECEE; color:#6B7378; }
+
+  .dc-bar { width:70px; height:6px; background:var(--ops-border); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:0.4rem; }
+  .dc-bar-fill { height:100%; background:var(--mountain-pink); }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+
+  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
+  .hidden { display:none !important; }
+
+  @media (max-width: 760px) {
+    .ops-app { grid-template-columns:1fr; margin:0.8rem; min-height:auto; }
+    .ops-sidebar { display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0.6rem 0.4rem; gap:0.2rem; }
+    .ops-sidebar-brand { display:none; }
+    .ops-nav-item { border-left:none; border-bottom:3px solid transparent; white-space:nowrap; padding:0.6rem 0.8rem; }
+    .ops-nav-item.is-active { border-left-color:transparent; border-bottom-color:var(--mountain-pink); }
+    .ops-main { padding:1.1rem 1rem; }
+    .ops-form-grid { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar">
+      <div class="ops-sidebar-brand">PSAC Ops</div>
+      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
+      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
+      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
+      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
+      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
+      <a class="ops-nav-item is-active" href="ops-gear-units.html">Gear Units</a>
+      <a class="ops-nav-item" href="ops-gear-checkin.html">Return Check-In</a>
+      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
+    </div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title">Gear Units</div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div class="ops-subtitle">The standing inventory — every trackable unit, its current status, and deep-clean progress. Bulk keepsakes (sunscreen, LMNT, dates, etc.) are never listed here — Section 2 keeps those restock-count-only, off this page entirely.</div>
+
+      <div id="banner-container"></div>
+
+      <div class="ops-panel">
+        <div class="ops-panel-title" style="font-size:0.85rem;">Add Unit</div>
+        <div class="ops-form-grid">
+          <div class="ops-form-row"><label>Unit ID</label><input class="ops-input" id="add-unit-id" placeholder="GP-0009"></div>
+          <div class="ops-form-row">
+            <label>Item type</label>
+            <select class="ops-select" id="add-item-type">
+              <option value="backpack_standard">Backpack, Standard</option>
+              <option value="backpack_plus">Backpack, Plus</option>
+              <option value="poles">Trekking Poles (pair)</option>
+              <option value="bottle">Water Bottle</option>
+              <option value="first_aid_kit">Hard-Shell First Aid Kit</option>
+              <option value="duffel">Duffel</option>
+            </select>
+          </div>
+        </div>
+        <div class="ops-form-row"><label>Replacement cost, in cents (optional — defaults to the standard reference cost for this item type)</label><input class="ops-input" id="add-cost-cents" type="number" min="0" placeholder="15900"></div>
+        <div class="ops-panel-footer">
+          <button class="ops-btn" id="add-unit-submit">Add Unit</button>
+        </div>
+      </div>
+
+      <div class="ops-form-row" style="max-width:280px;">
+        <label>Filter by item type</label>
+        <select class="ops-select" id="filter-item-type">
+          <option value="">All item types</option>
+          <option value="backpack_standard">Backpack, Standard</option>
+          <option value="backpack_plus">Backpack, Plus</option>
+          <option value="poles">Trekking Poles (pair)</option>
+          <option value="bottle">Water Bottle</option>
+          <option value="first_aid_kit">Hard-Shell First Aid Kit</option>
+          <option value="duffel">Duffel</option>
+        </select>
+      </div>
+
+      <div id="units-list"><div class="ops-empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var ITEM_LABELS = {
+    backpack_standard: 'Backpack, Standard', backpack_plus: 'Backpack, Plus',
+    poles: 'Trekking Poles (pair)', bottle: 'Water Bottle',
+    first_aid_kit: 'Hard-Shell First Aid Kit', duffel: 'Duffel',
+  };
+  var DEEP_CLEAN_THRESHOLD = {
+    backpack_standard: 10, backpack_plus: 10, poles: 5, bottle: 5, first_aid_kit: 10, duffel: 10,
+  };
+  var STATUS_CLASS = {
+    available: 'st-available', allocated: 'st-allocated', checked_out: 'st-checked-out',
+    needs_cleaning: 'st-needs-cleaning', needs_deep_clean: 'st-needs-deep-clean',
+    damaged_pending_repair: 'st-damaged', retired: 'st-retired',
+  };
+
+  function opsCall(action, payload) {
+    return fetch('/api/ops-proxy', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function showBanner(kind, message) {
+    var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
+  }
+
+  function renderUnits(units) {
+    var container = document.getElementById('units-list');
+    if (!units.length) { container.innerHTML = '<div class="ops-empty">No units match this filter.</div>'; return; }
+
+    var groups = {};
+    units.forEach(function (u) { (groups[u.itemType] = groups[u.itemType] || []).push(u); });
+
+    var html = '<table class="ops-table"><thead><tr><th>Unit</th><th>Status</th><th>Deep-clean progress</th><th>Current booking</th><th>Actions</th></tr></thead><tbody>';
+    Object.keys(groups).sort().forEach(function (itemType) {
+      html += '<tr><td class="item-group-hdr" colspan="5">' + escapeHtml(ITEM_LABELS[itemType] || itemType) + ' (' + groups[itemType].length + ')</td></tr>';
+      groups[itemType].forEach(function (u) {
+        var threshold = DEEP_CLEAN_THRESHOLD[itemType] || 10;
+        var uses = Number(u.usesSinceDeepClean) || 0;
+        var pct = Math.min(100, Math.round((uses / threshold) * 100));
+        var statusClass = STATUS_CLASS[u.status] || '';
+        var actions = '';
+        if (u.status === 'needs_cleaning') actions += '<button class="ops-btn-small" data-action="markClean" data-unit="' + escapeHtml(u.unitId) + '">Mark Clean</button>';
+        if (u.status === 'needs_deep_clean') actions += '<button class="ops-btn-small" data-action="markDeepCleaned" data-unit="' + escapeHtml(u.unitId) + '">Mark Deep-Cleaned</button>';
+        if (u.status !== 'retired') actions += '<button class="ops-btn-small" data-action="retire" data-unit="' + escapeHtml(u.unitId) + '">Retire</button>';
+        html += '<tr>'
+          + '<td>' + escapeHtml(u.unitId) + '</td>'
+          + '<td><span class="status-tag ' + statusClass + '">' + escapeHtml((u.status || '').replace(/_/g, ' ')) + '</span></td>'
+          + '<td><span class="dc-bar"><span class="dc-bar-fill" style="width:' + pct + '%;"></span></span>' + uses + ' / ' + threshold + '</td>'
+          + '<td>' + (u.currentBookingId ? '#' + escapeHtml(u.currentBookingId) : '—') + '</td>'
+          + '<td>' + (actions || '&mdash;') + '</td>'
+          + '</tr>';
+      });
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('button[data-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () { handleAction(btn.getAttribute('data-action'), btn.getAttribute('data-unit')); });
+    });
+  }
+
+  function loadUnits() {
+    var itemType = document.getElementById('filter-item-type').value;
+    document.getElementById('units-list').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('gearUnits_list', { itemType: itemType }).then(function (result) {
+      if (!result.ok) { document.getElementById('units-list').innerHTML = '<div class="ops-empty">Could not load Gear Units.</div>'; return; }
+      renderUnits(result.data.units || []);
+    });
+  }
+
+  function handleAction(action, unitId) {
+    if (action === 'markClean') {
+      opsCall('gearUnits_markClean', { unitId: unitId }).then(function (result) {
+        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark clean.'); return; }
+        showBanner('success', unitId + ' marked clean and available.');
+        loadUnits();
+      });
+    } else if (action === 'markDeepCleaned') {
+      opsCall('gearUnits_markDeepCleaned', { unitId: unitId }).then(function (result) {
+        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark deep-cleaned.'); return; }
+        showBanner('success', unitId + ' marked deep-cleaned, use count reset.');
+        loadUnits();
+      });
+    } else if (action === 'retire') {
+      var reason = window.prompt('Reason for retiring ' + unitId + ':');
+      if (reason === null) return; // cancelled
+      if (!reason.trim()) { showBanner('error', 'A retirement reason is required.'); return; }
+      opsCall('gearUnits_retire', { unitId: unitId, retiredReason: reason.trim() }).then(function (result) {
+        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not retire unit.'); return; }
+        showBanner('success', unitId + ' retired.');
+        loadUnits();
+      });
+    }
+  }
+
+  function submitAddUnit() {
+    var unitId = document.getElementById('add-unit-id').value.trim();
+    var itemType = document.getElementById('add-item-type').value;
+    var costCents = document.getElementById('add-cost-cents').value;
+    if (!unitId) { showBanner('error', 'A unit ID is required.'); return; }
+    var payload = { unitId: unitId, itemType: itemType };
+    if (costCents !== '') payload.replacementCostCents = Number(costCents);
+    document.getElementById('add-unit-submit').disabled = true;
+    opsCall('gearUnits_add', payload).then(function (result) {
+      document.getElementById('add-unit-submit').disabled = false;
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not add that unit.'); return; }
+      showBanner('success', unitId + ' added to inventory.');
+      document.getElementById('add-unit-id').value = '';
+      document.getElementById('add-cost-cents').value = '';
+      loadUnits();
+    });
+  }
+
+  function initShell(email) {
+    document.getElementById('user-email').textContent = email;
+    document.getElementById('loading-gate').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.getElementById('signout-btn').addEventListener('click', function () {
+      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
+        .then(function () { window.location.href = 'ops-login.html'; });
+    });
+    document.getElementById('add-unit-submit').addEventListener('click', submitAddUnit);
+    document.getElementById('filter-item-type').addEventListener('change', loadUnits);
+    loadUnits();
+  }
+
+  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
+      initShell(result.data.email);
+    })
+    .catch(function () { window.location.href = 'ops-login.html'; });
+})();
+</script>
+</body>
+</html>

@@ -63,7 +63,13 @@
     custom: { key: 'custom', name: 'Custom Experience',         booking: 595, gear: 100 }
   };
 
-  // CA sales tax (Palm Springs / Riverside County), Option A from
+  // CA sales tax, Palm Springs's actual current combined rate — 9.25%,
+  // confirmed directly against palmspringsca.gov (Measure J + Measure D
+  // took this to 9.25% effective April 2018). NOT 8.75%: that figure came
+  // from the original tax-strategy document and was propagated into this
+  // codebase before being caught (Aug 2026) when a real Stripe Tax test-
+  // mode calculation returned a different, correct number and prompted a
+  // check against the city's own published rate. Option A from
   // psac-tax-and-stripe-implementation.md: applied to the full combined
   // booking + gear total, no service/rental split. This is a DISPLAY
   // ESTIMATE only, computed the same way api/create-payment-intent.js's
@@ -74,7 +80,7 @@
   // screen doesn't have to wait on a network round trip just to show an
   // accurate-looking total. Not charged through this endpoint for Custom
   // Experience, so no tax is shown there (see isCustom checks below).
-  var TAX_RATE = 0.0875;
+  var TAX_RATE = 0.0925;
 
   function taxCentsFor(subtotalDollars) {
     return Math.round(subtotalDollars * 100 * TAX_RATE);
@@ -1236,7 +1242,7 @@
       var taxCents = taxCentsFor(total);
       var grandTotalCents = Math.round(total * 100) + taxCents;
       html += '<div class="paf-price-line"><span>Subtotal</span><span>$' + total + '</span></div>';
-      html += '<div class="paf-price-line"><span>CA sales tax (8.75%)</span><span>$' + formatDollars(taxCents) + '</span></div>';
+      html += '<div class="paf-price-line"><span>CA sales tax (9.25%)</span><span>$' + formatDollars(taxCents) + '</span></div>';
       html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + formatDollars(grandTotalCents) + '</span></div>';
     } else {
       html += '<div class="paf-price-total"><span>' + totalLabel + '</span><span>$' + total + '</span></div>';
@@ -1379,7 +1385,7 @@
         // from Stripe's actual Tax calculation, computed server-side —
         // this replaces the client-side estimate the button showed before
         // this fetch resolved. In virtually every case these match to the
-        // penny (same fixed 8.75% rate, same rounding), but this line
+        // penny (same fixed 9.25% rate, same rounding), but this line
         // ensures the button never lies about the real charge even if
         // they ever diverge.
         var chargeTotal = (typeof result.data.amount === 'number') ? result.data.amount : total;
