@@ -53,10 +53,12 @@ function stripeAuthHeader() {
   return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
 }
 
-async function stripePost(path, params) {
+async function stripePost(path, params, idempotencyKey) {
+  const headers = { Authorization: stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await fetch('https://api.stripe.com/v1/' + path, {
     method: 'POST',
-    headers: { Authorization: stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers,
     body: params.toString(),
   });
   const data = await res.json();
@@ -140,7 +142,7 @@ module.exports = async function handler(req, res) {
     params.append('metadata[bookingId]', ctx.bookingId);
     params.append('metadata[refundTarget]', refundTarget);
 
-    let refundRes = await stripePost('refunds', params);
+    let refundRes = await stripePost('refunds', params, idempotencyKey);
     let refundId;
     let refundAmountCents;
 
@@ -175,7 +177,7 @@ module.exports = async function handler(req, res) {
         refundAmountCents,
         refundedAt,
         staffNotes: body.staffNotes,
-      });
+      }, { retries: 2 });
     } catch (writeBackErr) {
       writeBackFailed = true;
       // eslint-disable-next-line no-console
@@ -188,7 +190,7 @@ module.exports = async function handler(req, res) {
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: `Refund ${refundId} for $${centsToDollarsStr(refundAmountCents)} (${refundTarget}) succeeded on Stripe, but the booking record could not be updated. A retry with the same amount reuses the same Idempotency-Key and should self-heal; if this alert is still Open, it did not.`,
-        });
+        }, { retries: 2 });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('refund-gear-charge: also failed to write the write-back-failed Ops Alert', ctx.bookingId, alertErr);

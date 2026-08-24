@@ -124,7 +124,7 @@ async function processOneCandidate(candidate, today) {
         stripeErrorDetail: typeof detail === 'string' ? detail : JSON.stringify(detail),
         urgency: 'urgent_same_day',
         notes: `The deposit hold has been open ${daysSince} days without reconciliation and the automated renewal attempt did not succeed (status: ${result.body && result.body.status}). The old hold (${oldPaymentIntentId}) has been left untouched. Reconcile this booking's gear check-in or follow up on the card on file before the original hold's own ~5-7 day expiry.`,
-      });
+      }, { retries: 2 });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('renew-deposit-hold: also failed to write the hold_renewal_failed Ops Alert', candidate.bookingId, alertErr);
@@ -142,7 +142,7 @@ async function processOneCandidate(candidate, today) {
       renewedAt,
       oldPaymentIntentId: oldPaymentIntentId || '',
       newPaymentIntentId,
-    });
+    }, { retries: 2 });
   } catch (writeBackErr) {
     // eslint-disable-next-line no-console
     console.error('renew-deposit-hold: new hold placed but write-back failed', candidate.bookingId, newPaymentIntentId, writeBackErr);
@@ -153,7 +153,7 @@ async function processOneCandidate(candidate, today) {
         stripeErrorDetail: writeBackErr.message,
         urgency: 'urgent_same_day',
         notes: `A new deposit hold (${newPaymentIntentId}) was placed to renew the safety net, but the booking record could not be updated with depositHoldRenewedAt. The next daily run will likely attempt to renew again using the same stale reference point — flagged in case that happens more than once.`,
-      });
+      }, { retries: 2 });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('renew-deposit-hold: also failed to write the writeback-failed Ops Alert', candidate.bookingId, alertErr);

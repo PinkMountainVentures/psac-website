@@ -32,6 +32,8 @@
 // Deposit-per-kit deliberately matches the existing gear line-item price
 // per tier (see TIERS.gear in create-payment-intent.js) — not a
 // coincidence, a decision made explicitly for this feature.
+var { callBookingsWebApp } = require('../lib/apps-script-client');
+
 var TIERS = {
   trail: { name: 'Trail Guide Experience', gear: 65 },
   p2p:   { name: 'Peaks to Pools Experience', gear: 100 }
@@ -69,19 +71,12 @@ async function getBookingRecord(bookingId) {
 // was already placed on Stripe's side, just gets logged for a manual look.
 async function updateBookingDepositStatus(bookingId, depositPaymentIntentId, depositStatus) {
   try {
-    var res = await fetch(process.env.BOOKINGS_WEBAPP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'updateDepositStatus',
-        bookingId: bookingId,
-        depositPaymentIntentId: depositPaymentIntentId || '',
-        depositStatus: depositStatus,
-        secret: process.env.BOOKINGS_WEBAPP_SECRET
-      })
-    });
-    var data = await res.json();
-    if (!res.ok || data.ok === false) {
+    var data = await callBookingsWebApp('updateDepositStatus', {
+      bookingId: bookingId,
+      depositPaymentIntentId: depositPaymentIntentId || '',
+      depositStatus: depositStatus
+    }, { retries: 2 });
+    if (data.ok === false) {
       console.error('Failed to write back deposit status for', bookingId, data);
     }
   } catch (err) {

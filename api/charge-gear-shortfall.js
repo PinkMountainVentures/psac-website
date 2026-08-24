@@ -208,7 +208,7 @@ module.exports = async function handler(req, res) {
         shortfallChargedAmountCents: requestedAmountCents,
         shortfallChargedAt: chargedAt,
         staffNotes: body.staffNotes || '',
-      });
+      }, { retries: 2 });
     } catch (writeBackErr) {
       // eslint-disable-next-line no-console
       console.error('charge-gear-shortfall: charge succeeded but write-back failed', ctx.bookingId, chargeRes.data.id, writeBackErr);
@@ -220,7 +220,7 @@ module.exports = async function handler(req, res) {
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: `Shortfall charge ${chargeRes.data.id} for $${centsToDollarsStr(requestedAmountCents)} succeeded on Stripe, but the booking record could not be updated. Retrying this same call reuses the same Idempotency-Key so it should self-heal; if this alert is still Open, it did not.`,
-        });
+        }, { retries: 2 });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: also failed to write the write-back-failed Ops Alert', ctx.bookingId, alertErr);
@@ -252,7 +252,7 @@ module.exports = async function handler(req, res) {
 
     async function recordFailure(ctxInner, amountCents, detail) {
       try {
-        await callBookingsWebApp('gearOps_recordShortfallChargeFailure', { bookingId: ctxInner.bookingId, detail });
+        await callBookingsWebApp('gearOps_recordShortfallChargeFailure', { bookingId: ctxInner.bookingId, detail }, { retries: 2 });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: failed to record shortfall charge failure', ctxInner.bookingId, e);
@@ -264,7 +264,7 @@ module.exports = async function handler(req, res) {
           amount: amountCents / 100,
           stripeErrorDetail: detail,
           urgency: 'urgent_same_day',
-        });
+        }, { retries: 2 });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: failed to record Ops Alert for shortfall charge failure', ctxInner.bookingId, e);

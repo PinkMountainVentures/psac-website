@@ -49,13 +49,15 @@ function stripeAuthHeader() {
   return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
 }
 
-async function stripePost(path, params) {
+async function stripePost(path, params, idempotencyKey) {
+  const headers = {
+    Authorization: stripeAuthHeader(),
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await fetch('https://api.stripe.com/v1/' + path, {
     method: 'POST',
-    headers: {
-      Authorization: stripeAuthHeader(),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers,
     body: params.toString(),
   });
   const data = await res.json();
@@ -148,7 +150,13 @@ module.exports = async function handler(req, res) {
     params.append('metadata[bookingId]', body.bookingId);
     params.append('metadata[reasons]', reasons.join(','));
 
-    const refundRes = await stripePost('refunds', params);
+    // Idempotency key added 2026-08-24 alongside the same fix in
+    // api/refund-gear-charge.js. This cancellation refund is always a full
+    // refund of one specific PaymentIntent, so a key on bookingId + that
+    // PaymentIntent is enough for a genuine retry to reuse safely; the
+    // existing "already refunded" self-heal below remains the backstop.
+    const idempotencyKey = 'cancelrefund_' + body.bookingId + '_' + ctx.mainPaymentIntentId;
+    const refundRes = await stripePost('refunds', params, idempotencyKey);
     let refundId, refundAmount;
 
     if (!refundRes.ok) {
@@ -215,7 +223,7 @@ module.exports = async function handler(req, res) {
         cancellationReasons: reasons.join(','),
         beforeT3Cutoff: reasons.indexOf('hold_never_cleared') === -1,
         staffNotes: '',
-      });
+      }, { retries: 2 });
     } catch (writeBackErr) {
       writeBackFailed = true;
       // eslint-disable-next-line no-console
@@ -228,7 +236,7 @@ module.exports = async function handler(req, res) {
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: 'Refund ' + refundId + ' for $' + refundAmount + ' succeeded on Stripe, but the booking record could not be updated (bookingStatus/refundId/cancelledAt). A retry of this same cancellation should self-heal it automatically; if this alert is still Open, it did not.',
-        });
+        }, { retries: 2 });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('cancel-and-refund-booking: also failed to write the orphaned-refund Ops Alert', body.bookingId, alertErr);

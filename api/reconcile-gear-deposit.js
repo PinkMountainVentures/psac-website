@@ -277,7 +277,7 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
       gearShortfallCents,
       stripeTransactionId,
       itemizedItems: chargeableItems.map((i) => ({ itemName: i.itemName, unitId: i.unitId, condition: i.condition, replacementCostCents: i.replacementCostCents })),
-    });
+    }, { retries: 2 });
   } catch (writeBackErr) {
     // eslint-disable-next-line no-console
     console.error('reconcile-gear-deposit: Stripe action succeeded but the booking write-back failed', ctx.bookingId, stripeTransactionId, writeBackErr);
@@ -289,7 +289,7 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
         stripeErrorDetail: writeBackErr.message,
         urgency: 'urgent_same_day',
         notes: `Deposit reconciliation (${depositStatus}) for PaymentIntent ${stripeTransactionId} succeeded on Stripe, but the booking record could not be updated. A retry of this same reconciliation call should self-heal automatically (this endpoint reads the PaymentIntent's real Stripe status back on retry); if this alert is still Open, it did not.`,
-      });
+      }, { retries: 2 });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('reconcile-gear-deposit: also failed to write the write-back-failed Ops Alert', ctx.bookingId, alertErr);
