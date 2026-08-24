@@ -34,6 +34,29 @@
      adventurePrep-actions.gs's own live-header-lookup helpers, never this
      file's hardcoded HEADERS array. Run adventurePrep_setup() once after
      pasting that file in, per its own install instructions.
+     Updated again Aug 2026 when the Operations UX build shipped —
+     dispatches the cadence_*, cancelRefund_*, holdClearance_*,
+     manualAdjustment_*, opsAlerts_*, trailSwap_*, changeLog_*,
+     paymentUpdate_*, and t3Cutoff_* actions, implemented across
+     cadence-actions.gs, cancel-refund-actions.gs,
+     hold-clearance-actions.gs, manual-adjustment-actions.gs,
+     ops-alerts-actions.gs, trail-swap-actions.gs, change-log-actions.gs,
+     payment-update-actions.gs, and t3-cutoff-actions.gs respectively.
+     SYNCED 2026-08-24: this file had drifted from the live Apps Script
+     project (all of the above were pasted directly into the editor and
+     never copied back here) — brought back in sync from a direct copy of
+     the live doPost, same day the getBookingByPaymentIntentId action
+     below was added.
+   - getBookingByPaymentIntentId (added 2026-08-24): a read-only recovery
+     lookup for api/save-booking.js. Confirmed via psac-build-checklist.md
+     that this Web App intermittently serves a generic Google interstitial
+     page instead of its real JSON output even when the underlying
+     execution (including a saveBooking call) completed and wrote data
+     correctly — save-booking.js has no safe way to retry saveBooking
+     itself (not idempotent, would create a duplicate booking), so instead
+     it can recover the real bookingId/adventurePrepToken by looking the
+     booking back up using the one value it already had before the failed
+     call: the main PaymentIntent id.
    ============================================ */
 
 var SHEETS = {
@@ -55,12 +78,6 @@ var ITEM_COSTS = {
   'Hydro Flask Big Mouth 32oz Bottle': 42,
   'Leki Khumbu Lite Trekking Poles': 129,
   'REI Pack Mule 90L Duffel': 159,
-  // Added Aug 2026 (gear inventory/checkout/reconciliation build): hard-shell
-  // first aid kit, one per gear kit, case-cost-only replacement value per
-  // Airey (confirmed 2026-08-15) at $9.99 pretax. NOTE: the guest-facing
-  // "full kit retail value $531" copy predates this line item — true sum is
-  // $540.99. That's a copy decision, not an engineering one; flagged to
-  // Airey in this build's handoff, not changed here.
   'Hard-Shell First Aid Kit': 9.99
 };
 
@@ -98,6 +115,8 @@ function doPost(e) {
       out = handleSaveBooking(body);
     } else if (body.action === 'getBooking') {
       out = handleGetBooking(body);
+    } else if (body.action === 'getBookingByPaymentIntentId') {
+      out = handleGetBookingByPaymentIntentId(body);
     } else if (body.action === 'updateDepositStatus') {
       out = handleUpdateDepositStatus(body);
     } else if (body.action === 'getAdventurePrepContext') {
@@ -136,6 +155,62 @@ function doPost(e) {
       out = adventurePrep_listPendingKitChanges(body);
     } else if (body.action === 'adventurePrep_ensureToken') {
       out = adventurePrep_ensureToken(body);
+    } else if (body.action === 'cadence_getBookingContext') {
+      out = cadence_getBookingContext(body);
+    } else if (body.action === 'cadence_setStallFlags') {
+      out = cadence_setStallFlags(body);
+    } else if (body.action === 'cadence_recordStageSent') {
+      out = cadence_recordStageSent(body);
+    } else if (body.action === 'cadence_listActiveBookings') {
+      out = cadence_listActiveBookings(body);
+    } else if (body.action === 'cancelRefund_getBookingContext') {
+      out = cancelRefund_getBookingContext(body);
+    } else if (body.action === 'cancelRefund_writeCancellation') {
+      out = cancelRefund_writeCancellation(body);
+    } else if (body.action === 'holdClearance_findOpenDepositAlert') {
+      out = holdClearance_findOpenDepositAlert(body);
+    } else if (body.action === 'holdClearance_listBookingsForTripDate') {
+      out = holdClearance_listBookingsForTripDate(body);
+    } else if (body.action === 'manualAdjustment_kitCountCorrection') {
+      out = manualAdjustment_kitCountCorrection(body);
+    } else if (body.action === 'manualAdjustment_gearCheckLogAdjustment') {
+      out = manualAdjustment_gearCheckLogAdjustment(body);
+    } else if (body.action === 'manualAdjustment_changeLogNote') {
+      out = manualAdjustment_changeLogNote(body);
+    } else if (body.action === 'manualAdjustment_gearReturnedUncleaned') {
+      out = manualAdjustment_gearReturnedUncleaned(body);
+    } else if (body.action === 'manualAdjustment_updateDeliveryAddress') {
+      out = manualAdjustment_updateDeliveryAddress(body);
+    } else if (body.action === 'opsAlerts_recordAlert') {
+      out = opsAlerts_recordAlert(body);
+    } else if (body.action === 'opsAlerts_resolveAlert') {
+      out = opsAlerts_resolveAlert(body);
+    } else if (body.action === 'opsAlerts_listAll') {
+      out = opsAlerts_listAll(body);
+    } else if (body.action === 'trailSwap_logIntake') {
+      out = trailSwap_logIntake(body);
+    } else if (body.action === 'trailSwap_getRequestContext') {
+      out = trailSwap_getRequestContext(body);
+    } else if (body.action === 'trailSwap_getDropdownOptions') {
+      out = trailSwap_getDropdownOptions(body);
+    } else if (body.action === 'trailSwap_applyOverride') {
+      out = trailSwap_applyOverride(body);
+    } else if (body.action === 'trailSwap_listAll') {
+      out = trailSwap_listAll(body);
+    } else if (body.action === 'changeLog_listRecent') {
+      out = changeLog_listRecent(body);
+    } else if (body.action === 'paymentUpdate_getBookingForToken') {
+      out = paymentUpdate_getBookingForToken(body);
+    } else if (body.action === 't3Cutoff_getProcessingContext') {
+      out = t3Cutoff_getProcessingContext(body);
+    } else if (body.action === 't3Cutoff_removeUncoveredKit') {
+      out = t3Cutoff_removeUncoveredKit(body);
+    } else if (body.action === 't3Cutoff_writeRideWithGpsAccess') {
+      out = t3Cutoff_writeRideWithGpsAccess(body);
+    } else if (body.action === 't3Cutoff_markProcessed') {
+      out = t3Cutoff_markProcessed(body);
+    } else if (body.action === 't3Cutoff_listActiveBookings') {
+      out = t3Cutoff_listActiveBookings(body);
     } else {
       out = { ok: false, error: 'Unknown action' };
     }
@@ -268,6 +343,41 @@ function handleGetBooking(payload) {
   };
 }
 
+// Recovery lookup for api/save-booking.js (added 2026-08-24): if the
+// original saveBooking call's response got lost to the confirmed-
+// transient "Web App served a Google interstitial page instead of JSON"
+// glitch (psac-build-checklist.md), the booking row itself may already
+// have been written correctly — this lets the caller check by the one
+// value it already had from BEFORE the failed call (the main
+// PaymentIntent id), rather than duplicate the booking by retrying
+// saveBooking itself. Read-only, safe to call as often as needed.
+// adventurePrepToken isn't in this file's own HEADERS constant (see the
+// file header comment), so its column is read the same way
+// adventurePrep-actions.gs's own helpers do — a live header lookup, never
+// a hardcoded index.
+function handleGetBookingByPaymentIntentId(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var pid = String(payload.paymentIntentId || '').trim();
+  if (!pid) {
+    return { ok: false, error: 'Missing paymentIntentId' };
+  }
+  var sheet = ss.getSheetByName(SHEETS.bookings);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][12] || '').trim() === pid) {
+      var map = adventurePrep_headerMap_(sheet);
+      var tokenCol = map['adventurePrepToken'];
+      return {
+        ok: true,
+        personId: data[i][2],
+        bookingId: data[i][0],
+        adventurePrepToken: tokenCol ? (data[i][tokenCol - 1] || '') : ''
+      };
+    }
+  }
+  return { ok: false, error: 'No booking found for that PaymentIntent.' };
+}
+
 // Writes the outcome of a T-1 deposit hold attempt back onto the booking's
 // row, called by api/create-deposit-hold.js after it resolves the hold
 // with Stripe (held / failed / unavailable / requires_action), so the
@@ -346,9 +456,6 @@ function buildGearLogRows(bookingId, payload) {
     rows.push(gearRow(bookingId, k + 1, personName, 'Hydro Flask Big Mouth 32oz Bottle'));
     rows.push(gearRow(bookingId, k + 1, personName, 'Hydro Flask Big Mouth 32oz Bottle'));
     rows.push(gearRow(bookingId, k + 1, personName, 'Leki Khumbu Lite Trekking Poles'));
-    // Added Aug 2026 (gear inventory/checkout/reconciliation build): one
-    // hard-shell first aid kit per gear kit, same per-kit cardinality as the
-    // backpack/poles rows above.
     rows.push(gearRow(bookingId, k + 1, personName, 'Hard-Shell First Aid Kit'));
   }
   for (var d = 0; d < duffelCount; d++) {

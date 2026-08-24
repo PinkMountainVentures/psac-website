@@ -17,6 +17,7 @@
 
 var { sendBookingConfirmationEmail } = require('../lib/send-booking-confirmation');
 var { sendBookingConfirmationSms } = require('../lib/send-booking-confirmation-sms');
+var { callBookingsWebApp } = require('../lib/apps-script-client');
 
 // Same constant/pattern as api/adventure-prep.js's own SITE_URL (kept
 // local rather than shared, matching this repo's existing convention of
@@ -63,8 +64,35 @@ module.exports = async function handler(req, res) {
 
     if (!sheetRes.ok || data.ok === false) {
       console.error('Apps Script save-booking error:', data);
-      res.status(200).json({ ok: false, error: data.error || 'Could not save booking record.' });
-      return;
+
+      // RECOVERY (added 2026-08-24, see psac-build-checklist.md's Apps
+      // Script incident writeup): this failure can be the confirmed-
+      // transient "Web App served a Google interstitial page instead of
+      // JSON" glitch - the booking row, gear log rows, and
+      // adventurePrepToken may already have been written correctly even
+      // though this response is garbage. saveBooking itself is never
+      // retried here (not idempotent, a retry would create a second
+      // booking) - instead, a safe, read-only lookup by the one value
+      // already known before the failed call (the main PaymentIntent id)
+      // checks whether the row actually landed.
+      var recovered = null;
+      if (body.paymentIntentId) {
+        try {
+          recovered = await callBookingsWebApp('getBookingByPaymentIntentId', {
+            paymentIntentId: body.paymentIntentId
+          }, { retries: 2 });
+        } catch (recoverErr) {
+          console.error('save-booking recovery lookup threw:', recoverErr);
+        }
+      }
+
+      if (recovered && recovered.ok) {
+        console.error('save-booking: recovered booking record after a garbled saveBooking response', recovered.bookingId);
+        data = recovered;
+      } else {
+        res.status(200).json({ ok: false, error: data.error || 'Could not save booking record.' });
+        return;
+      }
     }
 
     // NEW (Aug 2026): bookings-code.gs's handleSaveBooking() now mints an
