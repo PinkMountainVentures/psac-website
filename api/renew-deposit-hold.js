@@ -110,7 +110,7 @@ async function processOneCandidate(candidate, today) {
   const { res: innerRes, result } = captureResponse();
   await createDepositHoldHandler({
     method: 'POST',
-    body: { bookingId: candidate.bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET },
+    body: { bookingId: candidate.bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET, purpose: 'renewal' },
   }, innerRes);
 
   if (result.statusCode !== 200 || !result.body || result.body.status !== 'succeeded') {

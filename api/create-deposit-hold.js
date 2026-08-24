@@ -114,6 +114,14 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // 'renewal' is passed only by api/renew-deposit-hold.js's in-process
+    // call - every other caller (the T-1 cron, a manual staff re-trigger)
+    // is an 'initial' placement. Distinguishing the two is what lets the
+    // idempotency guard below, and the Stripe Idempotency-Key further
+    // down, treat "retry of the same placement" and "deliberate new hold"
+    // safely differently.
+    var purpose = body.purpose === 'renewal' ? 'renewal' : 'initial';
+
     var booking = await getBookingRecord(bookingId);
     if (!booking) {
       res.status(404).json({ error: 'Booking not found.' });
@@ -140,14 +148,36 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    var gearCount = Math.max(1, Math.min(20, parseInt(booking.gearKitCount, 10) || 1));
+    var depositAmountCents = Math.round(tier.gear * gearCount * 100);
+
+    // IDEMPOTENCY GUARD (added 2026-08-24, see psac-build-checklist.md's
+    // Apps Script incident writeup): a plain retry of an INITIAL placement
+    // whose Stripe call already succeeded (staff re-triggering it because
+    // the write-back silently failed, or a stale retry) must never place a
+    // second hold on top of a live one. A genuine renewal
+    // (purpose === 'renewal', the only caller being
+    // api/renew-deposit-hold.js) is explicitly exempt - it means to
+    // replace the existing hold with a fresh one. This is a fast-path
+    // optimization, not the only safety net: the Idempotency-Key on the
+    // actual Stripe call below is what protects the case where the
+    // Sheet's own depositStatus never made it past 'scheduled_t1' because
+    // the write-back itself failed.
+    if (purpose !== 'renewal' && booking.depositStatus === 'held') {
+      res.status(200).json({
+        status: 'succeeded',
+        paymentIntentId: booking.depositPaymentIntentId || null,
+        amount: tier.gear * gearCount,
+        alreadyHeld: true
+      });
+      return;
+    }
+
     var mainPaymentIntentId = String(booking.mainPaymentIntentId || '');
     if (!mainPaymentIntentId) {
       res.status(400).json({ error: 'Booking has no main PaymentIntent on file.' });
       return;
     }
-
-    var gearCount = Math.max(1, Math.min(20, parseInt(booking.gearKitCount, 10) || 1));
-    var depositAmountCents = Math.round(tier.gear * gearCount * 100);
 
     // Look up the main PaymentIntent on Stripe's side rather than trust a
     // stored customer/payment method id directly — same "never trust a
@@ -224,11 +254,26 @@ module.exports = async function handler(req, res) {
     params.append('metadata[gearCount]', String(gearCount));
     params.append('metadata[mainPaymentIntentId]', mainPaymentIntentId);
 
+    // Idempotency-Key (added 2026-08-24): stable across a raw retry of
+    // the SAME logical placement, so a retry after a write-back failure
+    // (the Sheet's depositStatus never left 'scheduled_t1', so the guard
+    // above couldn't catch it) still can't create a second live hold -
+    // Stripe itself returns the original PaymentIntent instead of
+    // creating a new one. Keyed differently for a renewal (which
+    // deliberately places a real second hold) vs. an initial placement,
+    // and for a renewal specifically includes the old PaymentIntent id
+    // being replaced, so a later, separate renewal of the SAME booking
+    // still gets its own key.
+    var idempotencyKey = purpose === 'renewal'
+      ? 'deposit_hold_renewal_' + bookingId + '_' + (booking.depositPaymentIntentId || 'none')
+      : 'deposit_hold_initial_' + bookingId;
+
     var depositRes = await fetch('https://api.stripe.com/v1/payment_intents', {
       method: 'POST',
       headers: {
         'Authorization': stripeAuthHeader(),
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Idempotency-Key': idempotencyKey
       },
       body: params.toString()
     });
