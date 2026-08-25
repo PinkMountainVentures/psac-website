@@ -332,11 +332,25 @@ function handleGetBooking(payload) {
     return { ok: false, error: 'Booking not found' };
   }
   var row = found.values;
+  // FIX (2026-08-25, gear-ops live verification pass): the kit count used
+  // to size the T-1 deposit hold must reflect the guest's real, CURRENT
+  // kit count, never the count captured at booking time (row[9]). A guest
+  // who adjusts their kit count post-booking via the normal Adventure Prep
+  // flow (lib/finalize-kit-change.js) only ever writes Adventure Prep's
+  // own confirmedKitCount column - it never touches this row - so reading
+  // row[9] alone silently under- or over-sizes every hold placed after
+  // such a change. Prefer confirmedKitCount when an Adventure Prep row
+  // exists and has a real value; fall back to the booking-time count
+  // otherwise (no Adventure Prep row yet, or a booking that predates this
+  // fix).
+  var ap = adventurePrep_readAdventurePrepRow_(ss, payload.bookingId);
+  var hasConfirmedCount = ap && ap.confirmedKitCount !== '' && ap.confirmedKitCount != null;
+  var effectiveGearKitCount = hasConfirmedCount ? ap.confirmedKitCount : row[9];
   return {
     ok: true,
     bookingId: row[0],
     tier: row[6],
-    gearKitCount: row[9],
+    gearKitCount: effectiveGearKitCount,
     mainPaymentIntentId: row[12],
     depositPaymentIntentId: row[13],
     depositStatus: row[14]

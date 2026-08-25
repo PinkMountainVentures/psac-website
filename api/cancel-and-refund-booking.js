@@ -72,6 +72,60 @@ async function stripeGet(path) {
   return { ok: res.ok, data };
 }
 
+// ADDED (2026-08-25, gear-ops live verification pass): a booking can be
+// cancelled after its T-1 deposit hold already succeeded (depositStatus
+// 'held') — none of today's four automated gates actually reach that state
+// (the three T-3 gates fire before T-1; hold_never_cleared only fires when
+// the hold itself failed), but this endpoint has no way to know a FUTURE
+// caller (a same-day ad-hoc staff cancellation, say) won't. Without this,
+// a live hold on a cancelled booking would just sit there until Stripe's
+// own ~5-7 day expiry — fine for the guest (never charged), but a real gap
+// if reconciliation happens to run first and captures against a booking
+// that's already been told it's cancelled and refunded. Mirrors
+// api/renew-deposit-hold.js's cancelOldHold() self-heal posture: never
+// trust the Sheet's own depositStatus, always read the PaymentIntent's
+// real status back from Stripe first.
+async function releaseDepositHoldIfLive(ctx, bookingId) {
+  if (!ctx.depositPaymentIntentId || ctx.depositStatus !== 'held') {
+    return { attempted: false };
+  }
+  const piRes = await stripeGet('payment_intents/' + encodeURIComponent(ctx.depositPaymentIntentId));
+  if (!piRes.ok) {
+    return { attempted: true, ok: false, detail: 'Could not retrieve the deposit PaymentIntent to release it.' };
+  }
+  const pi = piRes.data;
+  if (pi.status === 'canceled') {
+    // Already released — a previous call, or the reconciliation cron beat
+    // this one to it (Scenario 1, itemized === 0 also cancels the hold).
+    return { attempted: true, ok: true, alreadyResolved: true };
+  }
+  if (pi.status === 'succeeded') {
+    // Already captured (reconciliation ran and found something owed) —
+    // nothing to release, and NOT ours to overwrite; leave depositStatus
+    // as reconciliation already set it.
+    return { attempted: true, ok: true, alreadyCaptured: true };
+  }
+  if (pi.status !== 'requires_capture') {
+    return { attempted: true, ok: false, detail: 'Deposit PaymentIntent is in an unexpected state: ' + pi.status };
+  }
+  const cancelRes = await stripePost(
+    'payment_intents/' + encodeURIComponent(pi.id) + '/cancel',
+    new URLSearchParams(),
+    'cancelrefund_holdcancel_' + bookingId + '_' + pi.id
+  );
+  if (!cancelRes.ok) {
+    const err = cancelRes.data && cancelRes.data.error;
+    const alreadyDone = err && (err.code === 'payment_intent_unexpected_state' || /already|cannot be canceled/i.test(err.message || ''));
+    if (alreadyDone) {
+      return { attempted: true, ok: true, alreadyResolved: true };
+    }
+    // eslint-disable-next-line no-console
+    console.error('cancel-and-refund-booking: failed to release the deposit hold', bookingId, pi.id, err);
+    return { attempted: true, ok: false, detail: (err && err.message) || 'Stripe error releasing the deposit hold.' };
+  }
+  return { attempted: true, ok: true, paymentIntentId: pi.id };
+}
+
 function parseBody(req) {
   var body = req.body;
   if (typeof body === 'string') {
@@ -196,6 +250,27 @@ module.exports = async function handler(req, res) {
       refundAmount = Math.round((refundRes.data.amount || 0)) / 100;
     }
 
+    // ADDED (2026-08-25): release a live deposit hold, if one exists, as
+    // part of this same cancellation. Best-effort and never blocks the
+    // booking cancellation itself — a failure here still lets the (more
+    // urgent) main-charge refund and cancellation stand, just raises an
+    // Ops Alert so staff know a hold needs manual attention.
+    const depositRelease = await releaseDepositHoldIfLive(ctx, body.bookingId);
+    if (depositRelease.attempted && !depositRelease.ok) {
+      try {
+        await callBookingsWebApp('opsAlerts_recordAlert', {
+          bookingId: body.bookingId,
+          alertType: 'deposit_hold_release_failed_on_cancellation',
+          stripeErrorDetail: depositRelease.detail,
+          urgency: 'urgent_same_day',
+          notes: 'This booking was cancelled and its main charge refunded, but its live gear deposit hold (' + ctx.depositPaymentIntentId + ') could not be released: ' + depositRelease.detail + '. Left untouched — Stripe will release it on its own after ~5-7 days if nothing else acts on it first, but reconciliation could otherwise still capture against a cancelled booking.',
+        }, { retries: 2 });
+      } catch (alertErr) {
+        // eslint-disable-next-line no-console
+        console.error('cancel-and-refund-booking: also failed to write the deposit-hold-release-failed Ops Alert', body.bookingId, alertErr);
+      }
+    }
+
     const bookingStatus = bookingStatusForReasons(reasons);
     const cancelledAt = new Date().toISOString();
 
@@ -214,6 +289,7 @@ module.exports = async function handler(req, res) {
     // happened, regardless of whether the Sheet reflects it yet).
     let writeBackFailed = false;
     try {
+      const depositWasReleased = depositRelease.attempted && depositRelease.ok && !depositRelease.alreadyCaptured;
       await callBookingsWebApp('cancelRefund_writeCancellation', {
         bookingId: body.bookingId,
         bookingStatus,
@@ -223,6 +299,10 @@ module.exports = async function handler(req, res) {
         cancellationReasons: reasons.join(','),
         beforeT3Cutoff: reasons.indexOf('hold_never_cleared') === -1,
         staffNotes: '',
+        depositStatus: depositWasReleased ? 'released' : undefined,
+        depositReconciledAt: depositWasReleased ? cancelledAt : undefined,
+        depositReconciledAmountCents: depositWasReleased ? 0 : undefined,
+        depositHoldPaymentIntentId: depositWasReleased ? ctx.depositPaymentIntentId : undefined,
       }, { retries: 2 });
     } catch (writeBackErr) {
       writeBackFailed = true;

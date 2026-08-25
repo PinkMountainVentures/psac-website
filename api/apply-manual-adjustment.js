@@ -41,6 +41,89 @@
 
 const { callBookingsWebApp } = require('../lib/apps-script-client');
 const { validateAddress } = require('../lib/validate-address');
+const createDepositHoldHandler = require('./create-deposit-hold');
+
+// ADDED (2026-08-25, gear-ops live verification pass): kit_count_correction
+// used to write the new confirmedKitCount with zero awareness of a live T-1
+// deposit hold — a correction applied after the hold already succeeded left
+// a stale-sized hold in place with nothing resizing it. Same "place the new
+// hold first, only cancel the old one after the new one succeeds" ordering
+// api/renew-deposit-hold.js already established, and the same in-process
+// reuse technique (a synthetic req/res calling create-deposit-hold.js's
+// exported handler directly, purpose: 'renewal', so every safeguard already
+// inside that file applies here automatically).
+function stripeAuthHeader() {
+  return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
+}
+
+function captureResponse() {
+  const result = { statusCode: 200, body: null };
+  const res = {
+    status(code) { result.statusCode = code; return this; },
+    json(body) { result.body = body; return this; },
+  };
+  return { res, result };
+}
+
+async function cancelOldDepositHold(paymentIntentId, bookingId) {
+  try {
+    const res = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(paymentIntentId) + '/cancel', {
+      method: 'POST',
+      headers: { Authorization: stripeAuthHeader() },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const err = data && data.error;
+      const alreadyDone = err && (err.code === 'payment_intent_unexpected_state' || /already|cannot be canceled/i.test(err.message || ''));
+      if (alreadyDone) return { ok: true, alreadyResolved: true };
+      // eslint-disable-next-line no-console
+      console.error('apply-manual-adjustment: failed to cancel the old deposit hold', bookingId, paymentIntentId, err);
+      return { ok: false, detail: (err && err.message) || 'unknown' };
+    }
+    return { ok: true };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('apply-manual-adjustment: exception cancelling the old deposit hold', bookingId, paymentIntentId, err);
+    return { ok: false, detail: err.message };
+  }
+}
+
+// Resizes a live deposit hold to match a just-applied kit_count_correction.
+// Called AFTER the Sheet's confirmedKitCount has already been updated, so
+// create-deposit-hold.js's own getBooking lookup (fixed 2026-08-25 to read
+// confirmedKitCount) picks up the corrected count automatically — no
+// amount is computed or passed here.
+async function resizeDepositHoldForCorrection(bookingId, oldPaymentIntentId) {
+  const { res: innerRes, result } = captureResponse();
+  await createDepositHoldHandler({
+    method: 'POST',
+    body: { bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET, purpose: 'renewal' },
+  }, innerRes);
+
+  if (result.statusCode !== 200 || !result.body || result.body.status !== 'succeeded') {
+    const detail = (result.body && (result.body.error || result.body.status)) || ('unexpected status ' + result.statusCode);
+    // eslint-disable-next-line no-console
+    console.error('apply-manual-adjustment: resized hold placement did not succeed', bookingId, detail);
+    return { ok: false, detail: typeof detail === 'string' ? detail : JSON.stringify(detail) };
+  }
+
+  const newPaymentIntentId = result.body.paymentIntentId;
+  const cancelResult = oldPaymentIntentId ? await cancelOldDepositHold(oldPaymentIntentId, bookingId) : { ok: true, skipped: true };
+
+  try {
+    await callBookingsWebApp('gearOps_recordHoldRenewed', {
+      bookingId,
+      renewedAt: new Date().toISOString(),
+      oldPaymentIntentId: oldPaymentIntentId || '',
+      newPaymentIntentId,
+    }, { retries: 2 });
+  } catch (writeBackErr) {
+    // eslint-disable-next-line no-console
+    console.error('apply-manual-adjustment: resized hold placed but write-back failed', bookingId, newPaymentIntentId, writeBackErr);
+  }
+
+  return { ok: true, oldPaymentIntentId, newPaymentIntentId, cancelResult };
+}
 
 const VALID_TYPES = [
   'kit_count_correction',
@@ -87,9 +170,31 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'newConfirmedKitCount (a number) is required for kit_count_correction' });
         return;
       }
+      // ADDED (2026-08-25): check for a live T-1 deposit hold BEFORE
+      // applying the correction, so we still have the old PaymentIntent id
+      // on hand afterward if a resize turns out to be needed.
+      const depositCtxBefore = await callBookingsWebApp('cancelRefund_getBookingContext', { bookingId });
       result = await callBookingsWebApp('manualAdjustment_kitCountCorrection', {
         bookingId, newConfirmedKitCount: Number(body.newConfirmedKitCount), staffNotes,
       });
+      if (result && result.ok && depositCtxBefore && depositCtxBefore.depositStatus === 'held') {
+        const resize = await resizeDepositHoldForCorrection(bookingId, depositCtxBefore.depositPaymentIntentId);
+        if (!resize.ok) {
+          try {
+            await callBookingsWebApp('opsAlerts_recordAlert', {
+              bookingId,
+              alertType: 'kit_count_correction_hold_resize_failed',
+              stripeErrorDetail: resize.detail,
+              urgency: 'urgent_same_day',
+              notes: 'Kit count was manually corrected to ' + body.newConfirmedKitCount + ', but resizing the live deposit hold (' + depositCtxBefore.depositPaymentIntentId + ') failed: ' + resize.detail + '. The OLD hold has been left untouched (still sized for the pre-correction kit count) — needs a manual look before reconciliation runs against it.',
+            }, { retries: 2 });
+          } catch (alertErr) {
+            // eslint-disable-next-line no-console
+            console.error('apply-manual-adjustment: also failed to write the hold-resize-failed Ops Alert', bookingId, alertErr);
+          }
+        }
+        extra = Object.assign({}, extra, { depositHoldResized: resize.ok, depositHoldResizeDetail: resize.ok ? undefined : resize.detail });
+      }
     } else if (type === 'gear_check_log_adjustment') {
       if (!Array.isArray(body.kitNumbersToRemove) || !body.kitNumbersToRemove.length) {
         res.status(400).json({ error: 'bad_request', detail: 'kitNumbersToRemove (non-empty array) is required for gear_check_log_adjustment' });

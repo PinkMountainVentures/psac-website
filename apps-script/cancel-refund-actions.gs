@@ -66,6 +66,12 @@ function cancelRefund_getBookingContext(payload) {
     // a booking that predates this column existing reads as active, not as
     // some falsy/blank status a caller might mishandle.
     bookingStatus: booking.bookingStatus || 'active',
+    // ADDED (2026-08-25): api/cancel-and-refund-booking.js also needs to
+    // know whether a live gear deposit hold exists on this booking, so a
+    // cancellation can release it rather than leaving it to expire on its
+    // own days later with the guest still showing a pending charge.
+    depositPaymentIntentId: booking.depositPaymentIntentId || '',
+    depositStatus: booking.depositStatus || '',
   };
 }
 
@@ -99,6 +105,18 @@ function cancelRefund_writeCancellation(payload) {
     set('refundAmount', payload.refundAmount);
     set('cancellationReasons', payload.cancellationReasons);
 
+    // ADDED (2026-08-25): fold the deposit-hold release into this SAME
+    // atomic write when api/cancel-and-refund-booking.js cancelled a live
+    // hold as part of this cancellation — this file's own header already
+    // promises "a single atomic write... never two separate writes a
+    // caller could see half-applied," so this belongs here, not as a
+    // second call. Absent (undefined) on every cancellation that had no
+    // live hold to release (the normal T-3 gates), so those keep writing
+    // exactly what they always have.
+    if (payload.depositStatus !== undefined) set('depositStatus', payload.depositStatus);
+    if (payload.depositReconciledAt !== undefined) set('reconciledAt', payload.depositReconciledAt);
+    if (payload.depositReconciledAmountCents !== undefined) set('reconciledAmountCents', payload.depositReconciledAmountCents);
+
     adventurePrep_appendChangeLog_(ss, {
       bookingId: payload.bookingId,
       changeType: 'cancellation',
@@ -108,10 +126,12 @@ function cancelRefund_writeCancellation(payload) {
         refundId: payload.refundId,
         refundAmount: payload.refundAmount,
         cancellationReasons: payload.cancellationReasons,
+        depositStatus: payload.depositStatus,
+        depositHoldPaymentIntentId: payload.depositHoldPaymentIntentId || '',
       }),
       refundOrChargeAmount: payload.refundAmount,
       stripeTransactionId: payload.refundId,
-      staffNotes: payload.staffNotes || '',
+      staffNotes: (payload.staffNotes || '') + (payload.depositHoldPaymentIntentId ? (' Deposit hold ' + payload.depositHoldPaymentIntentId + ' released as part of this cancellation.') : ''),
     });
 
     return { ok: true };
