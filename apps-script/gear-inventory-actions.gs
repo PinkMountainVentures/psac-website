@@ -175,6 +175,13 @@ var GEAR_ITEM_NAME_TO_TYPE = {
   'REI Pack Mule 90L Duffel': 'duffel',
 };
 
+// Mirrors api/reconcile-gear-deposit.js's own ALREADY_RECONCILED_STATUSES —
+// any depositStatus this booking could only reach by having already gone
+// through reconciliation once. Used by gearOps_checkInItem's post-incident
+// safety net below (2026-08-25) to detect a condition correction landing
+// after the hold is already resolved.
+var RECONCILED_DEPOSIT_STATUSES_ = ['released', 'partial_capture', 'full_capture', 'full_capture_pending_review', 'shortfall_charged'];
+
 function gearOps_setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   adventurePrep_ensureTabWithHeaders_(ss, 'Gear Units', GEAR_UNITS_HEADERS);
@@ -713,7 +720,25 @@ function gearOps_getCheckinContext(payload) {
 function gearOps_isBookingSettled_(gearRows, nowIso) {
   var now = new Date(nowIso).getTime();
   return gearRows.every(function (r) {
-    if (!r.unitId) return true; // not a trackable row (shouldn't happen post-filter, defensive)
+    // BUG FIX (2026-08-25, live reconciliation testing): this used to read
+    // `if (!r.unitId) return true`, on the assumption the caller already
+    // filtered gearRows down to unitId-having rows so this branch could
+    // never actually fire. That assumption was wrong — the real caller,
+    // gearOps_getReconciliationContext, filtered its own gearRows to
+    // `r.unitId` truthy BEFORE calling here, so a booking that hadn't been
+    // allocated/checked out yet produced an EMPTY gearRows array, and
+    // `[].every(...)` is vacuously true in JS — meaning any booking whose
+    // gear hadn't even been checked out yet read as "settled" with $0
+    // itemized, and the reconciliation cron (api/trigger-gear-
+    // reconciliation.js, every 15 min) auto-canceled its live deposit hold
+    // almost immediately after it was placed, well before checkout — a real
+    // production bug caught live when it silently canceled two active test
+    // holds before their checkout even started. Fixed at both ends: this
+    // function no longer receives a pre-filtered gearRows (the caller now
+    // passes every row for the booking, unallocated included), and a row
+    // with no unitId now correctly reads as NOT settled — it hasn't even
+    // been checked out yet, so it can't possibly be checked in.
+    if (!r.unitId) return false; // not yet allocated/checked out — never settled
     if (r.condition === 'Good' || r.condition === 'Damaged' || r.condition === 'Recovered') return true;
     if (r.condition === 'Missing') {
       if (!r.graceDeadline) return false; // Missing but no deadline ever set — data gap, treat as unsettled
@@ -790,6 +815,40 @@ function gearOps_checkInItem(payload) {
       }
     }
 
+    // Safety net (2026-08-25, post-incident — see Fix G/settle-buffer header
+    // comments above for the full story): a condition write for a
+    // chargeable state (Damaged/Missing) landing AFTER this booking's
+    // deposit hold has already been reconciled previously went nowhere —
+    // the correction was silently absorbed into the Sheet with no signal
+    // that money might now be owed, and no automatic path was left to
+    // recover it (Stripe's capture/cancel already happened and can't be
+    // reopened). Catch it here instead: raise an Ops Alert so a human
+    // decides whether a manual charge is needed, rather than the
+    // newly-discovered cost being lost silently a second time. Never lets a
+    // failure here block the check-in write itself — the condition/photo
+    // are already saved above by this point.
+    if (condition === 'Damaged' || condition === 'Missing') {
+      try {
+        var bookingForAlert = adventurePrep_findExperienceBookingById_(ss, payload.bookingId);
+        if (bookingForAlert && RECONCILED_DEPOSIT_STATUSES_.indexOf(bookingForAlert.depositStatus) !== -1) {
+          var lateUnit = unitFound ? gearOps_readUnit_(unitsSheet, unitFound) : null;
+          var lateCostCents = lateUnit && lateUnit.replacementCostCents != null ? Number(lateUnit.replacementCostCents) : 0;
+          opsAlerts_recordAlert({
+            bookingId: payload.bookingId,
+            alertType: 'gear_condition_corrected_after_reconciliation',
+            amount: lateCostCents ? lateCostCents / 100 : 0,
+            urgency: 'urgent_same_day',
+            notes: 'Item ' + payload.unitId + ' (' + found.itemName + ') was marked ' + condition +
+              ' after this booking\'s deposit hold was already reconciled (depositStatus=' + bookingForAlert.depositStatus +
+              '). That reconciliation ran without this item\'s real condition, so the deposit outcome may no longer be' +
+              ' correct — review whether a manual charge is owed (api/apply-manual-adjustment.js or api/charge-gear-shortfall.js).',
+          });
+        }
+      } catch (alertErr) {
+        // Never let the alert path block check-in itself.
+      }
+    }
+
     return { ok: true, bookingId: payload.bookingId, unitId: payload.unitId, condition: condition, routedTo: routedTo };
   } finally {
     lock.releaseLock();
@@ -813,8 +872,15 @@ function gearOps_getReconciliationContext(payload) {
   if (!booking) return { notFound: true };
 
   var gearSheet = ss.getSheetByName('Gear Check Log');
+  // BUG FIX (2026-08-25): this used to filter to `r.unitId` truthy, which
+  // silently dropped every row for a booking that hadn't been
+  // allocated/checked out yet — see gearOps_isBookingSettled_'s own header
+  // comment for the full incident this caused. Now returns every Gear
+  // Check Log row for the booking regardless of allocation state, so
+  // gearOps_isBookingSettled_ actually sees the not-yet-checked-out rows
+  // and can correctly call the booking unsettled.
   var gearRows = adventurePrep_readRowsAsObjects_(gearSheet).filter(function (r) {
-    return String(r.bookingId) === String(payload.bookingId) && r.unitId;
+    return String(r.bookingId) === String(payload.bookingId);
   });
   var unitsSheet = ss.getSheetByName('Gear Units');
   var unitRows = adventurePrep_readRowsAsObjects_(unitsSheet);
@@ -822,6 +888,22 @@ function gearOps_getReconciliationContext(payload) {
   unitRows.forEach(function (u) { unitsById[u.unitId] = u; });
 
   var settled = gearOps_isBookingSettled_(gearRows, payload.nowIso || new Date().toISOString());
+
+  // Settle-buffer support (2026-08-25, post-incident): the latest
+  // checkedInAt across every row for this booking. api/reconcile-gear-
+  // deposit.js uses this to require a booking to have sat fully settled for
+  // a buffer window before it will actually resolve the Stripe hold — see
+  // that file's own header comment for the incident this closes (a
+  // condition correction landing after a cron tick had already read the
+  // booking as settled-with-$0-itemized and canceled the hold for real,
+  // an hour before the correcting edit). gearOps_checkInItem re-stamps
+  // checkedInAt on every write, corrections included, so this naturally
+  // reflects "time since the last edit to any item," not just first entry.
+  var lastItemUpdateIso = gearRows.reduce(function (latest, r) {
+    if (!r.checkedInAt) return latest;
+    if (!latest || new Date(r.checkedInAt).getTime() > new Date(latest).getTime()) return r.checkedInAt;
+    return latest;
+  }, null);
 
   return {
     bookingId: booking.bookingId,
@@ -848,6 +930,7 @@ function gearOps_getReconciliationContext(payload) {
     shortfallRefundAmountCents: booking.shortfallRefundAmountCents || '',
     refundedAt: booking.refundedAt || '',
     settled: settled,
+    lastItemUpdateIso: lastItemUpdateIso || '',
     items: gearRows.map(function (r) {
       var u = unitsById[r.unitId] || {};
       return {
@@ -1016,9 +1099,27 @@ function gearOps_recordRefund(payload) {
 function gearOps_listHoldRenewalCandidates(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Experience Bookings');
+  // BUG FIX (2026-08-25, live reconciliation testing, Fix H): this used to
+  // also require `!r.reconciledAt`, on the assumption a booking's
+  // reconciledAt only ever gets set once a hold is truly done. That's not
+  // true across a hold's full lifecycle: `depositStatus` alone is already
+  // the authoritative "is there a live hold right now" signal (reconcile-
+  // gear-deposit.js's own ALREADY_RECONCILED_STATUSES check independently
+  // guards against double-reconciling off of it), so requiring a blank
+  // reconciledAt on top of that is redundant in the normal case and
+  // actively wrong whenever a booking gets a genuinely fresh hold after an
+  // earlier reconciliation already ran on it — reconciledAt is never
+  // cleared when a new hold is placed (renewal, or recovering a hold that
+  // was cancelled and re-placed), so a stale reconciledAt value from a
+  // PRIOR reconciliation cycle silently and permanently excluded the
+  // booking from ever being picked up again, hit live when a hold that
+  // had been auto-released by the Fix G bug was re-placed — the fresh held
+  // hold never appeared in this candidate list because reconciledAt from
+  // the earlier cycle was still sitting on the row. Dropped the clause;
+  // depositStatus === 'held' is sufficient on its own.
   var rows = adventurePrep_readRowsAsObjects_(sheet).filter(function (r) {
     var status = r.bookingStatus || 'active';
-    return status === 'active' && r.depositStatus === 'held' && !r.reconciledAt;
+    return status === 'active' && r.depositStatus === 'held';
   });
   return {
     bookings: rows.map(function (r) {

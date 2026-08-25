@@ -46,6 +46,20 @@ const { renderDepositFullHoldNoChargeEmail } = require('../lib/email-templates/d
 const ALREADY_RECONCILED_STATUSES = ['released', 'partial_capture', 'full_capture', 'full_capture_pending_review', 'shortfall_charged'];
 const NO_VALID_HOLD_STATUSES = ['requires_action', 'unavailable', 'failed', 'skipped', 'scheduled_t1', ''];
 
+// Settle buffer (added 2026-08-25, post-incident): confirmed live that a
+// booking can read as fully settled ($0 itemized, since every item was
+// still "Good") the moment before a staff member corrects one item's
+// condition to Damaged/Missing — and the reconciliation cron (every ~15
+// min) can land in exactly that gap, canceling/capturing the hold against
+// the pre-correction state a full hour before the correction ever lands.
+// Once that happens the Stripe action is done and cannot be reopened. This
+// buffer requires a booking to have sat settled, with no check-in edit at
+// all (first entry or correction), for this long before reconciliation is
+// allowed to actually touch Stripe — giving staff a real window to correct
+// a condition before it becomes irreversible. Mirrors the debounce pattern
+// already used elsewhere in this codebase (T-3 cutoff, kit-count changes).
+const SETTLE_BUFFER_MS = 15 * 60 * 1000;
+
 function checkSecret(body) {
   return body && body.secret === process.env.GEAR_OPS_SHARED_SECRET;
 }
@@ -158,6 +172,25 @@ module.exports = async function handler(req, res) {
       // not just a fairness nicety — never partially reconcile.
       res.status(409).json({ ok: false, ready: false, reason: 'not_settled', detail: 'One or more items are still Missing with the grace period open. Reconciliation cannot run until every trackable item is settled.' });
       return;
+    }
+
+    // Settle buffer — see SETTLE_BUFFER_MS's own comment above for the
+    // incident this closes. Applies uniformly to the cron and to a direct/
+    // manual call like this one, since either path could otherwise race a
+    // staff correction the exact same way.
+    if (ctx.lastItemUpdateIso) {
+      const msSinceLastUpdate = Date.now() - new Date(ctx.lastItemUpdateIso).getTime();
+      if (msSinceLastUpdate < SETTLE_BUFFER_MS) {
+        const readyAt = new Date(new Date(ctx.lastItemUpdateIso).getTime() + SETTLE_BUFFER_MS).toISOString();
+        res.status(409).json({
+          ok: false,
+          ready: false,
+          reason: 'settle_buffer',
+          detail: `Every item is checked in, but the most recent check-in edit was only ${Math.max(0, Math.round(msSinceLastUpdate / 60000))} minute(s) ago. Reconciliation waits ${SETTLE_BUFFER_MS / 60000} minutes after the last check-in edit before resolving the deposit hold, in case a condition still needs correcting. Try again after ${readyAt}.`,
+          readyAt,
+        });
+        return;
+      }
     }
 
     if (!ctx.depositPaymentIntentId) {
