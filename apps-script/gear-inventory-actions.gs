@@ -379,12 +379,46 @@ function gearOps_checkAvailabilityRaw(payload) {
  * existing view); this action only adds what's new here (gearKitCount, and
  * whether allocation has already run).
  */
+/**
+ * Normalizes a Bookings sheet "date" cell to a plain 'yyyy-MM-dd' string
+ * for comparison against a caller-supplied tripDate.
+ *
+ * REAL BUG FOUND 2026-08-25, during the gear-ops live verification pass:
+ * bookings-code.gs writes payload.date as a plain ISO string
+ * ("2026-08-29") via appendRow(). With the "date" column's format left as
+ * Sheets' default "Automatic", Sheets silently auto-converts that
+ * unambiguous date-looking string into a real Date-typed cell on write —
+ * confirmed directly against the live sheet (the date column reads
+ * right-aligned, Sheets' own signal for a number/date value, not text).
+ * Every date-filtered queue in this codebase was comparing
+ * String(r.date || '').indexOf(payload.tripDate) === 0 against that cell
+ * — String(aDateObject) reads like "Sat Aug 29 2026 00:00:00 GMT-0700
+ * (Pacific Daylight Time)", which never starts with an ISO tripDate
+ * string, so the filter silently excluded every booking, always. This
+ * affected THREE call sites: gearOps_getCheckoutQueue and
+ * gearOps_getCheckinQueue below, and holdClearance_listBookingsForTripDate
+ * (hold-clearance-actions.gs) — the last of which the actual T-1
+ * deposit-hold-placement cron (api/trigger-deposit-holds.js) depends on to
+ * find bookings due for a hold, meaning that cron has likely never found a
+ * real candidate on its own in production; every hold placed so far came
+ * from a manual/direct call instead. Handles both a real Date object (the
+ * live, actual case) and a plain string (a booking saved before this fix,
+ * or if the column's format is ever changed to Plain Text), so this is
+ * safe regardless of which type a given cell happens to hold.
+ */
+function gearOps_normalizeDateString_(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(value || '');
+}
+
 function gearOps_getCheckoutQueue(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Experience Bookings');
   var rows = adventurePrep_readRowsAsObjects_(sheet).filter(function (r) {
     var status = r.bookingStatus || 'active';
-    return status === 'active' && String(r.date || '').indexOf(payload.tripDate) === 0;
+    return status === 'active' && gearOps_normalizeDateString_(r.date).indexOf(payload.tripDate) === 0;
   });
   return {
     bookings: rows.map(function (r) {
@@ -631,7 +665,7 @@ function gearOps_getCheckinQueue(payload) {
   var sheet = ss.getSheetByName('Experience Bookings');
   var rows = adventurePrep_readRowsAsObjects_(sheet).filter(function (r) {
     var status = r.bookingStatus || 'active';
-    return status === 'active' && String(r.date || '').indexOf(payload.tripDate) === 0 && r.gearDeliveredAt;
+    return status === 'active' && gearOps_normalizeDateString_(r.date).indexOf(payload.tripDate) === 0 && r.gearDeliveredAt;
   });
   return {
     bookings: rows.map(function (r) {

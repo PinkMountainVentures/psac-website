@@ -40,9 +40,16 @@
 function holdClearance_listBookingsForTripDate(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Experience Bookings');
+  // FIX (2026-08-25): see gearOps_normalizeDateString_'s header comment in
+  // gear-inventory-actions.gs (same Apps Script project, shared global
+  // scope) — the "date" cell is a real Date object, not a string, and a
+  // naive String(r.date) comparison silently matched nothing. This is the
+  // actual candidate list api/trigger-deposit-holds.js's T-1 cron depends
+  // on, so this was the highest-impact of the three call sites this bug
+  // hit.
   var rows = adventurePrep_readRowsAsObjects_(sheet).filter(function (r) {
     var status = r.bookingStatus || 'active';
-    return status === 'active' && String(r.date || '').indexOf(payload.tripDate) === 0;
+    return status === 'active' && gearOps_normalizeDateString_(r.date).indexOf(payload.tripDate) === 0;
   });
   return {
     bookings: rows.map(function (r) {
