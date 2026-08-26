@@ -105,6 +105,29 @@ async function processOneBooking(booking) {
   }
 
   const cancelResult = await cancelBooking(booking.bookingId);
+  // BUG FIX (payment-review, Aug 2026, High #23): this used to report
+  // 'cancelled_hold_never_cleared' regardless of whether the downstream
+  // cancel-and-refund-booking.js call actually succeeded — its response was
+  // captured but never checked. A genuinely failed cancellation (a Stripe
+  // refund decline, an engineering error) reported as success in this
+  // cron's own output, with no alert, leaving a booking that should have
+  // been cancelled quietly still 'active' with a live, about-to-expire
+  // deposit hold and nobody told.
+  if (!cancelResult || cancelResult.ok !== true) {
+    try {
+      await callBookingsWebApp('opsAlerts_recordAlert', {
+        bookingId: booking.bookingId,
+        alertType: 'cancellation_gate_call_failed',
+        stripeErrorDetail: (cancelResult && (cancelResult.detail || cancelResult.error)) || 'no response',
+        urgency: 'urgent_same_day',
+        notes: 'check-hold-clearance-deadline (the noon Pacific hold-never-cleared gate) tried to cancel this booking, but cancel-and-refund-booking.js did not report success: ' + JSON.stringify(cancelResult) + '. The booking was NOT cancelled — it is still active, with a deposit hold that never cleared. Needs manual review before it expires unresolved.',
+      }, { retries: 2 });
+    } catch (alertErr) {
+      // eslint-disable-next-line no-console
+      console.error('check-hold-clearance-deadline: also failed to write the cancellation_gate_call_failed Ops Alert', booking.bookingId, alertErr);
+    }
+    return { bookingId: booking.bookingId, outcome: 'cancel_call_failed', depositStatus: booking.depositStatus, cancelResult };
+  }
   return { bookingId: booking.bookingId, outcome: 'cancelled_hold_never_cleared', depositStatus: booking.depositStatus, cancelResult };
 }
 

@@ -104,6 +104,32 @@ function findUncoveredRosterMembers(roster, waiverRows) {
   });
 }
 
+// BUG FIX (payment-review, Aug 2026, High #23): all three of this file's
+// cancellation gates used to report outcome: 'cancelled' regardless of
+// whether the downstream cancel-and-refund-booking.js call actually
+// succeeded — its response was captured into `result` but never checked.
+// A genuinely failed cancellation (a Stripe refund decline, an engineering
+// error) reported as success in this cron's own output, with no alert,
+// leaving a booking that should have been cancelled quietly still 'active'.
+async function reportCancelOutcome(bookingId, reason, result) {
+  if (!result || result.ok !== true) {
+    try {
+      await callBookingsWebApp('opsAlerts_recordAlert', {
+        bookingId,
+        alertType: 'cancellation_gate_call_failed',
+        stripeErrorDetail: (result && (result.detail || result.error)) || 'no response',
+        urgency: 'urgent_same_day',
+        notes: 'process-t3-cutoff (the T-3, 10pm gate: ' + reason + ') tried to cancel this booking, but cancel-and-refund-booking.js did not report success: ' + JSON.stringify(result) + '. The booking was NOT cancelled — it is still active. Needs manual review.',
+      }, { retries: 2 });
+    } catch (alertErr) {
+      // eslint-disable-next-line no-console
+      console.error('process-t3-cutoff: also failed to write the cancellation_gate_call_failed Ops Alert', bookingId, alertErr);
+    }
+    return { bookingId, outcome: 'cancel_call_failed', reason, result };
+  }
+  return { bookingId, outcome: 'cancelled', reason, result };
+}
+
 async function processOneBooking(bookingId) {
   const ctx = await callBookingsWebApp('t3Cutoff_getProcessingContext', { bookingId });
   if (!ctx || ctx.notFound) return { bookingId, outcome: 'not_found' };
@@ -112,15 +138,15 @@ async function processOneBooking(bookingId) {
   // Step 1: three cancellation gates, fixed order, first fire short-circuits.
   if (!ctx.assignedAt) {
     const result = await cancelBooking(bookingId, 'no_1.2a');
-    return { bookingId, outcome: 'cancelled', reason: 'no_1.2a', result };
+    return await reportCancelOutcome(bookingId, 'no_1.2a', result);
   }
   if (ctx.waiverTrack === 'zero') {
     const result = await cancelBooking(bookingId, 'zero_waivers');
-    return { bookingId, outcome: 'cancelled', reason: 'zero_waivers', result };
+    return await reportCancelOutcome(bookingId, 'zero_waivers', result);
   }
   if (!hasDeliveryAddress(ctx)) {
     const result = await cancelBooking(bookingId, 'no_address');
-    return { bookingId, outcome: 'cancelled', reason: 'no_address', result };
+    return await reportCancelOutcome(bookingId, 'no_address', result);
   }
 
   const stepResults = {};
