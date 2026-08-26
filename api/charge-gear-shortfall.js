@@ -132,12 +132,27 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // MOVED UP (payment-review, Aug 2026, High #18): used to be computed
+    // just before the Stripe charge attempt itself, which meant recordFailure
+    // couldn't be called from the mainPaymentIntentId lookup failure branch
+    // below (it closes over chargeableItems, which didn't exist yet at that
+    // point in execution). Only depends on ctx.items, already available —
+    // safe to compute this early.
+    const chargeableItems = (ctx.items || []).filter((i) => i.condition === 'Damaged' || i.condition === 'Missing');
+
     if (!ctx.mainPaymentIntentId) {
       res.status(500).json({ error: 'engineering_error', detail: 'booking has no main PaymentIntent on file' });
       return;
     }
     const mainRes = await stripeGet('payment_intents/' + encodeURIComponent(ctx.mainPaymentIntentId));
     if (!mainRes.ok) {
+      // BUG FIX (payment-review, Aug 2026, High #18): this used to return a
+      // raw 502 with no recordFailure call, unlike every other failure
+      // branch in this function — no Ops Alert, no gearOps_
+      // recordShortfallChargeFailure write, no guest email, for a real
+      // failure to look up the very PaymentIntent this whole charge depends
+      // on. requestedAmountCents is already validated above.
+      await recordFailure(ctx, requestedAmountCents, 'Could not retrieve the main PaymentIntent from Stripe (' + JSON.stringify((mainRes.data && mainRes.data.error) || {}) + ').');
       res.status(502).json({ error: 'stripe_error', detail: 'Could not retrieve the main PaymentIntent.' });
       return;
     }
@@ -161,7 +176,8 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const chargeableItems = (ctx.items || []).filter((i) => i.condition === 'Damaged' || i.condition === 'Missing');
+    // chargeableItems is now computed earlier (see High #18 note above);
+    // itemsLabel/conditionNote still only needed from here down.
     const { itemsLabel, conditionNote } = summarizeItems(chargeableItems);
     const idempotencyKey = 'gearshortfall_' + ctx.bookingId + '_' + ctx.reconciledAt + '_' + requestedAmountCents;
 
