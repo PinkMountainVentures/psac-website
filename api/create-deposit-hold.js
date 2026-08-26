@@ -69,18 +69,42 @@ async function getBookingRecord(bookingId) {
 // result instead of staying on the "scheduled_t1" placeholder written at
 // booking time. Best-effort: a failure here never unwinds the hold that
 // was already placed on Stripe's side, just gets logged for a manual look.
-async function updateBookingDepositStatus(bookingId, depositPaymentIntentId, depositStatus) {
+// BUG FIX (payment-review, Aug 2026, Follow-up A — the reverse-direction
+// twin of High #14, flagged during that fix but not closed until now): a
+// hold renewal (purpose 'renewal') reads its candidate list, places a NEW
+// Stripe hold, then writes back here unconditionally. If gear-deposit
+// reconciliation (a separate ~15-minute cron) finished FIRST and already
+// moved this booking to a terminal, reconciled depositStatus, this write
+// used to silently clobber that back to whatever status the renewal
+// attempt produced — reviving an already-settled, possibly fully-refunded
+// booking, in the worst case with a brand-new live Stripe hold on the
+// guest's card weeks after their trip ended. `opts.guardReconciled` (only
+// ever passed true for a renewal write) makes this refuse the write and
+// return `{stale:true, currentDepositStatus}` instead, mirroring the exact
+// compare-and-swap pattern already used for the forward direction of this
+// same race in `gearOps_writeReconciliation`. Now RETURNS the Apps Script
+// response (previously fire-and-forget) so the caller can react to a
+// refused write, in particular releasing an orphaned just-placed hold —
+// see the 'requires_capture' branch below.
+async function updateBookingDepositStatus(bookingId, depositPaymentIntentId, depositStatus, opts) {
   try {
     var data = await callBookingsWebApp('updateDepositStatus', {
       bookingId: bookingId,
       depositPaymentIntentId: depositPaymentIntentId || '',
-      depositStatus: depositStatus
+      depositStatus: depositStatus,
+      guardReconciled: !!(opts && opts.guardReconciled)
     }, { retries: 2 });
-    if (data.ok === false) {
-      console.error('Failed to write back deposit status for', bookingId, data);
+    if (data && data.ok === false) {
+      if (data.stale) {
+        console.error('updateBookingDepositStatus: write refused, booking was already reconciled (renewal-vs-reconciliation race)', bookingId, depositStatus, data.currentDepositStatus);
+      } else {
+        console.error('Failed to write back deposit status for', bookingId, data);
+      }
     }
+    return data;
   } catch (err) {
     console.error('updateBookingDepositStatus error:', err);
+    return null;
   }
 }
 
@@ -143,7 +167,7 @@ module.exports = async function handler(req, res) {
       // before the trip, despite never having had a deposit hold to begin
       // with. Writing 'skipped' here is what that downstream check was
       // always assuming would happen.
-      await updateBookingDepositStatus(bookingId, null, 'skipped');
+      await updateBookingDepositStatus(bookingId, null, 'skipped', { guardReconciled: purpose === 'renewal' });
       res.status(200).json({ status: 'skipped', reason: 'No deposit hold for this tier.' });
       return;
     }
@@ -257,7 +281,7 @@ module.exports = async function handler(req, res) {
       // No saved customer/payment method (e.g. Customer creation failed
       // silently earlier) — can't place a silent hold. Not a hard failure,
       // just means the deposit needs manual follow-up.
-      await updateBookingDepositStatus(bookingId, null, 'unavailable');
+      await updateBookingDepositStatus(bookingId, null, 'unavailable', { guardReconciled: purpose === 'renewal' });
       res.status(200).json({ status: 'unavailable', reason: 'No saved payment method to hold a deposit against.' });
       return;
     }
@@ -328,7 +352,7 @@ module.exports = async function handler(req, res) {
     if (!depositRes.ok) {
       console.error('Stripe error creating deposit PaymentIntent:', depositData);
       var message = (depositData && depositData.error && depositData.error.message) || 'Could not place the deposit hold.';
-      await updateBookingDepositStatus(bookingId, null, 'failed');
+      await updateBookingDepositStatus(bookingId, null, 'failed', { guardReconciled: purpose === 'renewal' });
       res.status(200).json({ status: 'failed', error: message });
       return;
     }
@@ -338,7 +362,7 @@ module.exports = async function handler(req, res) {
       // be placed. Off-session confirmations that hit this can't be
       // completed silently server-side; record it as needing manual
       // follow-up rather than leaving it ambiguous.
-      await updateBookingDepositStatus(bookingId, depositData.id, 'requires_action');
+      await updateBookingDepositStatus(bookingId, depositData.id, 'requires_action', { guardReconciled: purpose === 'renewal' });
       res.status(200).json({
         status: 'requires_action',
         paymentIntentId: depositData.id
@@ -348,7 +372,48 @@ module.exports = async function handler(req, res) {
 
     if (depositData.status === 'requires_capture') {
       // Success — the hold is placed, nothing captured yet.
-      await updateBookingDepositStatus(bookingId, depositData.id, 'held');
+      var writeBackResult = await updateBookingDepositStatus(bookingId, depositData.id, 'held', { guardReconciled: purpose === 'renewal' });
+
+      // BUG FIX (payment-review, Aug 2026, Follow-up A): if this was a
+      // renewal and the write-back above was refused because reconciliation
+      // already finished and moved this booking to a terminal state, the
+      // hold placed on Stripe just above is now orphaned and unwanted — the
+      // booking is already settled (possibly fully refunded), and leaving a
+      // live, uncaptured hold on the guest's card until it naturally
+      // expires in 5-7 days is a real guest-facing harm (an unexpected hold
+      // on their card, weeks after their trip). Release it immediately as a
+      // compensating action, alert, and report a distinct status so the
+      // renewal cron (api/renew-deposit-hold.js) doesn't treat this as an
+      // ordinary success and go on to cancel the (now-irrelevant) old hold
+      // or stamp a misleading depositHoldRenewedAt.
+      if (writeBackResult && writeBackResult.stale) {
+        try {
+          await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(depositData.id) + '/cancel', {
+            method: 'POST',
+            headers: { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams().toString()
+          });
+        } catch (releaseErr) {
+          console.error('create-deposit-hold: failed to release the orphaned renewal hold after a reconciliation race', bookingId, depositData.id, releaseErr);
+        }
+        try {
+          await callBookingsWebApp('opsAlerts_recordAlert', {
+            bookingId: bookingId,
+            alertType: 'hold_renewal_race_with_reconciliation',
+            stripeErrorDetail: 'Renewal placed a new hold (' + depositData.id + ') on Stripe, but by the time it tried to write back, this booking had already been reconciled to depositStatus \'' + (writeBackResult.currentDepositStatus || '?') + '\'. The Sheet was NOT overwritten and still reflects the real reconciled outcome. Attempted to release the now-unwanted new hold on Stripe — confirm it actually shows canceled on the guest\'s card.',
+            urgency: 'urgent_same_day'
+          }, { retries: 2 });
+        } catch (alertErr) {
+          console.error('create-deposit-hold: also failed to write the hold_renewal_race_with_reconciliation Ops Alert', bookingId, alertErr);
+        }
+        res.status(200).json({
+          status: 'renewal_race_reconciled_already',
+          paymentIntentId: depositData.id,
+          released: true
+        });
+        return;
+      }
+
       res.status(200).json({
         status: 'succeeded',
         paymentIntentId: depositData.id,
@@ -358,7 +423,7 @@ module.exports = async function handler(req, res) {
     }
 
     // Any other terminal status (e.g. the card was declined for the hold).
-    await updateBookingDepositStatus(bookingId, depositData.id || null, 'failed');
+    await updateBookingDepositStatus(bookingId, depositData.id || null, 'failed', { guardReconciled: purpose === 'renewal' });
     res.status(200).json({ status: 'failed', error: 'Deposit hold could not be placed (status: ' + depositData.status + ').' });
   } catch (err) {
     console.error('create-deposit-hold error:', err);

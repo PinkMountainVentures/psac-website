@@ -130,6 +130,26 @@ async function processOneCandidate(candidate, today) {
     body: { bookingId: candidate.bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET, purpose: 'renewal', renewalCycleId },
   }, innerRes);
 
+  // BUG FIX (payment-review, Aug 2026, Follow-up A — the reverse-direction
+  // twin of High #14): create-deposit-hold.js now detects, on its own
+  // write-back, when reconciliation has already finished for this booking
+  // between this cron reading its candidate list and this call completing
+  // — in that case it releases the new hold it just placed and reports
+  // status 'renewal_race_reconciled_already' instead of 'succeeded'. Handle
+  // that as its own outcome, distinct from both success and failure:
+  // falling through to the generic "not succeeded" branch below would
+  // raise a second, redundant Ops Alert (create-deposit-hold.js already
+  // raised its own hold_renewal_race_with_reconciliation alert) with
+  // inaccurate wording ("the old hold has been left untouched" — there is
+  // no live old hold left to leave untouched, reconciliation already
+  // resolved it). Also skip cancelOldHold and gearOps_recordHoldRenewed
+  // below — the oldPaymentIntentId reference is stale, and stamping
+  // depositHoldRenewedAt would misleadingly imply a live renewed hold
+  // exists when there isn't one.
+  if (result.body && result.body.status === 'renewal_race_reconciled_already') {
+    return { bookingId: candidate.bookingId, outcome: 'renewal_aborted_already_reconciled' };
+  }
+
   if (result.statusCode !== 200 || !result.body || result.body.status !== 'succeeded') {
     const detail = (result.body && (result.body.error || result.body.status)) || `unexpected status ${result.statusCode}`;
     // eslint-disable-next-line no-console

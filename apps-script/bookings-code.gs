@@ -471,17 +471,49 @@ function handleGetBookingByPaymentIntentId(payload) {
 // with Stripe (held / failed / unavailable / requires_action), so the
 // sheet reflects the real result instead of the "scheduled_t1" placeholder
 // written at booking time.
+// BUG FIX (payment-review, Aug 2026, Follow-up A — the reverse-direction
+// twin of High #14's renewal-vs-reconciliation race, flagged during that
+// fix but not closed until now): this write previously had no LockService
+// lock at all, unlike every other depositStatus writer in this codebase
+// (gearOps_writeReconciliation, gearOps_recordShortfallCharge, etc. all
+// already lock). Added one here so the compare-and-swap check below is
+// actually atomic with the write, not just a read-then-hope. The guard
+// itself: when the caller explicitly passes payload.guardReconciled
+// (api/create-deposit-hold.js does this only for a renewal write-back),
+// refuse the write if the row's CURRENT depositStatus already reflects a
+// completed reconciliation — meaning reconciliation's own ~15-minute cron
+// finished FIRST and this renewal write would otherwise silently clobber
+// that back to 'held' (or whatever the renewal attempt produced),
+// reviving an already-settled, possibly fully-refunded booking with an
+// unwanted live Stripe hold on the guest's card. Every other caller (the
+// T-1 initial placement path) omits guardReconciled and is completely
+// unaffected — the guard only ever activates when explicitly requested.
 function handleUpdateDepositStatus(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var found = findBookingRow(ss, payload.bookingId);
-  if (!found) {
-    return { ok: false, error: 'Booking not found' };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var found = findBookingRow(ss, payload.bookingId);
+    if (!found) {
+      return { ok: false, error: 'Booking not found' };
+    }
+
+    if (payload.guardReconciled) {
+      var currentStatus = found.sheet.getRange(found.rowIndex, 15).getValue();
+      var RECONCILED_DEPOSIT_STATUSES = ['released', 'partial_capture', 'full_capture', 'full_capture_pending_review', 'shortfall_charged'];
+      if (RECONCILED_DEPOSIT_STATUSES.indexOf(String(currentStatus)) !== -1) {
+        return { ok: false, stale: true, bookingId: payload.bookingId, currentDepositStatus: String(currentStatus) };
+      }
+    }
+
+    // depositPaymentIntentId is column 14, depositStatus is column 15
+    // (1-indexed) in the Experience Bookings sheet — see HEADERS above.
+    found.sheet.getRange(found.rowIndex, 14).setValue(payload.depositPaymentIntentId || '');
+    found.sheet.getRange(found.rowIndex, 15).setValue(payload.depositStatus || '');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
   }
-  // depositPaymentIntentId is column 14, depositStatus is column 15
-  // (1-indexed) in the Experience Bookings sheet — see HEADERS above.
-  found.sheet.getRange(found.rowIndex, 14).setValue(payload.depositPaymentIntentId || '');
-  found.sheet.getRange(found.rowIndex, 15).setValue(payload.depositStatus || '');
-  return { ok: true };
 }
 
 // Shared lookup: finds a booking's row by bookingId in the Experience
