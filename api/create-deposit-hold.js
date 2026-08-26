@@ -148,7 +148,34 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    var gearCount = Math.max(1, Math.min(20, parseInt(booking.gearKitCount, 10) || 1));
+    // BUG FIX (payment-review, Aug 2026, Critical #3 — revised per Airey:
+    // every booking requires at least 1 kit, 1 person = 1 kit minimum,
+    // there is no valid 0-kit booking). The original `parseInt(...) || 1`
+    // fallback was already reaching the right ANSWER (1 kit) for a stored
+    // 0, just by accident (0 is falsy, same as blank/missing) — but doing
+    // so silently. A stored gearKitCount of 0 or negative should never
+    // happen given the 1-kit minimum, so treat it as the data bug it is:
+    // still fall back to 1 kit (so the hold isn't blocked), but raise an
+    // Ops Alert instead of masking it, so a genuinely bad stored value
+    // gets investigated rather than silently and permanently hidden.
+    var rawGearKitCount = booking.gearKitCount;
+    var parsedGearKitCount = parseInt(rawGearKitCount, 10);
+    var hasExplicitGearKitCount = rawGearKitCount !== null && rawGearKitCount !== undefined
+      && rawGearKitCount !== '' && Number.isFinite(parsedGearKitCount);
+    if (hasExplicitGearKitCount && parsedGearKitCount <= 0) {
+      try {
+        await callBookingsWebApp('opsAlerts_recordAlert', {
+          bookingId: bookingId,
+          alertType: 'invalid_gear_kit_count',
+          urgency: 'urgent_same_day',
+          notes: 'Stored gearKitCount is ' + parsedGearKitCount + ', which should never happen — every booking requires at least 1 kit. Falling back to 1 kit for this deposit hold; worth checking how the stored value went to 0 or below.',
+        }, { retries: 2 });
+      } catch (alertErr) {
+        // eslint-disable-next-line no-console
+        console.error('create-deposit-hold: failed to record invalid_gear_kit_count Ops Alert', bookingId, alertErr);
+      }
+    }
+    var gearCount = Math.max(1, Math.min(20, hasExplicitGearKitCount && parsedGearKitCount > 0 ? parsedGearKitCount : 1));
     var depositAmountCents = Math.round(tier.gear * gearCount * 100);
 
     // IDEMPOTENCY GUARD (added 2026-08-24, see psac-build-checklist.md's
@@ -254,19 +281,38 @@ module.exports = async function handler(req, res) {
     params.append('metadata[gearCount]', String(gearCount));
     params.append('metadata[mainPaymentIntentId]', mainPaymentIntentId);
 
-    // Idempotency-Key (added 2026-08-24): stable across a raw retry of
-    // the SAME logical placement, so a retry after a write-back failure
-    // (the Sheet's depositStatus never left 'scheduled_t1', so the guard
-    // above couldn't catch it) still can't create a second live hold -
-    // Stripe itself returns the original PaymentIntent instead of
-    // creating a new one. Keyed differently for a renewal (which
-    // deliberately places a real second hold) vs. an initial placement,
-    // and for a renewal specifically includes the old PaymentIntent id
-    // being replaced, so a later, separate renewal of the SAME booking
-    // still gets its own key.
+    // Idempotency-Key (added 2026-08-24, revised payment-review Aug 2026 —
+    // Critical #4 and the paired unverified 'initial'-branch finding):
+    // stable across a raw retry of the SAME logical placement, so a retry
+    // after a write-back failure (the Sheet's depositStatus never left
+    // 'scheduled_t1', so the guard above couldn't catch it) still can't
+    // create a second live hold - Stripe itself returns the original
+    // PaymentIntent instead of creating a new one. Keyed differently for a
+    // renewal (which deliberately places a real second hold) vs. an
+    // initial placement.
+    //
+    // Renewal: previously keyed off booking.depositPaymentIntentId, read
+    // fresh here - but that's the very field this call is about to
+    // overwrite, so a retry after a partial write-back (new PaymentIntent
+    // written, but the separate depositHoldRenewedAt write then failing)
+    // silently built a DIFFERENT key than the first attempt and placed a
+    // genuine, unwanted second renewal. api/renew-deposit-hold.js now
+    // passes an explicit renewalCycleId that stays fixed for the whole
+    // "not yet fully renewed" cycle - prefer that; fall back to the old
+    // depositPaymentIntentId-based key only for a caller that doesn't
+    // supply one (defensive, not the expected path today).
+    //
+    // Initial: previously never varied with the actual request parameters.
+    // If attempt 1 fails against a declined card and the guest updates
+    // their payment method, a retry with the identical key hit a hard
+    // Stripe idempotency_error (parameter mismatch against the cached
+    // fingerprint) instead of trying the new card - the hold silently
+    // never got placed. Fold in paymentMethodId and depositAmountCents so
+    // a retry with genuinely different parameters gets its own key, while
+    // a pure retry (nothing changed) still collapses to the same one.
     var idempotencyKey = purpose === 'renewal'
-      ? 'deposit_hold_renewal_' + bookingId + '_' + (booking.depositPaymentIntentId || 'none')
-      : 'deposit_hold_initial_' + bookingId;
+      ? 'deposit_hold_renewal_' + bookingId + '_' + (body.renewalCycleId || booking.depositPaymentIntentId || 'none')
+      : 'deposit_hold_initial_' + bookingId + '_' + paymentMethodId + '_' + depositAmountCents;
 
     var depositRes = await fetch('https://api.stripe.com/v1/payment_intents', {
       method: 'POST',
