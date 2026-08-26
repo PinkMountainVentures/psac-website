@@ -270,11 +270,28 @@ module.exports = async function handler(req, res) {
         // real reason (not the self-heal case above) is a real operational
         // problem (the booking is about to be marked cancelled with no
         // successful refund behind it) — surfaced as an engineering error
-        // rather than silently marked cancelled anyway. Not yet wired to its
-        // own Ops Alert type; flagged as a gap worth a follow-up round
-        // rather than expanded here without a decision from Airey.
+        // rather than silently marked cancelled anyway.
         // eslint-disable-next-line no-console
         console.error('cancel-and-refund-booking: Stripe refund failed', body.bookingId, refundRes.data);
+        // BUG FIX (payment-review, Aug 2026, High #19): this used to be
+        // console.error only — the comment above even said so explicitly
+        // ("not yet wired to its own Ops Alert type"). An unattended,
+        // cron-triggered cancellation (the T-3/T-1 gates, not a staff
+        // click) hitting a genuine refund decline used to get permanently
+        // stuck 'active' with nobody told. Best-effort, never blocks the
+        // 502 response below.
+        try {
+          await callBookingsWebApp('opsAlerts_recordAlert', {
+            bookingId: body.bookingId,
+            alertType: 'cancel_refund_declined',
+            stripeErrorDetail: (stripeErr && stripeErr.message) || 'unknown',
+            urgency: 'urgent_same_day',
+            notes: 'This booking should be cancelled (reasons: ' + reasons.join(',') + '), but Stripe declined the refund on PaymentIntent ' + ctx.mainPaymentIntentId + ': ' + ((stripeErr && stripeErr.message) || 'unknown') + '. The booking was NOT marked cancelled — it is still active. Needs manual review.',
+          }, { retries: 2 });
+        } catch (alertErr) {
+          // eslint-disable-next-line no-console
+          console.error('cancel-and-refund-booking: also failed to write the cancel_refund_declined Ops Alert', body.bookingId, alertErr);
+        }
         res.status(502).json({ error: 'stripe_refund_failed', detail: (stripeErr && stripeErr.message) || 'unknown' });
         return;
       }
