@@ -104,7 +104,16 @@ function opsAlerts_recordAlert(payload) {
     row[map['status'] - 1] = 'Open';
     row[map['resolvedAt'] - 1] = '';
     row[map['resolvedBy'] - 1] = '';
-    row[map['notes'] - 1] = '';
+    // BUG FIX (found during payment-review Batch 3, Aug 2026): this always
+    // wrote an empty string here, silently dropping payload.notes on every
+    // single caller across the codebase (every Ops Alert this project
+    // raises passes a notes string) -- staff only ever saw real notes text
+    // if/when someone later resolved the alert (opsAlerts_resolveAlert
+    // does read payload.notes correctly, this was the one place that
+    // didn't match). Every alert created before this fix has a blank
+    // Notes column; nothing to backfill, the detail text was never stored
+    // anywhere to recover.
+    row[map['notes'] - 1] = payload.notes || '';
     row[map['urgency'] - 1] = payload.urgency || '';
     sheet.appendRow(row);
     return { ok: true, alertId: row[map['alertId'] - 1] };
