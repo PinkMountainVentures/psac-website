@@ -42,7 +42,11 @@ const { addDaysToDateString } = require('../lib/cadence');
 const VALID_SAFETY_FILTERS = ['difficulty_ceiling', 'technical_ceiling', 'family_tier', 'seasonal_safety'];
 
 function checkSecret(payload) {
-  return payload && payload.secret === process.env.TRAIL_OVERRIDE_SHARED_SECRET;
+  // Fail closed: require both a configured secret and a non-empty
+  // caller-supplied one, so an unset env var never matches an absent
+  // payload.secret (undefined === undefined would otherwise pass).
+  if (!process.env.TRAIL_OVERRIDE_SHARED_SECRET) return false;
+  return !!(payload && payload.secret && payload.secret === process.env.TRAIL_OVERRIDE_SHARED_SECRET);
 }
 
 function formatDate(isoDateStr) {

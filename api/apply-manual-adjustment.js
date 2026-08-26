@@ -134,7 +134,11 @@ const VALID_TYPES = [
 ];
 
 function checkSecret(payload) {
-  return payload && payload.secret === process.env.MANUAL_ADJUSTMENT_SHARED_SECRET;
+  // Fail closed: require both a configured secret and a non-empty
+  // caller-supplied one, so an unset env var never matches an absent
+  // payload.secret (undefined === undefined would otherwise pass).
+  if (!process.env.MANUAL_ADJUSTMENT_SHARED_SECRET) return false;
+  return !!(payload && payload.secret && payload.secret === process.env.MANUAL_ADJUSTMENT_SHARED_SECRET);
 }
 
 module.exports = async function handler(req, res) {
@@ -168,6 +172,23 @@ module.exports = async function handler(req, res) {
     if (type === 'kit_count_correction') {
       if (body.newConfirmedKitCount == null || isNaN(Number(body.newConfirmedKitCount))) {
         res.status(400).json({ error: 'bad_request', detail: 'newConfirmedKitCount (a number) is required for kit_count_correction' });
+        return;
+      }
+      // BUG FIX (payment-review, Aug 2026, Critical #7, floor corrected per
+      // Airey): this used to accept any finite number with no bounds check.
+      // A staff typo (e.g. -8 meant to be 8) wrote a negative
+      // confirmedKitCount that nothing downstream caught - the deposit-hold
+      // resize above is separately clamped to [1,20] so nothing looked
+      // wrong at correction time, but the next routine kit-count change
+      // (lib/finalize-kit-change.js) computed its delta off the
+      // uncorrected negative value and issued a real off-session charge
+      // for far more kits than the guest actually requested. Clamp to
+      // [1,20] - every booking requires at least 1 kit, 1 person = 1 kit
+      // minimum, there is no valid 0-kit booking - and reject out-of-range
+      // explicitly rather than silently clamping a value staff didn't intend.
+      const newConfirmedKitCountNum = Number(body.newConfirmedKitCount);
+      if (!Number.isInteger(newConfirmedKitCountNum) || newConfirmedKitCountNum < 1 || newConfirmedKitCountNum > 20) {
+        res.status(400).json({ error: 'bad_request', detail: 'newConfirmedKitCount must be a whole number between 1 and 20' });
         return;
       }
       // ADDED (2026-08-25): check for a live T-1 deposit hold BEFORE

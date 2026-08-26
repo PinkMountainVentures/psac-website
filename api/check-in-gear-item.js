@@ -32,7 +32,11 @@ const VALID_CONDITIONS = ['Good', 'Damaged', 'Missing', 'Recovered'];
 const GRACE_PERIOD_HOURS = 48;
 
 function checkSecret(body) {
-  return body && body.secret === process.env.GEAR_OPS_SHARED_SECRET;
+  // Fail closed: require both a configured secret and a non-empty
+  // caller-supplied one, so an unset env var never matches an absent
+  // payload.secret (undefined === undefined would otherwise pass).
+  if (!process.env.GEAR_OPS_SHARED_SECRET) return false;
+  return !!(body && body.secret && body.secret === process.env.GEAR_OPS_SHARED_SECRET);
 }
 
 function parseBody(req) {

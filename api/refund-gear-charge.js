@@ -38,7 +38,11 @@ const { renderGearRefundConfirmationEmail } = require('../lib/email-templates/ge
 const VALID_TARGETS = ['deposit', 'shortfall'];
 
 function checkSecret(body) {
-  return body && body.secret === process.env.GEAR_OPS_SHARED_SECRET;
+  // Fail closed: require both a configured secret and a non-empty
+  // caller-supplied one, so an unset env var never matches an absent
+  // payload.secret (undefined === undefined would otherwise pass).
+  if (!process.env.GEAR_OPS_SHARED_SECRET) return false;
+  return !!(body && body.secret && body.secret === process.env.GEAR_OPS_SHARED_SECRET);
 }
 
 function parseBody(req) {
@@ -133,7 +137,22 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const idempotencyKey = 'gearrefund_' + ctx.bookingId + '_' + refundTarget + '_' + sourcePaymentIntentId + '_' + (amountCents != null ? amountCents : 'full');
+    // BUG FIX (payment-review, Aug 2026, Critical #6): this key used to be
+    // bookingId + refundTarget + PaymentIntent + amount alone. Since
+    // per-itemType replacementCostCents is fixed, two separate, legitimate
+    // partial refunds of the same amount against the same target (e.g. two
+    // different recovered items that happen to cost the same) built the
+    // identical key — Stripe's idempotency contract silently returned the
+    // first refund object for the second call instead of actually
+    // refunding a second time, with no error and a normal-looking
+    // write-back. staffNotes is already required on every call and is the
+    // one field staff naturally vary per distinct action (which item,
+    // which correction) — folding it in distinguishes two real refunds
+    // while staying retry-safe: a genuine retry of the exact same
+    // submission (browser resend after a network hiccup) reuses the same
+    // notes and still collapses to one key, so Stripe still dedupes it.
+    const idempotencyKey = 'gearrefund_' + ctx.bookingId + '_' + refundTarget + '_' + sourcePaymentIntentId + '_'
+      + (amountCents != null ? amountCents : 'full') + '_' + String(body.staffNotes).trim().slice(0, 200);
 
     const params = new URLSearchParams();
     params.append('payment_intent', sourcePaymentIntentId);

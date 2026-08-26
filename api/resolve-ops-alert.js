@@ -27,7 +27,11 @@
 const { callBookingsWebApp } = require('../lib/apps-script-client');
 
 function checkSecret(payload) {
-  return payload && payload.secret === process.env.OPS_ALERT_SHARED_SECRET;
+  // Fail closed: require both a configured secret and a non-empty
+  // caller-supplied one, so an unset env var never matches an absent
+  // payload.secret (undefined === undefined would otherwise pass).
+  if (!process.env.OPS_ALERT_SHARED_SECRET) return false;
+  return !!(payload && payload.secret && payload.secret === process.env.OPS_ALERT_SHARED_SECRET);
 }
 
 module.exports = async function handler(req, res) {
