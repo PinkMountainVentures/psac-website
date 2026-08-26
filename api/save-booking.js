@@ -181,51 +181,110 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    var payload = Object.assign({}, body, {
-      action: 'saveBooking',
-      secret: process.env.BOOKINGS_WEBAPP_SECRET
-    });
-
-    var sheetRes = await fetch(process.env.BOOKINGS_WEBAPP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    var text = await sheetRes.text();
-    var data;
-    try { data = JSON.parse(text); } catch (e) { data = { ok: false, error: 'Unexpected response from booking sheet.', raw: text.slice(0, 300) }; }
-
-    if (!sheetRes.ok || data.ok === false) {
-      console.error('Apps Script save-booking error:', data);
-
-      // RECOVERY (added 2026-08-24, see psac-build-checklist.md's Apps
-      // Script incident writeup): this failure can be the confirmed-
-      // transient "Web App served a Google interstitial page instead of
-      // JSON" glitch - the booking row, gear log rows, and
-      // adventurePrepToken may already have been written correctly even
-      // though this response is garbage. saveBooking itself is never
-      // retried here (not idempotent, a retry would create a second
-      // booking) - instead, a safe, read-only lookup by the one value
-      // already known before the failed call (the main PaymentIntent id)
-      // checks whether the row actually landed.
-      var recovered = null;
-      if (body.paymentIntentId) {
-        try {
-          recovered = await callBookingsWebApp('getBookingByPaymentIntentId', {
-            paymentIntentId: body.paymentIntentId
-          }, { retries: 2 });
-        } catch (recoverErr) {
-          console.error('save-booking recovery lookup threw:', recoverErr);
+    // BUG FIX (payment-review, Aug 2026, High #9, dedup half): handleSaveBooking()
+    // itself has no dedup — every call appends a brand-new booking row. The
+    // 2026-08-24 Apps Script incident already added a safe, read-only lookup
+    // (getBookingByPaymentIntentId) for POST-failure recovery; reused here as
+    // a PRE-check, this closes the dedup gap for every retry shape (a thrown
+    // network error, a non-OK application response, or a client-side double-
+    // submit), not just the narrow post-failure case recovery alone covered.
+    // Custom tier has no paymentIntentId (never charges through Stripe at
+    // booking time), so there's nothing to dedup against — falls straight
+    // through to a normal save, same as always.
+    var existingPaymentIntentId = String(body.paymentIntentId || '');
+    var data = null;
+    if (existingPaymentIntentId) {
+      try {
+        var preExisting = await callBookingsWebApp('getBookingByPaymentIntentId', {
+          paymentIntentId: existingPaymentIntentId
+        }, { retries: 2 });
+        if (preExisting && preExisting.ok) {
+          console.error('save-booking: found an existing booking for this PaymentIntent before saving — treating as a retry, not creating a duplicate', preExisting.bookingId);
+          data = preExisting;
         }
+      } catch (dedupErr) {
+        // A failed dedup check should never block a genuinely new booking —
+        // fall through to the normal save path below, same "don't block a
+        // guest who already paid" posture as the rest of this file.
+        console.error('save-booking: dedup pre-check threw, proceeding with a normal save', dedupErr);
+      }
+    }
+
+    if (!data) {
+      var payload = Object.assign({}, body, {
+        action: 'saveBooking',
+        secret: process.env.BOOKINGS_WEBAPP_SECRET
+      });
+
+      var sheetRes = null;
+      var text = '';
+      var fetchThrew = null;
+      try {
+        sheetRes = await fetch(process.env.BOOKINGS_WEBAPP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        text = await sheetRes.text();
+        try { data = JSON.parse(text); } catch (e) { data = { ok: false, error: 'Unexpected response from booking sheet.', raw: text.slice(0, 300) }; }
+      } catch (fetchErr) {
+        // BUG FIX (payment-review, Aug 2026, High #9, network-error half):
+        // this used to only attempt recovery inside the `!sheetRes.ok`
+        // branch below — a thrown network-level error (DNS, connection
+        // reset, timeout) skipped straight past it to this handler's outer
+        // catch, which never tried the recovery lookup at all. Now it's
+        // funneled into the exact same recovery path as a non-OK response.
+        fetchThrew = fetchErr;
+        data = { ok: false, error: 'Network error saving booking record.' };
+        console.error('save-booking: the saveBooking fetch itself threw', fetchErr);
       }
 
-      if (recovered && recovered.ok) {
-        console.error('save-booking: recovered booking record after a garbled saveBooking response', recovered.bookingId);
-        data = recovered;
-      } else {
-        res.status(200).json({ ok: false, error: data.error || 'Could not save booking record.' });
-        return;
+      if (!sheetRes || !sheetRes.ok || data.ok === false) {
+        console.error('Apps Script save-booking error:', data);
+
+        // RECOVERY (added 2026-08-24, see psac-build-checklist.md's Apps
+        // Script incident writeup): this failure can be the confirmed-
+        // transient "Web App served a Google interstitial page instead of
+        // JSON" glitch - the booking row, gear log rows, and
+        // adventurePrepToken may already have been written correctly even
+        // though this response is garbage. saveBooking itself is never
+        // retried here (not idempotent, a retry would create a second
+        // booking) - instead, a safe, read-only lookup by the one value
+        // already known before the failed call (the main PaymentIntent id)
+        // checks whether the row actually landed.
+        var recovered = null;
+        if (existingPaymentIntentId) {
+          try {
+            recovered = await callBookingsWebApp('getBookingByPaymentIntentId', {
+              paymentIntentId: existingPaymentIntentId
+            }, { retries: 2 });
+          } catch (recoverErr) {
+            console.error('save-booking recovery lookup threw:', recoverErr);
+          }
+        }
+
+        if (recovered && recovered.ok) {
+          console.error('save-booking: recovered booking record after a garbled saveBooking response', recovered.bookingId);
+          data = recovered;
+        } else {
+          // BUG FIX (payment-review, Aug 2026, High #10): this used to be
+          // console.error only — no Ops Alert, no guest or staff email, so
+          // an already-charged guest could end up with no booking record
+          // and nobody notified. Best-effort, never blocks the response.
+          try {
+            await callBookingsWebApp('opsAlerts_recordAlert', {
+              bookingId: '',
+              alertType: 'save_booking_failed_unrecovered',
+              stripeErrorDetail: (fetchThrew && fetchThrew.message) || data.error || 'unknown',
+              urgency: 'urgent_same_day',
+              notes: 'A booking save failed and the recovery lookup could not find a record either, for PaymentIntent ' + (existingPaymentIntentId || '(none/custom)') + ' (' + (body.email || 'no email') + '). The guest has likely already been charged with no booking record on file. Needs manual follow-up.',
+            }, { retries: 2 });
+          } catch (alertErr) {
+            console.error('save-booking: also failed to write the save_booking_failed_unrecovered Ops Alert', alertErr);
+          }
+          res.status(200).json({ ok: false, error: data.error || 'Could not save booking record.' });
+          return;
+        }
       }
     }
 
