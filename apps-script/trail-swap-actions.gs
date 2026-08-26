@@ -154,6 +154,45 @@ function trailSwap_readParkAccess_(ss) {
   return adventurePrep_readRowsAsObjects_(sheet);
 }
 
+/**
+ * BUG FIX (2026-08-25, deferred from the live gear-ops payment testing pass,
+ * picked back up per Airey's decision now that testing is done): same root
+ * cause as Fix E in gear-inventory-actions.gs (see that file's own header
+ * comment for the full incident), never actually fixed here. With the
+ * `Experience Bookings` "date" column left as Sheets' default "Automatic"
+ * format, Sheets silently auto-converts an unambiguous date-looking string
+ * into a real Date-typed cell — `adventurePrep_findExperienceBookingById_`
+ * returns that cell's raw value as `booking.date`, a Date object, not a
+ * string. `trailSwap_monthAbbrev_`, `trailSwap_dayOfWeekAbbrev_`, and
+ * `trailSwap_dateInSeasonRange_` all parsed `tripDate` with
+ * `String(tripDate || '').match(/^\d{4}-.../)`, which never matches a
+ * Date's `.toString()` output (e.g. "Sat Aug 29 2026 00:00:00 GMT-0700
+ * (Pacific Daylight Time)"), so the match always failed for a real live
+ * booking. That silently disabled the **Park/date-availability Tier A
+ * safety filter** (`trailSwap_parkAvailable_`, called with
+ * `trailSwap_dayOfWeekAbbrev_` returning `null` -> "unparseable trip date
+ * -> don't falsely exclude", i.e. fails OPEN) — the exact mechanism meant to
+ * catch Indian Canyons/Tahquitz Canyon's Friday-Sunday-only summer
+ * restriction, meaning it would never have actually restricted anything
+ * against a real live booking. `trailSwap_seasonStatus_` fails the other
+ * direction (an unparseable month reads as `'unknown'`, which its caller,
+ * `trailSwap_getDropdownOptions`, already correctly treats as `'avoid'` —
+ * fail-closed by existing design — so that path was overly conservative
+ * rather than unsafe, but still broken: it would never have distinguished
+ * optimal/viable/avoid season for any real trip date, always defaulting to
+ * avoid). Fixed at the one call site that feeds a raw Sheet value in
+ * (`trailSwap_getDropdownOptions`), same "normalize once at the read
+ * boundary" pattern Fix E established — handles both a real Date object
+ * (the live, actual case) and a plain string (a booking saved before this
+ * fix, or if the column format is ever changed to Plain Text).
+ */
+function trailSwap_normalizeTripDate_(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(value || '');
+}
+
 function trailSwap_monthAbbrev_(dateStr) {
   var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var m = String(dateStr || '').match(/^\d{4}-(\d{2})-\d{2}/);
@@ -372,12 +411,13 @@ function trailSwap_getDropdownOptions(payload) {
   var trails = trailSwap_readTrailsTab_(ss).filter(function (t) { return String(t['Bookable?']).toLowerCase() === 'yes'; });
   var parkAccessRows = trailSwap_readParkAccess_(ss);
   var ceilings = trailSwap_evaluateCeilings_(ss, payload.bookingId, roster);
+  var tripDate = trailSwap_normalizeTripDate_(booking.date); // see trailSwap_normalizeTripDate_'s header comment
 
   var options = [];
   trails.forEach(function (trail) {
-    if (!trailSwap_parkAvailable_(trail, booking.date, parkAccessRows)) return; // absolute exclusion
+    if (!trailSwap_parkAvailable_(trail, tripDate, parkAccessRows)) return; // absolute exclusion
 
-    var season = trailSwap_seasonStatus_(trail, booking.date);
+    var season = trailSwap_seasonStatus_(trail, tripDate);
     var family = trailSwap_familyTierEligible_(trail, roster);
     var difficultyRating = Number(trail['Difficulty (1-5)'] || trail['Difficulty'] || 0);
     var technicalRating = Number(trail['Technical Rating (1-5)'] || trail['Technical Rating'] || 0);
