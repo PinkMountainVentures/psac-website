@@ -25,6 +25,134 @@ var { callBookingsWebApp } = require('../lib/apps-script-client');
 // shared constants module).
 var SITE_URL = 'https://www.palmspringsadventureclub.com';
 
+// BUG FIX (payment-review, Aug 2026, Critical #2): this file used to
+// forward the browser-supplied body straight through to
+// handleSaveBooking() with zero verification — tier, total,
+// gearKitsSelected, and paymentIntentId were all trusted verbatim.
+// verifyChargeAgainstStripe() below fetches the actual PaymentIntent
+// api/create-payment-intent.js created (whose amount and metadata.tier/
+// metadata.gearCount are themselves server-computed there, never
+// client-supplied) and uses IT as the source of truth for every
+// money-relevant field this file writes, rather than merely checking the
+// client's copy and still trusting it. Custom Experience is exempt —
+// per api/create-payment-intent.js's own header, Custom never charges
+// through that endpoint at all (personal follow-up quote), so there is no
+// PaymentIntent to verify against; every other Custom-tier carve-out in
+// this codebase (e.g. adventure-form.js's paymentStatus default) makes
+// the same exception.
+function stripeAuthHeader() {
+  return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
+}
+
+async function fetchPaymentIntent(paymentIntentId) {
+  var res = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(paymentIntentId), {
+    headers: { Authorization: stripeAuthHeader() }
+  });
+  var data = await res.json();
+  return { ok: res.ok, data: data };
+}
+
+async function recordVerificationAlert(alertType, notes) {
+  try {
+    await callBookingsWebApp('opsAlerts_recordAlert', {
+      bookingId: '',
+      alertType: alertType,
+      urgency: 'urgent_same_day',
+      notes: notes
+    }, { retries: 2 });
+  } catch (alertErr) {
+    console.error('save-booking: failed to write a ' + alertType + ' Ops Alert', alertErr);
+  }
+}
+
+// Returns { ok: true } and mutates body's money-relevant fields in place
+// to the Stripe-verified values, or { ok: false, message } if the booking
+// should NOT be written (either the charge doesn't check out, or it
+// couldn't be verified at all). Skips entirely for tier === 'custom'.
+async function verifyChargeAgainstStripe(body) {
+  if (body.tier === 'custom') return { ok: true };
+
+  var paymentIntentId = String(body.paymentIntentId || '');
+  if (!paymentIntentId) {
+    console.error('save-booking: rejected — non-custom tier with no paymentIntentId', body.tier, body.email);
+    return { ok: false, message: 'Missing payment confirmation for this booking.' };
+  }
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('save-booking: cannot verify charge, STRIPE_SECRET_KEY is not configured');
+    await recordVerificationAlert(
+      'save_booking_charge_verification_unreachable',
+      'A booking save for PaymentIntent ' + paymentIntentId + ' (' + (body.email || 'no email') + ') could not be verified — STRIPE_SECRET_KEY is not set on this deployment. Booking was NOT written to the Sheet.'
+    );
+    return { ok: false, message: 'Could not verify payment. Please contact us to complete your booking.' };
+  }
+
+  var piRes;
+  try {
+    piRes = await fetchPaymentIntent(paymentIntentId);
+  } catch (fetchErr) {
+    piRes = { ok: false, data: null };
+  }
+  // One retry — a genuine Stripe read hiccup moments after the guest's own
+  // browser just successfully confirmed this exact PaymentIntent is rare
+  // enough to be worth one retry before treating it as a real problem.
+  if (!piRes.ok) {
+    try {
+      piRes = await fetchPaymentIntent(paymentIntentId);
+    } catch (fetchErr2) {
+      piRes = { ok: false, data: null };
+    }
+  }
+
+  if (!piRes.ok || !piRes.data) {
+    console.error('save-booking: could not retrieve PaymentIntent to verify charge', paymentIntentId, piRes.data);
+    await recordVerificationAlert(
+      'save_booking_charge_verification_unreachable',
+      'A booking save for PaymentIntent ' + paymentIntentId + ' (' + (body.email || 'no email') + ') could not be verified against Stripe — the read call failed twice. Booking was NOT written to the Sheet. If this guest genuinely paid, find the PaymentIntent in the Stripe Dashboard and create the booking manually.'
+    );
+    return { ok: false, message: 'Could not verify payment. Please contact us to complete your booking.' };
+  }
+
+  var pi = piRes.data;
+  var piTier = pi.metadata && pi.metadata.tier;
+  var piGearCount = pi.metadata && pi.metadata.gearCount;
+  // adventure-form.js's own confirmPayment handler treats BOTH 'succeeded'
+  // and 'processing' as good enough to call submitForm() — match that
+  // here rather than requiring only 'succeeded', or a perfectly legitimate
+  // booking would get rejected.
+  var statusOk = pi.status === 'succeeded' || pi.status === 'processing';
+  var tierMatches = piTier === body.tier;
+
+  if (!statusOk || !tierMatches) {
+    console.error('save-booking: PaymentIntent failed verification', paymentIntentId, { status: pi.status, piTier: piTier, bodyTier: body.tier });
+    await recordVerificationAlert(
+      'save_booking_charge_verification_failed',
+      'A booking save for PaymentIntent ' + paymentIntentId + ' (' + (body.email || 'no email') + ') failed verification — Stripe status: ' + pi.status + ', PaymentIntent tier: ' + piTier + ', claimed tier: ' + body.tier + '. Booking was NOT written to the Sheet. Check whether this is a real guest hitting an edge case or a fabricated request.'
+    );
+    return { ok: false, message: 'Could not verify payment for this booking.' };
+  }
+
+  // Stripe is the source of truth from here on — overwrite whatever the
+  // client sent for the money-relevant fields with what the PaymentIntent
+  // itself actually says, rather than merely checking and still trusting
+  // the client's copy. (Also closes the paired unverified Medium finding,
+  // handleSaveBooking()'s payload.total || 0 — that line is now fed an
+  // already-verified figure, not the raw client value.)
+  body.total = pi.amount / 100;
+  body.paymentStatus = pi.status;
+  if (piGearCount != null && piGearCount !== '') {
+    var verifiedGearCount = parseInt(piGearCount, 10);
+    if (Number.isFinite(verifiedGearCount)) {
+      body.gearKitsSelected = verifiedGearCount;
+      // Keep the shared-duffel packaging count consistent with whatever
+      // gear count actually shipped this Sheet row, same Math.ceil(n/2)
+      // rule adventure-form.js's own buildPayload() uses.
+      body.duffelCount = Math.ceil(Math.max(verifiedGearCount, 1) / 2);
+    }
+  }
+  return { ok: true };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -46,6 +174,12 @@ module.exports = async function handler(req, res) {
       try { body = JSON.parse(body); } catch (e) { body = {}; }
     }
     body = body || {};
+
+    var verification = await verifyChargeAgainstStripe(body);
+    if (!verification.ok) {
+      res.status(200).json({ ok: false, error: verification.message });
+      return;
+    }
 
     var payload = Object.assign({}, body, {
       action: 'saveBooking',
