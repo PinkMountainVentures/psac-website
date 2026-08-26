@@ -57,6 +57,29 @@
      it can recover the real bookingId/adventurePrepToken by looking the
      booking back up using the one value it already had before the failed
      call: the main PaymentIntent id.
+   - ROOT-CAUSE FIX (2026-08-25, gear-ops live verification pass): the
+     entire Gear Inventory build (apps-script/gear-inventory-actions.gs —
+     units management, allocation, checkout, checkin, reconciliation,
+     shortfall charge/refund, hold-renewal candidates) was fully
+     implemented — all 23 gearOps_* functions exist and are individually
+     correct — but this doPost() was NEVER updated to dispatch to any of
+     them. Every gearOps_* call from the site (api/checkout-gear.js,
+     api/check-in-gear-item.js, api/manage-gear-units.js,
+     api/allocate-gear-units.js, api/reconcile-gear-deposit.js,
+     api/charge-gear-shortfall.js, api/refund-gear-charge.js,
+     api/check-gear-availability.js, api/renew-deposit-hold.js, and the
+     new api/trigger-gear-reconciliation.js cron) was silently falling
+     into the final `else { out = { ok: false, error: 'Unknown action' } }`
+     branch — always HTTP 200 (Apps Script's ContentService always returns
+     200), so callers saw a normally-shaped-but-empty/false response
+     instead of a hard error, which is why the Ops app's checkout queue
+     rendered as "no bookings" instead of visibly failing. Found by tracing
+     the full call path end-to-end (front-end -> api/ops-proxy.js ->
+     api/checkout-gear.js -> lib/apps-script-client.js -> here) after the
+     gearOps_normalizeDateString_ date-filter fix, confirmed correct in
+     isolation, still didn't fix the live symptom. All 23 actions are added
+     below in one block, in the same order they're defined in
+     gear-inventory-actions.gs.
    ============================================ */
 
 var SHEETS = {
@@ -211,6 +234,57 @@ function doPost(e) {
       out = t3Cutoff_markProcessed(body);
     } else if (body.action === 't3Cutoff_listActiveBookings') {
       out = t3Cutoff_listActiveBookings(body);
+    // ---- Gear Inventory build (gear-inventory-actions.gs) ----
+    // ROOT-CAUSE FIX (2026-08-25): these 23 actions were fully implemented
+    // in gear-inventory-actions.gs but had no dispatch branch here at all
+    // — see this file's header comment for the full story. Order matches
+    // the function order in gear-inventory-actions.gs.
+    } else if (body.action === 'gearOps_listUnits') {
+      out = gearOps_listUnits(body);
+    } else if (body.action === 'gearOps_addUnit') {
+      out = gearOps_addUnit(body);
+    } else if (body.action === 'gearOps_retireUnit') {
+      out = gearOps_retireUnit(body);
+    } else if (body.action === 'gearOps_markClean') {
+      out = gearOps_markClean(body);
+    } else if (body.action === 'gearOps_markDeepCleaned') {
+      out = gearOps_markDeepCleaned(body);
+    } else if (body.action === 'gearOps_checkAvailabilityRaw') {
+      out = gearOps_checkAvailabilityRaw(body);
+    } else if (body.action === 'gearOps_getCheckoutQueue') {
+      out = gearOps_getCheckoutQueue(body);
+    } else if (body.action === 'gearOps_allocateUnits') {
+      out = gearOps_allocateUnits(body);
+    } else if (body.action === 'gearOps_getAllocation') {
+      out = gearOps_getAllocation(body);
+    } else if (body.action === 'gearOps_recordShortageResolution') {
+      out = gearOps_recordShortageResolution(body);
+    } else if (body.action === 'gearOps_confirmCheckoutScan') {
+      out = gearOps_confirmCheckoutScan(body);
+    } else if (body.action === 'gearOps_markDelivered') {
+      out = gearOps_markDelivered(body);
+    } else if (body.action === 'gearOps_getCheckinQueue') {
+      out = gearOps_getCheckinQueue(body);
+    } else if (body.action === 'gearOps_getCheckinContext') {
+      out = gearOps_getCheckinContext(body);
+    } else if (body.action === 'gearOps_checkInItem') {
+      out = gearOps_checkInItem(body);
+    } else if (body.action === 'gearOps_getReconciliationContext') {
+      out = gearOps_getReconciliationContext(body);
+    } else if (body.action === 'gearOps_writeReconciliation') {
+      out = gearOps_writeReconciliation(body);
+    } else if (body.action === 'gearOps_listReconciliationQueue') {
+      out = gearOps_listReconciliationQueue(body);
+    } else if (body.action === 'gearOps_recordShortfallCharge') {
+      out = gearOps_recordShortfallCharge(body);
+    } else if (body.action === 'gearOps_recordShortfallChargeFailure') {
+      out = gearOps_recordShortfallChargeFailure(body);
+    } else if (body.action === 'gearOps_recordRefund') {
+      out = gearOps_recordRefund(body);
+    } else if (body.action === 'gearOps_listHoldRenewalCandidates') {
+      out = gearOps_listHoldRenewalCandidates(body);
+    } else if (body.action === 'gearOps_recordHoldRenewed') {
+      out = gearOps_recordHoldRenewed(body);
     } else {
       out = { ok: false, error: 'Unknown action' };
     }
