@@ -68,18 +68,27 @@ function holdClearance_listBookingsForTripDate(payload) {
 }
 
 /**
- * Finds an OPEN `deposit_hold_failed` Ops Alert for this booking, if any —
- * so a hold that clears between the 9am attempt and the noon check can have
- * its alert resolved automatically rather than sitting Open forever after
- * the underlying problem already fixed itself.
+ * Finds an OPEN Ops Alert of a given type for this booking, if any — so a
+ * hold that clears between the 9am attempt and the noon check can have its
+ * alert resolved automatically rather than sitting Open forever after the
+ * underlying problem already fixed itself.
+ *
+ * GENERALIZED (payment-review, Aug 2026, High #11/#12): payload.alertType
+ * is new and defaults to 'deposit_hold_failed' — every existing caller
+ * (api/check-hold-clearance-deadline.js) doesn't pass it and is completely
+ * unaffected. api/trigger-deposit-holds.js now reuses this same lookup with
+ * both 'deposit_hold_failed' (dedup the guest-failure alert/email across
+ * this cron's own 15-minute retry ticks) and a new 'deposit_hold_trigger_error'
+ * (dedup the engineering-exception alert) — same mechanism, two alert types.
  */
 function holdClearance_findOpenDepositAlert(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Ops Alerts');
   if (!sheet) return { found: false };
+  var alertType = payload.alertType || 'deposit_hold_failed';
   var rows = adventurePrep_readRowsAsObjects_(sheet).filter(function (r) {
     return String(r.bookingId) === String(payload.bookingId) &&
-      r.alertType === 'deposit_hold_failed' &&
+      r.alertType === alertType &&
       r.status === 'Open';
   });
   if (!rows.length) return { found: false };

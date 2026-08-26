@@ -73,6 +73,23 @@ async function processOneBooking(booking) {
     return { bookingId: booking.bookingId, outcome: holdResult ? holdResult.status : 'no_response' };
   }
 
+  // BUG FIX (payment-review, Aug 2026, High #12): this cron fires every 15
+  // minutes across the whole 9am-noon Pacific window (vercel.json:
+  // */15 15,16,17,18 * * *), and every tick re-processes every booking still
+  // sitting at 'scheduled_t1'/blank — so an unresolved hold failure used to
+  // re-raise this alert and re-send the guest's "act within 2 hours" email
+  // on every single tick, a dozen+ duplicates for one underlying problem.
+  // holdClearance_findOpenDepositAlert already exists for exactly this (used
+  // by api/check-hold-clearance-deadline.js to auto-resolve); reused here as
+  // a dedup check before alerting/emailing again.
+  const existingAlert = await callBookingsWebApp('holdClearance_findOpenDepositAlert', {
+    bookingId: booking.bookingId,
+    alertType: 'deposit_hold_failed',
+  });
+  if (existingAlert && existingAlert.found) {
+    return { bookingId: booking.bookingId, outcome: holdResult.status, alertId: existingAlert.alertId, alreadyAlerted: true };
+  }
+
   // requires_action / unavailable / failed — Section 6's immediate-alert path.
   const alert = await callBookingsWebApp('opsAlerts_recordAlert', {
     bookingId: booking.bookingId,
@@ -140,7 +157,39 @@ module.exports = async function handler(req, res) {
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('trigger-deposit-holds: booking failed', b.bookingId, err);
-        results.push({ bookingId: b.bookingId, outcome: 'error', detail: err.message });
+        // BUG FIX (payment-review, Aug 2026, High #11): a non-Stripe
+        // exception here (e.g. a network failure reaching create-deposit-
+        // hold.js, or reaching the Sheet itself) used to be console.error
+        // only, no alert of any kind — and since this cron re-processes
+        // every still-due booking on every 15-minute tick across the whole
+        // window, the same underlying problem could recur a dozen+ times
+        // before the noon auto-cancel fires, with nobody ever told. Deduped
+        // the same way as the deposit_hold_failed alert above, via the same
+        // generalized holdClearance_findOpenDepositAlert lookup, so a
+        // persistent problem alerts once, not every tick.
+        let alertId = null;
+        try {
+          const existingErrorAlert = await callBookingsWebApp('holdClearance_findOpenDepositAlert', {
+            bookingId: b.bookingId,
+            alertType: 'deposit_hold_trigger_error',
+          });
+          if (!existingErrorAlert || !existingErrorAlert.found) {
+            const errorAlert = await callBookingsWebApp('opsAlerts_recordAlert', {
+              bookingId: b.bookingId,
+              alertType: 'deposit_hold_trigger_error',
+              stripeErrorDetail: err.message,
+              urgency: 'same_day_2hr',
+              notes: 'trigger-deposit-holds hit a non-Stripe error trying to place this booking\'s T-1 deposit hold: ' + err.message + '. This cron retries every 15 minutes until noon Pacific; if this alert is still Open close to noon, the hold may never get placed and the booking could be wrongly auto-cancelled.',
+            }, { retries: 2 });
+            alertId = errorAlert && errorAlert.alertId;
+          } else {
+            alertId = existingErrorAlert.alertId;
+          }
+        } catch (alertErr) {
+          // eslint-disable-next-line no-console
+          console.error('trigger-deposit-holds: also failed to write/check the deposit_hold_trigger_error Ops Alert', b.bookingId, alertErr);
+        }
+        results.push({ bookingId: b.bookingId, outcome: 'error', detail: err.message, alertId });
       }
     }
 
