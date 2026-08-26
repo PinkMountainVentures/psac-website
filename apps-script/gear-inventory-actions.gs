@@ -1140,9 +1140,21 @@ function gearOps_recordHoldRenewed(payload) {
   try {
     var target = adventurePrep_getOrCreateRow_findExperienceBooking_(ss, payload.bookingId);
     target.sheet.getRange(target.rowIndex, target.headerMap['depositHoldRenewedAt']).setValue(payload.renewedAt || adventurePrep_nowIso_());
+    // BUG FIX (payment-review, Aug 2026, High #13/#20): oldHoldCancelSucceeded
+    // is new and defaults to true when omitted, so any caller that doesn't
+    // pass it keeps this function's original "cancelled" wording exactly as
+    // before. Both callers of this function (api/renew-deposit-hold.js's
+    // 3-day safety net, api/apply-manual-adjustment.js's kit-count-correction
+    // hold resize) now pass it explicitly, and it can legitimately be false —
+    // the old hold's cancel attempt genuinely failed, so it's still live,
+    // not cancelled, and the audit trail should say so rather than assume.
+    var cancelSucceeded = payload.oldHoldCancelSucceeded !== false;
+    var cancelNote = cancelSucceeded
+      ? 'cancelled'
+      : 'NOT cancelled (cancel attempt failed — still live, see Ops Alerts for detail)';
     adventurePrep_appendChangeLog_(ss, {
       bookingId: payload.bookingId, changeType: 'gear_hold_renewed', beforeT3Cutoff: false,
-      staffNotes: 'Old hold ' + (payload.oldPaymentIntentId || '') + ' cancelled, new hold ' + (payload.newPaymentIntentId || '') + ' placed by the automated 3-day safety net.',
+      staffNotes: 'Old hold ' + (payload.oldPaymentIntentId || '') + ' ' + cancelNote + ', new hold ' + (payload.newPaymentIntentId || '') + ' placed by the automated 3-day safety net.',
     });
     return { ok: true, bookingId: payload.bookingId };
   } finally {

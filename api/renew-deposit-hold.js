@@ -152,6 +152,29 @@ async function processOneCandidate(candidate, today) {
   const newPaymentIntentId = result.body.paymentIntentId;
   const cancelResult = oldPaymentIntentId ? await cancelOldHold(oldPaymentIntentId) : { ok: true, skipped: true };
 
+  // BUG FIX (payment-review, Aug 2026, High #13): cancelResult was computed
+  // but never actually checked before this function returned "renewed" — a
+  // genuine (non-alreadyResolved) old-hold cancel failure was silently
+  // swallowed, gearOps_recordHoldRenewed unconditionally wrote "cancelled"
+  // to the Change Log regardless of whether it actually was, and no alert
+  // ever fired. The guest was left with two live holds on their card and an
+  // audit trail that said otherwise.
+  const oldHoldCancelFailed = !!(oldPaymentIntentId && !cancelResult.ok);
+  if (oldHoldCancelFailed) {
+    try {
+      await callBookingsWebApp('opsAlerts_recordAlert', {
+        bookingId: candidate.bookingId,
+        alertType: 'hold_renewal_old_hold_cancel_failed',
+        stripeErrorDetail: cancelResult.detail,
+        urgency: 'urgent_same_day',
+        notes: 'A new deposit hold (' + newPaymentIntentId + ') was placed by the 3-day renewal safety net, but cancelling the old hold (' + oldPaymentIntentId + ') failed: ' + cancelResult.detail + '. The guest\'s card now has TWO live holds. Needs manual review — cancel the old hold directly in the Stripe Dashboard once confirmed safe to do so.',
+      }, { retries: 2 });
+    } catch (alertErr) {
+      // eslint-disable-next-line no-console
+      console.error('renew-deposit-hold: also failed to write the old-hold-cancel-failed Ops Alert', candidate.bookingId, alertErr);
+    }
+  }
+
   const renewedAt = new Date().toISOString();
   try {
     await callBookingsWebApp('gearOps_recordHoldRenewed', {
@@ -159,6 +182,10 @@ async function processOneCandidate(candidate, today) {
       renewedAt,
       oldPaymentIntentId: oldPaymentIntentId || '',
       newPaymentIntentId,
+      // NEW (High #13): lets gearOps_recordHoldRenewed's Change Log entry
+      // say the truth instead of always saying "cancelled" — see that
+      // function's own comment (defaults to true/unchanged when omitted).
+      oldHoldCancelSucceeded: !oldHoldCancelFailed,
     }, { retries: 2 });
   } catch (writeBackErr) {
     // eslint-disable-next-line no-console
@@ -178,7 +205,11 @@ async function processOneCandidate(candidate, today) {
     return { bookingId: candidate.bookingId, outcome: 'renewed_writeback_failed', newPaymentIntentId, cancelResult };
   }
 
-  return { bookingId: candidate.bookingId, outcome: 'renewed', oldPaymentIntentId, newPaymentIntentId, cancelResult };
+  return {
+    bookingId: candidate.bookingId,
+    outcome: oldHoldCancelFailed ? 'renewed_old_hold_still_live' : 'renewed',
+    oldPaymentIntentId, newPaymentIntentId, cancelResult,
+  };
 }
 
 module.exports = async function handler(req, res) {
