@@ -17,12 +17,16 @@
  *    Requires apps-script/adventure-prep-actions.gs already pasted in
  *    (reuses adventurePrep_findExperienceBookingById_, shared global scope).
  *
- * 2. Wire the new action into the existing doPost's action dispatch:
+ * 2. Wire the new actions into the existing doPost's action dispatch:
  *
  *      } else if (body.action === 'paymentUpdate_getBookingForToken') {
  *        out = paymentUpdate_getBookingForToken(body);
+ *      } else if (body.action === 'paymentUpdate_recordCardUpdated') {
+ *        out = paymentUpdate_recordCardUpdated(body);
  *
- * No setup() needed — reads only, no new tabs/columns.
+ * No setup() needed — paymentUpdate_recordCardUpdated (added Aug 2026,
+ * Medium #40) reuses the existing Adventure Prep Change Log tab, no new
+ * tabs/columns.
  *
  * ============================================================================
  * PASTE BELOW THIS LINE
@@ -51,4 +55,24 @@ function paymentUpdate_getBookingForToken(payload) {
     contactName: booking.contactName,
     depositStatus: booking.depositStatus || '',
   };
+}
+
+/**
+ * NEW (payment-review, Aug 2026, Medium #40): a successful card update in
+ * api/save-updated-payment-method.js used to write nothing back to the
+ * Sheet at all — no record of the event anywhere. Reuses the generic
+ * Adventure Prep Change Log (adventurePrep_appendChangeLog_, already shared
+ * across every other write-back in this project) rather than adding a new
+ * dedicated column, since this is a one-off event log entry, not a field
+ * that needs to be read back later. No setup()/new tab needed.
+ */
+function paymentUpdate_recordCardUpdated(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  adventurePrep_appendChangeLog_(ss, {
+    bookingId: payload.bookingId,
+    changeType: 'payment_method_updated',
+    newValueJson: JSON.stringify({ paymentMethodId: payload.paymentMethodId || '' }),
+    staffNotes: 'Guest updated their card via the self-service payment-method-update page.',
+  });
+  return { ok: true };
 }

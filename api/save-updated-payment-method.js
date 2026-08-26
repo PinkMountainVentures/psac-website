@@ -145,6 +145,32 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // BUG FIX (payment-review, Aug 2026, Medium #40): a successful card
+    // update used to write nothing back to the Sheet and raise no Ops
+    // Alert — staff had no way to know a previously-alerted card-failure
+    // issue had just been resolved by the guest. Both writes are
+    // best-effort: the Stripe-side update above already succeeded, so
+    // neither should block or fail this response if the Sheet side hiccups.
+    try {
+      await callBookingsWebApp('paymentUpdate_recordCardUpdated', { bookingId, paymentMethodId }, { retries: 2 });
+    } catch (writeBackErr) {
+      // eslint-disable-next-line no-console
+      console.error('save-updated-payment-method: card updated but Change Log write-back failed', bookingId, writeBackErr);
+    }
+    try {
+      const alertLookup = await callBookingsWebApp('holdClearance_findOpenDepositAlert', { bookingId, alertType: 'deposit_hold_failed' });
+      if (alertLookup && alertLookup.found) {
+        await callBookingsWebApp('opsAlerts_resolveAlert', {
+          alertId: alertLookup.alertId,
+          resolvedBy: 'system (guest updated payment method)',
+          notes: 'Guest updated their card via the self-service payment-method-update link. The next scheduled hold attempt (or a manual retry) should now have a working card to charge.',
+        }, { retries: 2 });
+      }
+    } catch (resolveErr) {
+      // eslint-disable-next-line no-console
+      console.error('save-updated-payment-method: card updated but failed to check/resolve an open deposit_hold_failed alert', bookingId, resolveErr);
+    }
+
     res.status(200).json({ ok: true, paymentMethodId });
   } catch (err) {
     // eslint-disable-next-line no-console

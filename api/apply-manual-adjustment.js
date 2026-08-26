@@ -129,8 +129,25 @@ async function resizeDepositHoldForCorrection(bookingId, oldPaymentIntentId) {
       oldHoldCancelSucceeded: !oldHoldCancelFailed,
     }, { retries: 2 });
   } catch (writeBackErr) {
+    // BUG FIX (payment-review, Aug 2026, Medium #36): this used to be
+    // console.error-only, unlike the identical write-back this function was
+    // copied from (renew-deposit-hold.js's own hold_renewal_writeback_failed
+    // alert) — a resized hold could place correctly, and its Change Log
+    // entry silently never get written, with nobody told.
     // eslint-disable-next-line no-console
     console.error('apply-manual-adjustment: resized hold placed but write-back failed', bookingId, newPaymentIntentId, writeBackErr);
+    try {
+      await callBookingsWebApp('opsAlerts_recordAlert', {
+        bookingId,
+        alertType: 'kit_count_correction_hold_resize_writeback_failed',
+        stripeErrorDetail: writeBackErr.message,
+        urgency: 'urgent_same_day',
+        notes: `A resized deposit hold (${newPaymentIntentId}) was placed for a manual kit-count correction, but the booking's Change Log entry could not be written. The hold itself is live and correctly sized — this only means the audit trail is incomplete.`,
+      }, { retries: 2 });
+    } catch (alertErr) {
+      // eslint-disable-next-line no-console
+      console.error('apply-manual-adjustment: also failed to write the hold-resize-writeback-failed Ops Alert', bookingId, alertErr);
+    }
   }
 
   if (oldHoldCancelFailed) {

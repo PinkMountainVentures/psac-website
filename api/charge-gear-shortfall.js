@@ -112,11 +112,24 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ error: 'not_in_review_state', detail: `depositStatus is '${ctx.depositStatus}', expected 'full_capture_pending_review'` });
       return;
     }
+    // BUG FIX (payment-review, Aug 2026, Medium #32): these two "should
+    // never happen" branches used to fall straight through to a bare 500
+    // with only a console.error — no Ops Alert, no audit trail, for a
+    // genuine data-integrity anomaly (a booking marked pending review with
+    // no reconciledAt/gearShortfallCents on file). Deliberately NOT routed
+    // through recordFailure below: no shortfall-charge claim has been taken
+    // yet at this point (gearOps_beginShortfallCharge hasn't run), and no
+    // Stripe charge was ever attempted, so recordFailure's "we couldn't
+    // process your charge" guest email would be false — this is a data
+    // problem for staff to investigate, not a failed charge to notify the
+    // guest about.
     if (!ctx.reconciledAt) {
+      await recordDataIntegrityAlert(ctx, 'booking is pending review but has no reconciledAt on file');
       res.status(500).json({ error: 'engineering_error', detail: 'booking is pending review but has no reconciledAt on file' });
       return;
     }
     if (ctx.gearShortfallCents == null) {
+      await recordDataIntegrityAlert(ctx, 'booking is pending review but has no gearShortfallCents on file');
       res.status(500).json({ error: 'engineering_error', detail: 'booking is pending review but has no gearShortfallCents on file' });
       return;
     }
@@ -163,6 +176,15 @@ module.exports = async function handler(req, res) {
     const chargeableItems = (ctx.items || []).filter((i) => i.condition === 'Damaged' || i.condition === 'Missing');
 
     if (!ctx.mainPaymentIntentId) {
+      // BUG FIX (payment-review, Aug 2026, Medium #32): unlike the two
+      // reconciledAt/gearShortfallCents checks above, this one runs AFTER
+      // gearOps_beginShortfallCharge has already claimed the booking (line
+      // ~146) — a bare 500 here used to leave that claim stuck in
+      // 'shortfall_charge_in_progress' with no release and no alert.
+      // requestedAmountCents is already computed above, so this is a normal
+      // recordFailure call, same as the sibling Stripe-lookup-failure branch
+      // just below.
+      await recordFailure(ctx, requestedAmountCents, 'Booking has no main PaymentIntent on file — cannot look up a saved card to charge.');
       res.status(500).json({ error: 'engineering_error', detail: 'booking has no main PaymentIntent on file' });
       return;
     }
@@ -291,6 +313,24 @@ module.exports = async function handler(req, res) {
       ok: true, outcome: 'charged', bookingId: ctx.bookingId,
       shortfallChargeId: chargeRes.data.id, shortfallChargedAmountCents: requestedAmountCents, shortfallChargedAt: chargedAt,
     });
+
+    // BUG FIX (payment-review, Aug 2026, Medium #32): lightweight sibling to
+    // recordFailure for the two pre-claim data-integrity checks above —
+    // raises an Ops Alert for staff to investigate, no claim to release, no
+    // "your charge failed" guest email (nothing was ever attempted).
+    async function recordDataIntegrityAlert(ctxInner, detail) {
+      try {
+        await callBookingsWebApp('opsAlerts_recordAlert', {
+          bookingId: ctxInner.bookingId,
+          alertType: 'gear_shortfall_data_integrity_error',
+          stripeErrorDetail: detail,
+          urgency: 'urgent_same_day',
+        }, { retries: 2 });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('charge-gear-shortfall: failed to record data-integrity Ops Alert', ctxInner.bookingId, e);
+      }
+    }
 
     async function recordFailure(ctxInner, amountCents, detail) {
       try {

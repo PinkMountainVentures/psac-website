@@ -224,6 +224,8 @@ function doPost(e) {
       out = changeLog_listRecent(body);
     } else if (body.action === 'paymentUpdate_getBookingForToken') {
       out = paymentUpdate_getBookingForToken(body);
+    } else if (body.action === 'paymentUpdate_recordCardUpdated') {
+      out = paymentUpdate_recordCardUpdated(body);
     } else if (body.action === 't3Cutoff_getProcessingContext') {
       out = t3Cutoff_getProcessingContext(body);
     } else if (body.action === 't3Cutoff_removeUncoveredKit') {

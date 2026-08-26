@@ -9,6 +9,8 @@
    .env.local for `vercel dev`). Never hardcode it here, never commit it.
    ============================================ */
 
+const { callBookingsWebApp } = require('../lib/apps-script-client');
+
 // Standard tiers only. Custom Experience is bespoke-priced and never
 // charged through this endpoint — that flow stays a personal follow-up.
 // NOTE: booking fee here is the CURRENT CHARGED amount, not the anchor
@@ -312,6 +314,34 @@ module.exports = async function handler(req, res) {
       var message = (data && data.error && data.error.message) || 'Payment setup failed.';
       res.status(502).json({ error: message });
       return;
+    }
+
+    // BUG FIX (payment-review, Aug 2026, Medium #25): the tax-fallback path
+    // above only ever reached console.error — nothing surfaced it to a
+    // human, so a Stripe Tax outage (no automatic Tax Transaction record,
+    // needs manual CDTFA reconciliation per the comment above) could pass
+    // silently for every affected booking. Raised here, after the
+    // PaymentIntent exists, so the alert has a real Stripe id to point at —
+    // no bookingId exists yet at this point in the flow (the Sheet row is
+    // created later by save-booking.js), so the PaymentIntent id is the
+    // identifier staff reconcile against. Best-effort: never blocks or
+    // fails the guest's checkout if the alert write itself has a problem.
+    if (taxFallbackApplied) {
+      try {
+        await callBookingsWebApp('opsAlerts_recordAlert', {
+          bookingId: '',
+          alertType: 'tax_fallback_applied',
+          amount: taxAmountCents / 100,
+          stripeErrorDetail: 'Stripe Tax Calculation API call failed for PaymentIntent ' + data.id +
+            ' (tier ' + tierKey + '); applied the manual 9.25% fallback rate instead. No automatic Stripe ' +
+            'Tax Transaction record exists for this booking — include it by hand in quarterly CDTFA reconciliation.',
+          urgency: 'standard_24hr',
+          notes: 'paymentIntentId=' + data.id + ', tier=' + tierKey + ', gearCount=' + gearCount +
+            ', fallbackTaxAmountCents=' + taxAmountCents,
+        }, { retries: 2 });
+      } catch (alertErr) {
+        console.error('create-payment-intent: also failed to write the tax_fallback_applied Ops Alert', alertErr);
+      }
     }
 
     res.status(200).json({
