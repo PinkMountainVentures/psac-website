@@ -1359,6 +1359,20 @@
   // stays easy to read — this is the original synchronous body, unchanged
   // apart from taking `stripe` as a parameter instead of a closure var.
   function startStripePaymentWithKey(stripe, root, total, gearCount, reserveBtn, section, errorEl, payBtn, showError) {
+    // BUG FIX (payment-review, Aug 2026, Critical #1): api/create-payment-
+    // intent.js's Stripe call had no Idempotency-Key, so two requests for
+    // this same checkout attempt (a retried fetch after a flaky network
+    // response, browser back/forward re-triggering this step, anything
+    // beyond the plain double-click the reserveBtn.disabled guard above
+    // already covers) could create two independent PaymentIntents. Generate
+    // one attempt id per booking session, persisted on `state.answers` (the
+    // same object this flow already persists page-to-page/step-to-step),
+    // and reuse it on every call this attempt makes — the server folds it
+    // into the Stripe Idempotency-Key so a duplicate request collapses into
+    // the original PaymentIntent instead of creating a second one.
+    if (!state.answers.checkoutAttemptId) {
+      state.answers.checkoutAttemptId = 'ppp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    }
     fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1367,7 +1381,8 @@
         gearCount: gearCount,
         email: state.answers.contact_email,
         name: state.answers.contact_name,
-        date: state.answers.q3_date
+        date: state.answers.q3_date,
+        checkoutAttemptId: state.answers.checkoutAttemptId
       })
     })
       .then(function (r) {

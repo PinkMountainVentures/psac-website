@@ -229,6 +229,28 @@ module.exports = async function handler(req, res) {
     var name = String(body.name || '').slice(0, 200);
     var date = String(body.date || '').slice(0, 40);
 
+    // BUG FIX (payment-review, Aug 2026, Critical #1): this call previously
+    // had no Idempotency-Key at all - a retried/duplicated request for the
+    // same checkout attempt (flaky network, browser back/forward, anything
+    // beyond the plain double-click adventure-form.js's own button-disable
+    // guard covers) could create two independent PaymentIntents for one
+    // guest. Prefer the client-generated, per-attempt checkoutAttemptId
+    // (adventure-form.js) so the key is stable across true retries of the
+    // exact same attempt; if an older cached front-end bundle hasn't picked
+    // that field up yet, fall back to a deterministic key built from the
+    // request's own defining fields binned into a 2-minute window - not as
+    // strong (a guest who genuinely resubmits after 2+ minutes gets a fresh
+    // PaymentIntent either way), but real, immediate protection against the
+    // common rapid-retry case without waiting on a full front-end rollout.
+    var checkoutAttemptId = String(body.checkoutAttemptId || '').slice(0, 100);
+    var idempotencyKey;
+    if (checkoutAttemptId) {
+      idempotencyKey = 'checkout_' + checkoutAttemptId;
+    } else {
+      var fallbackWindow = Math.floor(Date.now() / (2 * 60 * 1000));
+      idempotencyKey = 'checkout_fallback_' + tierKey + '_' + gearCount + '_' + email + '_' + fallbackWindow;
+    }
+
     // Find-or-create the Stripe Customer up front so we can attach it to
     // this PaymentIntent and save the payment method on confirmation — the
     // deposit-hold PaymentIntent (created right after this one succeeds)
@@ -277,7 +299,8 @@ module.exports = async function handler(req, res) {
       method: 'POST',
       headers: {
         'Authorization': stripeAuthHeader(),
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Idempotency-Key': idempotencyKey
       },
       body: params.toString()
     });

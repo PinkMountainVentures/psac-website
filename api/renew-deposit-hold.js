@@ -107,10 +107,27 @@ async function processOneCandidate(candidate, today) {
   }
 
   const oldPaymentIntentId = candidate.depositPaymentIntentId;
+  // BUG FIX (payment-review, Aug 2026, Critical #4): create-deposit-hold.js
+  // used to derive its renewal Idempotency-Key from depositPaymentIntentId,
+  // read fresh at call time — but that's the very field this call is about
+  // to overwrite. If the Stripe placement succeeds and depositPaymentIntentId
+  // gets written, but the separate gearOps_recordHoldRenewed call (which
+  // sets depositHoldRenewedAt) then throws, the booking still reads "due"
+  // on the next cron tick — and by then depositPaymentIntentId already
+  // reflects the NEW hold, so the retry builds a different key than the
+  // first attempt and places a genuine, unwanted second renewal. Pass a
+  // renewalCycleId that's fixed for the whole "not yet fully renewed" cycle
+  // instead: candidate.depositHoldRenewedAt only changes once this cycle's
+  // own write-back actually succeeds, so it (or the trip-date-based
+  // fallback for a booking that's never been renewed before) stays
+  // constant across every retry of one incomplete cycle, the same "fixed,
+  // stored identifier for this event" pattern api/charge-gear-shortfall.js
+  // already uses via ctx.reconciledAt.
+  const renewalCycleId = candidate.depositHoldRenewedAt || ('initial_' + candidate.tripDate);
   const { res: innerRes, result } = captureResponse();
   await createDepositHoldHandler({
     method: 'POST',
-    body: { bookingId: candidate.bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET, purpose: 'renewal' },
+    body: { bookingId: candidate.bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET, purpose: 'renewal', renewalCycleId },
   }, innerRes);
 
   if (result.statusCode !== 200 || !result.body || result.body.status !== 'succeeded') {

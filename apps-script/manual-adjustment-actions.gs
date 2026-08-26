@@ -106,15 +106,27 @@
  * separate, explicit step per 8a").
  */
 function manualAdjustment_kitCountCorrection(payload) {
+  // BUG FIX (payment-review, Aug 2026, Critical #7, floor corrected per
+  // Airey): this wrote payload.newConfirmedKitCount straight to the Sheet
+  // with zero bounds checking. api/apply-manual-adjustment.js now clamps
+  // to [1,20] before this is ever called (every booking requires at least
+  // 1 kit - there is no valid 0-kit booking), but this is a second,
+  // independent trust boundary (server-to-server, but not the same code)
+  // - defense-in-depth so a future caller can't reintroduce the
+  // unclamped-write bug from this side.
+  var newCount = Number(payload.newConfirmedKitCount);
+  if (!isFinite(newCount) || Math.floor(newCount) !== newCount || newCount < 1 || newCount > 20) {
+    return { ok: false, error: 'newConfirmedKitCount must be a whole number between 1 and 20' };
+  }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     var target = adventurePrep_getOrCreateRow_(ss, payload.bookingId);
     var oldValue = target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).getValue();
-    target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).setValue(payload.newConfirmedKitCount);
+    target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).setValue(newCount);
 
-    return { ok: true, bookingId: payload.bookingId, oldConfirmedKitCount: oldValue, newConfirmedKitCount: payload.newConfirmedKitCount };
+    return { ok: true, bookingId: payload.bookingId, oldConfirmedKitCount: oldValue, newConfirmedKitCount: newCount };
   } finally {
     lock.releaseLock();
   }
