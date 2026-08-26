@@ -234,6 +234,13 @@ function doPost(e) {
       out = t3Cutoff_markProcessed(body);
     } else if (body.action === 't3Cutoff_listActiveBookings') {
       out = t3Cutoff_listActiveBookings(body);
+    // ADDED (payment-review, Aug 2026, Medium #42): a whole-invocation
+    // overlap guard for api/process-t3-cutoff.js — see
+    // t3Cutoff_acquireRunLock's own header comment in t3-cutoff-actions.gs.
+    } else if (body.action === 't3Cutoff_acquireRunLock') {
+      out = t3Cutoff_acquireRunLock(body);
+    } else if (body.action === 't3Cutoff_releaseRunLock') {
+      out = t3Cutoff_releaseRunLock(body);
     // ---- Gear Inventory build (gear-inventory-actions.gs) ----
     // ROOT-CAUSE FIX (2026-08-25): these 23 actions were fully implemented
     // in gear-inventory-actions.gs but had no dispatch branch here at all

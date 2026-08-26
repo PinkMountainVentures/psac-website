@@ -241,3 +241,45 @@ function t3Cutoff_writeRideWithGpsAccess(payload) {
     lock.releaseLock();
   }
 }
+
+// BUG FIX (payment-review, Aug 2026, Medium #42): api/process-t3-cutoff.js
+// (a Vercel Cron target, fired roughly every 15 minutes) had no
+// invocation-level overlap guard — a slow tick still processing its
+// candidate list (each booking runs one or more real cancellation/Stripe
+// calls) when the NEXT tick starts would let both ticks pull the same
+// candidate list and run the same cancellation gate for the same booking
+// twice concurrently. Uses PropertiesService (not a new Sheet column —
+// this is whole-run state, not per-booking state, so a Script Property is
+// the right-sized tool) as a simple mutex: acquire before the candidate
+// loop starts, release when it finishes (success OR error — the caller
+// must release in a finally). A stale lock (the previous run crashed or
+// timed out mid-tick, never reaching its own release call) self-expires
+// after T3_CUTOFF_RUN_LOCK_STALE_MS so one bad run can't permanently wedge
+// every future tick.
+var T3_CUTOFF_RUN_LOCK_STALE_MS = 10 * 60 * 1000; // 10 min — generous vs. this cron's own ~15-min tick cadence
+
+function t3Cutoff_acquireRunLock(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var existing = props.getProperty('t3CutoffRunLockAt');
+    var now = new Date();
+    if (existing) {
+      var ageMs = now.getTime() - new Date(existing).getTime();
+      if (ageMs < T3_CUTOFF_RUN_LOCK_STALE_MS) {
+        return { ok: false, reason: 'run_in_progress', lockAgeMs: ageMs };
+      }
+      // Stale — the previous run never released it. Reclaim below.
+    }
+    props.setProperty('t3CutoffRunLockAt', now.toISOString());
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function t3Cutoff_releaseRunLock(payload) {
+  PropertiesService.getScriptProperties().deleteProperty('t3CutoffRunLockAt');
+  return { ok: true };
+}

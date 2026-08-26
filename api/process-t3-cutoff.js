@@ -221,11 +221,30 @@ async function processOneBooking(bookingId) {
 }
 
 module.exports = async function handler(req, res) {
+  // BUG FIX (payment-review, Aug 2026, Medium #42): this cron fires roughly
+  // every 15 minutes (vercel.json), each tick running one or more real
+  // cancellation/Stripe calls per candidate. With no invocation-level
+  // overlap guard, a slow tick still in flight when the next tick starts
+  // could pull the same candidate list and run the same cancellation gate
+  // for the same booking twice concurrently. t3Cutoff_acquireRunLock (see
+  // its own header in t3-cutoff-actions.gs) is a simple whole-run mutex —
+  // acquired here before the candidate loop, released in the finally below
+  // so a run that errors out still frees it for the next tick, and a run
+  // that never gets the chance to release (a crash/timeout) self-expires
+  // after 10 minutes rather than wedging every future tick permanently.
+  let runLockAcquired = false;
   try {
     if (!checkCronAuth(req)) {
       res.status(401).json({ error: 'unauthorized' });
       return;
     }
+
+    const lockResult = await callBookingsWebApp('t3Cutoff_acquireRunLock', {});
+    if (!lockResult || !lockResult.ok) {
+      res.status(200).json({ ok: true, skipped: 'run_in_progress' });
+      return;
+    }
+    runLockAcquired = true;
 
     const listRes = await callBookingsWebApp('t3Cutoff_listActiveBookings', {});
     const candidates = (listRes && listRes.bookings) || [];
@@ -253,5 +272,14 @@ module.exports = async function handler(req, res) {
     // eslint-disable-next-line no-console
     console.error('process-t3-cutoff failed', err);
     res.status(500).json({ error: 'engineering_error', detail: err.message });
+  } finally {
+    if (runLockAcquired) {
+      try {
+        await callBookingsWebApp('t3Cutoff_releaseRunLock', {});
+      } catch (releaseErr) {
+        // eslint-disable-next-line no-console
+        console.error('process-t3-cutoff: failed to release the run lock — next tick(s) will wait out the 10-minute staleness window instead', releaseErr);
+      }
+    }
   }
 };

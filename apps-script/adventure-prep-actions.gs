@@ -844,6 +844,40 @@ function adventurePrep_finalizeKitChange(payload) {
   lock.waitLock(30000);
   try {
     var target = adventurePrep_getOrCreateRow_(ss, payload.bookingId);
+
+    // BUG FIX (payment-review, Aug 2026, Medium #38): lib/finalize-kit-
+    // change.js reads confirmedKitCount, computes a delta against it, and
+    // only AFTER a real Stripe charge/refund succeeds calls back here to
+    // write the new count — a gap that spans a network round-trip to
+    // Stripe, with no lock held across it (LockService can't span two
+    // separate Apps Script invocations anyway). If a staff kit-count
+    // correction (manualAdjustment_kitCountCorrection, which reads-and-
+    // writes atomically under its own lock and always wins with whatever
+    // value staff typed) lands in that gap, this call would otherwise
+    // blindly overwrite confirmedKitCount back to a value computed from a
+    // baseline that's no longer true — silently discarding the staff
+    // correction's data-only write while treating the Stripe charge/refund
+    // (which already happened for real) as reconciled, with nobody told
+    // either side no longer agrees with the other. payload.
+    // expectedConfirmedKitCount (optional, backward compatible — every
+    // caller that omits it keeps this function's original unconditional-
+    // write behavior) lets the caller name the baseline its Stripe action
+    // was actually computed from; if the row's CURRENT confirmedKitCount no
+    // longer matches, refuse the write entirely (no Gear Check Log changes
+    // either) and let the caller alert instead of silently clobbering.
+    if (payload.expectedConfirmedKitCount != null) {
+      var currentConfirmedKitCount = target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).getValue();
+      if (Number(currentConfirmedKitCount) !== Number(payload.expectedConfirmedKitCount)) {
+        return {
+          ok: false,
+          stale: true,
+          bookingId: payload.bookingId,
+          expectedConfirmedKitCount: payload.expectedConfirmedKitCount,
+          currentConfirmedKitCount: currentConfirmedKitCount,
+        };
+      }
+    }
+
     target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).setValue(payload.newConfirmedKitCount);
     target.sheet.getRange(target.rowIndex, target.headerMap['pendingKitCount']).setValue('');
     target.sheet.getRange(target.rowIndex, target.headerMap['pendingSince']).setValue('');
