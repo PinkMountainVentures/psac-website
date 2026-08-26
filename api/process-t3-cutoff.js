@@ -54,16 +54,30 @@ function checkCronAuth(req) {
 }
 
 async function cancelBooking(bookingId, reason) {
-  const res = await fetch(CANCEL_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      bookingId,
-      secret: process.env.CANCEL_AND_REFUND_SHARED_SECRET,
-      reasons: [reason],
-    }),
-  });
-  return res.json();
+  // BUG FIX (payment-review, Aug 2026, High #22, applied here for the same
+  // reason as check-hold-clearance-deadline.js's own copy of this bug):
+  // a thrown fetch/JSON error used to propagate straight past
+  // reportCancelOutcome's alerting logic into the per-booking catch in the
+  // handler below, which only console.errors — no Ops Alert. This cron
+  // does get a "next tick" roughly every 15 minutes (unlike the noon
+  // single-fire endpoint), so the exposure window is smaller, but a booking
+  // that should have been cancelled and wasn't deserves the same alert
+  // either way. Catch here and return the same failure shape
+  // reportCancelOutcome already checks for (result.ok !== true).
+  try {
+    const res = await fetch(CANCEL_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookingId,
+        secret: process.env.CANCEL_AND_REFUND_SHARED_SECRET,
+        reasons: [reason],
+      }),
+    });
+    return await res.json();
+  } catch (fetchErr) {
+    return { ok: false, error: 'fetch_threw', detail: fetchErr.message };
+  }
 }
 
 function hasDeliveryAddress(ctx) {

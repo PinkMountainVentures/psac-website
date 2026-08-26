@@ -132,6 +132,28 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // BUG FIX (payment-review, Aug 2026, High #17): the ctx.depositStatus
+    // check above is a plain read with no lock — two overlapping requests
+    // can both read 'full_capture_pending_review' and both proceed. This is
+    // the real, authoritative gate: gearOps_beginShortfallCharge atomically
+    // claims the booking (inside its own LockService lock) before this
+    // endpoint ever calls Stripe, so a genuinely concurrent second request
+    // — even one with a different, differently-idempotency-keyed
+    // requestedAmountCents — is turned away here instead of creating a
+    // second real charge. Every failure branch below (recordFailure) undoes
+    // this claim via gearOps_recordShortfallChargeFailure so a legitimate
+    // retry isn't blocked by its own earlier failed attempt.
+    const beginResult = await callBookingsWebApp('gearOps_beginShortfallCharge', { bookingId: ctx.bookingId, nowIso: new Date().toISOString() }, { retries: 2 });
+    if (!beginResult || !beginResult.ok) {
+      const reason = (beginResult && beginResult.reason) || 'unknown';
+      if (reason === 'charge_in_progress') {
+        res.status(409).json({ error: 'charge_in_progress', detail: 'Another shortfall charge attempt for this booking is already in progress. Please wait a moment and retry.' });
+        return;
+      }
+      res.status(409).json({ error: 'not_in_review_state', detail: `depositStatus is '${(beginResult && beginResult.depositStatus) || ctx.depositStatus}', expected 'full_capture_pending_review'` });
+      return;
+    }
+
     // MOVED UP (payment-review, Aug 2026, High #18): used to be computed
     // just before the Stripe charge attempt itself, which meant recordFailure
     // couldn't be called from the mainPaymentIntentId lookup failure branch

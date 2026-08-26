@@ -718,6 +718,17 @@ function gearOps_getCheckinContext(payload) {
  * than read from `new Date()` here.
  */
 function gearOps_isBookingSettled_(gearRows, nowIso) {
+  // BUG FIX (payment-review, Aug 2026, High #16): Array.prototype.every on a
+  // genuinely EMPTY gearRows array returns true (vacuous truth) — a booking
+  // with zero Gear Check Log rows for it at all (not the already-fixed
+  // filtered-to-empty-by-unitId case just below, but really zero rows,
+  // e.g. a booking that was never allocated gear in the first place, or a
+  // gearOps_getReconciliationContext call that ran before any check-in
+  // record existed yet) read as "settled" with nothing to reconcile,
+  // instead of correctly reading as not settled / not applicable. Explicit
+  // early return closes the gap the earlier 2026-08-25 fix (below) didn't
+  // cover.
+  if (!gearRows.length) return false;
   var now = new Date(nowIso).getTime();
   return gearRows.every(function (r) {
     // BUG FIX (2026-08-25, live reconciliation testing): this used to read
@@ -957,6 +968,37 @@ function gearOps_writeReconciliation(payload) {
   lock.waitLock(15000);
   try {
     var target = adventurePrep_getOrCreateRow_findExperienceBooking_(ss, payload.bookingId);
+
+    // BUG FIX (payment-review, Aug 2026, High #14): compare-and-swap guard
+    // against the renewal-vs-reconciliation race. create-deposit-hold.js
+    // (purpose:'renewal') writes a NEW depositPaymentIntentId +
+    // depositStatus:'held' the moment a renewed hold succeeds, BEFORE it
+    // separately cancels the old hold. api/reconcile-gear-deposit.js reads
+    // ctx.depositPaymentIntentId at the START of its own run, acts on
+    // Stripe against THAT PaymentIntent, and only writes back here at the
+    // end — a window in which a renewal can swap the PaymentIntent
+    // reference out from under it. If the caller tells us which
+    // PaymentIntent it actually acted against (payload.
+    // expectedPaymentIntentId — optional, backward compatible with every
+    // existing caller that omits it) and the Sheet's CURRENT
+    // depositPaymentIntentId no longer matches, refuse the write rather
+    // than clobbering the record of the new hold with stale figures
+    // describing the old, already-superseded one.
+    if (payload.expectedPaymentIntentId) {
+      var currentPaymentIntentId = target.headerMap['depositPaymentIntentId']
+        ? target.sheet.getRange(target.rowIndex, target.headerMap['depositPaymentIntentId']).getValue()
+        : '';
+      if (String(currentPaymentIntentId) !== String(payload.expectedPaymentIntentId)) {
+        return {
+          ok: false,
+          stale: true,
+          bookingId: payload.bookingId,
+          expectedPaymentIntentId: payload.expectedPaymentIntentId,
+          currentPaymentIntentId: currentPaymentIntentId,
+        };
+      }
+    }
+
     var set = function (col, value) {
       if (!target.headerMap[col]) return;
       target.sheet.getRange(target.rowIndex, target.headerMap[col]).setValue(value === undefined || value === null ? '' : value);
@@ -1006,6 +1048,65 @@ function gearOps_listReconciliationQueue(payload) {
   };
 }
 
+/**
+ * BUG FIX (payment-review, Aug 2026, High #17): api/charge-gear-shortfall.js
+ * had no server-side lock — Stripe's Idempotency-Key only dedupes an EXACT
+ * retry (same bookingId + reconciledAt + amount); two overlapping requests
+ * with DIFFERENT requestedAmountCents (a staff double-click landing between
+ * an edit to the adjusted-amount field, or two staff members working the
+ * same Reconciliation Review queue entry at once) both pass that gate as
+ * two genuinely different Stripe idempotency keys, creating two separate
+ * real off-session charges. Gate every charge attempt through this
+ * compare-and-swap: only a caller that sees depositStatus still
+ * 'full_capture_pending_review' proceeds, and it atomically claims the row
+ * by flipping depositStatus to 'shortfall_charge_in_progress' — inside this
+ * same LockService lock every other write-back in this file already uses —
+ * before releasing the lock, so a second, concurrent request sees the
+ * claimed state and is turned away before ever calling Stripe.
+ *
+ * A stale claim (the Stripe call started but the process never got back
+ * here to record success or failure — a serverless timeout or crash, not
+ * a normal error path, which already self-heals via
+ * gearOps_recordShortfallChargeFailure reverting the claim below) is
+ * allowed through again after SHORTFALL_CHARGE_LOCK_STALE_MS, so a
+ * genuinely abandoned attempt doesn't block this booking's shortfall
+ * charge forever. Requires a new 'shortfallChargeLockAt' column on
+ * Experience Bookings — see the build checklist for the one-time sheet
+ * change this needs before this function can be pasted in live.
+ */
+var SHORTFALL_CHARGE_LOCK_STALE_MS = 5 * 60 * 1000;
+
+function gearOps_beginShortfallCharge(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var target = adventurePrep_getOrCreateRow_findExperienceBooking_(ss, payload.bookingId);
+    var statusCol = target.headerMap['depositStatus'];
+    var lockAtCol = target.headerMap['shortfallChargeLockAt'];
+    var currentStatus = statusCol ? target.sheet.getRange(target.rowIndex, statusCol).getValue() : '';
+    var currentLockAt = lockAtCol ? target.sheet.getRange(target.rowIndex, lockAtCol).getValue() : '';
+
+    if (String(currentStatus) === 'shortfall_charge_in_progress') {
+      var lockAgeMs = currentLockAt ? (new Date().getTime() - new Date(currentLockAt).getTime()) : Infinity;
+      if (lockAgeMs < SHORTFALL_CHARGE_LOCK_STALE_MS) {
+        return { ok: false, reason: 'charge_in_progress', depositStatus: String(currentStatus), lockAgeMs: lockAgeMs };
+      }
+      // Stale claim from an abandoned attempt — fall through and reclaim it.
+    } else if (String(currentStatus) !== 'full_capture_pending_review') {
+      return { ok: false, reason: 'not_in_review_state', depositStatus: String(currentStatus) };
+    }
+
+    var nowIso = payload.nowIso || new Date().toISOString();
+    if (statusCol) target.sheet.getRange(target.rowIndex, statusCol).setValue('shortfall_charge_in_progress');
+    if (lockAtCol) target.sheet.getRange(target.rowIndex, lockAtCol).setValue(nowIso);
+
+    return { ok: true, bookingId: payload.bookingId };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** api/charge-gear-shortfall.js's write-back on a successful charge. */
 function gearOps_recordShortfallCharge(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1037,6 +1138,26 @@ function gearOps_recordShortfallCharge(payload) {
 /** api/charge-gear-shortfall.js's write-back on a FAILED charge — status stays reviewable, not silently stuck. */
 function gearOps_recordShortfallChargeFailure(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // BUG FIX (payment-review, Aug 2026, High #17): release this booking's
+  // shortfall-charge claim (see gearOps_beginShortfallCharge above) on a
+  // failed attempt, so the very next retry doesn't have to wait out
+  // SHORTFALL_CHARGE_LOCK_STALE_MS to try again.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var target = adventurePrep_getOrCreateRow_findExperienceBooking_(ss, payload.bookingId);
+    var statusCol = target.headerMap['depositStatus'];
+    if (statusCol) {
+      var currentStatus = target.sheet.getRange(target.rowIndex, statusCol).getValue();
+      if (String(currentStatus) === 'shortfall_charge_in_progress') {
+        target.sheet.getRange(target.rowIndex, statusCol).setValue('full_capture_pending_review');
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
+
   adventurePrep_appendChangeLog_(ss, {
     bookingId: payload.bookingId, changeType: 'gear_shortfall_charge_failed', beforeT3Cutoff: false,
     staffNotes: payload.detail || 'Shortfall charge attempt failed.',

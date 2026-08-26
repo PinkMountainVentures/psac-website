@@ -62,6 +62,13 @@ function holdClearance_listBookingsForTripDate(payload) {
         // "update payment method" link (api/create-payment-update-session.js)
         // without a second round-trip.
         adventurePrepToken: r.adventurePrepToken || '',
+        // ADDED (payment-review, Aug 2026, High #24): api/check-hold-
+        // clearance-deadline.js now re-verifies a non-'held' depositStatus
+        // directly against Stripe before cancelling, in case the Sheet's
+        // own 'held' write-back from this morning's hold attempt was
+        // delayed or failed even though the hold itself succeeded. Needs
+        // the PaymentIntent ID to check.
+        depositPaymentIntentId: r.depositPaymentIntentId || '',
       };
     }),
   };

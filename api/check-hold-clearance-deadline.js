@@ -61,6 +61,18 @@ function checkCronAuth(req) {
   return header === 'Bearer ' + process.env.CRON_SECRET;
 }
 
+function stripeAuthHeader() {
+  return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
+}
+
+async function stripeGetPaymentIntent(paymentIntentId) {
+  const res = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(paymentIntentId), {
+    headers: { Authorization: stripeAuthHeader() },
+  });
+  const data = await res.json();
+  return { ok: res.ok, data };
+}
+
 async function cancelBooking(bookingId) {
   const res = await fetch(CANCEL_ENDPOINT, {
     method: 'POST',
@@ -104,7 +116,69 @@ async function processOneBooking(booking) {
     return { bookingId: booking.bookingId, outcome: 'skipped_no_hold_applies' };
   }
 
-  const cancelResult = await cancelBooking(booking.bookingId);
+  // BUG FIX (payment-review, Aug 2026, High #24): this go/no-go decision
+  // used to trust the Sheet's persisted depositStatus alone. But
+  // api/create-deposit-hold.js writes depositPaymentIntentId and
+  // depositStatus:'held' as a SEPARATE step after the Stripe hold itself
+  // already succeeded (see updateDepositStatus) — if that write-back is
+  // delayed or fails (Sheet lock timeout, transient Apps Script error,
+  // same bug class as every other write-back in this stack), depositStatus
+  // can still read as something other than 'held' (e.g. still
+  // 'scheduled_t1' or a stale 'requires_action') even though there is a
+  // genuinely live Stripe hold on the guest's card. Falling through to
+  // cancelBooking() in that case would wrongly cancel a reservation with a
+  // real, successfully-placed deposit hold. Re-verify directly against
+  // Stripe before ever cancelling: if the PaymentIntent shows
+  // 'requires_capture' (Stripe's own live-hold state), self-heal the Sheet
+  // write-back and treat it the same as the 'held' branch above, instead
+  // of trusting the stale persisted value.
+  if (booking.depositPaymentIntentId) {
+    const piCheck = await stripeGetPaymentIntent(booking.depositPaymentIntentId);
+    if (piCheck.ok && piCheck.data && piCheck.data.status === 'requires_capture') {
+      try {
+        await callBookingsWebApp('updateDepositStatus', {
+          bookingId: booking.bookingId,
+          depositPaymentIntentId: booking.depositPaymentIntentId,
+          depositStatus: 'held',
+        }, { retries: 2 });
+      } catch (writeBackErr) {
+        // eslint-disable-next-line no-console
+        console.error('check-hold-clearance-deadline: Stripe re-verify found a live hold but self-heal write-back failed', booking.bookingId, writeBackErr);
+      }
+      const alertLookup = await callBookingsWebApp('holdClearance_findOpenDepositAlert', { bookingId: booking.bookingId });
+      if (alertLookup && alertLookup.found) {
+        await callBookingsWebApp('opsAlerts_resolveAlert', {
+          alertId: alertLookup.alertId,
+          resolvedBy: 'system (noon hold-clearance check, Stripe re-verify)',
+          notes: `Sheet's depositStatus read '${booking.depositStatus}' at noon, but Stripe confirms PaymentIntent ${booking.depositPaymentIntentId} is a live, successfully-placed hold (requires_capture) — the depositStatus write-back was evidently delayed or failed. Self-healed, booking NOT cancelled.`,
+        });
+        return { bookingId: booking.bookingId, outcome: 'cleared_via_stripe_reverify_alert_resolved', alertId: alertLookup.alertId };
+      }
+      return { bookingId: booking.bookingId, outcome: 'cleared_via_stripe_reverify' };
+    }
+  }
+
+  // BUG FIX (payment-review, Aug 2026, High #22): this endpoint fires on a
+  // single fixed noon-Pacific trigger, not a repeating cron window like
+  // most of this stack (see this file's own header) — there is no "next
+  // tick" to self-heal on. cancelBooking()'s fetch (or its res.json()) can
+  // throw on a network blip, which used to propagate straight out of this
+  // function, past the alerting logic below entirely, into the caller's
+  // outer per-booking catch (which only console.errors). That meant this
+  // safety net's one and only shot at a booking could fail completely
+  // silently: no alert, and by tomorrow this booking's trip date is no
+  // longer "tomorrow" so holdClearance_listBookingsForTripDate never
+  // surfaces it to this endpoint again — a booking stuck 'active' with a
+  // deposit hold that never cleared, permanently unflagged. Wrapping this
+  // in its own try/catch funnels a thrown network error into the exact
+  // same cancelResult-shaped failure the alerting logic below already
+  // handles, same pattern as api/save-booking.js's own fetchThrew fix.
+  let cancelResult;
+  try {
+    cancelResult = await cancelBooking(booking.bookingId);
+  } catch (fetchErr) {
+    cancelResult = { ok: false, error: 'fetch_threw', detail: fetchErr.message };
+  }
   // BUG FIX (payment-review, Aug 2026, High #23): this used to report
   // 'cancelled_hold_never_cleared' regardless of whether the downstream
   // cancel-and-refund-booking.js call actually succeeded — its response was

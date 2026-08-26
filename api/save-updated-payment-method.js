@@ -94,6 +94,49 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // BUG FIX (payment-review, Aug 2026, High #21): `token` authenticates
+    // that the caller is allowed to act on `bookingId` (paymentUpdate_
+    // getBookingForToken above), but nothing previously checked that the
+    // client-supplied `setupIntentId` actually belongs to THIS booking's own
+    // Stripe Customer before writing invoice_settings.default_payment_method
+    // — a real cross-guest bug: a stale, replayed, or hand-edited
+    // setupIntentId from a DIFFERENT booking's Customer would silently
+    // rewrite that OTHER booking's default payment method using a token
+    // that only ever proved authority over THIS booking. Cross-check against
+    // the booking's own main PaymentIntent's Customer — the same
+    // authoritative, never-trust-a-caller-supplied-ID anchor
+    // api/charge-gear-shortfall.js already uses for its own Customer lookup
+    // — and fail closed with an Ops Alert on any mismatch rather than
+    // proceeding.
+    if (!ctx.mainPaymentIntentId) {
+      res.status(500).json({ error: 'engineering_error', detail: 'booking has no mainPaymentIntentId on file to verify the Customer against' });
+      return;
+    }
+    const mainPi = await stripeGet(`/payment_intents/${encodeURIComponent(ctx.mainPaymentIntentId)}`);
+    const expectedCustomerId = mainPi && mainPi.customer
+      && (typeof mainPi.customer === 'string' ? mainPi.customer : mainPi.customer.id);
+    if (!mainPi || mainPi.error || !expectedCustomerId) {
+      res.status(502).json({ error: 'stripe_error', detail: 'Could not verify the booking\'s Customer against its main PaymentIntent.' });
+      return;
+    }
+    if (String(expectedCustomerId) !== String(customerId)) {
+      // eslint-disable-next-line no-console
+      console.error('save-updated-payment-method: setupIntentId Customer mismatch', { bookingId, setupIntentId, expectedCustomerId, gotCustomerId: customerId });
+      try {
+        await callBookingsWebApp('opsAlerts_recordAlert', {
+          bookingId,
+          alertType: 'payment_method_update_customer_mismatch',
+          stripeErrorDetail: `setupIntentId ${setupIntentId} belongs to Customer ${customerId}, but booking ${bookingId}'s main PaymentIntent (${ctx.mainPaymentIntentId}) belongs to Customer ${expectedCustomerId}. Rejected — likely a stale/replayed/edited setupIntentId, possibly from a different booking. No payment method was changed.`,
+          urgency: 'urgent_same_day',
+        }, { retries: 2 });
+      } catch (alertErr) {
+        // eslint-disable-next-line no-console
+        console.error('save-updated-payment-method: also failed to write the customer-mismatch Ops Alert', bookingId, alertErr);
+      }
+      res.status(403).json({ error: 'customer_mismatch', detail: 'This payment method does not belong to this booking.' });
+      return;
+    }
+
     const updated = await stripePost(`/customers/${encodeURIComponent(customerId)}`, {
       'invoice_settings[default_payment_method]': paymentMethodId,
     });
