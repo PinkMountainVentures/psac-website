@@ -117,7 +117,40 @@ async function releaseDepositHoldIfLive(ctx, bookingId) {
     const err = cancelRes.data && cancelRes.data.error;
     const alreadyDone = err && (err.code === 'payment_intent_unexpected_state' || /already|cannot be canceled/i.test(err.message || ''));
     if (alreadyDone) {
-      return { attempted: true, ok: true, alreadyResolved: true };
+      // BUG FIX (payment-review, Aug 2026, Critical #5): a
+      // payment_intent_unexpected_state error here doesn't ONLY mean
+      // "someone already canceled this hold" — it's the exact same error
+      // Stripe returns when the 15-minute gear-reconciliation cron just
+      // captured this same PaymentIntent for a real shortfall in the gap
+      // between the requires_capture read above and this /cancel call.
+      // Blindly returning alreadyResolved: true here made the caller write
+      // depositStatus='released', reconciledAmountCents=0 straight over a
+      // real capture reconciliation had just recorded — the guest saw
+      // "cancelled and refunded" while actually still charged, with no
+      // alert anywhere. Re-fetch the PaymentIntent and branch on its
+      // ACTUAL resulting status, exactly like the two sibling branches
+      // above, instead of inferring "already canceled" from the error
+      // shape alone.
+      const recheckRes = await stripeGet('payment_intents/' + encodeURIComponent(pi.id));
+      if (!recheckRes.ok) {
+        // eslint-disable-next-line no-console
+        console.error('cancel-and-refund-booking: cancel failed as "already done" but re-checking the PaymentIntent also failed', bookingId, pi.id, err);
+        return { attempted: true, ok: false, detail: 'Deposit PaymentIntent cancel failed, and re-checking its actual status also failed — refusing to guess.' };
+      }
+      const recheckedPi = recheckRes.data;
+      if (recheckedPi.status === 'canceled') {
+        return { attempted: true, ok: true, alreadyResolved: true };
+      }
+      if (recheckedPi.status === 'succeeded') {
+        // Real capture, same as the sibling branch above — not ours to
+        // overwrite. This is the case the old code got wrong.
+        return { attempted: true, ok: true, alreadyCaptured: true };
+      }
+      // Neither canceled nor succeeded — a genuinely unexpected state.
+      // Don't guess; surface it as a failure so it raises the existing
+      // deposit_hold_release_failed_on_cancellation Ops Alert instead of
+      // silently writing either branch's outcome.
+      return { attempted: true, ok: false, detail: 'Deposit PaymentIntent cancel failed and re-check found an unexpected state: ' + recheckedPi.status };
     }
     // eslint-disable-next-line no-console
     console.error('cancel-and-refund-booking: failed to release the deposit hold', bookingId, pi.id, err);
