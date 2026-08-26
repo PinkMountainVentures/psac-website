@@ -109,6 +109,14 @@ async function resizeDepositHoldForCorrection(bookingId, oldPaymentIntentId) {
 
   const newPaymentIntentId = result.body.paymentIntentId;
   const cancelResult = oldPaymentIntentId ? await cancelOldDepositHold(oldPaymentIntentId, bookingId) : { ok: true, skipped: true };
+  // BUG FIX (payment-review, Aug 2026, High #20): this used to return
+  // ok: true unconditionally once the NEW hold succeeded, even when
+  // cancelOldDepositHold genuinely failed — cancelResult was computed but
+  // never actually checked, so this function's own caller (the
+  // kit_count_correction_hold_resize_failed alert, gated on `!resize.ok`)
+  // could never fire for this specific failure mode. The guest ended up
+  // with two live holds (potentially $1,235+ combined) and nobody told.
+  const oldHoldCancelFailed = !!(oldPaymentIntentId && !cancelResult.ok);
 
   try {
     await callBookingsWebApp('gearOps_recordHoldRenewed', {
@@ -116,12 +124,22 @@ async function resizeDepositHoldForCorrection(bookingId, oldPaymentIntentId) {
       renewedAt: new Date().toISOString(),
       oldPaymentIntentId: oldPaymentIntentId || '',
       newPaymentIntentId,
+      // NEW (High #13/#20): same fix as renew-deposit-hold.js — lets the
+      // Change Log entry say the truth instead of always saying "cancelled".
+      oldHoldCancelSucceeded: !oldHoldCancelFailed,
     }, { retries: 2 });
   } catch (writeBackErr) {
     // eslint-disable-next-line no-console
     console.error('apply-manual-adjustment: resized hold placed but write-back failed', bookingId, newPaymentIntentId, writeBackErr);
   }
 
+  if (oldHoldCancelFailed) {
+    return {
+      ok: false,
+      detail: 'New hold placed (' + newPaymentIntentId + '), but cancelling the old hold (' + oldPaymentIntentId + ') failed: ' + cancelResult.detail + '. Guest now has two live holds.',
+      oldPaymentIntentId, newPaymentIntentId, cancelResult,
+    };
+  }
   return { ok: true, oldPaymentIntentId, newPaymentIntentId, cancelResult };
 }
 
