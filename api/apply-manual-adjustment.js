@@ -249,7 +249,28 @@ module.exports = async function handler(req, res) {
             console.error('apply-manual-adjustment: also failed to write the hold-resize-failed Ops Alert', bookingId, alertErr);
           }
         }
-        extra = Object.assign({}, extra, { depositHoldResized: resize.ok, depositHoldResizeDetail: resize.ok ? undefined : resize.detail });
+        // BUG FIX (payment-review, Aug 2026, Medium #37): this used to only
+        // ever surface a resize failure in this buried, easy-to-miss nested
+        // field — the endpoint's own top-level response (below, `ok: true`
+        // unconditionally once `result.ok` was true) never reflected it. A
+        // naive UI toast reading only the top-level `ok` reported plain
+        // success on a call that just left the guest with a stale-sized
+        // hold and an Open Ops Alert. The kit-count correction ITSELF did
+        // succeed (that's `result.ok`, untouched here) — this only flips
+        // the top-level `ok` on a genuine resize failure, via `extra.ok`
+        // overriding the `{ok:true}` spread below (Object.assign applies
+        // `extra` last). `partialFailure` names which part actually failed,
+        // since `ok:false` alone reads like the whole adjustment was
+        // rejected, which isn't true.
+        extra = Object.assign({}, extra, {
+          depositHoldResized: resize.ok,
+          depositHoldResizeDetail: resize.ok ? undefined : resize.detail,
+        });
+        if (!resize.ok) {
+          extra.ok = false;
+          extra.partialFailure = 'deposit_hold_resize_failed';
+          extra.warning = 'Kit count correction saved, but the live deposit hold could not be resized to match — see depositHoldResizeDetail. An Ops Alert was raised.';
+        }
       }
     } else if (type === 'gear_check_log_adjustment') {
       if (!Array.isArray(body.kitNumbersToRemove) || !body.kitNumbersToRemove.length) {

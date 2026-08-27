@@ -282,7 +282,16 @@ module.exports = async function handler(req, res) {
       // silently earlier) — can't place a silent hold. Not a hard failure,
       // just means the deposit needs manual follow-up.
       await updateBookingDepositStatus(bookingId, null, 'unavailable', { guardReconciled: purpose === 'renewal' });
-      res.status(200).json({ status: 'unavailable', reason: 'No saved payment method to hold a deposit against.' });
+      // BUG FIX (payment-review, Aug 2026, Medium #27): every failure-path
+      // response below used to omit `amount` entirely. api/trigger-deposit-
+      // holds.js's own deposit_hold_failed Ops Alert reads holdResult.amount
+      // straight off this response (`amount: holdResult.amount != null ? ... : null`)
+      // — with nothing here to read, every single deposit_hold_failed alert
+      // showed `amount: null`, hiding exactly the dollar figure a staff
+      // member calling the guest needs. depositAmountCents/tier.gear is
+      // already computed by this point on every branch below, so this is a
+      // free addition, not a new lookup.
+      res.status(200).json({ status: 'unavailable', reason: 'No saved payment method to hold a deposit against.', amount: tier.gear * gearCount });
       return;
     }
 
@@ -353,7 +362,8 @@ module.exports = async function handler(req, res) {
       console.error('Stripe error creating deposit PaymentIntent:', depositData);
       var message = (depositData && depositData.error && depositData.error.message) || 'Could not place the deposit hold.';
       await updateBookingDepositStatus(bookingId, null, 'failed', { guardReconciled: purpose === 'renewal' });
-      res.status(200).json({ status: 'failed', error: message });
+      // Medium #27 fix — see the 'unavailable' branch above for full context.
+      res.status(200).json({ status: 'failed', error: message, amount: tier.gear * gearCount });
       return;
     }
 
@@ -365,7 +375,9 @@ module.exports = async function handler(req, res) {
       await updateBookingDepositStatus(bookingId, depositData.id, 'requires_action', { guardReconciled: purpose === 'renewal' });
       res.status(200).json({
         status: 'requires_action',
-        paymentIntentId: depositData.id
+        paymentIntentId: depositData.id,
+        // Medium #27 fix — see the 'unavailable' branch above for full context.
+        amount: tier.gear * gearCount
       });
       return;
     }
@@ -424,7 +436,8 @@ module.exports = async function handler(req, res) {
 
     // Any other terminal status (e.g. the card was declined for the hold).
     await updateBookingDepositStatus(bookingId, depositData.id || null, 'failed', { guardReconciled: purpose === 'renewal' });
-    res.status(200).json({ status: 'failed', error: 'Deposit hold could not be placed (status: ' + depositData.status + ').' });
+    // Medium #27 fix — see the 'unavailable' branch above for full context.
+    res.status(200).json({ status: 'failed', error: 'Deposit hold could not be placed (status: ' + depositData.status + ').', amount: tier.gear * gearCount });
   } catch (err) {
     console.error('create-deposit-hold error:', err);
     res.status(500).json({ error: 'Server error placing the deposit hold.' });

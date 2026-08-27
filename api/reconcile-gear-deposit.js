@@ -43,7 +43,14 @@ const { renderDepositFullReleaseEmail } = require('../lib/email-templates/deposi
 const { renderDepositPartialCaptureEmail } = require('../lib/email-templates/deposit-partial-capture-email');
 const { renderDepositFullHoldNoChargeEmail } = require('../lib/email-templates/deposit-full-hold-no-charge-email');
 
-const ALREADY_RECONCILED_STATUSES = ['released', 'partial_capture', 'full_capture', 'full_capture_pending_review', 'shortfall_charged'];
+// 'refunded' added (payment-review, Aug 2026, Medium #35): the new terminal
+// status apps-script/gear-inventory-actions.gs's gearOps_recordRefund now
+// writes once every dollar captured/charged against a booking has been
+// fully refunded. Without it here, a stray reconciliation retry against an
+// already-fully-refunded booking fell through to the generic
+// 'unexpected_deposit_status' 400 below instead of this clean idempotent
+// no-op.
+const ALREADY_RECONCILED_STATUSES = ['released', 'partial_capture', 'full_capture', 'full_capture_pending_review', 'shortfall_charged', 'refunded'];
 const NO_VALID_HOLD_STATUSES = ['requires_action', 'unavailable', 'failed', 'skipped', 'scheduled_t1', ''];
 
 // Settle buffer (added 2026-08-25, post-incident): confirmed live that a

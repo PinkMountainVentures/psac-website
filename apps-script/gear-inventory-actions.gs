@@ -943,12 +943,48 @@ function gearOps_getReconciliationContext(payload) {
     settled: settled,
     lastItemUpdateIso: lastItemUpdateIso || '',
     items: gearRows.map(function (r) {
-      var u = unitsById[r.unitId] || {};
+      var u = unitsById[r.unitId];
+      // BUG FIX (payment-review, Aug 2026, Medium #30): the old
+      // `unitsById[r.unitId] || {}` fallback treated "this row's unitId
+      // doesn't match ANY row in Gear Units" (a typo'd/retired/deleted
+      // unit — a real Sheet data-integrity problem) identically to "this
+      // Gear Check Log row genuinely has no itemType info yet" — both fell
+      // through to `{}`, both silently priced at $0. For a Damaged/Missing
+      // item that's real, documented damage getting charged nothing,
+      // undercharging the guest with no signal anything was wrong. Kept
+      // the $0 fallback (this function can't safely block the whole
+      // reconciliation-context call over one bad row), but now flags it
+      // with an Ops Alert so a human finds out and can charge it manually
+      // (api/apply-manual-adjustment.js) instead of it being silently lost.
+      // holdClearance_findOpenDepositAlert (apps-script/hold-clearance-
+      // actions.gs, same script project/global scope) dedupes so repeated
+      // calls to this function — it's read on every settle-buffer check,
+      // not just once — don't spam a fresh alert every time.
+      var itemType = u ? (u.itemType || '') : '';
+      var replacementCostCents = u
+        ? (u.replacementCostCents != null ? u.replacementCostCents : (GEAR_ITEM_TYPE_CONFIG[itemType] || {}).defaultReplacementCostCents || 0)
+        : 0;
+      if (!u && r.unitId && (r.condition === 'Damaged' || r.condition === 'Missing')) {
+        try {
+          var existingAlert = holdClearance_findOpenDepositAlert({ bookingId: payload.bookingId, alertType: 'gear_reconciliation_unmatched_unit' });
+          if (!existingAlert || !existingAlert.found) {
+            opsAlerts_recordAlert({
+              bookingId: payload.bookingId,
+              alertType: 'gear_reconciliation_unmatched_unit',
+              amount: 0,
+              urgency: 'urgent_same_day',
+              notes: 'Gear Check Log row for unitId "' + r.unitId + '" (' + (r.itemName || 'unknown item') + ', condition: ' + r.condition + ') has no matching row in Gear Units — replacementCostCents defaulted to $0 for reconciliation purposes. Likely a typo\'d, retired, or deleted unit. Review whether a manual charge (api/apply-manual-adjustment.js) is owed for this item before/after this booking\'s deposit resolves.',
+            });
+          }
+        } catch (alertErr) {
+          // Never let the alert path block reconciliation context itself.
+        }
+      }
       return {
-        unitId: r.unitId, itemName: r.itemName, itemType: u.itemType || '',
+        unitId: r.unitId, itemName: r.itemName, itemType: itemType,
         condition: r.condition || '', graceDeadline: r.graceDeadline || '', recoveredAt: r.recoveredAt || '',
         photoUrl: r.photoUrl || '',
-        replacementCostCents: u.replacementCostCents != null ? u.replacementCostCents : (GEAR_ITEM_TYPE_CONFIG[u.itemType] || {}).defaultReplacementCostCents || 0,
+        replacementCostCents: replacementCostCents,
       };
     }),
   };
@@ -1178,26 +1214,78 @@ function gearOps_recordRefund(payload) {
   lock.waitLock(15000);
   try {
     var target = adventurePrep_getOrCreateRow_findExperienceBooking_(ss, payload.bookingId);
+    // BUG FIX (payment-review, Aug 2026, Medium #34/#35): read the row's
+    // state as it stood BEFORE this call's own writes below, both to
+    // accumulate correctly and to decide the depositStatus transition off
+    // the pre-write value.
+    var before = adventurePrep_findExperienceBookingById_(ss, payload.bookingId) || {};
     var set = function (col, value) {
       if (!target.headerMap[col]) return;
       target.sheet.getRange(target.rowIndex, target.headerMap[col]).setValue(value === undefined || value === null ? '' : value);
     };
+
+    // BUG FIX (Medium #34): depositRefundAmountCents/shortfallRefundAmountCents
+    // used to be overwritten with just THIS call's refundAmountCents on every
+    // call — a booking with two legitimate partial refunds (e.g. two
+    // different recovered items refunded separately) ended up showing only
+    // the most recent one, undercounting the true total refunded. Now
+    // accumulates. Each individual refund's own amount/id/timestamp is still
+    // separately and permanently recorded in the Change Log entry below on
+    // every call regardless — this only fixes the running-total columns
+    // cached on the booking row itself.
+    var cumulativeRefundAmountCents;
     if (payload.refundTarget === 'shortfall') {
+      cumulativeRefundAmountCents = Number(before.shortfallRefundAmountCents || 0) + Number(payload.refundAmountCents || 0);
       set('shortfallRefundId', payload.refundId);
-      set('shortfallRefundAmountCents', payload.refundAmountCents);
+      set('shortfallRefundAmountCents', cumulativeRefundAmountCents);
     } else {
+      cumulativeRefundAmountCents = Number(before.depositRefundAmountCents || 0) + Number(payload.refundAmountCents || 0);
       set('depositRefundId', payload.refundId);
-      set('depositRefundAmountCents', payload.refundAmountCents);
+      set('depositRefundAmountCents', cumulativeRefundAmountCents);
     }
     set('refundedAt', payload.refundedAt);
     set('refundStaffNotes', payload.staffNotes || '');
+
+    // BUG FIX (Medium #35): this never touched depositStatus at all — a
+    // booking sitting in the Section 10 manual-review queue
+    // (gearOps_listReconciliationQueue, gated on depositStatus being
+    // 'full_capture_pending_review' or 'shortfall_charged') stayed there
+    // forever even after every dollar actually captured/charged against it
+    // had been fully refunded, inviting a duplicate refund or shortfall-
+    // charge attempt later by a staff member with no signal it was already
+    // resolved. Only advances the booking to a new terminal 'refunded'
+    // status once EVERYTHING that was actually taken has been given back —
+    // both the deposit capture (reconciledAmountCents) and, if one was ever
+    // charged, the separate shortfall charge (shortfallChargedAmountCents).
+    // A partial refund correctly leaves depositStatus unchanged, so the
+    // booking stays visible in the queue for staff to keep tracking.
+    // 'refunded' falls outside every existing status check downstream:
+    // api/reconcile-gear-deposit.js's ALREADY_RECONCILED_STATUSES gets it
+    // added alongside this fix so a stray reconciliation retry reports the
+    // correct "already reconciled" rather than an "unexpected_deposit_status"
+    // error; api/charge-gear-shortfall.js's own compare-and-swap already
+    // only proceeds from the exact literal 'full_capture_pending_review',
+    // so 'refunded' is naturally refused there with no separate change
+    // needed.
+    var currentStatus = String(before.depositStatus || '');
+    if (currentStatus === 'full_capture_pending_review' || currentStatus === 'shortfall_charged') {
+      var reconciledAmountCents = Number(before.reconciledAmountCents || 0);
+      var shortfallChargedAmountCents = Number(before.shortfallChargedAmountCents || 0);
+      var depositRefundedCents = payload.refundTarget === 'shortfall' ? Number(before.depositRefundAmountCents || 0) : cumulativeRefundAmountCents;
+      var shortfallRefundedCents = payload.refundTarget === 'shortfall' ? cumulativeRefundAmountCents : Number(before.shortfallRefundAmountCents || 0);
+      var depositFullyRefunded = reconciledAmountCents <= 0 || depositRefundedCents >= reconciledAmountCents;
+      var shortfallFullyRefunded = shortfallChargedAmountCents <= 0 || shortfallRefundedCents >= shortfallChargedAmountCents;
+      if (depositFullyRefunded && shortfallFullyRefunded) {
+        set('depositStatus', 'refunded');
+      }
+    }
 
     adventurePrep_appendChangeLog_(ss, {
       bookingId: payload.bookingId, changeType: 'gear_refund', beforeT3Cutoff: false,
       refundOrChargeAmount: payload.refundAmountCents != null ? -Math.abs(payload.refundAmountCents) / 100 : '',
       stripeTransactionId: payload.refundId || '', staffNotes: '[' + (payload.refundTarget || 'deposit') + '] ' + (payload.staffNotes || ''),
     });
-    return { ok: true, bookingId: payload.bookingId };
+    return { ok: true, bookingId: payload.bookingId, cumulativeRefundAmountCents: cumulativeRefundAmountCents };
   } finally {
     lock.releaseLock();
   }

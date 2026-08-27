@@ -56,6 +56,12 @@ const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = requ
 
 const CANCEL_ENDPOINT = 'https://www.palmspringsadventureclub.com/api/cancel-and-refund-booking';
 
+// Must match api/create-deposit-hold.js's own TIERS keys — the two tiers a
+// deposit hold ever applies to. Duplicated rather than shared (no shared
+// constants module exists yet in this stack for it, and this file only
+// needs the key set, not the dollar amounts) — see Medium #43's fix below.
+const DEPOSIT_HOLD_TIER_KEYS = ['trail', 'p2p'];
+
 function checkCronAuth(req) {
   const header = req.headers && req.headers.authorization;
   return header === 'Bearer ' + process.env.CRON_SECRET;
@@ -114,6 +120,38 @@ async function processOneBooking(booking) {
   if (booking.depositStatus === 'skipped') {
     // Custom tier, no deposit hold applies — not a failure, nothing to do.
     return { bookingId: booking.bookingId, outcome: 'skipped_no_hold_applies' };
+  }
+
+  // BUG FIX (payment-review, Aug 2026, Medium #43): this function used to
+  // treat ANY depositStatus other than the exact literals 'held'/'skipped'
+  // — including a blank value that was never written at all — as a genuine
+  // hold failure and fell straight through to cancelBooking() below. But
+  // create-deposit-hold.js's own "no tier, no deposit hold" branch writes
+  // 'skipped' as a separate best-effort updateBookingDepositStatus call
+  // AFTER deciding the response — the exact same write-back-can-silently-
+  // fail class as every other bug this review found. If THAT write is lost,
+  // a perfectly normal Custom Experience booking (which never had a deposit
+  // hold to begin with) still reads as blank/'scheduled_t1' at noon and got
+  // wrongly cancelled and refunded here. Self-heal the same way the Stripe
+  // re-verify branch just below already does for a lost 'held' write-back:
+  // if this booking's tier has no deposit hold at all, treat it as
+  // 'skipped' directly instead of falling through toward cancellation.
+  // Deliberately conservative — only acts when `tier` is actually present
+  // and unambiguously not a deposit-hold tier; a blank/missing tier (a
+  // different, unrelated data gap) falls through to the existing logic
+  // unchanged rather than being guessed at.
+  if (booking.tier && DEPOSIT_HOLD_TIER_KEYS.indexOf(booking.tier) === -1) {
+    try {
+      await callBookingsWebApp('updateDepositStatus', {
+        bookingId: booking.bookingId,
+        depositPaymentIntentId: '',
+        depositStatus: 'skipped',
+      }, { retries: 2 });
+    } catch (writeBackErr) {
+      // eslint-disable-next-line no-console
+      console.error('check-hold-clearance-deadline: tier-based skip self-heal write-back failed', booking.bookingId, writeBackErr);
+    }
+    return { bookingId: booking.bookingId, outcome: 'skipped_via_tier_reverify', depositStatus: booking.depositStatus, tier: booking.tier };
   }
 
   // BUG FIX (payment-review, Aug 2026, High #24): this go/no-go decision

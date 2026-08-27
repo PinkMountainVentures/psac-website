@@ -69,6 +69,16 @@ function holdClearance_listBookingsForTripDate(payload) {
         // delayed or failed even though the hold itself succeeded. Needs
         // the PaymentIntent ID to check.
         depositPaymentIntentId: r.depositPaymentIntentId || '',
+        // ADDED (payment-review, Aug 2026, Medium #43): api/check-hold-
+        // clearance-deadline.js now also re-verifies a non-'held'/'skipped'
+        // depositStatus against the booking's own tier before cancelling —
+        // a tier with no deposit hold at all (e.g. Custom Experience)
+        // should always land on 'skipped', but that write is a separate
+        // best-effort step in create-deposit-hold.js that can silently
+        // fail like every other write-back in this stack. Needs the tier to
+        // tell "should have been skipped, write-back lost" apart from a
+        // genuine hold failure.
+        tier: r.tier || '',
       };
     }),
   };
