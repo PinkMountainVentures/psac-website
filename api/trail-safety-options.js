@@ -84,6 +84,29 @@ module.exports = async function handler(req, res) {
       callBookingsWebApp('getParkAccess', {}),
     ]);
 
+    // BUG FIX (Aug 2026, trail-selection live-testing investigation): see
+    // the identical fix + full explanation in lib/run-trail-assignment.js.
+    // Apps Script always answers HTTP 200 even when the dispatched action
+    // threw (doPost's own try/catch wraps a throw as
+    // `{ ok: false, error: ... }`), so callBookingsWebApp() doesn't throw
+    // on it — the old `(trailDb.rows || [])` / `(parkAccess.rows || [])`
+    // silently turned that failure into "zero trails," here surfacing as a
+    // Trail Swap Requests dropdown that looks empty/broken with no error
+    // anywhere. Fail loudly instead so the real cause shows up as a
+    // diagnosable engineering_error.
+    if (!trailDb || trailDb.ok === false || !Array.isArray(trailDb.rows)) {
+      throw new Error(
+        'trail-safety-options: getTrailDatabase did not return rows — ' +
+          ((trailDb && trailDb.error) || 'Apps Script webapp response missing rows array')
+      );
+    }
+    if (!parkAccess || parkAccess.ok === false || !Array.isArray(parkAccess.rows)) {
+      throw new Error(
+        'trail-safety-options: getParkAccess did not return rows — ' +
+          ((parkAccess && parkAccess.error) || 'Apps Script webapp response missing rows array')
+      );
+    }
+
     const fullPayload = parseMaybeJson(ctx.experienceBooking.fullPayloadJson, {});
     const bookingTimeRoster = fullPayload.roster || [];
     const booking = normalizeBookingContext(ctx.adventurePrep, ctx.experienceBooking, bookingTimeRoster);
