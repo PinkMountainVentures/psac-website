@@ -111,9 +111,19 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: `condition must be one of: ${VALID_CONDITIONS.join(', ')}` });
         return;
       }
-      // Section 5/10: photo required for Damaged or Missing.
-      if ((condition === 'Damaged' || condition === 'Missing') && !body.photoUrl) {
-        res.status(400).json({ error: 'bad_request', detail: 'photoUrl is required when condition is Damaged or Missing' });
+      // BUG FIX (Ops App Redesign, Aug 2026 — Round 2 item 6, resolves P2d):
+      // this used to require photoUrl for BOTH Damaged and Missing, even
+      // though there's nothing to physically photograph for an item that
+      // isn't there — confirmed live gap, Phase 1/2 of the journey map.
+      // Photo requirement now applies to Damaged only. Missing gets its own
+      // required text note instead (below) — the 48-hour grace-period
+      // countdown and guest notification are unchanged either way.
+      if (condition === 'Damaged' && !body.photoUrl) {
+        res.status(400).json({ error: 'bad_request', detail: 'photoUrl is required when condition is Damaged' });
+        return;
+      }
+      if (condition === 'Missing' && !(body.notes && String(body.notes).trim())) {
+        res.status(400).json({ error: 'bad_request', detail: 'notes is required when condition is Missing (describe what\'s known about the missing item)' });
         return;
       }
 
@@ -131,6 +141,21 @@ module.exports = async function handler(req, res) {
         nowIso,
         graceDeadline,
       });
+
+      // Ops App Redesign (Aug 2026) — Round 2 item 6: Checked-In is set
+      // automatically the instant every item on the booking has a judged
+      // condition, never a button staff clicks. Best-effort — a sync
+      // failure here never masks the check-in write that already
+      // succeeded above; the next check-in on this booking (or a manual
+      // Sheet glance) will catch it if this one call happens to fail.
+      if (result && result.ok !== false) {
+        try {
+          await callBookingsWebApp('gearOps_syncReturnStatusIfSettled', { bookingId: body.bookingId, nowIso });
+        } catch (syncErr) {
+          // eslint-disable-next-line no-console
+          console.error('check-in-gear-item: returnStatus sync failed', body.bookingId, syncErr);
+        }
+      }
 
       // Section 5/11: fire the grace-period guest notification the moment
       // an item is marked Missing — not a separate cron job, this is the
@@ -164,6 +189,65 @@ module.exports = async function handler(req, res) {
         }
       }
 
+      res.status(200).json(result);
+      return;
+    }
+
+    // Ops App Redesign (Aug 2026) — Round 2 item 6: the inbound return leg.
+    // See apps-script/ops-redesign-round2-actions.gs for the state-machine
+    // detail (Pickup Scheduled -> optional Picked Up -> Returned (required
+    // gate) -> Checked-In (automatic, handled above)).
+    if (action === 'getQueueV2') {
+      if (!body.tripDate) {
+        res.status(400).json({ error: 'bad_request', detail: 'tripDate is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_getCheckinQueueV2', { tripDate: body.tripDate });
+      res.status(200).json(Object.assign({ ok: true }, result));
+      return;
+    }
+
+    if (action === 'getReturnContext') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_getReturnContext', { bookingId: body.bookingId });
+      res.status(200).json(Object.assign({ ok: true }, result));
+      return;
+    }
+
+    if (action === 'schedulePickup') {
+      if (!body.bookingId || !body.pickupServiceType) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId and pickupServiceType are required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_schedulePickup', {
+        bookingId: body.bookingId,
+        pickupServiceType: body.pickupServiceType,
+        pickupAddressOverride: body.pickupAddressOverride || '',
+        pickupTimeNote: body.pickupTimeNote || '',
+      });
+      res.status(200).json(result);
+      return;
+    }
+
+    if (action === 'markPickedUp') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_markPickedUp', { bookingId: body.bookingId });
+      res.status(200).json(result);
+      return;
+    }
+
+    if (action === 'markReturned') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_markReturned', { bookingId: body.bookingId });
       res.status(200).json(result);
       return;
     }

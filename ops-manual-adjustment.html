@@ -9,45 +9,43 @@
 
   Real, working version of claude/psac-ops-manual-adjustment-gear-
   checkout.html's "Page D" mockup — the constrained, fixed-type form
-  Section 13 calls for ("not an open-ended field-write endpoint"), wired to
+  Section 13 calls for ("not an open-ended field-write endpoint"), extended
+  by Ops App Redesign (Aug 2026) Round 2 item 8 with three new types (Trail
+  day/date change, Swap an allocated unit, Post-delivery cancellation),
+  Booking ID + Adjustment Type filters, and a "Show system-generated
+  entries" toggle (off by default) above the change-log table. Wired to
   /api/ops-proxy -> api/apply-manual-adjustment.js. The dropdown only ever
   offers the types that endpoint accepts; there is deliberately no
   free-form "field name / new value" pair anywhere on this page.
 
-  Aug 2026: added "Update delivery address" as a fifth type, at Airey's
-  direct request — staff need to enter/correct a guest's delivery address
-  after a phone/SMS/email interaction, not just through Surface A's own
-  self-service field. Not in the original locked PRD; added as a fifth
-  fixed type rather than an open-ended edit, to keep this page's whole
-  design intent intact.
+  Aug 2026: "Update delivery address" added as a fifth type, at Airey's
+  direct request. Round 2 added three more (eight total).
+
+  FLAGGED FOR AIREY: the Adjustment Type filter below maps each of the 8
+  form types to the actual changeType value(s) each one writes to the
+  Adventure Prep Change Log — and three of the original five types
+  (kit_count_correction, gear_check_log_adjustment, update_delivery_
+  address) were already built to NOT write their own dedicated log row at
+  all (per manual-adjustment-actions.gs's own header: their audit trail is
+  the separate "Change log note" step staff run afterward). Filtering to
+  one of those three will correctly show nothing unless a change_log_note
+  entry was also logged — this isn't a bug in this page, it's the existing
+  logging design surfacing through the new filter. Worth deciding whether
+  that's the right long-term behavior, or whether those three should each
+  get their own auto-logged row the way the three new Round 2 types do
+  (trail_day_change/swap_allocated_unit/post_delivery_cancellation all
+  auto-log; trail_day_change was actually MISSING this until this build —
+  see apps-script/ops-redesign-round2-actions.gs's own fix note).
 
   Page E (Gear Assembly/Checkout extensions) from that same mockup isn't
   built here — it's explicitly a different, pre-existing tool per
   psac-internal-ops-ux-brief.md, not one of this project's Section 13
   endpoints.
+
+  Round 2 (Aug 2026): adopts the shared OpsShell (ops-shell.js/.css).
 -->
+<link rel="stylesheet" href="ops-shell.css">
 <style>
-  :root {
-    --mountain-pink: #F58271; --dark-pine: #2A4747;
-    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
-
-  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
-  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
-  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
-  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
-  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
-  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
-
-  .ops-main { padding:1.6rem 1.8rem; }
-  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
-  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
-  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
-  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
-  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
-
   .ops-select, .ops-input { width:100%; padding:0.65rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; color:var(--ops-text); background:white; margin-bottom:0.9rem; }
   .ops-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
   .ops-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
@@ -55,22 +53,25 @@
   .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-top:0.4rem; }
   .ops-panel-title { font-size:0.95rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
   .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.5rem; }
-  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
-  .ops-btn:disabled { opacity:0.4; cursor:default; }
-  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
   .ops-helper { font-size:0.74rem; color:var(--ops-text-mid); font-style:italic; margin-top:-0.4rem; margin-bottom:0.9rem; }
 
-  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.65rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
   .ops-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; background:#E7ECEE; color:#3E4A50; }
 
-  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+  .no-refund-notice { background:rgba(231,111,81,0.1); border:1px solid rgba(231,111,81,0.3); color:#a8341c; border-radius:6px; padding:0.7rem 0.9rem; font-size:0.8rem; margin-bottom:0.9rem; }
+  .checkbox-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.9rem; font-size:0.83rem; }
+  .checkbox-row input { width:auto; margin:0; }
 
-  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
-  .hidden { display:none !important; }
+  .log-filters { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:0.8rem; }
+  .log-filters .ops-form-row { margin-bottom:0; min-width:200px; }
+  .log-filters .ops-input, .log-filters .ops-select { margin-bottom:0; }
+  .type-filter-caption { font-size:0.72rem; color:var(--ops-text-mid); margin:0.4rem 0 0.6rem; }
+
+  @media (max-width: 760px) {
+    .ops-form-grid { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
 </style>
 </head>
 <body>
@@ -79,24 +80,16 @@
 
 <div id="app-shell" class="hidden">
   <div class="ops-app">
-    <div class="ops-sidebar">
-      <div class="ops-sidebar-brand">PSAC Ops</div>
-      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
-      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
-      <a class="ops-nav-item is-active" href="ops-manual-adjustment.html">Manual Adjustment</a>
-      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
-      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
-      <a class="ops-nav-item" href="ops-gear-checkin.html">Return Check-In</a>
-      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
-    </div>
+    <div class="ops-sidebar" id="ops-sidebar"></div>
     <div class="ops-main">
       <div class="ops-topbar">
-        <div class="ops-title">Manual Adjustment</div>
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
         <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
       </div>
-      <div class="ops-subtitle">For the off-system playbooks only (Section 8) plus manual address entry. Every submission calls api/apply-manual-adjustment.js, never a direct sheet edit.</div>
+      <div id="ops-search-container"></div>
 
       <div id="banner-container"></div>
 
@@ -111,6 +104,9 @@
               <option value="change_log_note">Change log note</option>
               <option value="gear_returned_uncleaned">Gear returned, uncleaned</option>
               <option value="update_delivery_address">Update delivery address</option>
+              <option value="trail_day_change">Trail day/date change</option>
+              <option value="swap_allocated_unit">Swap an allocated unit</option>
+              <option value="post_delivery_cancellation">Post-delivery cancellation</option>
             </select>
           </div>
         </div>
@@ -127,29 +123,65 @@
 
       <div style="margin-top:1.4rem;">
         <div class="ops-panel-title" style="font-size:0.85rem;">Recent Change Log entries</div>
-        <div class="ops-helper">Not filtered to only this page's adjustments — this tab is shared with every other change-logging write path in the project.</div>
+        <div class="ops-helper">Shows the 30 most recent entries system-wide (not full history) — this tab is shared with every other change-logging write path in the project, not filtered to only this page's own adjustments by default.</div>
+
+        <div class="log-filters">
+          <div class="ops-form-row"><label>Booking ID</label><input class="ops-input" id="log-filter-booking-id" placeholder="Filter by booking ID…"></div>
+          <div class="ops-form-row">
+            <label>Adjustment type</label>
+            <select class="ops-select" id="log-filter-type">
+              <option value="">All types</option>
+              <option value="kit_count_correction">Kit count correction</option>
+              <option value="gear_check_log_adjustment">Gear Check Log adjustment</option>
+              <option value="change_log_note">Change log note</option>
+              <option value="gear_returned_uncleaned">Gear returned, uncleaned</option>
+              <option value="update_delivery_address">Update delivery address</option>
+              <option value="trail_day_change">Trail day/date change</option>
+              <option value="swap_allocated_unit">Swap an allocated unit</option>
+              <option value="post_delivery_cancellation">Post-delivery cancellation</option>
+            </select>
+          </div>
+          <div class="checkbox-row" style="margin-bottom:0;">
+            <input type="checkbox" id="log-filter-show-system">
+            <label for="log-filter-show-system" style="text-transform:none; font-weight:normal; letter-spacing:normal; color:var(--ops-text);">Show system-generated entries</label>
+          </div>
+        </div>
+        <div id="type-filter-caption" class="type-filter-caption hidden"></div>
+
         <div id="recent-log"></div>
       </div>
     </div>
   </div>
 </div>
 
+<script src="ops-shell.js"></script>
 <script>
 (function () {
   'use strict';
 
-  function opsCall(action, payload) {
-    return fetch('/api/ops-proxy', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
-    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
-  }
+  var SWAP_UNIT_REASONS = [
+    { value: 'damaged_before_delivery', label: 'Damaged before delivery' },
+    { value: 'dirty_before_delivery', label: 'Dirty before delivery' },
+    { value: 'wrong_size_or_type', label: 'Wrong size or type' },
+    { value: 'lost_or_destroyed_in_transit', label: 'Lost or destroyed in transit' },
+    { value: 'broken_during_rental', label: 'Broken during rental' },
+  ];
 
-  function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  // Entries known to come from a write path OTHER than this page (per the
+  // journey map's own examples — gear shortfall/reconciliation/shortage-
+  // resolution — extended here to the other non-manual-adjustment
+  // changeType values actually found in the codebase). Hidden unless
+  // "Show system-generated entries" is checked.
+  var SYSTEM_GENERATED_CHANGE_TYPES = [
+    'gear_shortfall_charge', 'gear_shortfall_charge_failed', 'gear_reconciliation',
+    'gear_shortage_resolution', 'gear_refund', 'gear_hold_renewed',
+    'trail_manual_override', 'payment_method_updated', 'cancellation',
+  ];
+
+  var allLogEntries = [];
+
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
 
   function showBanner(kind, message) {
     var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
@@ -159,7 +191,7 @@
   function renderTypeFields(type) {
     var el = document.getElementById('type-specific-fields');
     if (type === 'kit_count_correction') {
-      el.innerHTML = '<div class="ops-form-row"><label>New confirmed kit count</label><input class="ops-input" id="field-new-kit-count" type="number" min="0" placeholder="2"></div>';
+      el.innerHTML = '<div class="ops-form-row"><label>New confirmed kit count</label><input class="ops-input" id="field-new-kit-count" type="number" min="1" max="20" placeholder="2"></div>';
     } else if (type === 'gear_check_log_adjustment') {
       el.innerHTML = '<div class="ops-form-row"><label>Kit numbers to remove (comma-separated)</label><input class="ops-input" id="field-kit-numbers" placeholder="GP-0142, LK-0311"></div>';
     } else if (type === 'change_log_note') {
@@ -173,6 +205,29 @@
         '<div class="ops-form-row"><label>ZIP</label><input class="ops-input" id="field-address-zip" placeholder="92262"></div>' +
         '</div>' +
         '<div class="ops-helper" style="margin-top:-0.2rem;">Runs through the same Google address validation Surface A uses. An unconfirmed match still saves, just flagged as unvalidated for staff review.</div>';
+    } else if (type === 'trail_day_change') {
+      el.innerHTML =
+        '<div class="ops-form-row"><label>New trip date</label><input class="ops-input" id="field-new-trip-date" type="date"></div>' +
+        '<div class="ops-helper" style="margin-top:-0.2rem;">Re-runs trail selection against the new date automatically — algorithmic candidates are fully replaced; any manual override in place is re-checked against the new date and preserved only if it still passes, otherwise it\'s dropped and flagged for a swap request, never silently kept or silently reverted.</div>';
+    } else if (type === 'swap_allocated_unit') {
+      el.innerHTML =
+        '<div class="ops-form-grid">' +
+        '<div class="ops-form-row"><label>Original unit ID</label><input class="ops-input" id="field-original-unit-id" placeholder="GP-0142"></div>' +
+        '<div class="ops-form-row"><label>Reason</label><select class="ops-select" id="field-swap-reason">' +
+        SWAP_UNIT_REASONS.map(function (r) { return '<option value="' + escapeHtml(r.value) + '">' + escapeHtml(r.label) + '</option>'; }).join('') +
+        '</select></div>' +
+        '</div>' +
+        '<div class="checkbox-row"><input type="checkbox" id="field-no-substitute"><label for="field-no-substitute" style="text-transform:none; font-weight:normal; letter-spacing:normal; color:var(--ops-text);">No substitute available (booking handled via a separate reschedule/refund playbook)</label></div>' +
+        '<div class="ops-form-row" id="field-new-unit-row"><label>New unit ID</label><input class="ops-input" id="field-new-unit-id" placeholder="GP-0201"></div>';
+      document.getElementById('field-no-substitute') && setTimeout(function () {
+        var cb = document.getElementById('field-no-substitute');
+        var row = document.getElementById('field-new-unit-row');
+        cb.addEventListener('change', function () { row.style.display = cb.checked ? 'none' : ''; });
+      }, 0);
+    } else if (type === 'post_delivery_cancellation') {
+      el.innerHTML =
+        '<div class="no-refund-notice">No refund is issued for a post-delivery cancellation — gear delivery happens T-1, inside the 72-hour cancellation window by policy. This is not editable here.</div>' +
+        '<div class="ops-form-row"><label>Cancellation reason</label><input class="ops-input" id="field-cancellation-reason" placeholder="e.g. guest called in sick, family emergency"></div>';
     } else {
       el.innerHTML = '<div class="ops-helper" style="margin-top:0.4rem;">No additional fields — this just logs the audit-trail note for gear checked back in unused after a hold-clearance cancellation (Section 8c).</div>';
     }
@@ -180,16 +235,60 @@
 
   function loadRecentLog() {
     opsCall('listChangeLogRecent', {}).then(function (result) {
-      var container = document.getElementById('recent-log');
-      if (!result.ok) { container.innerHTML = '<div class="ops-empty">Could not load recent activity.</div>'; return; }
-      var entries = result.data.entries || [];
-      if (!entries.length) { container.innerHTML = '<div class="ops-empty">No change log entries yet.</div>'; return; }
-      var rows = entries.map(function (e) {
-        return '<tr><td>#' + escapeHtml(e.bookingId) + '</td><td><span class="ops-tag">' + escapeHtml(e.changeType) + '</span></td>'
-          + '<td>' + escapeHtml(e.staffNotes || '') + '</td><td>' + escapeHtml(e.timestamp || '') + '</td></tr>';
-      }).join('');
-      container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Type</th><th>Notes</th><th>When</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      if (!result.ok) { document.getElementById('recent-log').innerHTML = '<div class="ops-empty">Could not load recent activity.</div>'; return; }
+      allLogEntries = result.data.entries || [];
+      renderFilteredLog();
     });
+  }
+
+  // change_log_note has no fixed changeType of its own (caller-supplied,
+  // defaults to 'kit_count') — it's matched by the fixed prefix
+  // manualAdjustment_changeLogNote always writes into staffNotes instead,
+  // which is the one reliable signature it leaves behind.
+  var CHANGE_LOG_NOTE_PREFIX = 'Manual adjustment (off-system):';
+
+  function matchesAdjustmentType(entry, type) {
+    if (!type) return true;
+    if (type === 'change_log_note') return String(entry.staffNotes || '').indexOf(CHANGE_LOG_NOTE_PREFIX) === 0;
+    if (type === 'gear_returned_uncleaned') return entry.changeType === 'gear_return';
+    if (type === 'trail_day_change') return entry.changeType === 'trail_day_change';
+    if (type === 'swap_allocated_unit') return entry.changeType === 'gear_unit_swap';
+    if (type === 'post_delivery_cancellation') return entry.changeType === 'post_delivery_cancellation';
+    // kit_count_correction, gear_check_log_adjustment, update_delivery_address
+    // don't write their own dedicated Change Log row today — see this
+    // page's header comment.
+    return false;
+  }
+
+  var NO_SELF_LOG_TYPES = { kit_count_correction: 1, gear_check_log_adjustment: 1, update_delivery_address: 1 };
+
+  function renderFilteredLog() {
+    var bookingFilter = document.getElementById('log-filter-booking-id').value.trim().toLowerCase();
+    var typeFilter = document.getElementById('log-filter-type').value;
+    var showSystem = document.getElementById('log-filter-show-system').checked;
+
+    var captionEl = document.getElementById('type-filter-caption');
+    if (typeFilter && NO_SELF_LOG_TYPES[typeFilter]) {
+      captionEl.classList.remove('hidden');
+      captionEl.textContent = 'This adjustment type doesn\'t write its own dedicated log row today — its audit trail is a separate "Change log note" entry staff add afterward, so this filter will show nothing unless one was logged.';
+    } else {
+      captionEl.classList.add('hidden');
+    }
+
+    var filtered = allLogEntries.filter(function (e) {
+      if (bookingFilter && String(e.bookingId || '').toLowerCase().indexOf(bookingFilter) === -1) return false;
+      if (!matchesAdjustmentType(e, typeFilter)) return false;
+      if (!showSystem && !typeFilter && SYSTEM_GENERATED_CHANGE_TYPES.indexOf(e.changeType) !== -1) return false;
+      return true;
+    });
+
+    var container = document.getElementById('recent-log');
+    if (!filtered.length) { container.innerHTML = '<div class="ops-empty">No change log entries match these filters.</div>'; return; }
+    var rows = filtered.map(function (e) {
+      return '<tr><td>#' + escapeHtml(e.bookingId) + '</td><td><span class="ops-tag">' + escapeHtml(e.changeType) + '</span></td>'
+        + '<td>' + escapeHtml(e.staffNotes || '') + '</td><td>' + escapeHtml(e.timestamp || '') + '</td></tr>';
+    }).join('');
+    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Type</th><th>Notes</th><th>When</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
 
   function resetForm() {
@@ -228,6 +327,23 @@
         state: 'CA',
         zip: document.getElementById('field-address-zip').value.trim(),
       };
+    } else if (type === 'trail_day_change') {
+      var newTripDate = document.getElementById('field-new-trip-date').value;
+      if (!newTripDate) { showBanner('error', 'A new trip date is required.'); return; }
+      payload.newTripDate = newTripDate;
+    } else if (type === 'swap_allocated_unit') {
+      var originalUnitId = document.getElementById('field-original-unit-id').value.trim();
+      var reason = document.getElementById('field-swap-reason').value;
+      var noSubstitute = document.getElementById('field-no-substitute').checked;
+      var newUnitId = document.getElementById('field-new-unit-id').value.trim();
+      if (!originalUnitId) { showBanner('error', 'The original unit ID is required.'); return; }
+      if (!noSubstitute && !newUnitId) { showBanner('error', 'A new unit ID is required unless "No substitute available" is checked.'); return; }
+      payload.originalUnitId = originalUnitId;
+      payload.reason = reason;
+      payload.noSubstitute = noSubstitute;
+      if (!noSubstitute) payload.newUnitId = newUnitId;
+    } else if (type === 'post_delivery_cancellation') {
+      payload.cancellationReason = document.getElementById('field-cancellation-reason').value.trim() || 'post_delivery_cancellation';
     }
 
     document.getElementById('form-submit').disabled = true;
@@ -242,6 +358,10 @@
         msg += result.data.addressValidated
           ? ' Address confirmed by Google.'
           : ' Saved, but the address could not be fully confirmed — worth a double check before dispatch.';
+      } else if (type === 'trail_day_change') {
+        msg += result.data.warning ? ' ' + result.data.warning : ' Trail selection was re-run against the new date.';
+      } else if (result.data.warning) {
+        msg += ' ' + result.data.warning;
       }
       showBanner('success', msg);
       resetForm();
@@ -249,30 +369,25 @@
     });
   }
 
-  function initShell(email) {
-    document.getElementById('user-email').textContent = email;
-    document.getElementById('loading-gate').classList.add('hidden');
-    document.getElementById('app-shell').classList.remove('hidden');
-    document.getElementById('signout-btn').addEventListener('click', function () {
-      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
-        .then(function () { window.location.href = 'ops-login.html'; });
-    });
-
+  function onReady() {
     renderTypeFields('kit_count_correction');
     document.getElementById('adjustment-type').addEventListener('change', function (e) { renderTypeFields(e.target.value); });
     document.getElementById('form-reset').addEventListener('click', resetForm);
     document.getElementById('form-submit').addEventListener('click', submitForm);
 
+    document.getElementById('log-filter-booking-id').addEventListener('input', renderFilteredLog);
+    document.getElementById('log-filter-type').addEventListener('change', renderFilteredLog);
+    document.getElementById('log-filter-show-system').addEventListener('change', renderFilteredLog);
+
     loadRecentLog();
   }
 
-  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
-    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
-    .then(function (result) {
-      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
-      initShell(result.data.email);
-    })
-    .catch(function () { window.location.href = 'ops-login.html'; });
+  OpsShell.boot({
+    activeHref: 'ops-manual-adjustment.html',
+    title: 'Manual Adjustment',
+    subtitle: 'For the off-system playbooks only (Section 8) plus manual address entry. Every submission calls api/apply-manual-adjustment.js, never a direct sheet edit.',
+    onReady: onReady,
+  });
 })();
 </script>
 </body>

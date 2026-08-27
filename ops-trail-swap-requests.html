@@ -13,28 +13,15 @@
   TRAIL_OVERRIDE_SHARED_SECRET server-side and reuses api/write-manual-
   trail-override.js's own validation (mandatory reason when overriding a
   Tier A check, etc.) rather than re-implementing it here.
+
+  Round 2 (Aug 2026): retrofitted to the shared OpsShell (ops-shell.js/.css)
+  — this page previously carried its own inline sidebar/topbar/loading
+  boilerplate, unaware of the redesign's other new pages (All Bookings,
+  Ops Alerts, Stalled Bookings, Cancellations). No functional change to
+  the trail-swap review flow itself.
 -->
+<link rel="stylesheet" href="ops-shell.css">
 <style>
-  :root {
-    --mountain-pink: #F58271; --dark-pine: #2A4747;
-    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
-
-  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
-  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
-  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
-  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
-  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
-  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
-
-  .ops-main { padding:1.6rem 1.8rem; }
-  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
-  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
-  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
-  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
-
   .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
@@ -63,11 +50,6 @@
   .ops-form-row { margin-bottom:0.9rem; }
   .ops-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
   .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1rem; }
-  .ops-empty { text-align:center; padding:2.5rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
-  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-
-  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
-  .hidden { display:none !important; }
 </style>
 </head>
 <body>
@@ -76,23 +58,16 @@
 
 <div id="app-shell" class="hidden">
   <div class="ops-app">
-    <div class="ops-sidebar">
-      <div class="ops-sidebar-brand">PSAC Ops</div>
-      <a class="ops-nav-item is-active" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
-      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
-      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
-      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
-      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
-      <a class="ops-nav-item" href="ops-gear-checkin.html">Return Check-In</a>
-      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
-    </div>
+    <div class="ops-sidebar" id="ops-sidebar"></div>
     <div class="ops-main">
       <div class="ops-topbar">
-        <div class="ops-title" id="page-title">Trail Swap Requests</div>
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
         <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
       </div>
+      <div id="ops-search-container"></div>
       <div id="error-banner" class="ops-error-banner hidden"></div>
       <div id="queue-view"></div>
       <div id="review-view"></div>
@@ -100,23 +75,14 @@
   </div>
 </div>
 
+<script src="ops-shell.js"></script>
 <script>
 (function () {
   'use strict';
   var currentUserEmail = '';
 
-  function opsCall(action, payload) {
-    return fetch('/api/ops-proxy', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
-    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
-  }
-
-  function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
 
   function showError(message) {
     var el = document.getElementById('error-banner');
@@ -162,9 +128,11 @@
   }
 
   function loadQueue() {
-    opsCall('listTrailSwapRequests', {}).then(function (result) {
-      if (!result.ok) { showError('Could not load Trail Swap Requests.'); return; }
-      renderQueue(result.data.requests || []);
+    OpsShell.withLoadingState(document.getElementById('queue-view'), function () {
+      return opsCall('listTrailSwapRequests', {}).then(function (result) {
+        if (!result.ok) { showError('Could not load Trail Swap Requests.'); return; }
+        renderQueue(result.data.requests || []);
+      });
     });
   }
 
@@ -181,7 +149,7 @@
   }
 
   function openReview(swapRequestId, bookingId) {
-    document.getElementById('page-title').textContent = 'Trail Swap Requests / #' + bookingId;
+    document.getElementById('ops-title').textContent = 'Trail Swap Requests / #' + bookingId;
     var reviewView = document.getElementById('review-view');
     reviewView.innerHTML = '<div class="ops-empty">Loading trail options…</div>';
 
@@ -197,7 +165,7 @@
       if (!options.length) {
         reviewView.innerHTML = '<div class="ops-panel"><div class="ops-panel-title">No bookable trails available for this booking\'s date/park.</div>'
           + '<button class="ops-btn-secondary" id="review-back">Back to queue</button></div>';
-        document.getElementById('review-back').addEventListener('click', function () { reviewView.innerHTML = ''; document.getElementById('page-title').textContent = 'Trail Swap Requests'; });
+        document.getElementById('review-back').addEventListener('click', function () { reviewView.innerHTML = ''; document.getElementById('ops-title').textContent = 'Trail Swap Requests'; });
         return;
       }
 
@@ -207,8 +175,9 @@
         reviewView.innerHTML = '<div class="ops-panel" style="' + (hasFailures ? 'border-color:rgba(231,111,81,0.4);' : '') + '">'
           + '<div class="ops-panel-title">Pick a new trail</div>'
           + '<select class="ops-select" id="trail-select">'
-          + options.map(function (o, i) { return '<option value="' + i + '"' + (i === selectedIdx ? ' selected' : '') + '>' + escapeHtml(o.trailName) + '</option>'; }).join('')
+          + options.map(function (o, i) { return '<option value="' + i + '"' + (i === selectedIdx ? ' selected' : '') + '>' + escapeHtml(o.trailName) + (o.difficultyRating ? ' (Difficulty ' + o.difficultyRating + '/5)' : '') + '</option>'; }).join('')
           + '</select>'
+          + (selected.difficultyRating ? '<div class="ops-check-row"><span>Difficulty rating</span><span>' + selected.difficultyRating + ' / 5</span></div>' : '')
           + renderChecklist(selected.failedFilters || [], ceilingsEvaluatable)
           + (hasFailures ? (
               '<div class="ops-warning-box"><strong>⚠ This selection overrides a Tier A safety filter.</strong>'
@@ -226,7 +195,7 @@
         document.getElementById('trail-select').addEventListener('change', function (e) { renderPanel(Number(e.target.value)); });
         document.getElementById('review-cancel').addEventListener('click', function () {
           reviewView.innerHTML = '';
-          document.getElementById('page-title').textContent = 'Trail Swap Requests';
+          document.getElementById('ops-title').textContent = 'Trail Swap Requests';
         });
         document.getElementById('review-apply').addEventListener('click', function () {
           var reasonEl = document.getElementById('override-reason');
@@ -252,7 +221,7 @@
               return;
             }
             reviewView.innerHTML = '';
-            document.getElementById('page-title').textContent = 'Trail Swap Requests';
+            document.getElementById('ops-title').textContent = 'Trail Swap Requests';
             loadQueue();
           });
         });
@@ -262,25 +231,15 @@
     });
   }
 
-  function initShell(email) {
-    currentUserEmail = email;
-    document.getElementById('user-email').textContent = email;
-    document.getElementById('loading-gate').classList.add('hidden');
-    document.getElementById('app-shell').classList.remove('hidden');
-    document.getElementById('signout-btn').addEventListener('click', function () {
-      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
-        .then(function () { window.location.href = 'ops-login.html'; });
-    });
-    loadQueue();
-  }
-
-  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
-    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
-    .then(function (result) {
-      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
-      initShell(result.data.email);
-    })
-    .catch(function () { window.location.href = 'ops-login.html'; });
+  OpsShell.boot({
+    activeHref: 'ops-trail-swap-requests.html',
+    title: 'Trail Swap Requests',
+    subtitle: 'Staff-reported and system-flagged trail concerns awaiting a swap decision.',
+    onReady: function (email) {
+      currentUserEmail = email;
+      loadQueue();
+    },
+  });
 })();
 </script>
 </body>

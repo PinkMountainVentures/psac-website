@@ -94,6 +94,24 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Ops App Redesign (Aug 2026) — Gear Units item 7. Confirmed decision
+    // (claude/psac-ops-redesign-open-items-confirmed.md item 3): a repaired
+    // unit returns straight to Available, matching Mark Clean/Mark Deep-
+    // Cleaned, NOT routed through Needs Cleaning first — so this reuses
+    // gearOps_markClean directly rather than a new Apps Script function.
+    // gearOps_markClean has no status precondition at all, confirmed live
+    // (Phase 1, Surface 3) — this is a pure front-end-facing action name,
+    // zero backend risk.
+    if (action === 'markRepaired') {
+      if (!body.unitId) {
+        res.status(400).json({ error: 'bad_request', detail: 'unitId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_markClean', { unitId: body.unitId });
+      res.status(200).json(result);
+      return;
+    }
+
     res.status(400).json({ error: 'unknown_action', detail: action });
   } catch (err) {
     // eslint-disable-next-line no-console

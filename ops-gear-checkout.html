@@ -8,13 +8,20 @@
   ops-gear-checkout.html
 
   Real, working version of claude/psac-ops-gear-assembly-checkout.html's
-  mockup — Gear Inventory PRD Section 3/4. T-1 checkout queue, allocation
-  (size-matched, shortage-flagged), a combined packing checklist (QR-scan
-  or manual entry for trackables, plain checkboxes for bulk keepsakes —
-  bulk items are never unit-tracked or written to the Sheet, purely
-  client-side per Section 2), and the deliberate manual "Mark delivered"
-  Uber Direct stand-in. Wired to /api/ops-proxy ->
-  api/allocate-gear-units.js and api/checkout-gear.js.
+  mockup — Gear Inventory PRD Section 3/4, extended by Ops App Redesign
+  (Aug 2026) Round 2 item 5. T-1 checkout queue, allocation (size-matched,
+  shortage-flagged, now with a genuine Retry Allocation path — see the
+  loadDetail() comment below), a combined packing checklist (QR-scan or
+  manual entry for trackables, plain checkboxes + a "Confirm all remaining"
+  bulk button for keepsakes — bulk items are never unit-tracked or written
+  to the Sheet, purely client-side per Section 2), and the new three-state
+  outbound delivery flow (Ready for Delivery -> Delivery Scheduled ->
+  Delivered), replacing the old single "Mark Delivered" button. Wired to
+  /api/ops-proxy -> api/allocate-gear-units.js and api/checkout-gear.js.
+
+  Round 2 (Aug 2026): adopts the shared OpsShell (ops-shell.js/.css) for the
+  sidebar, search bar, and branded loading convention — this page used to be
+  fully self-contained; see ops-shell.js's own header for why that changed.
 
   QR scanning uses the browser's native BarcodeDetector API when available
   (Chrome/Edge on Android and recent desktop Chrome) — no scanning library
@@ -23,73 +30,51 @@
   Section 4/6, staff on a phone with a cracked camera or a QR label that
   won't scan need the same path, not a degraded one.
 -->
+<link rel="stylesheet" href="ops-shell.css">
 <style>
   :root {
-    --mountain-pink: #F58271; --dark-pine: #2A4747;
-    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
     --amber-bg: rgba(154,91,30,0.12); --amber-text: #9A5B1E; --amber-border: rgba(154,91,30,0.35);
   }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
-
-  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
-  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
-  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
-  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
-  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
-  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
-
-  .ops-main { padding:1.6rem 1.8rem; }
   .ops-breadcrumb { font-size:0.78rem; margin-bottom:0.8rem; }
   .ops-breadcrumb a { color:var(--mountain-pink); text-decoration:none; cursor:pointer; }
-  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
-  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
-  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
-  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
-  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
 
   .ops-select, .ops-input { padding:0.6rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; color:var(--ops-text); background:white; }
   .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-bottom:1.2rem; }
   .ops-panel-title { font-size:0.9rem; font-weight:700; margin-bottom:0.7rem; color:var(--dark-pine); }
-  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
-  .ops-btn:disabled { opacity:0.4; cursor:default; }
-  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
   .ops-btn-small { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; }
 
-  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.6rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
 
   .unit-chip { display:inline-block; background:var(--ops-bg); border:1px solid var(--ops-border); border-radius:4px; padding:0.15rem 0.5rem; font-size:0.74rem; font-family:monospace; }
   .shortage-box { background:var(--amber-bg); border:1px solid var(--amber-border); color:var(--amber-text); border-radius:6px; padding:0.9rem 1rem; margin-bottom:1rem; font-size:0.83rem; }
-  .shortage-actions { display:flex; gap:0.5rem; margin-top:0.6rem; }
+  .shortage-actions { display:flex; gap:0.5rem; margin-top:0.6rem; flex-wrap:wrap; }
   .shortage-actions button { background:white; border:1px solid var(--amber-border); color:var(--amber-text); border-radius:4px; padding:0.35rem 0.7rem; font-size:0.74rem; cursor:pointer; }
+  .retry-allocation-row { margin-bottom:1rem; }
 
   .checklist-row { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 0.2rem; border-bottom:1px solid var(--ops-border); font-size:0.85rem; }
   .checklist-row.scan-done { color:#2a7a4a; }
   .checklist-left { display:flex; align-items:center; gap:0.6rem; }
   .qr-icon { font-size:1.1rem; }
-  .scan-panel { display:flex; gap:0.5rem; align-items:center; }
+  .scan-panel { display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; }
   .viewfinder { position:relative; width:220px; height:160px; background:#000; border-radius:6px; overflow:hidden; }
   .viewfinder video { width:100%; height:100%; object-fit:cover; }
 
   .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-  .ops-mismatch-banner { background:rgba(154,91,30,0.12); color:#9A5B1E; border:1px solid rgba(154,91,30,0.35); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
+  .ops-mismatch-banner { background:var(--amber-bg); color:var(--amber-text); border:1px solid var(--amber-border); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
 
   .bulk-checklist label { display:block; font-size:0.83rem; padding:0.3rem 0; }
+  .bulk-checklist-footer { margin-top:0.6rem; }
 
-  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
-  .hidden { display:none !important; }
+  .delivery-state-banner { border-radius:6px; padding:0.7rem 1rem; font-size:0.83rem; margin-bottom:0.8rem; }
+  .delivery-state-banner.ready { background:var(--amber-bg); color:var(--amber-text); border:1px solid var(--amber-border); }
+  .delivery-state-banner.scheduled { background:rgba(42,111,151,0.1); color:#2A6F97; border:1px solid rgba(42,111,151,0.3); }
+  .delivery-state-banner.delivered { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); }
+  .window-hint { font-size:0.72rem; color:var(--ops-text-mid); margin-top:0.3rem; }
+  .delivery-form-row { margin-bottom:0.9rem; }
+  .delivery-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
 
   @media (max-width: 760px) {
-    .ops-app { grid-template-columns:1fr; margin:0.8rem; min-height:auto; }
-    .ops-sidebar { display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0.6rem 0.4rem; gap:0.2rem; }
-    .ops-sidebar-brand { display:none; }
-    .ops-nav-item { border-left:none; border-bottom:3px solid transparent; white-space:nowrap; padding:0.6rem 0.8rem; }
-    .ops-nav-item.is-active { border-left-color:transparent; border-bottom-color:var(--mountain-pink); }
-    .ops-main { padding:1.1rem 1rem; }
     .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
     .checklist-row { flex-direction:column; align-items:flex-start; gap:0.4rem; }
     .viewfinder { width:100%; }
@@ -102,28 +87,20 @@
 
 <div id="app-shell" class="hidden">
   <div class="ops-app">
-    <div class="ops-sidebar">
-      <div class="ops-sidebar-brand">PSAC Ops</div>
-      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
-      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
-      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
-      <a class="ops-nav-item is-active" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
-      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
-      <a class="ops-nav-item" href="ops-gear-checkin.html">Return Check-In</a>
-      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
-    </div>
+    <div class="ops-sidebar" id="ops-sidebar"></div>
     <div class="ops-main">
       <div class="ops-topbar">
-        <div class="ops-title">Gear Assembly &amp; Checkout</div>
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
         <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
       </div>
+      <div id="ops-search-container"></div>
 
       <div id="banner-container"></div>
 
       <div id="queue-view">
-        <div class="ops-subtitle">T-1 checkout queue — every active booking whose trail day is the selected date.</div>
         <div style="margin-bottom:1rem;">
           <label style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-right:0.5rem;">Trip date</label>
           <input class="ops-input" id="queue-trip-date" type="date">
@@ -139,27 +116,35 @@
   </div>
 </div>
 
+<script src="ops-shell.js"></script>
 <script>
 (function () {
   'use strict';
 
   var BULK_ITEMS = ['Sunscreen', 'LMNT electrolyte packets', 'Dates', 'Bandana', 'Membership card', 'Route card'];
+
+  // Delivery Time dropdown options, per the guest's own Adventure Prep
+  // deliveryWindow selection (adventure-prep-form.js's own three fixed
+  // values). Defaults to 7pm-9pm's slots if the guest never picked a
+  // window or picked something unrecognized — matching the journey map's
+  // explicit default. 30-minute increments, none flush with the window's
+  // own end (a 7pm start still has to leave time to actually deliver
+  // before 9pm) — same four-slots-per-window shape as the design mockup.
+  var DELIVERY_WINDOW_SLOTS = {
+    '3:00pm – 5:00pm': ['3:00pm', '3:30pm', '4:00pm', '4:30pm'],
+    '5:00pm – 7:00pm': ['5:00pm', '5:30pm', '6:00pm', '6:30pm'],
+    '7:00pm – 9:00pm': ['7:00pm', '7:30pm', '8:00pm', '8:30pm'],
+  };
+  var DEFAULT_DELIVERY_WINDOW = '7:00pm – 9:00pm';
+
   var currentBookingId = null;
   var currentAllocation = [];
+  var currentDeliveryContext = null;
   var scanStream = null;
   var scanDetector = null;
 
-  function opsCall(action, payload) {
-    return fetch('/api/ops-proxy', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
-    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
-  }
-
-  function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
 
   function showBanner(kind, message) {
     var cls = kind === 'success' ? 'ops-success-banner' : (kind === 'mismatch' ? 'ops-mismatch-banner' : 'ops-error-banner');
@@ -171,23 +156,24 @@
   function loadQueue() {
     var tripDate = document.getElementById('queue-trip-date').value;
     if (!tripDate) return;
-    document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('gearCheckout_getQueue', { tripDate: tripDate }).then(function (result) {
-      if (!result.ok) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Could not load the checkout queue.</div>'; return; }
-      var bookings = result.data.bookings || [];
-      if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No active bookings for this trip date.</div>'; return; }
-      var rows = bookings.map(function (b) {
-        return '<tr>'
-          + '<td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
-          + '<td>' + escapeHtml(b.tier || '') + '</td>'
-          + '<td>' + escapeHtml(b.gearKitCount || '') + '</td>'
-          + '<td>' + (b.gearDeliveredAt ? 'Delivered' : 'Pending') + '</td>'
-          + '<td><button class="ops-btn-small" data-open="' + escapeHtml(b.bookingId) + '">Open</button></td>'
-          + '</tr>';
-      }).join('');
-      document.getElementById('queue-list').innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Tier</th><th>Kits</th><th>Delivery</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
-      document.querySelectorAll('button[data-open]').forEach(function (btn) {
-        btn.addEventListener('click', function () { openBooking(btn.getAttribute('data-open')); });
+    OpsShell.withLoadingState(document.getElementById('queue-list'), function () {
+      return opsCall('gearCheckout_getQueue', { tripDate: tripDate }).then(function (result) {
+        if (!result.ok) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Could not load the checkout queue.</div>'; return; }
+        var bookings = result.data.bookings || [];
+        if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No active bookings for this trip date.</div>'; return; }
+        var rows = bookings.map(function (b) {
+          return '<tr>'
+            + '<td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
+            + '<td>' + escapeHtml(b.tier || '') + '</td>'
+            + '<td>' + escapeHtml(b.gearKitCount || '') + '</td>'
+            + '<td>' + (b.gearDeliveredAt ? 'Delivered' : 'Pending') + '</td>'
+            + '<td><button class="ops-btn-small" data-open="' + escapeHtml(b.bookingId) + '">Open</button></td>'
+            + '</tr>';
+        }).join('');
+        document.getElementById('queue-list').innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Tier</th><th>Kits</th><th>Delivery</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+        document.querySelectorAll('button[data-open]').forEach(function (btn) {
+          btn.addEventListener('click', function () { openBooking(btn.getAttribute('data-open')); });
+        });
       });
     });
   }
@@ -198,17 +184,44 @@
     currentBookingId = bookingId;
     document.getElementById('queue-view').classList.add('hidden');
     document.getElementById('detail-view').classList.remove('hidden');
-    document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('gearAllocation_get', { bookingId: bookingId }).then(function (result) {
-      if (!result.ok) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load allocation.</div>'; return; }
-      var allocation = result.data.allocation || [];
-      var anyAllocated = allocation.some(function (a) { return a.unitId; });
-      if (!allocation.length || !anyAllocated) {
-        renderAllocatePrompt();
-      } else {
-        currentAllocation = allocation;
-        renderChecklist([]);
-      }
+    loadDetail();
+  }
+
+  /**
+   * BUG FIX (Ops App Redesign, Aug 2026 — Round 2 item 5, Retry Allocation):
+   * the old check was `if (!allocation.length || !anyAllocated)` — as soon
+   * as ONE item had a unitId, a booking with a genuine partial shortage
+   * (some items allocated, some not) skipped straight to the checklist
+   * with shortages silently thrown away (gearAllocation_get doesn't return
+   * a `shortages` array the way the one-time runAllocation() response
+   * does — that was only ever populated right after an Allocate click).
+   * Retry Allocation never had anything to attach to. Now: any booking
+   * with unassigned items gets a "Retry Allocation (short N)" action
+   * (re-runs allocation in case units freed up since — cleaning finished,
+   * a return came in) shown alongside the checklist, not gated behind a
+   * dead precondition that could never actually surface it. Shortage
+   * context for display is reconstructed straight from the unassigned
+   * allocation rows themselves (itemName/personName/kitNumber/itemType are
+   * already on every allocation entry), not re-fetched separately.
+   */
+  function loadDetail() {
+    OpsShell.withLoadingState(document.getElementById('detail-content'), function () {
+      return Promise.all([
+        opsCall('gearAllocation_get', { bookingId: currentBookingId }),
+        opsCall('gearCheckout_getDeliveryContext', { bookingId: currentBookingId }),
+      ]).then(function (results) {
+        var allocResult = results[0];
+        var deliveryResult = results[1];
+        currentDeliveryContext = (deliveryResult.ok && deliveryResult.data) ? deliveryResult.data : {};
+        if (!allocResult.ok) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load allocation.</div>'; return; }
+        var allocation = allocResult.data.allocation || [];
+        if (!allocation.length) {
+          renderAllocatePrompt();
+        } else {
+          currentAllocation = allocation;
+          renderChecklist();
+        }
+      });
     });
   }
 
@@ -226,14 +239,22 @@
     opsCall('gearAllocation_allocate', { bookingId: currentBookingId }).then(function (result) {
       if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Allocation failed.'); return; }
       currentAllocation = result.data.allocation || [];
-      renderChecklist(result.data.shortages || []);
+      renderChecklist();
     });
   }
 
-  function renderChecklist(shortages) {
+  function deriveShortages() {
+    return currentAllocation.filter(function (item) { return !item.unitId; }).map(function (item) {
+      return { itemType: item.itemType, label: item.itemName, personName: item.personName, kitNumber: item.kitNumber };
+    });
+  }
+
+  function renderChecklist() {
+    var shortages = deriveShortages();
     var html = '<div class="ops-panel"><div class="ops-panel-title">#' + escapeHtml(currentBookingId) + ' — packing checklist</div>';
 
-    if (shortages && shortages.length) {
+    if (shortages.length) {
+      html += '<div class="retry-allocation-row"><button class="ops-btn-secondary" id="retry-allocation-btn">Retry Allocation (short ' + shortages.length + ')</button></div>';
       shortages.forEach(function (s) {
         html += '<div class="shortage-box">Short 1 unit of <strong>' + escapeHtml(s.label) + '</strong> for '
           + escapeHtml(s.personName || ('kit ' + s.kitNumber)) + '.'
@@ -264,17 +285,15 @@
 
     html += '<div class="ops-panel"><div class="ops-panel-title">Bulk keepsakes (not unit-tracked)</div><div class="bulk-checklist">'
       + BULK_ITEMS.map(function (name, i) { return '<label><input type="checkbox" data-bulk-check="' + i + '"> ' + escapeHtml(name) + '</label>'; }).join('')
+      + '<div class="bulk-checklist-footer"><button class="ops-btn-secondary" id="bulk-confirm-all-btn">Confirm all remaining (<span id="bulk-remaining-count">' + BULK_ITEMS.length + '</span>)</button></div>'
       + '</div></div>';
 
-    var allDone = currentAllocation.length > 0 && currentAllocation.every(function (i) { return i.checkedOutAt; });
-    html += '<div class="ops-panel"><div class="ops-panel-title">Delivery</div>'
-      + (allDone
-        ? '<button class="ops-btn" id="mark-delivered-btn">Mark Delivered</button>'
-        : '<p style="font-size:0.82rem; color:var(--ops-text-mid);">Every trackable item must be checked out before gear can be marked delivered.</p>')
-      + '<div id="scan-container" style="margin-top:1rem;"></div></div>';
+    var allTrackablesDone = currentAllocation.length > 0 && currentAllocation.every(function (i) { return i.checkedOutAt; });
+    html += '<div class="ops-panel"><div class="ops-panel-title">Delivery</div><div id="delivery-section"></div><div id="scan-container" style="margin-top:1rem;"></div></div>';
 
     document.getElementById('detail-content').innerHTML = html;
     wireChecklistEvents();
+    renderDeliverySection(allTrackablesDone);
   }
 
   function wireChecklistEvents() {
@@ -300,8 +319,33 @@
     document.querySelectorAll('button[data-start-scan]').forEach(function (btn) {
       btn.addEventListener('click', function () { startScan(); });
     });
-    var mdBtn = document.getElementById('mark-delivered-btn');
-    if (mdBtn) mdBtn.addEventListener('click', markDelivered);
+    var retryBtn = document.getElementById('retry-allocation-btn');
+    if (retryBtn) retryBtn.addEventListener('click', runAllocation);
+    wireBulkKeepsakes();
+  }
+
+  // Purely client-side — bulk keepsakes are never unit-tracked or written
+  // to the Sheet (Section 2). The live count reflects however many boxes
+  // are still unchecked, updating as staff check them individually or via
+  // the bulk button — never touches the trackable-unit rows above it.
+  function updateBulkRemainingCount() {
+    var countEl = document.getElementById('bulk-remaining-count');
+    if (!countEl) return;
+    var remaining = document.querySelectorAll('input[data-bulk-check]:not(:checked)').length;
+    countEl.textContent = remaining;
+  }
+
+  function wireBulkKeepsakes() {
+    document.querySelectorAll('input[data-bulk-check]').forEach(function (cb) {
+      cb.addEventListener('change', updateBulkRemainingCount);
+    });
+    var bulkAllBtn = document.getElementById('bulk-confirm-all-btn');
+    if (bulkAllBtn) {
+      bulkAllBtn.addEventListener('click', function () {
+        document.querySelectorAll('input[data-bulk-check]').forEach(function (cb) { cb.checked = true; });
+        updateBulkRemainingCount();
+      });
+    }
   }
 
   function confirmScan(scannedValue) {
@@ -322,7 +366,7 @@
       stopScan();
       opsCall('gearAllocation_get', { bookingId: currentBookingId }).then(function (r2) {
         currentAllocation = (r2.data && r2.data.allocation) || currentAllocation;
-        renderChecklist([]);
+        renderChecklist();
       });
     });
   }
@@ -363,24 +407,109 @@
     if (container) container.innerHTML = '';
   }
 
-  function markDelivered() {
-    opsCall('gearCheckout_markDelivered', { bookingId: currentBookingId, deliveredBy: document.getElementById('user-email').textContent }).then(function (result) {
+  // -------------------- Delivery: Ready for Delivery -> Delivery Scheduled -> Delivered --------------------
+
+  function renderDeliverySection(allTrackablesDone) {
+    var el = document.getElementById('delivery-section');
+    if (!el) return;
+    var ctx = currentDeliveryContext || {};
+    var status = ctx.deliveryStatus || '';
+
+    if (status === 'delivered') {
+      el.innerHTML = '<div class="delivery-state-banner delivered">✓ Delivered' + (ctx.gearDeliveredBy ? ' — marked by ' + escapeHtml(ctx.gearDeliveredBy) : '') + (ctx.gearDeliveredAt ? ' — ' + escapeHtml(ctx.gearDeliveredAt) : '') + '</div>';
+      return;
+    }
+
+    if (status === 'delivery_scheduled') {
+      el.innerHTML = '<div class="delivery-state-banner scheduled">◐ Delivery Scheduled — ' + escapeHtml(deliveryServiceLabel(ctx.deliveryServiceType)) + ', ' + escapeHtml(ctx.deliveryTimeSlot || '') + '</div>'
+        + '<button class="ops-btn" id="mark-delivered-final-btn">Mark Delivered</button>';
+      document.getElementById('mark-delivered-final-btn').addEventListener('click', markDeliveredFinal);
+      return;
+    }
+
+    if (status === 'ready_for_delivery') {
+      el.innerHTML = '<div class="delivery-state-banner ready">◐ Ready for Delivery' + (ctx.deliveryReadyAt ? ' — ' + escapeHtml(ctx.deliveryReadyAt) : '') + '</div>'
+        + renderScheduleDeliveryForm(ctx);
+      wireScheduleDeliveryForm();
+      return;
+    }
+
+    // Not started — Ready for Delivery keeps the exact same precondition
+    // the old single "Mark Delivered" button always had: the packing
+    // checklist 100% confirmed. It's just no longer the last step.
+    if (allTrackablesDone) {
+      el.innerHTML = '<button class="ops-btn" id="mark-ready-btn">Mark Ready for Delivery</button>';
+      document.getElementById('mark-ready-btn').addEventListener('click', markReadyForDelivery);
+    } else {
+      el.innerHTML = '<p style="font-size:0.82rem; color:var(--ops-text-mid);">Every trackable item must be checked out before gear can be marked ready for delivery.</p>';
+    }
+  }
+
+  function deliveryServiceLabel(v) {
+    if (v === 'psac_staff') return 'PSAC Staff';
+    if (v === 'uber_direct') return 'Uber Direct';
+    return v || '';
+  }
+
+  function windowSlots(deliveryWindow) {
+    return DELIVERY_WINDOW_SLOTS[deliveryWindow] || DELIVERY_WINDOW_SLOTS[DEFAULT_DELIVERY_WINDOW];
+  }
+
+  function renderScheduleDeliveryForm(ctx) {
+    var deliveryWindow = ctx.deliveryWindow || DEFAULT_DELIVERY_WINDOW;
+    var slots = windowSlots(deliveryWindow);
+    return '<div style="margin-top:0.8rem;">'
+      + '<div class="delivery-form-row"><label>Delivery Service</label>'
+      + '<select class="ops-select" id="delivery-service-select">'
+      + '<option value="psac_staff">PSAC Staff</option>'
+      + '<option value="uber_direct">Uber Direct</option>'
+      + '</select></div>'
+      + '<div class="delivery-form-row"><label>Delivery Time</label>'
+      + '<select class="ops-select" id="delivery-time-select">'
+      + slots.map(function (s) { return '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>'; }).join('')
+      + '</select>'
+      + '<div class="window-hint">Constrained to the guest\'s own delivery window: ' + escapeHtml(deliveryWindow) + '</div>'
+      + '</div>'
+      + '<div class="ops-helper">Selecting Uber Direct is what triggers the courier dispatch call (bucket 2.11) — the dispatch flow itself is a separate, out-of-scope build track; this only records the choice.</div>'
+      + '<button class="ops-btn" id="confirm-delivery-scheduled-btn">Confirm Delivery Scheduled</button>'
+      + '</div>';
+  }
+
+  function wireScheduleDeliveryForm() {
+    var btn = document.getElementById('confirm-delivery-scheduled-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var deliveryServiceType = document.getElementById('delivery-service-select').value;
+      var deliveryTimeSlot = document.getElementById('delivery-time-select').value;
+      btn.disabled = true;
+      opsCall('gearCheckout_scheduleDelivery', { bookingId: currentBookingId, deliveryServiceType: deliveryServiceType, deliveryTimeSlot: deliveryTimeSlot }).then(function (result) {
+        btn.disabled = false;
+        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not schedule delivery.'); return; }
+        showBanner('success', 'Delivery scheduled for #' + currentBookingId + '.');
+        loadDetail();
+      });
+    });
+  }
+
+  function markReadyForDelivery() {
+    opsCall('gearCheckout_markReadyForDelivery', { bookingId: currentBookingId }).then(function (result) {
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark ready for delivery.'); return; }
+      showBanner('success', 'Marked ready for delivery for #' + currentBookingId + '.');
+      loadDetail();
+    });
+  }
+
+  function markDeliveredFinal() {
+    opsCall('gearCheckout_markDeliveredFinal', { bookingId: currentBookingId, deliveredBy: document.getElementById('user-email').textContent }).then(function (result) {
       if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark delivered.'); return; }
       showBanner('success', 'Gear marked delivered for #' + currentBookingId + '.');
+      loadDetail();
     });
   }
 
   // -------------------- Shell --------------------
 
-  function initShell(email) {
-    document.getElementById('user-email').textContent = email;
-    document.getElementById('loading-gate').classList.add('hidden');
-    document.getElementById('app-shell').classList.remove('hidden');
-    document.getElementById('signout-btn').addEventListener('click', function () {
-      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
-        .then(function () { window.location.href = 'ops-login.html'; });
-    });
-
+  function onReady() {
     var today = new Date();
     var tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
     document.getElementById('queue-trip-date').value = tomorrow.toISOString().slice(0, 10);
@@ -394,13 +523,12 @@
     loadQueue();
   }
 
-  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
-    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
-    .then(function (result) {
-      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
-      initShell(result.data.email);
-    })
-    .catch(function () { window.location.href = 'ops-login.html'; });
+  OpsShell.boot({
+    activeHref: 'ops-gear-checkout.html',
+    title: 'Gear Assembly & Checkout',
+    subtitle: 'T-1 checkout queue — every active booking whose trail day is the selected date.',
+    onReady: onReady,
+  });
 })();
 </script>
 </body>

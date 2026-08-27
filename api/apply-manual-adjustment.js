@@ -42,6 +42,12 @@
 const { callBookingsWebApp } = require('../lib/apps-script-client');
 const { validateAddress } = require('../lib/validate-address');
 const createDepositHoldHandler = require('./create-deposit-hold');
+// Ops App Redesign (Aug 2026) — Manual Adjustment item 8's "Trail day /
+// adventure date change" type reuses this exact `trail_refresh` mechanism
+// (Trail Selection Logic PRD Section 2 Amendment 2), the same lib the
+// guest-facing self-service edit path already calls — per this build's own
+// instruction not to invent a second recompute path.
+const { runTrailAssignmentForBooking } = require('../lib/run-trail-assignment');
 
 // ADDED (2026-08-25, gear-ops live verification pass): kit_count_correction
 // used to write the new confirmedKitCount with zero awareness of a live T-1
@@ -166,7 +172,13 @@ const VALID_TYPES = [
   'change_log_note',
   'gear_returned_uncleaned',
   'update_delivery_address',
+  // Ops App Redesign (Aug 2026) — Manual Adjustment item 8's three new types.
+  'trail_day_change',
+  'swap_allocated_unit',
+  'post_delivery_cancellation',
 ];
+
+const SWAP_UNIT_REASONS = ['damaged_before_delivery', 'dirty_before_delivery', 'wrong_size_or_type', 'lost_or_destroyed_in_transit', 'broken_during_rental'];
 
 function checkSecret(payload) {
   // Fail closed: require both a configured secret and a non-empty
@@ -318,6 +330,60 @@ module.exports = async function handler(req, res) {
         staffNotes,
       });
       extra = { addressValidated: validation.validated, standardizedAddress: std };
+    } else if (type === 'trail_day_change') {
+      if (!body.newTripDate || !/^\d{4}-\d{2}-\d{2}/.test(String(body.newTripDate))) {
+        res.status(400).json({ error: 'bad_request', detail: 'newTripDate (YYYY-MM-DD) is required for trail_day_change' });
+        return;
+      }
+      result = await callBookingsWebApp('manualAdjustment_trailDayChange', {
+        bookingId, newTripDate: body.newTripDate, staffNotes,
+      });
+      if (result && result.ok) {
+        // A full re-run of the trail-selection engine against the new date
+        // — Airey's own confirmed answer (Section 2 Amendment 2): a date
+        // change discards and replaces the `source: rules_v1` candidates,
+        // and re-checks any preserved `source: manual_override` entry
+        // against the NEW date's Tier A filters (lib/trail-selection-
+        // engine.js's runTrailSelection, refresh branch — see that file's
+        // own Aug 2026 fix for the re-check this used to skip).
+        try {
+          const refresh = await runTrailAssignmentForBooking({ bookingId, operation: 'refresh' });
+          extra = {
+            trailRefresh: refresh.outcome,
+            candidateTrails: refresh.candidateTrails,
+            manualOverrideDropped: refresh.outcome === 'assigned' ? !!refresh.swapRequestOpened && refresh.manualOverrideDroppedOnRefresh : undefined,
+            swapRequestOpened: refresh.swapRequestOpened,
+          };
+          if (refresh.outcome !== 'assigned') {
+            extra.warning = 'Trail day was changed, but re-running trail selection did not complete cleanly (outcome: ' + refresh.outcome + '). Check this booking\'s trail assignment manually.';
+          }
+        } catch (refreshErr) {
+          // eslint-disable-next-line no-console
+          console.error('apply-manual-adjustment: trail_day_change date write succeeded but the trail_refresh re-run failed', bookingId, refreshErr);
+          extra = { warning: 'Trail day was changed, but re-running trail selection failed: ' + refreshErr.message + '. The date is saved; trail candidates were NOT refreshed — needs a manual retry.' };
+        }
+      }
+    } else if (type === 'swap_allocated_unit') {
+      if (!body.originalUnitId || SWAP_UNIT_REASONS.indexOf(body.reason) === -1) {
+        res.status(400).json({ error: 'bad_request', detail: `originalUnitId is required and reason must be one of: ${SWAP_UNIT_REASONS.join(', ')}` });
+        return;
+      }
+      if (!body.noSubstitute && !body.newUnitId) {
+        res.status(400).json({ error: 'bad_request', detail: 'newUnitId is required unless noSubstitute is true' });
+        return;
+      }
+      result = await callBookingsWebApp('manualAdjustment_swapAllocatedUnit', {
+        bookingId,
+        originalUnitId: body.originalUnitId,
+        reason: body.reason,
+        newUnitId: body.noSubstitute ? '' : body.newUnitId,
+        noSubstitute: !!body.noSubstitute,
+        staffNotes,
+      });
+    } else if (type === 'post_delivery_cancellation') {
+      result = await callBookingsWebApp('manualAdjustment_postDeliveryCancellation', {
+        bookingId, cancellationReason: body.cancellationReason || 'post_delivery_cancellation', staffNotes,
+      });
     }
 
     if (!result || result.ok !== true) {

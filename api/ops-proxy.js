@@ -63,18 +63,31 @@ const READ_ACTIONS = {
   listChangeLogRecent: () => callBookingsWebApp('changeLog_listRecent', {}),
   getTrailSwapDropdownOptions: (body) => callBookingsWebApp('trailSwap_getDropdownOptions', { bookingId: body.bookingId }),
   getTrailSwapRequestContext: (body) => callBookingsWebApp('trailSwap_getRequestContext', { swapRequestId: body.swapRequestId }),
+  // Ops App Redesign (Aug 2026) — apps-script/ops-redesign-round1-actions.gs.
+  listAllBookings: () => callBookingsWebApp('allBookings_listAll', {}),
+  listOpsAlertsExpanded: () => callBookingsWebApp('opsAlerts_listExpanded', { nowIso: new Date().toISOString() }),
+  listStalledBookings: () => callBookingsWebApp('stalled_listAll', {}),
+  listCancellations: () => callBookingsWebApp('cancellations_listAll', {}),
 };
 
 // Aug 2026: added 'update_delivery_address' — staff correcting/entering a
 // guest's delivery address after a phone/SMS/email interaction, per
 // Airey's direct request. Same fixed-type, no-open-ended-edit posture as
 // the original four; see api/apply-manual-adjustment.js's own header.
+// Ops App Redesign (Aug 2026) — Round 2 item 8: added 'trail_day_change',
+// 'swap_allocated_unit', and 'post_delivery_cancellation'. Must be kept in
+// sync with api/apply-manual-adjustment.js's own VALID_TYPES array — these
+// are two independent allowlists in two separate files, both required for
+// a type to actually work end-to-end through the proxy.
 const MANUAL_ADJUSTMENT_TYPES = [
   'kit_count_correction',
   'gear_check_log_adjustment',
   'change_log_note',
   'gear_returned_uncleaned',
   'update_delivery_address',
+  'trail_day_change',
+  'swap_allocated_unit',
+  'post_delivery_cancellation',
 ];
 
 // Gear Inventory build: each entry proxies straight through to its handler
@@ -88,6 +101,7 @@ const GEAR_OPS_PROXY_ACTIONS = {
   gearUnits_retire: manageGearUnitsHandler,
   gearUnits_markClean: manageGearUnitsHandler,
   gearUnits_markDeepCleaned: manageGearUnitsHandler,
+  gearUnits_markRepaired: manageGearUnitsHandler,
   // api/allocate-gear-units.js
   gearAllocation_allocate: allocateGearUnitsHandler,
   gearAllocation_get: allocateGearUnitsHandler,
@@ -96,11 +110,20 @@ const GEAR_OPS_PROXY_ACTIONS = {
   gearCheckout_getQueue: checkoutGearHandler,
   gearCheckout_confirmScan: checkoutGearHandler,
   gearCheckout_markDelivered: checkoutGearHandler,
+  gearCheckout_markReadyForDelivery: checkoutGearHandler,
+  gearCheckout_scheduleDelivery: checkoutGearHandler,
+  gearCheckout_markDeliveredFinal: checkoutGearHandler,
+  gearCheckout_getDeliveryContext: checkoutGearHandler,
   // api/check-in-gear-item.js
   gearCheckin_getQueue: checkInGearItemHandler,
   gearCheckin_getContext: checkInGearItemHandler,
   gearCheckin_uploadPhoto: checkInGearItemHandler,
   gearCheckin_checkIn: checkInGearItemHandler,
+  gearCheckin_getQueueV2: checkInGearItemHandler,
+  gearCheckin_getReturnContext: checkInGearItemHandler,
+  gearCheckin_schedulePickup: checkInGearItemHandler,
+  gearCheckin_markPickedUp: checkInGearItemHandler,
+  gearCheckin_markReturned: checkInGearItemHandler,
   // api/reconcile-gear-deposit.js
   gearReconcile_run: reconcileGearDepositHandler,
   gearReconcile_list: reconcileGearDepositHandler,
@@ -121,12 +144,16 @@ const GEAR_OPS_PROXY_ACTIONS = {
 // handler doesn't read body.action at all.
 const GEAR_OPS_INNER_ACTION = {
   gearUnits_list: 'listUnits', gearUnits_add: 'addUnit', gearUnits_retire: 'retireUnit',
-  gearUnits_markClean: 'markClean', gearUnits_markDeepCleaned: 'markDeepCleaned',
+  gearUnits_markClean: 'markClean', gearUnits_markDeepCleaned: 'markDeepCleaned', gearUnits_markRepaired: 'markRepaired',
   gearAllocation_allocate: 'allocate', gearAllocation_get: 'getAllocation',
   gearAllocation_recordShortageResolution: 'recordShortageResolution',
   gearCheckout_getQueue: 'getQueue', gearCheckout_confirmScan: 'confirmScan', gearCheckout_markDelivered: 'markDelivered',
+  gearCheckout_markReadyForDelivery: 'markReadyForDelivery', gearCheckout_scheduleDelivery: 'scheduleDelivery', gearCheckout_markDeliveredFinal: 'markDeliveredFinal',
+  gearCheckout_getDeliveryContext: 'getDeliveryContext',
   gearCheckin_getQueue: 'getQueue', gearCheckin_getContext: 'getContext',
   gearCheckin_uploadPhoto: 'uploadPhoto', gearCheckin_checkIn: 'checkIn',
+  gearCheckin_getQueueV2: 'getQueueV2', gearCheckin_getReturnContext: 'getReturnContext',
+  gearCheckin_schedulePickup: 'schedulePickup', gearCheckin_markPickedUp: 'markPickedUp', gearCheckin_markReturned: 'markReturned',
   gearReconcile_list: 'list', gearReconcile_getContext: 'context',
 };
 
@@ -162,6 +189,16 @@ module.exports = async function handler(req, res) {
         }),
       }, innerRes);
       res.status(result.statusCode).json(result.body);
+      return;
+    }
+
+    if (action === 'markStalledCalled') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const data = await callBookingsWebApp('stalled_markCalled', { bookingId: body.bookingId, calledBy: session.email });
+      res.status(200).json(Object.assign({ ok: true }, data));
       return;
     }
 

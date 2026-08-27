@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cancellations | PSAC Ops</title>
+<!--
+  ops-cancellations.html — brand new page (Phase 1, Surface 9's approved
+  design, never built until now). Deliberately read-only: no Resolve/Edit/
+  Reverse actions at all, by design — "a fact to review, not a workflow to
+  act on." Wired to /api/ops-proxy's listCancellations (apps-script/ops-
+  redesign-round1-actions.gs's cancellations_listAll).
+
+  CRITICAL: the source cancellationReasons enum values ('no_1.2a',
+  'zero_waivers', 'no_address', 'hold_never_cleared') are never renamed —
+  translated to display labels at render time only, via OpsShell's shared
+  cancellationReasonLabel() map (ops-shell.js), the same pattern the existing
+  16-string Ops Alerts label-mapping table already uses.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-app { max-width:1100px; }
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .ops-table tr:hover td { background:#FAFBFB; }
+  .ops-tag.reason { display:inline-block; font-size:0.66rem; background:#E7ECEE; color:#3E4A50; padding:0.18rem 0.5rem; border-radius:4px; margin-right:0.2rem; }
+  .filter-bar { display:flex; gap:0.6rem; align-items:flex-end; margin-bottom:1.1rem; }
+  .filter-field { display:flex; flex-direction:column; gap:0.3rem; }
+  .filter-field label { font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); }
+  .filter-field input { padding:0.5rem 0.6rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.78rem; font-family:inherit; min-width:220px; }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title" id="ops-title"></div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div class="ops-subtitle" id="ops-subtitle"></div>
+      <div id="ops-search-container"></div>
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+
+      <div class="filter-bar">
+        <div class="filter-field"><label>Booking ID</label><input type="text" id="f-booking-id" placeholder="e.g. BK-10339"></div>
+      </div>
+
+      <div id="table-container"></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var allCancellations = [];
+
+  function renderRows(list) {
+    var container = document.getElementById('table-container');
+    if (!list.length) { container.innerHTML = '<div class="ops-empty">No cancellations on record.</div>'; return; }
+    var rows = list.map(function (c) {
+      var reasons = (c.cancellationReasons || []).map(function (r) { return '<span class="ops-tag reason">' + escapeHtml(OpsShell.cancellationReasonLabel(r)) + '</span>'; }).join('');
+      return '<tr>'
+        + '<td>#' + escapeHtml(c.bookingId) + '</td>'
+        + '<td>' + escapeHtml(c.contactName) + '<br><span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(c.contactEmail) + '</span></td>'
+        + '<td>' + escapeHtml(String(c.tripDate || '').slice(0, 10)) + '</td>'
+        + '<td>' + escapeHtml(String(c.cancelledAt || '').slice(0, 10)) + '</td>'
+        + '<td>' + (reasons || '—') + '</td>'
+        + '<td>' + (c.refundAmount !== '' && c.refundAmount != null ? ('$' + Number(c.refundAmount).toFixed(2)) : '—') + '</td>'
+        + '</tr>';
+    }).join('');
+    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Guest</th><th>Trail Day</th><th>Cancelled</th><th>Reason(s)</th><th>Refund</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  function applyFilter() {
+    var q = document.getElementById('f-booking-id').value.trim().toLowerCase();
+    var urlBookingId = (new URLSearchParams(window.location.search).get('bookingId') || '').toLowerCase();
+    var effective = q || urlBookingId;
+    var list = effective ? allCancellations.filter(function (c) { return String(c.bookingId).toLowerCase().indexOf(effective) !== -1; }) : allCancellations;
+    renderRows(list);
+  }
+
+  function loadCancellations() {
+    var container = document.getElementById('table-container');
+    OpsShell.withLoadingState(container, function () {
+      return OpsShell.opsCall('listCancellations', {}).then(function (result) {
+        if (!result.ok) { document.getElementById('error-banner').classList.remove('hidden'); document.getElementById('error-banner').textContent = 'Could not load Cancellations.'; throw new Error('load failed'); }
+        allCancellations = result.data.cancellations || [];
+        applyFilter();
+      });
+    });
+  }
+
+  document.getElementById('f-booking-id').addEventListener('input', applyFilter);
+
+  OpsShell.boot({
+    activeHref: 'ops-cancellations.html',
+    title: 'Cancellations',
+    subtitle: 'Every automatic cancellation, its firing reason(s), and its refund reference — read-only.',
+    onReady: function () {
+      var urlBookingId = new URLSearchParams(window.location.search).get('bookingId');
+      if (urlBookingId) document.getElementById('f-booking-id').value = urlBookingId;
+      loadCancellations();
+    },
+  });
+})();
+</script>
+</body>
+</html>

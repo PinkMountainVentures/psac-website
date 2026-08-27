@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stalled Bookings | PSAC Ops</title>
+<!--
+  ops-stalled-bookings.html — brand new page (Phase 1, Surface 8's approved
+  design, never built until now). Wired to /api/ops-proxy's listStalledBookings
+  (apps-script/ops-redesign-round1-actions.gs's stalled_listAll) and the new
+  markStalledCalled write action. One combined queue covering both the T-5
+  "nudge" stage and the T-3 "call today" stage, tagging each row with exactly
+  which of the three tracks (Trail Details/1.2a, Waiver, Address) are still
+  outstanding — matching the approved design, not a redesign.
+
+  NOTE — call script: the approved design calls for a "Call script →" link
+  opening a pre-drafted phone script filled in with the booking's specifics.
+  No such script template exists anywhere in this project's docs or code
+  (only the T-3 phone-fallback MECHANISM is built, not guest-facing script
+  copy) — this page generates a reasonable one inline from the booking's own
+  outstanding-tracks data rather than leaving the button dead, but the actual
+  wording is this build's own draft, not a script Airey has reviewed. Flagged
+  in the handoff doc.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-app { max-width:1100px; }
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .ops-table tr:hover td { background:#FAFBFB; }
+  .ops-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; }
+  .ops-tag.callnow { background:var(--sunset-red); color:white; }
+  .ops-tag.nudged { background:#FFF3D6; color:#8a6300; }
+  .track-chip { display:inline-block; font-size:0.66rem; background:#E7ECEE; color:#3E4A50; padding:0.15rem 0.45rem; border-radius:4px; margin-right:0.25rem; }
+  .script-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-top:1rem; white-space:pre-line; font-size:0.86rem; line-height:1.7; }
+  .script-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.9rem; }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title" id="ops-title"></div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div class="ops-subtitle" id="ops-subtitle"></div>
+      <div id="ops-search-container"></div>
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+      <div id="table-container"></div>
+      <div id="script-container"></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var allBookings = [];
+  var filterBookingId = new URLSearchParams(window.location.search).get('bookingId') || '';
+
+  var TRACK_LABELS = { trail_details: 'Trail Details', waiver: 'Waiver', address: 'Address' };
+
+  function callScriptText(b) {
+    var tracks = (b.outstandingTracks || []).map(function (t) { return TRACK_LABELS[t] || t; });
+    return 'Hi ' + (b.contactName || 'there') + ', this is [staff name] calling from Palm Springs Adventure Club about your upcoming adventure on '
+      + escapeHtml(String(b.tripDate || '').slice(0, 10)) + '.\n\n'
+      + "We still need a bit more from you before your trail day: " + (tracks.length ? tracks.join(', ') : 'a couple of final details') + '.\n\n'
+      + (tracks.indexOf('Trail Details') !== -1 ? '- Trail Details: we need you to confirm your roster and preferences so we can lock in your trail.\n' : '')
+      + (tracks.indexOf('Waiver') !== -1 ? '- Waiver: everyone in your group needs a signed waiver before trail day.\n' : '')
+      + (tracks.indexOf('Address') !== -1 ? '- Address: we need a delivery address so we can get your gear to you.\n' : '')
+      + '\nCan you take care of this today, or would it help if I texted you the link again?';
+  }
+
+  function renderRows(list) {
+    var container = document.getElementById('table-container');
+    if (!list.length) { container.innerHTML = '<div class="ops-empty">No stalled bookings right now.</div>'; return; }
+    var rows = list.map(function (b) {
+      var stageTag = b.stage === 'call_today' ? '<span class="ops-tag callnow">Call today</span>' : '<span class="ops-tag nudged">Nudged</span>';
+      var tracks = (b.outstandingTracks || []).map(function (t) { return '<span class="track-chip">' + escapeHtml(TRACK_LABELS[t] || t) + '</span>'; }).join('');
+      var calledInfo = b.calledAt ? ('<div class="ops-helper">Called ' + escapeHtml(String(b.calledAt).slice(0, 10)) + (b.calledBy ? (' by ' + escapeHtml(b.calledBy)) : '') + '</div>') : '';
+      return '<tr>'
+        + '<td>#' + escapeHtml(b.bookingId) + '<br><span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(b.contactName) + '</span></td>'
+        + '<td>' + escapeHtml(String(b.tripDate || '').slice(0, 10)) + '</td>'
+        + '<td>' + stageTag + '</td>'
+        + '<td>' + tracks + '</td>'
+        + '<td><button class="ops-btn-secondary" data-call-script="' + escapeHtml(b.bookingId) + '">Call script &rarr;</button>' + calledInfo + '</td>'
+        + '</tr>';
+    }).join('');
+    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Trail Day</th><th>Stage</th><th>Outstanding</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+    container.querySelectorAll('[data-call-script]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openScript(btn.getAttribute('data-call-script')); });
+    });
+  }
+
+  function openScript(bookingId) {
+    var b = allBookings.filter(function (x) { return String(x.bookingId) === String(bookingId); })[0];
+    if (!b) return;
+    var container = document.getElementById('script-container');
+    container.innerHTML = '<div class="script-panel">' + escapeHtml(callScriptText(b)) + '</div>'
+      + '<div class="script-panel-footer">'
+      + '<button class="ops-btn-secondary" id="script-close">Close</button>'
+      + '<button class="ops-btn" id="script-mark-called">Mark called</button>'
+      + '</div>';
+    document.getElementById('script-close').addEventListener('click', function () { container.innerHTML = ''; });
+    document.getElementById('script-mark-called').addEventListener('click', function () {
+      OpsShell.opsCall('markStalledCalled', { bookingId: bookingId }).then(function (result) {
+        if (!result.ok) { document.getElementById('error-banner').classList.remove('hidden'); document.getElementById('error-banner').textContent = 'Could not record the call. Please try again.'; return; }
+        container.innerHTML = '';
+        loadBookings();
+      });
+    });
+  }
+
+  function loadBookings() {
+    var container = document.getElementById('table-container');
+    OpsShell.withLoadingState(container, function () {
+      return OpsShell.opsCall('listStalledBookings', {}).then(function (result) {
+        if (!result.ok) { document.getElementById('error-banner').classList.remove('hidden'); document.getElementById('error-banner').textContent = 'Could not load Stalled Bookings.'; throw new Error('load failed'); }
+        allBookings = result.data.bookings || [];
+        var list = filterBookingId ? allBookings.filter(function (b) { return String(b.bookingId) === String(filterBookingId); }) : allBookings;
+        renderRows(list);
+      });
+    });
+  }
+
+  OpsShell.boot({
+    activeHref: 'ops-stalled-bookings.html',
+    title: 'Stalled Bookings',
+    subtitle: "Bookings that haven't finished Adventure Prep — nudge stage and call-today stage in one queue.",
+    onReady: function () { loadBookings(); },
+  });
+})();
+</script>
+</body>
+</html>

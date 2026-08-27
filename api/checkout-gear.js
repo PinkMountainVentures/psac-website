@@ -91,6 +91,64 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Ops App Redesign (Aug 2026) — Gear Assembly & Checkout item 5. The
+    // single Mark Delivered button becomes three sequential, timestamped
+    // states (apps-script/ops-redesign-round2-actions.gs). These three
+    // supersede the plain 'markDelivered' branch above for pages built
+    // against this round — that branch stays for backward compatibility,
+    // not removed.
+    if (action === 'markReadyForDelivery') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_markReadyForDelivery', { bookingId: body.bookingId });
+      res.status(200).json(result);
+      return;
+    }
+
+    if (action === 'scheduleDelivery') {
+      if (!body.bookingId || !body.deliveryServiceType || !body.deliveryTimeSlot) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId, deliveryServiceType, and deliveryTimeSlot are required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_scheduleDelivery', {
+        bookingId: body.bookingId,
+        deliveryServiceType: body.deliveryServiceType,
+        deliveryTimeSlot: body.deliveryTimeSlot,
+      });
+      res.status(200).json(result);
+      return;
+    }
+
+    // Round 2 item 5's Delivery Scheduled mini-form needs the guest's own
+    // deliveryWindow (Adventure Prep) to constrain the Delivery Time
+    // dropdown to valid slots only. Reuses gearOps_getReturnContext
+    // (apps-script/ops-redesign-round2-actions.gs) rather than a second
+    // near-identical Apps Script read — see that function's own header.
+    if (action === 'getDeliveryContext') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_getReturnContext', { bookingId: body.bookingId });
+      res.status(200).json(Object.assign({ ok: true }, result));
+      return;
+    }
+
+    if (action === 'markDeliveredFinal') {
+      if (!body.bookingId) {
+        res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
+        return;
+      }
+      const result = await callBookingsWebApp('gearOps_markDeliveredFinal', {
+        bookingId: body.bookingId,
+        deliveredBy: body.deliveredBy || '',
+      });
+      res.status(200).json(result);
+      return;
+    }
+
     res.status(400).json({ error: 'unknown_action', detail: action });
   } catch (err) {
     // eslint-disable-next-line no-console

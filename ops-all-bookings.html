@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All Bookings | PSAC Ops</title>
+<!--
+  ops-all-bookings.html
+
+  Real, working build of claude/psac-ops-all-bookings.html's mockup (Phase 4,
+  Round 1 spec) — the one page in this app that just lists bookings, wired to
+  /api/ops-proxy's new listAllBookings action (apps-script/ops-redesign-
+  round1-actions.gs's allBookings_listAll) instead of static rows.
+
+  Link-out stacking order matches the Aug 27 confirmed revision
+  (claude/psac-ops-redesign-open-items-confirmed.md item 1): every applicable
+  destination shown, stacked, in the six-tier priority order, never a single
+  pick. "→ Booking detail" always last. There is no dedicated booking-detail
+  page yet anywhere in this app — that link currently routes back to this
+  same page pre-filtered to the booking ID, which is the closest existing
+  approximation of "a plain read-only record" until a real detail view is
+  built. Flagged in the handoff doc, not silently invented as a new page.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-app { max-width:1200px; }
+  .filter-bar { display:flex; flex-wrap:wrap; gap:0.6rem; align-items:flex-end; margin-bottom:1.2rem; padding:0.9rem 1rem; background:var(--ops-bg); border-radius:8px; }
+  .filter-field { display:flex; flex-direction:column; gap:0.3rem; min-width:150px; }
+  .filter-field label { font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); }
+  .filter-field select, .filter-field input { padding:0.5rem 0.6rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.78rem; font-family:inherit; background:white; }
+  .filter-daterange { display:flex; align-items:center; gap:0.4rem; }
+  .filter-daterange input { width:118px; }
+  .filter-clear { align-self:flex-end; }
+
+  .table-scroll-wrap { overflow-x:auto; border:1px solid var(--ops-border); border-radius:8px; -webkit-overflow-scrolling:touch; }
+  .ops-table { width:100%; min-width:1260px; border-collapse:collapse; font-size:0.8rem; }
+  .ops-table th { text-align:left; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.7rem; border-bottom:2px solid var(--ops-border); background:var(--ops-bg); white-space:nowrap; }
+  .th-tip { border-bottom:1px dotted rgba(107,115,120,0.7); cursor:help; position:relative; padding-bottom:1px; }
+  .th-tip[data-tip]:hover::after, .th-tip[data-tip]:focus::after {
+    content: attr(data-tip); position:absolute; top:135%; left:0; width:250px;
+    background:var(--dark-pine); color:rgba(248,241,233,0.95); font-size:0.72rem; font-weight:500;
+    text-transform:none; letter-spacing:normal; line-height:1.55; white-space:normal;
+    padding:0.65rem 0.8rem; border-radius:6px; z-index:10; box-shadow:0 4px 12px rgba(0,0,0,0.25);
+  }
+  .th-tip:focus { outline:2px solid var(--mountain-pink); outline-offset:2px; }
+  .ops-table td { padding:0.6rem 0.7rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; white-space:nowrap; }
+  .ops-table tr:hover td { background:#FAFBFB; }
+  .guest-cell { display:flex; flex-direction:column; gap:0.05rem; }
+  .guest-email { font-size:0.7rem; color:var(--ops-text-mid); }
+
+  .ops-tag { display:inline-block; font-size:0.64rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.2rem 0.5rem; border-radius:4px; white-space:nowrap; }
+  .ops-tag.confirmed { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.cancelled { background:#EDEDED; color:#6B7378; }
+  .ops-tag.reason { background:#E7ECEE; color:#3E4A50; font-weight:600; text-transform:none; letter-spacing:0; margin-left:0.25rem; }
+  .ops-tag.pay-succeeded, .ops-tag.hold-active, .ops-tag.hold-released, .ops-tag.hold-full { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.pay-pending, .ops-tag.hold-placed, .ops-tag.hold-partial { background:#FFF3D6; color:#8a6300; }
+  .ops-tag.pay-failed, .ops-tag.hold-failed { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.na { background:#EDEDED; color:#8a8f93; }
+  .ops-tag.deliv-ready, .ops-tag.ret-pickup { background:#E7ECEE; color:#3E4A50; }
+  .ops-tag.deliv-scheduled, .ops-tag.ret-picked { background:#FFF3D6; color:#8a6300; }
+  .ops-tag.deliv-delivered, .ops-tag.ret-returned, .ops-tag.ret-checkedin { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+
+  .alert-dot { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 5px; background:var(--sunset-red); color:white; border-radius:10px; font-size:0.68rem; font-weight:800; cursor:pointer; position:relative; border:none; }
+  .alert-dot.single { min-width:11px; height:11px; padding:0; border-radius:50%; font-size:0; }
+  .alert-dot[data-tip]:hover::after, .alert-dot[data-tip]:focus::after {
+    content: attr(data-tip); position:absolute; bottom:135%; left:50%; transform:translateX(-50%);
+    background:var(--dark-pine); color:white; font-size:0.7rem; font-weight:500; padding:0.45rem 0.65rem;
+    border-radius:5px; white-space:nowrap; z-index:5; box-shadow:0 4px 10px rgba(0,0,0,0.2);
+  }
+  .no-alert { color:var(--ops-text-mid); font-size:0.78rem; }
+
+  .ops-table td.linkout-cell { white-space:normal; }
+  .link-stack { display:flex; flex-direction:column; align-items:flex-start; gap:0.32rem; min-width:170px; }
+  .row-link { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.78rem; font-weight:600; text-decoration:none; }
+  .row-link.tier1 { color:#b04a2a; } .row-link.tier2 { color:#9A5B1E; } .row-link.tier3 { color:#8a6300; }
+  .row-link.tier4 { color:#1f5578; } .row-link.tier5 { color:#1f5578; } .row-link.tier6 { color:var(--ops-text-mid); font-weight:600; }
+
+  .pager-row { display:flex; justify-content:space-between; align-items:center; margin-top:0.9rem; font-size:0.78rem; color:var(--ops-text-mid); }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title" id="ops-title"></div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div class="ops-subtitle" id="ops-subtitle"></div>
+      <div id="ops-search-container"></div>
+
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+
+      <div class="filter-bar">
+        <div class="filter-field"><label>Booking Status</label><select id="f-booking"><option value="">All</option><option value="confirmed">Confirmed</option><option value="cancelled">Cancelled</option></select></div>
+        <div class="filter-field"><label>Payment Status</label><select id="f-payment"><option value="">All</option><option value="succeeded">Succeeded</option><option value="failed">Failed</option><option value="pending">Pending</option></select></div>
+        <div class="filter-field"><label>Hold Status</label><select id="f-hold"><option value="">All</option><option value="not_yet_placed">Not Yet Placed</option><option value="active">Active</option><option value="released">Released</option><option value="captured_partial">Captured (partial)</option><option value="captured_full">Captured (full)</option><option value="failed">Failed</option></select></div>
+        <div class="filter-field"><label>Delivery Status</label><select id="f-delivery"><option value="">All</option><option value="__NA__">N/A</option><option value="ready_for_delivery">Ready for Delivery</option><option value="delivery_scheduled">Delivery Scheduled</option><option value="delivered">Delivered</option></select></div>
+        <div class="filter-field"><label>Return Status</label><select id="f-return"><option value="">All</option><option value="__NA__">N/A</option><option value="pickup_scheduled">Pickup Scheduled</option><option value="picked_up">Picked Up</option><option value="returned">Returned</option><option value="checked_in">Checked-In</option></select></div>
+        <div class="filter-field"><label>Trail day range</label><div class="filter-daterange"><input type="date" id="f-date-from"> – <input type="date" id="f-date-to"></div></div>
+        <button class="ops-btn-secondary filter-clear" id="f-clear">Clear filters</button>
+      </div>
+
+      <div id="table-container"></div>
+      <div class="pager-row"><span id="pager-count"></span><span>Sort: trail day ascending</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var allBookings = [];
+
+  var TH_TIPS = {
+    booking: 'Confirmed — an active, current reservation. Cancelled — the reservation was cancelled and refunded; the specific reason shows inline.',
+    payment: "The guest's main trip charge — not the gear deposit, see Hold Status for that. Succeeded — charge went through. Pending — not yet confirmed. Failed — charge was declined, guest needs a new payment method.",
+    hold: 'The refundable gear deposit hold ($65–$100) — a separate Stripe object from Payment Status, with its own lifecycle. Not Yet Placed — scheduled for T-1, not attempted yet. Active — hold is live on the card, unresolved. Released — gear came back complete, nothing captured. Captured (partial) — some deposit captured for damaged/missing gear. Captured (full) — the entire hold captured; check Reconciliation Review if a shortfall beyond it is still pending. Failed — the hold attempt was declined.',
+    delivery: "Outbound leg — getting gear to the guest. N/A — checkout hasn't started. Ready for Delivery — packed, no service/time set yet. Delivery Scheduled — a delivery service and time are set. Delivered — gear is with the guest.",
+    ret: 'Inbound leg — getting gear back from the guest. N/A — not delivered yet. Pickup Scheduled — a pickup service and time are set. Picked Up — physically retrieved (optional, mostly Uber Direct). Returned — gear is back at PSAC. Checked-In — every item\'s condition is logged; this is set automatically, not a button staff clicks.',
+    alerts: 'Open Ops Alerts on this booking. The indicator always routes to Ops Alerts, filtered to this booking — never a guessed single alert.',
+  };
+
+  var HOLD_LABELS = { not_yet_placed: ['Not Yet Placed', 'hold-placed'], active: ['Active', 'hold-active'], released: ['Released', 'hold-released'], captured_partial: ['Captured (partial)', 'hold-partial'], captured_full: ['Captured (full)', 'hold-full'], failed: ['Failed', 'hold-failed'] };
+  var PAY_LABELS = { succeeded: ['Succeeded', 'pay-succeeded'], pending: ['Pending', 'pay-pending'], failed: ['Failed', 'pay-failed'] };
+  var DELIV_LABELS = { '': ['N/A', 'na'], ready_for_delivery: ['Ready for Delivery', 'deliv-ready'], delivery_scheduled: ['Delivery Scheduled', 'deliv-scheduled'], delivered: ['Delivered', 'deliv-delivered'] };
+  var RET_LABELS = { '': ['N/A', 'na'], pickup_scheduled: ['Pickup Scheduled', 'ret-pickup'], picked_up: ['Picked Up', 'ret-picked'], returned: ['Returned', 'ret-returned'], checked_in: ['Checked-In', 'ret-checkedin'] };
+
+  function tag(pair) { return '<span class="ops-tag ' + pair[1] + '">' + escapeHtml(pair[0]) + '</span>'; }
+
+  function linkStack(b) {
+    var links = [];
+    if (b.openAlertCount > 0) links.push('<a class="row-link tier1" href="ops-alerts.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Ops Alerts</a>');
+    if (b.hasReconciliationCase) links.push('<a class="row-link tier2" href="ops-reconciliation-review.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Reconciliation Review</a>');
+    if (b.hasOpenTrailSwap) links.push('<a class="row-link tier3" href="ops-trail-swap-requests.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Trail Swap Requests</a>');
+    if (b.checkoutStarted && !b.checkoutDelivered) links.push('<a class="row-link tier4" href="ops-gear-checkout.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Gear Assembly &amp; Checkout</a>');
+    if (b.checkoutDelivered && !b.checkedIn) links.push('<a class="row-link tier5" href="ops-gear-checkin.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Return Check-In</a>');
+    links.push('<a class="row-link tier6" href="ops-all-bookings.html?q=' + encodeURIComponent(b.bookingId) + '">&rarr; Booking detail</a>');
+    return '<div class="link-stack">' + links.join('') + '</div>';
+  }
+
+  function alertCell(b) {
+    if (!b.openAlertCount) return '<span class="no-alert">—</span>';
+    var tip = escapeHtml((b.openAlertTypes || []).join(', '));
+    if (b.openAlertCount === 1) return '<a href="ops-alerts.html?bookingId=' + encodeURIComponent(b.bookingId) + '"><button class="alert-dot single" data-tip="' + tip + '" aria-label="1 open alert"></button></a>';
+    return '<a href="ops-alerts.html?bookingId=' + encodeURIComponent(b.bookingId) + '"><button class="alert-dot" data-tip="' + tip + '">' + b.openAlertCount + '</button></a>';
+  }
+
+  function renderRows(list) {
+    var container = document.getElementById('table-container');
+    if (!list.length) { container.innerHTML = '<div class="ops-empty">No bookings match these filters.</div>'; return; }
+    var rows = list.map(function (b) {
+      var bookingTag = b.bookingStatusBucket === 'cancelled'
+        ? '<span class="ops-tag cancelled">Cancelled</span>' + (b.cancellationReasons || []).map(function (r) { return '<span class="ops-tag reason">' + escapeHtml(OpsShell.cancellationReasonLabel(r)) + '</span>'; }).join('')
+        : '<span class="ops-tag confirmed">Confirmed</span>';
+      return '<tr>'
+        + '<td>#' + escapeHtml(b.bookingId) + '</td>'
+        + '<td><div class="guest-cell">' + escapeHtml(b.contactName) + '<span class="guest-email">' + escapeHtml(b.contactEmail) + '</span></div></td>'
+        + '<td>' + escapeHtml(String(b.tripDate || '').slice(0, 10)) + '</td>'
+        + '<td>' + bookingTag + '</td>'
+        + '<td>' + tag(PAY_LABELS[b.paymentStatusBucket] || PAY_LABELS.succeeded) + '</td>'
+        + '<td>' + tag(HOLD_LABELS[b.holdStatusBucket] || HOLD_LABELS.not_yet_placed) + '</td>'
+        + '<td>' + tag(DELIV_LABELS[b.deliveryStatus] || DELIV_LABELS['']) + '</td>'
+        + '<td>' + tag(RET_LABELS[b.returnStatus] || RET_LABELS['']) + '</td>'
+        + '<td>' + alertCell(b) + '</td>'
+        + '<td class="linkout-cell">' + linkStack(b) + '</td>'
+        + '</tr>';
+    }).join('');
+
+    container.innerHTML = '<div class="table-scroll-wrap"><table class="ops-table"><thead><tr>'
+      + '<th>Booking ID</th><th>Guest</th><th>Trail Day</th>'
+      + '<th><span class="th-tip" tabindex="0" data-tip="' + escapeHtml(TH_TIPS.booking) + '">Booking Status</span></th>'
+      + '<th><span class="th-tip" tabindex="0" data-tip="' + escapeHtml(TH_TIPS.payment) + '">Payment Status</span></th>'
+      + '<th><span class="th-tip" tabindex="0" data-tip="' + escapeHtml(TH_TIPS.hold) + '">Hold Status</span></th>'
+      + '<th><span class="th-tip" tabindex="0" data-tip="' + escapeHtml(TH_TIPS.delivery) + '">Delivery Status</span></th>'
+      + '<th><span class="th-tip" tabindex="0" data-tip="' + escapeHtml(TH_TIPS.ret) + '">Return Status</span></th>'
+      + '<th><span class="th-tip" tabindex="0" data-tip="' + escapeHtml(TH_TIPS.alerts) + '">Alerts</span></th>'
+      + '<th>Related screens</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+    document.getElementById('pager-count').textContent = 'Showing ' + list.length + ' of ' + allBookings.length + ' bookings';
+  }
+
+  function applyFilters() {
+    var q = (new URLSearchParams(window.location.search).get('q') || '').trim().toLowerCase();
+    var fBooking = document.getElementById('f-booking').value;
+    var fPayment = document.getElementById('f-payment').value;
+    var fHold = document.getElementById('f-hold').value;
+    var fDelivery = document.getElementById('f-delivery').value;
+    var fReturn = document.getElementById('f-return').value;
+    var fFrom = document.getElementById('f-date-from').value;
+    var fTo = document.getElementById('f-date-to').value;
+
+    var list = allBookings.filter(function (b) {
+      if (q && String(b.bookingId).toLowerCase().indexOf(q) === -1 && String(b.contactEmail || '').toLowerCase().indexOf(q) === -1) return false;
+      if (fBooking && b.bookingStatusBucket !== fBooking) return false;
+      if (fPayment && b.paymentStatusBucket !== fPayment) return false;
+      if (fHold && b.holdStatusBucket !== fHold) return false;
+      if (fDelivery) { var wantDeliv = fDelivery === '__NA__' ? '' : fDelivery; if (b.deliveryStatus !== wantDeliv) return false; }
+      if (fReturn) { var wantRet = fReturn === '__NA__' ? '' : fReturn; if (b.returnStatus !== wantRet) return false; }
+      var tripDate = String(b.tripDate || '').slice(0, 10);
+      if (fFrom && tripDate < fFrom) return false;
+      if (fTo && tripDate > fTo) return false;
+      return true;
+    });
+    renderRows(list);
+  }
+
+  function loadBookings() {
+    var container = document.getElementById('table-container');
+    OpsShell.withLoadingState(container, function () {
+      return OpsShell.opsCall('listAllBookings', {}).then(function (result) {
+        if (!result.ok) { document.getElementById('error-banner').classList.remove('hidden'); document.getElementById('error-banner').textContent = 'Could not load bookings.'; throw new Error('load failed'); }
+        allBookings = result.data.bookings || [];
+        applyFilters();
+      });
+    });
+  }
+
+  ['f-booking', 'f-payment', 'f-hold', 'f-delivery', 'f-return', 'f-date-from', 'f-date-to'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', applyFilters);
+  });
+  document.getElementById('f-clear').addEventListener('click', function () {
+    ['f-booking', 'f-payment', 'f-hold', 'f-delivery', 'f-return', 'f-date-from', 'f-date-to'].forEach(function (id) { document.getElementById(id).value = ''; });
+    var url = new URL(window.location.href); url.searchParams.delete('q'); window.history.replaceState({}, '', url);
+    applyFilters();
+  });
+
+  OpsShell.boot({
+    activeHref: 'ops-all-bookings.html',
+    title: 'All Bookings',
+    subtitle: "Every booking — search, filter, and see what's next.",
+    onReady: function () {
+      // boot() renders the search bar synchronously before onReady runs, so
+      // the input already exists here — pre-fill it from ?q= (set when the
+      // shared search bar on another page routed in here).
+      var q = new URLSearchParams(window.location.search).get('q');
+      var input = document.getElementById('ops-shell-search-input');
+      if (input && q) input.value = q;
+      loadBookings();
+    },
+  });
+})();
+</script>
+</body>
+</html>

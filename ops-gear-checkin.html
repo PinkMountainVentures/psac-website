@@ -8,52 +8,40 @@
   ops-gear-checkin.html
 
   Real, working version of claude/psac-ops-gear-return-checkin.html's
-  mockup — Gear Inventory PRD Section 5/9. Per-item condition entry
-  (Good/Damaged/Missing/Recovered), the damage-severity rubric rendered
-  VERBATIM per itemType (Section 9, not paraphrased), required photo
-  upload for Damaged/Missing, and the 48-hour grace-period countdown for
-  Missing items. Wired to /api/ops-proxy -> api/check-in-gear-item.js.
+  mockup — Gear Inventory PRD Section 5/9, extended by Ops App Redesign
+  (Aug 2026) Round 2 item 6 with the full inbound leg: (no signal) ->
+  Pickup Scheduled -> (optional) Picked Up -> Returned (the required gate
+  that reveals per-item condition entry) -> Checked-In (automatic, set by
+  the server the instant every item is judged — never a button here).
 
-  Photos are captured via a plain file input with capture="environment"
-  (opens the device camera directly on mobile, per Section 5/11 — check-in
-  happens on a phone in the field), base64-encoded client-side, and posted
-  as a data URL to the uploadPhoto action, which stores it in Vercel Blob
-  and returns the public URL used on the actual checkIn call.
+  Pickup Scheduled is a default-plus-override model, modeled deliberately
+  on the airline/rental-car "same location" pattern: the default (same
+  address gear was delivered to, standard nightly sweep) renders as an
+  already-confirmed card needing zero action; a collapsed "Need a different
+  pickup time or location?" toggle reveals an editable Return Address and a
+  free-text Return Time note for the real-conflict case. Per-item condition
+  entry keeps the Section 9 damage rubric rendered VERBATIM per itemType,
+  required photo for Damaged, and — new this round — a required text note
+  instead of a photo for Missing (nothing to photograph for an item that
+  isn't there), plus an always-available "Mark all remaining Good" bulk
+  action with no precondition.
+
+  Round 2 (Aug 2026): adopts the shared OpsShell (ops-shell.js/.css). Wired
+  to /api/ops-proxy -> api/check-in-gear-item.js.
 -->
+<link rel="stylesheet" href="ops-shell.css">
 <style>
-  :root {
-    --mountain-pink: #F58271; --dark-pine: #2A4747;
-    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
-    --amber-bg: rgba(154,91,30,0.12); --amber-text: #9A5B1E; --amber-border: rgba(154,91,30,0.35);
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
-
-  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
-  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
-  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
-  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
-  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
-  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
-
-  .ops-main { padding:1.6rem 1.8rem; }
   .ops-breadcrumb { font-size:0.78rem; margin-bottom:0.8rem; }
   .ops-breadcrumb a { color:var(--mountain-pink); text-decoration:none; cursor:pointer; }
-  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
-  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
-  .ops-subtitle { font-size:0.8rem; color:var(--ops-text-mid); margin-bottom:1rem; }
-  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
-  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
 
   .ops-input, .ops-select { padding:0.6rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; background:white; }
   .ops-textarea { width:100%; border:1px solid var(--ops-border); border-radius:5px; padding:0.6rem 0.8rem; font-size:0.82rem; font-family:inherit; min-height:56px; margin-top:0.5rem; }
-  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.55rem 1rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
-  .ops-btn:disabled { opacity:0.4; cursor:default; }
-  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; cursor:pointer; }
-  .ops-empty { text-align:center; padding:2rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
-  .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.6rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .ops-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; background:#E7ECEE; color:#3E4A50; }
+  .ret-default { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ret-override { background:var(--amber-bg,rgba(154,91,30,0.12)); color:#9A5B1E; }
+  .ret-pickup { background:rgba(42,111,151,0.12); color:#2A6F97; }
 
   .item-card { border:1px solid var(--ops-border); border-radius:8px; padding:1.1rem 1.3rem; margin-bottom:1rem; }
   .item-card-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem; }
@@ -64,11 +52,11 @@
   .cond-seg button { border:1px solid var(--ops-border); background:white; border-radius:4px; padding:0.35rem 0.7rem; font-size:0.76rem; cursor:pointer; }
   .cond-seg button.sel-good { background:rgba(122,189,145,0.2); border-color:#2a7a4a; color:#2a7a4a; }
   .cond-seg button.sel-damaged { background:rgba(231,111,81,0.15); border-color:#a8341c; color:#a8341c; }
-  .cond-seg button.sel-missing { background:var(--amber-bg); border-color:var(--amber-border); color:var(--amber-text); }
+  .cond-seg button.sel-missing { background:rgba(154,91,30,0.12); border-color:#9A5B1E; color:#9A5B1E; }
   .cond-seg button.sel-recovered { background:rgba(122,189,145,0.2); border-color:#2a7a4a; color:#2a7a4a; }
 
   .rubric-toggle { font-size:0.76rem; color:var(--mountain-pink); cursor:pointer; display:inline-block; margin-top:0.4rem; }
-  .rubric-box { display:none; margin-top:0.5rem; padding:0.8rem; background:var(--ops-bg); border-radius:6px; display:grid; grid-template-columns:1fr 1fr; gap:1rem; font-size:0.78rem; }
+  .rubric-box { display:none; margin-top:0.5rem; padding:0.8rem; background:var(--ops-bg); border-radius:6px; grid-template-columns:1fr 1fr; gap:1rem; font-size:0.78rem; }
   .rubric-box.show { display:grid; }
   .rubric-col-hdr { font-weight:700; font-size:0.72rem; text-transform:uppercase; margin-bottom:0.3rem; }
   .rubric-col-hdr.damaged { color:#a8341c; }
@@ -79,24 +67,32 @@
   .photo-drop.show { display:block; }
   .take-photo-btn { margin-top:0.5rem; background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.45rem 0.9rem; font-size:0.76rem; cursor:pointer; }
   .photo-thumb { display:inline-block; margin-top:0.5rem; font-size:0.72rem; color:#2a7a4a; }
+  .missing-note-drop { display:none; margin-top:0.6rem; }
+  .missing-note-drop.show { display:block; }
+  .missing-note-drop label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.3rem; }
 
-  .grace-box { background:var(--amber-bg); border:1px solid var(--amber-border); color:var(--amber-text); border-radius:6px; padding:0.7rem 0.9rem; margin-top:0.6rem; font-size:0.8rem; }
+  .grace-box { background:var(--amber-bg,rgba(154,91,30,0.12)); border:1px solid rgba(154,91,30,0.35); color:#9A5B1E; border-radius:6px; padding:0.7rem 0.9rem; margin-top:0.6rem; font-size:0.8rem; }
 
   .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
-  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
 
-  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
-  .hidden { display:none !important; }
+  .pickup-default-card { border:1px solid rgba(122,189,145,0.4); background:rgba(122,189,145,0.1); border-radius:6px; padding:0.8rem 1rem; font-size:0.83rem; }
+  .pdc-check { font-weight:700; color:#2a7a4a; margin-bottom:0.3rem; }
+  .pdc-detail { color:var(--ops-text); }
+  .pdc-caption { font-size:0.72rem; color:var(--ops-text-mid); margin-top:0.3rem; }
+  .svc-grid { display:grid; grid-template-columns:1fr 2fr; gap:1.2rem; margin-bottom:1rem; align-items:start; }
+  .svc-field label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
+  .advanced-toggle { background:none; border:none; color:var(--mountain-pink); font-size:0.8rem; cursor:pointer; padding:0.3rem 0; }
+  .advanced-panel { display:none; margin-top:0.8rem; padding:1rem; background:var(--ops-bg); border-radius:6px; }
+  .advanced-panel.show { display:block; }
+  .advanced-panel-hdr { font-size:0.76rem; font-weight:700; color:var(--dark-pine); margin-bottom:0.6rem; }
+  .form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
+  .pickup-scheduled-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.83rem; }
+  .optional-tag { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-left:0.4rem; font-weight:600; }
 
   @media (max-width: 760px) {
-    .ops-app { grid-template-columns:1fr; margin:0.8rem; min-height:auto; }
-    .ops-sidebar { display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0.6rem 0.4rem; gap:0.2rem; }
-    .ops-sidebar-brand { display:none; }
-    .ops-nav-item { border-left:none; border-bottom:3px solid transparent; white-space:nowrap; padding:0.6rem 0.8rem; }
-    .ops-nav-item.is-active { border-left-color:transparent; border-bottom-color:var(--mountain-pink); }
-    .ops-main { padding:1.1rem 1rem; }
     .rubric-box { grid-template-columns:1fr; }
     .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .svc-grid { grid-template-columns:1fr; }
   }
 </style>
 </head>
@@ -106,28 +102,20 @@
 
 <div id="app-shell" class="hidden">
   <div class="ops-app">
-    <div class="ops-sidebar">
-      <div class="ops-sidebar-brand">PSAC Ops</div>
-      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
-      <a class="ops-nav-item" href="ops-alerts.html">Ops Alerts</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
-      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
-      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
-      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
-      <a class="ops-nav-item is-active" href="ops-gear-checkin.html">Return Check-In</a>
-      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
-    </div>
+    <div class="ops-sidebar" id="ops-sidebar"></div>
     <div class="ops-main">
       <div class="ops-topbar">
-        <div class="ops-title">Return Check-In</div>
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
         <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
       </div>
+      <div id="ops-search-container"></div>
 
       <div id="banner-container"></div>
 
       <div id="queue-view">
-        <div class="ops-subtitle">Bookings whose gear has been delivered for the selected trail day.</div>
         <div style="margin-bottom:1rem;">
           <label style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-right:0.5rem;">Trip date</label>
           <input class="ops-input" id="queue-trip-date" type="date">
@@ -143,6 +131,7 @@
   </div>
 </div>
 
+<script src="ops-shell.js"></script>
 <script>
 (function () {
   'use strict';
@@ -158,57 +147,190 @@
   };
 
   var currentBookingId = null;
+  var currentReturnContext = null;
 
-  function opsCall(action, payload) {
-    return fetch('/api/ops-proxy', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
-    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
-  }
-
-  function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
 
   function showBanner(kind, message) {
     var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
     document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
   }
 
+  function pickupPlanTag(b) {
+    if (!b.returnStatus) return '<span style="color:var(--ops-text-mid); font-size:0.78rem;">Not yet scheduled</span>';
+    var overridden = !!(b.pickupAddressOverride || b.pickupTimeNote);
+    return '<span class="ops-tag ' + (overridden ? 'ret-override' : 'ret-default') + '">' + (overridden ? 'Overridden — different address/time' : 'Default — standard sweep') + '</span>';
+  }
+
+  function returnStatusTag(status) {
+    if (!status) return '—';
+    var labels = { pickup_scheduled: 'Pickup Scheduled', picked_up: 'Picked Up', returned: 'Returned', checked_in: 'Checked-In' };
+    return '<span class="ops-tag ret-pickup">' + escapeHtml(labels[status] || status) + '</span>';
+  }
+
+  // -------------------- Queue --------------------
+
   function loadQueue() {
     var tripDate = document.getElementById('queue-trip-date').value;
     if (!tripDate) return;
-    document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('gearCheckin_getQueue', { tripDate: tripDate }).then(function (result) {
-      if (!result.ok) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Could not load the check-in queue.</div>'; return; }
-      var bookings = result.data.bookings || [];
-      if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No delivered bookings for this trail day.</div>'; return; }
-      var rows = bookings.map(function (b) {
-        return '<tr><td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
-          + '<td>Delivered ' + escapeHtml(b.gearDeliveredAt || '') + '</td>'
-          + '<td><button class="ops-btn" style="padding:0.35rem 0.7rem;" data-open="' + escapeHtml(b.bookingId) + '">Open</button></td></tr>';
-      }).join('');
-      document.getElementById('queue-list').innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
-      document.querySelectorAll('button[data-open]').forEach(function (btn) {
-        btn.addEventListener('click', function () { openBooking(btn.getAttribute('data-open')); });
+    OpsShell.withLoadingState(document.getElementById('queue-list'), function () {
+      return opsCall('gearCheckin_getQueueV2', { tripDate: tripDate }).then(function (result) {
+        if (!result.ok) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Could not load the check-in queue.</div>'; return; }
+        var bookings = result.data.bookings || [];
+        if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No delivered bookings for this trail day.</div>'; return; }
+        var rows = bookings.map(function (b) {
+          return '<tr><td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + (b.bookingStatus === 'cancelled_post_delivery' ? ' <span class="ops-tag" style="background:rgba(231,111,81,0.15); color:#a8341c;">Cancelled, gear still out</span>' : '') + '</td>'
+            + '<td>Delivered ' + escapeHtml(b.gearDeliveredAt || '') + '</td>'
+            + '<td>' + pickupPlanTag(b) + '</td>'
+            + '<td>' + returnStatusTag(b.returnStatus) + '</td>'
+            + '<td><button class="ops-btn" style="padding:0.35rem 0.7rem;" data-open="' + escapeHtml(b.bookingId) + '">' + (b.returnStatus ? 'Open' : 'Schedule pickup') + '</button></td></tr>';
+        }).join('');
+        document.getElementById('queue-list').innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Delivered</th><th>Pickup plan</th><th>Return Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+        document.querySelectorAll('button[data-open]').forEach(function (btn) {
+          btn.addEventListener('click', function () { openBooking(btn.getAttribute('data-open')); });
+        });
       });
     });
   }
+
+  // -------------------- Detail: phase router --------------------
 
   function openBooking(bookingId) {
     currentBookingId = bookingId;
     document.getElementById('queue-view').classList.add('hidden');
     document.getElementById('detail-view').classList.remove('hidden');
-    document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Loading…</div>';
-    loadContext();
+    loadDetail();
   }
 
-  function loadContext() {
-    opsCall('gearCheckin_getContext', { bookingId: currentBookingId }).then(function (result) {
+  function loadDetail() {
+    OpsShell.withLoadingState(document.getElementById('detail-content'), function () {
+      return opsCall('gearCheckin_getReturnContext', { bookingId: currentBookingId }).then(function (result) {
+        if (!result.ok || result.data.notFound) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load this booking.</div>'; return; }
+        currentReturnContext = result.data;
+        var status = currentReturnContext.returnStatus || '';
+        if (status === 'returned' || status === 'checked_in') {
+          return loadConditionView();
+        }
+        if (status === 'pickup_scheduled' || status === 'picked_up') {
+          renderPickupScheduledView();
+          return;
+        }
+        renderSchedulePickupForm();
+      });
+    });
+  }
+
+  function defaultAddressText(ctx) {
+    if (ctx.deliveryAddressLine1) {
+      return [ctx.deliveryAddressLine1, ctx.deliveryAddressLine2, ctx.deliveryCity, ctx.deliveryZip].filter(Boolean).join(', ');
+    }
+    return ctx.deliveryAddressRaw || 'address on file';
+  }
+
+  // -------------------- Phase 1: Schedule Pickup (default + override) --------------------
+
+  function renderSchedulePickupForm() {
+    var ctx = currentReturnContext || {};
+    var addressText = defaultAddressText(ctx);
+    var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem;">'
+      + '<div class="ops-panel-title" style="font-size:0.95rem; font-weight:700; color:var(--dark-pine); margin-bottom:0.9rem;">#' + escapeHtml(currentBookingId) + ' — Schedule Pickup</div>'
+      + '<div class="svc-grid">'
+      + '<div class="svc-field"><label>Pickup Service</label><select class="ops-select" id="pickup-service-select" style="width:100%;">'
+      + '<option value="psac_staff">PSAC Staff</option>'
+      + '<option value="uber_direct">Uber Direct</option>'
+      + '</select></div>'
+      + '<div class="svc-field"><label>Pickup Time &amp; Location</label>'
+      + '<div class="pickup-default-card"><div class="pdc-check">✓ Default — no action needed</div>'
+      + '<div class="pdc-detail">Same address as delivery (' + escapeHtml(addressText) + ') · standard nightly sweep, after 9:00pm tonight</div>'
+      + '<div class="pdc-caption">This is the default for every booking unless a guest has a real conflict — most pickups never touch the toggle below.</div>'
+      + '</div></div>'
+      + '</div>'
+      + '<button class="advanced-toggle" id="override-toggle-btn">Need a different pickup time or location? <span id="override-toggle-arrow">&#9662;</span></button>'
+      + '<div class="advanced-panel" id="override-panel">'
+      + '<div class="advanced-panel-hdr">Override — this booking\'s pickup</div>'
+      + '<div class="form-row" style="margin-bottom:0.8rem;"><label>Return Address</label><input class="ops-input" style="width:100%;" id="override-address" placeholder="' + escapeHtml(addressText) + ' (same as delivery)"></div>'
+      + '<div class="form-row"><label>Return Time note</label><textarea class="ops-textarea" id="override-time-note" placeholder="e.g. &quot;host asks no visitors after 8pm&quot; or &quot;I\'ll be checked out by 6, grab it before then&quot;"></textarea></div>'
+      + '</div>'
+      + '<div class="ops-panel-footer" style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1.1rem;">'
+      + '<button class="ops-btn" id="schedule-pickup-submit">Schedule Pickup</button>'
+      + '</div>'
+      + '</div>';
+    document.getElementById('detail-content').innerHTML = html;
+
+    document.getElementById('override-toggle-btn').addEventListener('click', function () {
+      var panel = document.getElementById('override-panel');
+      var open = panel.classList.toggle('show');
+      document.getElementById('override-toggle-arrow').innerHTML = open ? '&#9652;' : '&#9662;';
+    });
+
+    document.getElementById('schedule-pickup-submit').addEventListener('click', function () {
+      var pickupServiceType = document.getElementById('pickup-service-select').value;
+      var pickupAddressOverride = document.getElementById('override-address').value.trim();
+      var pickupTimeNote = document.getElementById('override-time-note').value.trim();
+      opsCall('gearCheckin_schedulePickup', {
+        bookingId: currentBookingId, pickupServiceType: pickupServiceType,
+        pickupAddressOverride: pickupAddressOverride, pickupTimeNote: pickupTimeNote,
+      }).then(function (result) {
+        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not schedule pickup.'); return; }
+        showBanner('success', 'Pickup scheduled for #' + currentBookingId + '.');
+        loadDetail();
+      });
+    });
+  }
+
+  // -------------------- Phase 2: Pickup Scheduled (+ optional Picked Up) --------------------
+
+  function renderPickupScheduledView() {
+    var ctx = currentReturnContext || {};
+    var overridden = !!(ctx.pickupAddressOverride || ctx.pickupTimeNote);
+    var planText = overridden
+      ? (ctx.pickupAddressOverride || defaultAddressText(ctx)) + (ctx.pickupTimeNote ? ' — ' + ctx.pickupTimeNote : '')
+      : 'standard sweep, after 9:00pm tonight';
+    var serviceLabel = ctx.pickupServiceType === 'uber_direct' ? 'Uber Direct' : 'PSAC Staff';
+
+    var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem;">'
+      + '<div class="pickup-scheduled-banner">✓ Pickup Scheduled — ' + escapeHtml(planText) + ' (' + escapeHtml(serviceLabel) + ')</div>'
+      + '<div style="display:flex; gap:1rem; flex-wrap:wrap;">'
+      + (ctx.returnStatus === 'picked_up'
+        ? '<span class="ops-tag ret-default">✓ Picked up' + (ctx.pickedUpAt ? ' — ' + escapeHtml(ctx.pickedUpAt) : '') + '</span>'
+        : '<button class="ops-btn-secondary" id="mark-picked-up-btn">Mark Picked Up<span class="optional-tag">Optional</span></button>')
+      + '<button class="ops-btn" id="mark-returned-btn">Mark Returned</button>'
+      + '</div>'
+      + '<div class="ops-helper" style="margin-top:0.7rem;">Gear physically back at the business. Marking Returned reveals the per-item condition assessment.</div>'
+      + '</div>';
+    document.getElementById('detail-content').innerHTML = html;
+
+    var pickedUpBtn = document.getElementById('mark-picked-up-btn');
+    if (pickedUpBtn) {
+      pickedUpBtn.addEventListener('click', function () {
+        opsCall('gearCheckin_markPickedUp', { bookingId: currentBookingId }).then(function (result) {
+          if (!result.ok) { showBanner('error', 'Could not mark picked up.'); return; }
+          loadDetail();
+        });
+      });
+    }
+    document.getElementById('mark-returned-btn').addEventListener('click', function () {
+      opsCall('gearCheckin_markReturned', { bookingId: currentBookingId }).then(function (result) {
+        if (!result.ok) { showBanner('error', 'Could not mark returned.'); return; }
+        showBanner('success', '#' + currentBookingId + ' marked returned — per-item condition assessment is now open.');
+        loadDetail();
+      });
+    });
+  }
+
+  // -------------------- Phase 3: per-item condition entry (Returned gate passed) --------------------
+
+  function loadConditionView() {
+    return opsCall('gearCheckin_getContext', { bookingId: currentBookingId }).then(function (result) {
       if (!result.ok) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load this booking.</div>'; return; }
       renderItems(result.data.items || []);
     });
+  }
+
+  function itemIsSettled(item) {
+    return item.condition === 'Good' || item.condition === 'Damaged' || item.condition === 'Recovered'
+      || (item.condition === 'Missing' && item.graceDeadline && new Date(item.graceDeadline).getTime() <= Date.now());
   }
 
   function renderItems(items) {
@@ -216,20 +338,23 @@
       document.getElementById('detail-content').innerHTML = '<div class="ops-empty">No trackable gear on this booking.</div>';
       return;
     }
-    var allSettled = items.every(function (i) { return i.condition === 'Good' || i.condition === 'Damaged' || i.condition === 'Recovered' || (i.condition === 'Missing' && i.graceDeadline && new Date(i.graceDeadline).getTime() <= Date.now()); });
+    var allSettled = items.every(itemIsSettled);
+    var uncheckedInAlready = (currentReturnContext || {}).returnStatus === 'checked_in';
 
-    var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem; margin-bottom:1rem;"><strong>#' + escapeHtml(currentBookingId) + '</strong></div>';
+    var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.6rem;">'
+      + '<strong>#' + escapeHtml(currentBookingId) + '</strong>'
+      + (uncheckedInAlready ? '<span class="ops-tag ret-default">Checked-In</span>' : '<button class="ops-btn-secondary" id="mark-all-good-btn">Mark all remaining Good</button>')
+      + '</div>';
 
     items.forEach(function (item) {
       var rubric = RUBRIC[item.itemType] || null;
-      var isSettled = item.condition === 'Good' || item.condition === 'Damaged' || item.condition === 'Recovered' || (item.condition === 'Missing' && item.graceDeadline && new Date(item.graceDeadline).getTime() <= Date.now());
       html += '<div class="item-card" data-unit="' + escapeHtml(item.unitId) + '">'
         + '<div class="item-card-hdr">'
         + '<div class="item-card-name">' + escapeHtml(item.itemName) + ' — <span class="unit-chip">' + escapeHtml(item.unitId) + '</span></div>'
         + '<div class="cond-seg" data-cond-group>'
         + ['Good', 'Damaged', 'Missing', 'Recovered'].map(function (c) {
             var sel = item.condition === c ? ' sel-' + c.toLowerCase() : '';
-            return '<button class="' + sel.trim() + '" data-cond="' + c + '"' + (isSettled && item.condition !== c ? '' : '') + '>' + c + '</button>';
+            return '<button class="' + sel.trim() + '" data-cond="' + c + '">' + c + '</button>';
           }).join('')
         + '</div></div>';
 
@@ -243,11 +368,23 @@
 
       html += '<textarea class="ops-textarea" placeholder="Notes (optional)" data-notes>' + escapeHtml(item.notes || '') + '</textarea>';
 
-      html += '<div class="photo-drop' + (item.condition === 'Damaged' || item.condition === 'Missing' ? ' show' : '') + '" data-photo-drop>'
-        + 'Required for Damaged/Missing<br>'
+      // Damaged: photo required, unchanged from the original design.
+      html += '<div class="photo-drop' + (item.condition === 'Damaged' ? ' show' : '') + '" data-photo-drop>'
+        + 'Required for Damaged<br>'
         + '<input type="file" accept="image/*" capture="environment" style="display:none;" data-photo-input>'
         + '<button class="take-photo-btn" data-take-photo>Take Photo</button>'
-        + '<div class="photo-thumb" data-photo-status>' + (item.photoUrl ? 'Photo attached' : '') + '</div>'
+        + '<div class="photo-thumb" data-photo-status>' + (item.photoUrl && item.condition === 'Damaged' ? 'Photo attached' : '') + '</div>'
+        + '</div>';
+
+      // BUG FIX (Ops App Redesign, Aug 2026 — Round 2 item 6, resolves P2d):
+      // Missing no longer shows the photo-upload area at all — there's
+      // nothing to physically photograph for an item that isn't there.
+      // Replaced with a required text note. api/check-in-gear-item.js
+      // already enforces this server-side (notes required, photo no
+      // longer required, for condition === 'Missing').
+      html += '<div class="missing-note-drop' + (item.condition === 'Missing' ? ' show' : '') + '" data-missing-note-drop>'
+        + '<label>Missing — describe what\'s known (required)</label>'
+        + '<textarea class="ops-textarea" data-missing-note placeholder="e.g. never came back from the trail, guest reports it fell out of the pack...">' + (item.condition === 'Missing' ? escapeHtml(item.notes || '') : '') + '</textarea>'
         + '</div>';
 
       if (item.condition === 'Missing' && item.graceDeadline) {
@@ -264,17 +401,19 @@
     });
 
     html += '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem;">'
-      + (allSettled
-        ? '<div style="color:#2a7a4a; font-weight:600;">Every trackable item is settled. This booking is ready for reconciliation.</div>'
+      + (uncheckedInAlready
+        ? '<div style="color:#2a7a4a; font-weight:600;">Checked-In — every trackable item has a judged condition. This booking is ready for reconciliation.</div>'
         + '<button class="ops-btn" style="margin-top:0.6rem;" data-go-reconcile>Go to Reconciliation Review</button>'
-        : '<div style="color:var(--ops-text-mid);">Reconciliation is blocked until every item above is Good, Damaged, Recovered, or Missing past its grace deadline.</div>')
+        : allSettled
+          ? '<div style="color:#2a7a4a; font-weight:600;">Every trackable item is settled — Checked-In will be set automatically.</div>'
+          : '<div style="color:var(--ops-text-mid);">Checked-In is set automatically once every item above is Good, Damaged, Recovered, or Missing past its grace deadline.</div>')
       + '</div>';
 
     document.getElementById('detail-content').innerHTML = html;
-    wireItemEvents();
+    wireItemEvents(items);
   }
 
-  function wireItemEvents() {
+  function wireItemEvents(items) {
     document.querySelectorAll('[data-rubric-toggle]').forEach(function (el) {
       el.addEventListener('click', function () {
         var box = el.nextElementSibling;
@@ -289,8 +428,10 @@
           btn.className = 'sel-' + btn.getAttribute('data-cond').toLowerCase();
           var cond = btn.getAttribute('data-cond');
           var photoDrop = card.querySelector('[data-photo-drop]');
-          if (cond === 'Damaged' || cond === 'Missing') photoDrop.classList.add('show');
-          else photoDrop.classList.remove('show');
+          var missingDrop = card.querySelector('[data-missing-note-drop]');
+          if (cond === 'Damaged') { photoDrop.classList.add('show'); missingDrop.classList.remove('show'); }
+          else if (cond === 'Missing') { missingDrop.classList.add('show'); photoDrop.classList.remove('show'); }
+          else { photoDrop.classList.remove('show'); missingDrop.classList.remove('show'); }
         });
       });
 
@@ -317,6 +458,9 @@
 
     var reconcileBtn = document.querySelector('[data-go-reconcile]');
     if (reconcileBtn) reconcileBtn.addEventListener('click', function () { window.location.href = 'ops-reconciliation-review.html'; });
+
+    var markAllGoodBtn = document.getElementById('mark-all-good-btn');
+    if (markAllGoodBtn) markAllGoodBtn.addEventListener('click', function () { markAllRemainingGood(items); });
   }
 
   function saveItem(card) {
@@ -324,30 +468,43 @@
     var selectedBtn = card.querySelector('[data-cond].sel-good, [data-cond].sel-damaged, [data-cond].sel-missing, [data-cond].sel-recovered');
     if (!selectedBtn) { showBanner('error', 'Select a condition before saving.'); return; }
     var condition = selectedBtn.getAttribute('data-cond');
-    var notes = card.querySelector('[data-notes]').value.trim();
     var photoUrl = card.querySelector('[data-photo-url]').value.trim();
+    var notes;
 
-    if ((condition === 'Damaged' || condition === 'Missing') && !photoUrl) {
-      showBanner('error', 'A photo is required for Damaged or Missing items.');
-      return;
+    if (condition === 'Missing') {
+      notes = card.querySelector('[data-missing-note]').value.trim();
+      if (!notes) { showBanner('error', 'A note describing the missing item is required.'); return; }
+    } else {
+      notes = card.querySelector('[data-notes]').value.trim();
+      if (condition === 'Damaged' && !photoUrl) { showBanner('error', 'A photo is required for Damaged items.'); return; }
     }
 
-    opsCall('gearCheckin_checkIn', { bookingId: currentBookingId, unitId: unitId, condition: condition, notes: notes, photoUrl: photoUrl }).then(function (result) {
-      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not save this item.'); return; }
-      showBanner('success', unitId + ' checked in as ' + condition + '.');
-      loadContext();
+    return opsCall('gearCheckin_checkIn', { bookingId: currentBookingId, unitId: unitId, condition: condition, notes: notes, photoUrl: condition === 'Damaged' ? photoUrl : '' }).then(function (result) {
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not save this item.'); return false; }
+      return true;
     });
   }
 
-  function initShell(email) {
-    document.getElementById('user-email').textContent = email;
-    document.getElementById('loading-gate').classList.add('hidden');
-    document.getElementById('app-shell').classList.remove('hidden');
-    document.getElementById('signout-btn').addEventListener('click', function () {
-      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
-        .then(function () { window.location.href = 'ops-login.html'; });
+  // Always available, no precondition — acts on whatever hasn't been
+  // individually judged (saved) yet. If nothing has been touched, marks
+  // 100% Good; if one item is already flagged Damaged/Missing/Recovered,
+  // marks every OTHER still-unjudged item Good and leaves it alone.
+  function markAllRemainingGood(items) {
+    var unjudged = items.filter(function (item) { return !item.condition; });
+    if (!unjudged.length) { showBanner('success', 'Nothing left to mark — every item already has a recorded condition.'); return; }
+    Promise.all(unjudged.map(function (item) {
+      return opsCall('gearCheckin_checkIn', { bookingId: currentBookingId, unitId: item.unitId, condition: 'Good', notes: '', photoUrl: '' });
+    })).then(function (results) {
+      var failed = results.filter(function (r) { return !r.ok; }).length;
+      if (failed) showBanner('error', failed + ' item(s) could not be marked Good — please check them individually.');
+      else showBanner('success', 'Marked ' + unjudged.length + ' remaining item(s) Good.');
+      loadDetail();
     });
+  }
 
+  // -------------------- Shell --------------------
+
+  function onReady() {
     document.getElementById('queue-trip-date').value = new Date().toISOString().slice(0, 10);
     document.getElementById('queue-trip-date').addEventListener('change', loadQueue);
     document.getElementById('back-to-queue').addEventListener('click', function () {
@@ -358,13 +515,12 @@
     loadQueue();
   }
 
-  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
-    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
-    .then(function (result) {
-      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
-      initShell(result.data.email);
-    })
-    .catch(function () { window.location.href = 'ops-login.html'; });
+  OpsShell.boot({
+    activeHref: 'ops-gear-checkin.html',
+    title: 'Return Check-In',
+    subtitle: 'Bookings whose gear has been delivered for the selected trail day.',
+    onReady: onReady,
+  });
 })();
 </script>
 </body>

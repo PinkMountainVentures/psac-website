@@ -7,70 +7,59 @@
 <!--
   ops-alerts.html
 
-  Real, working version of claude/psac-ops-alerts-stalled-cancellations.html's
-  "Page B" mockup — same visual shell/tokens, wired to /api/ops-proxy instead
-  of static rows. Everything here (list, Resolve) round-trips through the
-  proxy, which checks the staff session cookie on every call and holds the
-  actual OPS_ALERT_SHARED_SECRET server-side (see api/ops-proxy.js).
+  Expanded per Phase 4, Round 1 of claude/psac-ops-ux-journey-map-phases-1-3.md
+  — "the firefighting center." Wired to /api/ops-proxy's new
+  listOpsAlertsExpanded action (apps-script/ops-redesign-round1-actions.gs's
+  opsAlerts_listExpanded), which merges the existing sheet-backed payment/
+  hold-failure family with five new LIVE-COMPUTED producers (Reconciliation
+  required, Manual-adjustment short-allocation, Stalled call-today, Gear
+  low-stock, Cancellation FYI). None of those five are written as Ops Alerts
+  sheet rows — they're computed fresh on every load, so there is nothing to
+  "resolve" for them except gear low-stock, which auto-clears, and the
+  existing Resolve action still only applies to the original payment/hold-
+  failure family.
 
-  Stalled Bookings and Cancellations (the mockup's Pages A and C) are NOT
-  wired up in this pass — no list-read Apps Script action exists yet for
-  either (cadence_listActiveBookings returns bookings to nudge, not a
-  stalled-with-track-detail view shaped for this page; a cancellations
-  audit reader was never built). Shown in the sidebar as visibly disabled
-  rather than silently missing, so nobody mistakes "not on the nav" for
-  "forgotten" versus "a real follow-up item" — see the Aug 2026 build-review
-  addendum for the honest status of each.
+  CUSTOM TIER REQUESTS ARE NOT BUILT. No intake mechanism exists anywhere in
+  this codebase (confirmed via exhaustive grep across api/, lib/, apps-
+  script/, and every ops-*.html — zero matches for "custom tier"). Per this
+  build's explicit instruction, this is flagged as a real blocker below
+  (Standard tier), not silently stubbed with fake data.
 -->
+<link rel="stylesheet" href="ops-shell.css">
 <style>
-  :root {
-    --mountain-pink: #F58271; --desert-green: #7ABD91; --sunset-red: #E76F51;
-    --dark-pine: #2A4747;
-    --ops-bg: #F4F5F6; --ops-border: #DDE1E3; --ops-text: #2B3238; --ops-text-mid: #6B7378;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:14px; line-height:1.5; }
+  .ops-app { max-width:1200px; }
+  .critical-banner { display:flex; align-items:center; gap:0.7rem; background:var(--sunset-red); color:white; border-radius:8px; padding:0.9rem 1.2rem; margin-bottom:1.2rem; font-size:0.9rem; font-weight:700; }
+  .critical-banner-row { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+  .critical-banner-row + .critical-banner-row { margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid rgba(255,255,255,0.3); }
 
-  .ops-app { display:grid; grid-template-columns:220px 1fr; max-width:1200px; margin:1.6rem auto 4rem; border:1px solid var(--ops-border); border-radius:8px; overflow:hidden; background:white; min-height:600px; }
-  .ops-sidebar { background:var(--dark-pine); color:rgba(248,241,233,0.85); padding:1.2rem 0; }
-  .ops-sidebar-brand { font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:0 1.2rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:0.8rem; color:rgba(248,241,233,0.5); }
-  .ops-nav-item { display:block; padding:0.65rem 1.2rem; font-size:0.82rem; color:rgba(248,241,233,0.75); text-decoration:none; border-left:3px solid transparent; }
-  .ops-nav-item.is-active { background:rgba(255,255,255,0.08); color:white; border-left-color:var(--mountain-pink); font-weight:600; }
-  .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
+  .category-bar { display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1.1rem; }
+  .cat-chip { border:1px solid var(--ops-border); background:white; border-radius:16px; padding:0.35rem 0.8rem; font-size:0.76rem; cursor:pointer; color:var(--ops-text); }
+  .cat-chip.is-active { background:var(--dark-pine); color:white; border-color:var(--dark-pine); }
 
-  .ops-main { padding:1.6rem 1.8rem; }
-  .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
-  .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
-  .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
-  .ops-signout { background:none; border:1px solid var(--ops-border); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.74rem; cursor:pointer; color:var(--ops-text-mid); }
+  .tier-section { margin-bottom:1.6rem; }
+  .tier-heading { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); margin-bottom:0.5rem; }
+  .tier-section.awareness { opacity:0.85; }
+  .tier-section.awareness .tier-heading { color:var(--ops-text-mid); }
 
   .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
   .ops-table tr:hover td { background:#FAFBFB; }
+  .tier-section.awareness .ops-table td { color:var(--ops-text-mid); }
 
   .ops-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; }
   .ops-tag.callnow { background:var(--sunset-red); color:white; }
-  .ops-tag.hr24 { background:#FFF3D6; color:#8a6300; }
-  .ops-tag.hr48, .ops-tag.other { background:#E7ECEE; color:#3E4A50; }
+  .ops-tag.urgent { background:#FFF3D6; color:#8a6300; }
+  .ops-tag.standard, .ops-tag.awareness-tag { background:#E7ECEE; color:#3E4A50; }
   .ops-tag.open { background:rgba(245,130,113,0.15); color:#b04a2a; }
   .ops-tag.resolved { background:rgba(122,189,145,0.18); color:#2a7a4a; }
-
-  .ops-btn { background:var(--dark-pine); color:white; border:none; border-radius:5px; padding:0.5rem 0.9rem; font-size:0.78rem; font-weight:600; cursor:pointer; }
-  .ops-btn:hover { background:#1e3535; }
-  .ops-btn-secondary { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:5px; padding:0.4rem 0.75rem; font-size:0.76rem; cursor:pointer; }
-  .ops-btn:disabled, .ops-btn-secondary:disabled { opacity:0.4; cursor:default; }
-
-  .ops-callout { display:flex; align-items:center; gap:0.6rem; background:var(--sunset-red); color:white; border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.85rem; font-weight:600; }
-  .ops-empty { text-align:center; padding:2.5rem 1rem; color:var(--ops-text-mid); font-size:0.85rem; }
-  .ops-error-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.3); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-tag.responded { background:#FFF3D6; color:#8a6300; }
 
   .resolve-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-top:1rem; }
   .resolve-panel textarea { width:100%; min-height:56px; border:1px solid var(--ops-border); border-radius:5px; padding:0.6rem 0.8rem; font-size:0.82rem; font-family:inherit; margin-top:0.6rem; }
   .resolve-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.8rem; }
 
-  #loading-gate { text-align:center; padding:4rem; color:var(--ops-text-mid); }
-  .hidden { display:none !important; }
+  .blocked-note { background:#FFF9EC; border:1.5px solid #E9CB7A; padding:0.9rem 1.1rem; font-size:0.8rem; color:#6b4e00; line-height:1.6; border-radius:6px; }
 </style>
 </head>
 <body>
@@ -79,64 +68,73 @@
 
 <div id="app-shell" class="hidden">
   <div class="ops-app">
-    <div class="ops-sidebar">
-      <div class="ops-sidebar-brand">PSAC Ops</div>
-      <a class="ops-nav-item" href="ops-trail-swap-requests.html">Trail Swap Requests</a>
-      <a class="ops-nav-item is-active" href="ops-alerts.html">Ops Alerts</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Stalled Bookings</a>
-      <a class="ops-nav-item is-disabled" href="#" title="Not wired up yet — no list-read backend built this round">Cancellations</a>
-      <a class="ops-nav-item" href="ops-manual-adjustment.html">Manual Adjustment</a>
-      <a class="ops-nav-item" href="ops-gear-checkout.html">Gear Assembly &amp; Checkout</a>
-      <a class="ops-nav-item" href="ops-gear-units.html">Gear Units</a>
-      <a class="ops-nav-item" href="ops-gear-checkin.html">Return Check-In</a>
-      <a class="ops-nav-item" href="ops-reconciliation-review.html">Reconciliation Review</a>
-    </div>
+    <div class="ops-sidebar" id="ops-sidebar"></div>
     <div class="ops-main">
       <div class="ops-topbar">
-        <div class="ops-title">Ops Alerts</div>
+        <div class="ops-title" id="ops-title"></div>
         <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
       </div>
+      <div class="ops-subtitle" id="ops-subtitle"></div>
+      <div id="ops-search-container"></div>
 
       <div id="error-banner" class="ops-error-banner hidden"></div>
-      <div id="callout-row"></div>
-      <div id="table-container"></div>
+      <div id="banner-container"></div>
+
+      <div class="category-bar" id="category-bar"></div>
+
+      <div id="tiers-container"></div>
       <div id="resolve-container"></div>
     </div>
   </div>
 </div>
 
+<script src="ops-shell.js"></script>
 <script>
 (function () {
   'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var activeCategory = 'All';
+  var allData = null;
+  var filterBookingId = new URLSearchParams(window.location.search).get('bookingId') || '';
 
-  function opsCall(action, payload) {
-    return fetch('/api/ops-proxy', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
-    }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); });
-  }
+  var CATEGORIES = ['All', 'Payment & Hold', 'Bookings & Cancellations', 'Reconciliation', 'Manual Adjustment', 'Custom Tier', 'Gear'];
+  var CATEGORY_BY_SOURCE = {
+    payment_hold_failure: 'Payment & Hold',
+    stalled_call_today: 'Bookings & Cancellations',
+    cancellation_fyi: 'Bookings & Cancellations',
+    reconciliation_required: 'Reconciliation',
+    manual_adjustment_short_allocation: 'Manual Adjustment',
+    gear_low_stock: 'Gear',
+  };
 
-  function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  function urgencyTag(urgency) {
-    if (urgency === 'same_day_2hr') return '<span class="ops-tag callnow">same-day, 2hr</span>';
-    if (urgency === '24hr') return '<span class="ops-tag hr24">24hr</span>';
-    if (urgency === '48hr') return '<span class="ops-tag hr48">48hr</span>';
-    return '<span class="ops-tag other">' + escapeHtml(urgency || '—') + '</span>';
+  // First-pass human-readable labels for the payment/hold-failure family's
+  // raw alertType strings — Phase 4 Round 1's own named 9, plus a handful
+  // more this same family has grown to include (confirmed via grep across
+  // api/, lib/, apps-script/ — ~30 distinct alertType literals total, not
+  // exactly the "28" this build's kickoff prompt assumed). Anything not
+  // named here falls back to a humanized version of the raw string rather
+  // than breaking — this whole map is a first pass, worth Airey's review,
+  // same caveat the written spec itself carries.
+  var ALERT_TYPE_LABELS = {
+    kit_charge_failed: 'Kit charge failed',
+    deposit_hold_failed: 'Gear deposit hold failed',
+    gear_reconciliation_trigger_failed: "Reconciliation didn't trigger",
+    save_booking_failed_unrecovered: 'Booking save failed',
+    deposit_hold_trigger_error: 'Hold-trigger error',
+    hold_renewal_old_hold_cancel_failed: "Old hold didn't cancel on renewal",
+    cancel_refund_declined: 'Refund declined on cancellation',
+    cancellation_gate_call_failed: "Cancellation didn't complete",
+    kit_count_correction_hold_resize_failed: 'Hold resize failed (kit correction)',
+  };
+  function alertTypeLabel(alertType) {
+    if (ALERT_TYPE_LABELS[alertType]) return ALERT_TYPE_LABELS[alertType];
+    return String(alertType || '').replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); });
   }
 
   function formatMoney(amount) {
     if (amount === '' || amount == null) return '—';
     var n = Number(amount);
     if (isNaN(n)) return escapeHtml(amount);
-    // amount is stored in the sheet as whatever unit create-deposit-hold.js
-    // itself writes — this project's Stripe integration was never confirmed
-    // to store cents vs. whole dollars in this specific field, so this
-    // renders the raw stored value rather than guessing a /100 conversion.
     return '$' + n.toFixed(2);
   }
 
@@ -146,41 +144,88 @@
     el.classList.remove('hidden');
   }
 
-  function renderAlerts(alerts) {
-    var callout = document.getElementById('callout-row');
-    var urgent = alerts.filter(function (a) { return a.status === 'Open' && a.urgency === 'same_day_2hr'; });
-    callout.innerHTML = urgent.map(function (a) {
-      return '<div class="ops-callout">⚠ #' + escapeHtml(a.bookingId) + ' — ' + escapeHtml(a.alertType)
-        + (a.amount ? ', ' + formatMoney(a.amount) : '') + '. Call now.</div>';
-    }).join('');
+  function passesFilter(row) {
+    if (filterBookingId && String(row.bookingId) !== String(filterBookingId)) return false;
+    if (activeCategory === 'All') return true;
+    return CATEGORY_BY_SOURCE[row.source] === activeCategory;
+  }
 
-    var container = document.getElementById('table-container');
-    if (!alerts.length) {
-      container.innerHTML = '<div class="ops-empty">No alerts on record yet.</div>';
-      return;
+  function renderBanner(critical) {
+    var container = document.getElementById('banner-container');
+    if (!critical.length) { container.innerHTML = ''; return; }
+    container.innerHTML = '<div class="critical-banner">' + critical.map(function (a) {
+      return '<div class="critical-banner-row"><span>&#9888; #' + escapeHtml(a.bookingId) + ' — ' + escapeHtml(alertTypeLabel(a.alertType))
+        + (a.amount ? ', ' + formatMoney(a.amount) : '') + '. Act today.</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function actionCell(row) {
+    if (row.source === 'payment_hold_failure') {
+      if (row.status === 'Resolved') {
+        return '<span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(row.resolvedBy || '') + (row.resolvedAt ? (' — ' + escapeHtml(String(row.resolvedAt).slice(0, 10))) : '') + '</span>';
+      }
+      return '<button class="ops-btn-secondary" data-resolve-alert="' + escapeHtml(row.alertId) + '">Resolve</button>';
+    }
+    if (row.source === 'stalled_call_today') return '<a class="ops-link" href="ops-stalled-bookings.html?bookingId=' + encodeURIComponent(row.bookingId) + '">Call script &rarr;</a>';
+    if (row.source === 'reconciliation_required') return '<a class="ops-link" href="ops-reconciliation-review.html?bookingId=' + encodeURIComponent(row.bookingId) + '">Review &rarr;</a>';
+    if (row.source === 'manual_adjustment_short_allocation') return '<a class="ops-link" href="ops-gear-checkout.html?bookingId=' + encodeURIComponent(row.bookingId) + '">Retry Allocation &rarr;</a>';
+    if (row.source === 'gear_low_stock') return '<a class="ops-link" href="ops-gear-units.html?itemType=' + encodeURIComponent(row.itemType) + '">View Inventory &rarr;</a>';
+    if (row.source === 'cancellation_fyi') return '<a class="ops-link" href="ops-cancellations.html?bookingId=' + encodeURIComponent(row.bookingId) + '">View &rarr;</a>';
+    return '';
+  }
+
+  function statusTag(row) {
+    if (row.source === 'payment_hold_failure') return row.status === 'Resolved' ? '<span class="ops-tag resolved">Resolved</span>' : '<span class="ops-tag open">Open</span>';
+    if (row.source === 'gear_low_stock') return '<span class="ops-tag standard">Live — auto-clears</span>';
+    return '<span class="ops-tag open">Open</span>';
+  }
+
+  function rowHtml(row) {
+    var desc = row.source === 'payment_hold_failure' ? alertTypeLabel(row.alertType) : row.description;
+    var bookingCell = row.bookingId ? ('#' + escapeHtml(row.bookingId)) : '<span style="color:var(--ops-text-mid);">' + escapeHtml(desc) + (row.availableCount != null ? (' (' + row.availableCount + ' available)') : '') + '</span>';
+    return '<tr>'
+      + '<td>' + bookingCell + '</td>'
+      + '<td>' + escapeHtml(desc) + '</td>'
+      + '<td>' + formatMoney(row.amount) + '</td>'
+      + '<td>' + escapeHtml(String(row.createdAt || '').slice(0, 10)) + '</td>'
+      + '<td>' + statusTag(row) + '</td>'
+      + '<td>' + actionCell(row) + '</td>'
+      + '</tr>';
+  }
+
+  function tierTable(rows) {
+    if (!rows.length) return '<div class="ops-empty">Nothing in this tier right now.</div>';
+    return '<table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Amount</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>'
+      + rows.map(rowHtml).join('') + '</tbody></table>';
+  }
+
+  function render(data) {
+    var payment = data.paymentHoldFailure.filter(passesFilter);
+    var critical = payment.filter(function (a) { return a.urgencyTier === 'critical' && a.status === 'Open'; });
+    renderBanner(critical);
+
+    var urgent = []
+      .concat(payment.filter(function (a) { return a.urgencyTier !== 'critical'; }))
+      .concat(data.reconciliationRequired.filter(passesFilter))
+      .concat(data.shortAllocation.filter(passesFilter))
+      .concat(data.stalledCallToday.filter(passesFilter))
+      .concat(data.gearLowStock.filter(passesFilter));
+    urgent.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+
+    var awareness = data.cancellationsFyi.filter(passesFilter);
+
+    var html = '';
+    html += '<div class="tier-section"><div class="tier-heading">Urgent</div>' + tierTable(urgent) + '</div>';
+
+    if (activeCategory === 'All' || activeCategory === 'Custom Tier') {
+      html += '<div class="tier-section"><div class="tier-heading">Standard — Custom Tier requests</div>'
+        + '<div class="blocked-note"><strong>Not built this round.</strong> Custom Tier Experience requests exit the booking flow entirely as an off-system email inquiry today — there is no intake mechanism anywhere in this codebase for them to land in this app at all (confirmed by an exhaustive search across every API endpoint, library, Apps Script file, and ops page). Building the two-step Open/Responded/Handled status this page eventually needs requires that intake to exist first — a different system\'s build, flagged here rather than stubbed with fake rows.</div></div>';
     }
 
-    var rows = alerts.map(function (a) {
-      var statusTag = a.status === 'Resolved'
-        ? '<span class="ops-tag resolved">Resolved</span>'
-        : '<span class="ops-tag open">Open</span>';
-      var action = a.status === 'Resolved'
-        ? '<span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(a.resolvedBy || '') + (a.resolvedAt ? (' — ' + escapeHtml(String(a.resolvedAt).slice(0, 10))) : '') + '</span>'
-        : '<button class="ops-btn-secondary" data-resolve-alert="' + escapeHtml(a.alertId) + '">Resolve</button>';
-      return '<tr>'
-        + '<td>#' + escapeHtml(a.bookingId) + '</td>'
-        + '<td>' + escapeHtml(a.alertType) + '</td>'
-        + '<td>' + urgencyTag(a.urgency) + '</td>'
-        + '<td>' + formatMoney(a.amount) + '</td>'
-        + '<td>' + escapeHtml(a.createdAt || '') + '</td>'
-        + '<td>' + statusTag + '</td>'
-        + '<td>' + action + '</td>'
-        + '</tr>';
-    }).join('');
+    html += '<div class="tier-section awareness"><div class="tier-heading">For your awareness — Cancellations</div>' + tierTable(awareness) + '</div>';
 
-    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Urgency</th><th>Amount</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
-
-    container.querySelectorAll('[data-resolve-alert]').forEach(function (btn) {
+    document.getElementById('tiers-container').innerHTML = html;
+    document.getElementById('tiers-container').querySelectorAll('[data-resolve-alert]').forEach(function (btn) {
       btn.addEventListener('click', function () { openResolvePanel(btn.getAttribute('data-resolve-alert')); });
     });
   }
@@ -199,7 +244,7 @@
     document.getElementById('resolve-cancel').addEventListener('click', function () { container.innerHTML = ''; });
     document.getElementById('resolve-confirm').addEventListener('click', function () {
       var notes = document.getElementById('resolve-notes').value;
-      opsCall('resolveOpsAlert', { alertId: alertId, notes: notes }).then(function (result) {
+      OpsShell.opsCall('resolveOpsAlert', { alertId: alertId, notes: notes }).then(function (result) {
         if (!result.ok) { showError('Could not resolve that alert. Please try again.'); return; }
         container.innerHTML = '';
         loadAlerts();
@@ -207,31 +252,34 @@
     });
   }
 
+  function renderCategoryBar() {
+    document.getElementById('category-bar').innerHTML = CATEGORIES.map(function (c) {
+      return '<button class="cat-chip' + (c === activeCategory ? ' is-active' : '') + '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>';
+    }).join('');
+    document.querySelectorAll('[data-cat]').forEach(function (btn) {
+      btn.addEventListener('click', function () { activeCategory = btn.getAttribute('data-cat'); renderCategoryBar(); if (allData) render(allData); });
+    });
+  }
+
   function loadAlerts() {
-    opsCall('listOpsAlerts', {}).then(function (result) {
-      if (!result.ok) { showError('Could not load Ops Alerts.'); return; }
-      renderAlerts(result.data.alerts || []);
+    var container = document.getElementById('tiers-container');
+    OpsShell.withLoadingState(container, function () {
+      return OpsShell.opsCall('listOpsAlertsExpanded', {}).then(function (result) {
+        if (!result.ok) { showError('Could not load Ops Alerts.'); throw new Error('load failed'); }
+        allData = result.data;
+        render(allData);
+      });
     });
   }
 
-  function initShell(email) {
-    document.getElementById('user-email').textContent = email;
-    document.getElementById('loading-gate').classList.add('hidden');
-    document.getElementById('app-shell').classList.remove('hidden');
-    document.getElementById('signout-btn').addEventListener('click', function () {
-      fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
-        .then(function () { window.location.href = 'ops-login.html'; });
-    });
-    loadAlerts();
-  }
+  renderCategoryBar();
 
-  fetch('/api/ops-auth', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check' }) })
-    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
-    .then(function (result) {
-      if (!result.ok) { window.location.href = 'ops-login.html'; return; }
-      initShell(result.data.email);
-    })
-    .catch(function () { window.location.href = 'ops-login.html'; });
+  OpsShell.boot({
+    activeHref: 'ops-alerts.html',
+    title: 'Ops Alerts',
+    subtitle: 'Everything that needs a human right now, across the business.',
+    onReady: function () { loadAlerts(); },
+  });
 })();
 </script>
 </body>
