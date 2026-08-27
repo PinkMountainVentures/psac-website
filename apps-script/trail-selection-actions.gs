@@ -180,7 +180,61 @@ function trailSelection_getTrailDatabase() {
   var trailDb = trailSelection_openTrailDatabase_();
   var sheet = trailDb.getSheetByName('Trails');
   if (!sheet) throw new Error('trailSelection_getTrailDatabase: "Trails" tab not found in Trail Database spreadsheet');
-  return { rows: trailSelection_readRowsAsObjects_(sheet) };
+  return { rows: trailSelection_readTrailsRows_(sheet) };
+}
+
+/**
+ * BUG FIX (Aug 2026, trail-selection live-testing investigation — CONFIRMED
+ * root cause of every live booking coming back with 0 qualifying trails,
+ * regardless of trip date or roster). trailSelection_readRowsAsObjects_
+ * (the shared helper, still correct everywhere else it's used — Adventure
+ * Prep, Experience Bookings, Park Access all have a normal single header
+ * row) assumes row 1 of a sheet is always the header row. The Trails tab
+ * does not follow that: row 1 is a purely visual section-grouping row
+ * Airey added for readability when scanning 53 trails across many columns
+ * by eye (mostly blank cells, with section labels like "IDENTITY",
+ * "LOCATION", "STATS" spanning groups of columns) — the real column
+ * headers ("Trail ID", "Trail Name", "Bookable?", ...) live on row 2.
+ * Confirmed directly via a screenshot of the live sheet.
+ *
+ * Reading row 1 as the header row meant every trail's fields got keyed by
+ * 'IDENTITY' / '' / 'LOCATION' / '' / ... instead of their real column
+ * names, so `row['Trail ID']`, `row['Bookable?']`, etc. came back
+ * `undefined` for literally every one of the 53 rows — normalizeTrailRow
+ * turned that into `trailId: null` / `bookable: false` across the board,
+ * which fails the Bookable? Tier A check (an ABSOLUTE exclusion) for every
+ * trail and empties the candidate pool every single time. This is why
+ * changing trip date, roster fitness, or trail-experience tags never made
+ * a difference in testing — none of those affect this at all.
+ *
+ * Fixed by finding the real header row directly (the first row containing
+ * a "Trail ID" cell) instead of assuming it's row 1, so this keeps working
+ * regardless of how many category/grouping rows Airey adds above it later.
+ */
+function trailSelection_readTrailsRows_(sheet) {
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  var headerRowIndex = -1;
+  for (var i = 0; i < values.length; i++) {
+    if (values[i].indexOf('Trail ID') !== -1) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+  if (headerRowIndex === -1) {
+    throw new Error('trailSelection_readTrailsRows_: could not find a header row containing "Trail ID" on the Trails tab');
+  }
+  var headers = values[headerRowIndex];
+  var rows = [];
+  for (var r = headerRowIndex + 1; r < values.length; r++) {
+    var row = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue; // blank/section-label column, nothing real to key by
+      row[headers[c]] = values[r][c];
+    }
+    rows.push(row);
+  }
+  return rows;
 }
 
 // ---------------------------------------------------------------------------

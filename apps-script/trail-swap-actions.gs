@@ -142,10 +142,81 @@ function trailSwap_getRequestContext(payload) {
 // Read-side: the dropdown's underlying data (Section 7).
 // ---------------------------------------------------------------------------
 
+/**
+ * BUG FIX (Aug 2026, trail-selection live-testing investigation): this used
+ * to read the "Trails" tab off the ACTIVE spreadsheet (`ss`, "PSAC Bookings
+ * & Operations") — but the Trails tab lives on the SEPARATE
+ * "PSAC_Trail_Database" spreadsheet, exactly like
+ * trail-selection-actions.gs's own trailSelection_getTrailDatabase()
+ * already gets right. This file just never matched it, so every real call
+ * to trailSwap_getDropdownOptions threw `Error('Trails tab not found')` —
+ * an uncaught exception surfaced to the caller as a failed response, which
+ * is exactly the "Could not load trail options for that booking" error
+ * Airey hit testing the Ops UX Trail Swap Requests page. Opens the Trail
+ * Database by its own `TRAIL_DATABASE_SHEET_ID` script property, same as
+ * trailSelection_openTrailDatabase_() — duplicated locally rather than
+ * calling that function directly, matching this file's own stated
+ * philosophy above (a harmless duplicate of a settled, single-purpose
+ * lookup is safer here than a cross-file dependency). `ss` is kept as a
+ * parameter for call-site compatibility; it's the active/Bookings &
+ * Operations spreadsheet and is intentionally unused now.
+ */
+function trailSwap_openTrailDatabase_() {
+  var id = PropertiesService.getScriptProperties().getProperty('TRAIL_DATABASE_SHEET_ID');
+  if (!id) throw new Error('trailSwap_openTrailDatabase_: TRAIL_DATABASE_SHEET_ID script property is not set');
+  return SpreadsheetApp.openById(id);
+}
+
+/**
+ * BUG FIX (Aug 2026, trail-selection live-testing investigation — found
+ * while chasing the "0 qualifying trails" issue on the guest-facing side,
+ * confirmed to apply here too before it could bite this page next). The
+ * Trails tab's real column headers ("Trail ID", "Trail Name", "Bookable?",
+ * ...) live on row 2, not row 1 — row 1 is a purely visual section-
+ * grouping row (IDENTITY / LOCATION / STATS / ...) Airey added for
+ * readability, mostly blank cells with one label per column group.
+ * `adventurePrep_readRowsAsObjects_` (correct everywhere else it's used —
+ * every other tab it reads has a normal single header row) assumes row 1
+ * is always the header row, so it would key every trail's fields by
+ * 'IDENTITY' / '' / 'LOCATION' / ... instead of their real column names —
+ * every real field lookup below (`t['Bookable?']`, etc.) would come back
+ * undefined for every trail. Mirrors the identical fix in
+ * trail-selection-actions.gs's trailSelection_getTrailDatabase(), which is
+ * where this was actually diagnosed — duplicated locally rather than
+ * calling that function directly, matching this file's own stated
+ * philosophy elsewhere in this header.
+ */
+function trailSwap_readTrailsRows_(sheet) {
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  var headerRowIndex = -1;
+  for (var i = 0; i < values.length; i++) {
+    if (values[i].indexOf('Trail ID') !== -1) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+  if (headerRowIndex === -1) {
+    throw new Error('trailSwap_readTrailsRows_: could not find a header row containing "Trail ID" on the Trails tab');
+  }
+  var headers = values[headerRowIndex];
+  var rows = [];
+  for (var r = headerRowIndex + 1; r < values.length; r++) {
+    var row = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      row[headers[c]] = values[r][c];
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 function trailSwap_readTrailsTab_(ss) {
-  var sheet = ss.getSheetByName('Trails');
-  if (!sheet) throw new Error('Trails tab not found');
-  return adventurePrep_readRowsAsObjects_(sheet);
+  var trailDb = trailSwap_openTrailDatabase_();
+  var sheet = trailDb.getSheetByName('Trails');
+  if (!sheet) throw new Error('trailSwap_readTrailsTab_: "Trails" tab not found in Trail Database spreadsheet');
+  return trailSwap_readTrailsRows_(sheet);
 }
 
 function trailSwap_readParkAccess_(ss) {
