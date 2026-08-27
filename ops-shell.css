@@ -27,7 +27,20 @@ body { background:var(--ops-bg); color:var(--ops-text); font-family:'Segoe UI',-
 .ops-nav-item.is-disabled { opacity:0.35; cursor:default; pointer-events:none; }
 .ops-nav-divider { height:1px; background:rgba(255,255,255,0.1); margin:0.5rem 1.2rem 0.6rem; }
 
-.ops-main { padding:1.6rem 1.8rem; }
+/* BUG FIX (2026-08-27, All Bookings manual testing): .ops-main is the
+   second track (1fr) of .ops-app's grid. A CSS Grid item's default
+   min-width is auto, which means "never shrink narrower than your
+   content's min-content size" — so a wide table inside (like All
+   Bookings' 1260px-min-width table with nowrap cells) was forcing this
+   whole track wider than its 1fr share instead of shrinking to it. The
+   overflow then got silently clipped by .ops-app's own overflow:hidden
+   (no scrollbar, right-hand columns just cut off), instead of triggering
+   the intended horizontal scroll on each table's own .table-scroll-wrap
+   (overflow-x:auto). min-width:0 lets the track shrink to its allocated
+   space so that inner scroll wrapper is the one that overflows, as
+   designed. Shell-level fix, not just an All Bookings fix, since any
+   future wide table on any ops page would hit the same clipping. */
+.ops-main { padding:1.6rem 1.8rem; min-width:0; }
 .ops-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.9rem; }
 .ops-title { font-size:1.15rem; font-weight:700; color:var(--dark-pine); }
 .ops-user { font-size:0.78rem; color:var(--ops-text-mid); display:flex; align-items:center; gap:0.8rem; }
