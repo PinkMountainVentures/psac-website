@@ -93,17 +93,19 @@
  * manualAdjustment_gearCheckLogAdjustment's job and staff's own manual
  * Stripe-dashboard work, respectively, per 8a's own 4-separate-steps list.
  *
- * BUG FIX (independent bug pass, Aug 2026): this used to ALSO append its
- * own Change Log row here, unconditionally — but 8a's documented 4-step
- * playbook has a separate, explicit "log the change via the Manual
- * Adjustment page" step (manualAdjustment_changeLogNote below), which staff
- * are meant to run as its own step for every one of these playbooks. Doing
- * both meant one real kit-count correction produced TWO Change Log rows —
- * this function's own auto-logged one, plus the one staff explicitly add
- * afterward. Removed here; the explicit change_log_note step is now the
- * only place this correction gets logged, matching the documented playbook
- * and this file's own module comment ("the actual audit-trail entry ... a
- * separate, explicit step per 8a").
+ * REVERSED (Ops App Redesign, Aug 2026, Round 2 — direct instruction from
+ * Airey after reviewing the Manual Adjustment page's new Adjustment Type
+ * filter): this function used to deliberately NOT log its own Change Log
+ * row (see the superseded comment this replaces — the reasoning was that
+ * 8a's documented playbook has a separate, explicit change_log_note step,
+ * and logging in both places double-logged one correction). Airey's call:
+ * this and its two siblings below (manualAdjustment_gearCheckLogAdjustment,
+ * manualAdjustment_updateDeliveryAddress) should each auto-log their own
+ * row regardless — matching how the three newer Round 2 types
+ * (trail_day_change/swap_allocated_unit/post_delivery_cancellation) already
+ * behave. Staff can still run change_log_note separately for freeform
+ * context if they want to, same as before; it just no longer needs to be
+ * the ONLY place this shows up in the audit trail.
  */
 function manualAdjustment_kitCountCorrection(payload) {
   // BUG FIX (payment-review, Aug 2026, Critical #7, floor corrected per
@@ -126,6 +128,14 @@ function manualAdjustment_kitCountCorrection(payload) {
     var oldValue = target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).getValue();
     target.sheet.getRange(target.rowIndex, target.headerMap['confirmedKitCount']).setValue(newCount);
 
+    adventurePrep_appendChangeLog_(ss, {
+      bookingId: payload.bookingId,
+      changeType: 'kit_count_correction',
+      oldValueJson: JSON.stringify({ confirmedKitCount: oldValue }),
+      newValueJson: JSON.stringify({ confirmedKitCount: newCount }),
+      staffNotes: payload.staffNotes || '',
+    });
+
     return { ok: true, bookingId: payload.bookingId, oldConfirmedKitCount: oldValue, newConfirmedKitCount: newCount };
   } finally {
     lock.releaseLock();
@@ -137,6 +147,10 @@ function manualAdjustment_kitCountCorrection(payload) {
  * rows/unit assignment." Removes not-yet-checked-out rows for the given
  * kit numbers — same "never touch an already-checked-out row" posture as
  * every other Gear Check Log mutation in this stack.
+ *
+ * Logs its own Change Log row (Ops App Redesign, Aug 2026, Round 2 —
+ * direct instruction from Airey; see manualAdjustment_kitCountCorrection's
+ * own comment above for the full reasoning, same call here).
  */
 function manualAdjustment_gearCheckLogAdjustment(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -152,6 +166,14 @@ function manualAdjustment_gearCheckLogAdjustment(payload) {
     });
     var rowIndexes = rows.map(function (r) { return r.__rowIndex; }).sort(function (a, b) { return b - a; });
     rowIndexes.forEach(function (rowIndex) { gearSheet.deleteRow(rowIndex); });
+
+    adventurePrep_appendChangeLog_(ss, {
+      bookingId: payload.bookingId,
+      changeType: 'gear_check_log_adjustment',
+      oldValueJson: JSON.stringify({ kitNumbersToRemove: kitNumbers }),
+      newValueJson: JSON.stringify({ removedRowCount: rowIndexes.length }),
+      staffNotes: payload.staffNotes || '',
+    });
 
     return { ok: true, bookingId: payload.bookingId, removedRowCount: rowIndexes.length };
   } finally {
@@ -210,9 +232,10 @@ function manualAdjustment_gearReturnedUncleaned(payload) {
  * the "constrained form, not an open-ended cell edit" posture the rest of
  * this file follows.
  *
- * Does NOT auto-log a Change Log row, same convention as
- * kit_count_correction above — staff run manualAdjustment_changeLogNote as
- * its own explicit step if this correction should be recorded there too.
+ * Logs its own Change Log row (Ops App Redesign, Aug 2026, Round 2 —
+ * direct instruction from Airey, reversing the original "no auto-log"
+ * convention; see manualAdjustment_kitCountCorrection's own comment above
+ * for the full reasoning, same call here).
  */
 function manualAdjustment_updateDeliveryAddress(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -235,6 +258,13 @@ function manualAdjustment_updateDeliveryAddress(payload) {
         (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value
       );
       written.push(key);
+    });
+
+    adventurePrep_appendChangeLog_(ss, {
+      bookingId: payload.bookingId,
+      changeType: 'update_delivery_address',
+      newValueJson: JSON.stringify({ writtenFields: written, deliveryAddressRaw: payload.deliveryAddressRaw || '' }),
+      staffNotes: payload.staffNotes || '',
     });
 
     return { ok: true, bookingId: payload.bookingId, writtenFields: written };

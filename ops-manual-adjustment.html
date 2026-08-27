@@ -21,21 +21,20 @@
   Aug 2026: "Update delivery address" added as a fifth type, at Airey's
   direct request. Round 2 added three more (eight total).
 
-  FLAGGED FOR AIREY: the Adjustment Type filter below maps each of the 8
-  form types to the actual changeType value(s) each one writes to the
-  Adventure Prep Change Log — and three of the original five types
-  (kit_count_correction, gear_check_log_adjustment, update_delivery_
-  address) were already built to NOT write their own dedicated log row at
-  all (per manual-adjustment-actions.gs's own header: their audit trail is
-  the separate "Change log note" step staff run afterward). Filtering to
-  one of those three will correctly show nothing unless a change_log_note
-  entry was also logged — this isn't a bug in this page, it's the existing
-  logging design surfacing through the new filter. Worth deciding whether
-  that's the right long-term behavior, or whether those three should each
-  get their own auto-logged row the way the three new Round 2 types do
-  (trail_day_change/swap_allocated_unit/post_delivery_cancellation all
-  auto-log; trail_day_change was actually MISSING this until this build —
-  see apps-script/ops-redesign-round2-actions.gs's own fix note).
+  RESOLVED (Airey, Aug 2026): all 8 types now auto-log their own Change Log
+  row. The original five-type file initially had three (kit_count_
+  correction, gear_check_log_adjustment, update_delivery_address)
+  deliberately NOT self-logging — their audit trail was meant to be the
+  separate "Change log note" step staff ran afterward. Airey's direct
+  call, after seeing the Adjustment Type filter this page introduced: all
+  three should self-log too, matching the three newer Round 2 types
+  (trail_day_change/swap_allocated_unit/post_delivery_cancellation, all of
+  which already auto-log — trail_day_change was actually MISSING this
+  until this same build, see apps-script/ops-redesign-round2-actions.gs's
+  own fix note). See manual-adjustment-actions.gs's own updated comments
+  on each of the three functions. The Adjustment Type filter below now
+  matches every type directly against its own changeType — the earlier
+  "no dedicated log row" caveat no longer applies to any of the 8.
 
   Page E (Gear Assembly/Checkout extensions) from that same mockup isn't
   built here — it's explicitly a different, pre-existing tool per
@@ -66,7 +65,6 @@
   .log-filters { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:0.8rem; }
   .log-filters .ops-form-row { margin-bottom:0; min-width:200px; }
   .log-filters .ops-input, .log-filters .ops-select { margin-bottom:0; }
-  .type-filter-caption { font-size:0.72rem; color:var(--ops-text-mid); margin:0.4rem 0 0.6rem; }
 
   @media (max-width: 760px) {
     .ops-form-grid { grid-template-columns:1fr; }
@@ -146,7 +144,6 @@
             <label for="log-filter-show-system" style="text-transform:none; font-weight:normal; letter-spacing:normal; color:var(--ops-text);">Show system-generated entries</label>
           </div>
         </div>
-        <div id="type-filter-caption" class="type-filter-caption hidden"></div>
 
         <div id="recent-log"></div>
       </div>
@@ -244,36 +241,31 @@
   // change_log_note has no fixed changeType of its own (caller-supplied,
   // defaults to 'kit_count') — it's matched by the fixed prefix
   // manualAdjustment_changeLogNote always writes into staffNotes instead,
-  // which is the one reliable signature it leaves behind.
+  // which is the one reliable signature it leaves behind. Every other type
+  // (as of Airey's Aug 2026 call — all 8 types now auto-log their own row)
+  // matches directly on its own changeType, which is simply the type
+  // string itself for 6 of the 8; gear_returned_uncleaned and
+  // swap_allocated_unit predate this page and kept their own existing
+  // changeType names ('gear_return' and 'gear_unit_swap') rather than
+  // being renamed to match — same "never rename a stored enum value"
+  // posture this project uses for cancellationReasons.
   var CHANGE_LOG_NOTE_PREFIX = 'Manual adjustment (off-system):';
+  var ADJUSTMENT_TYPE_TO_CHANGE_TYPE = {
+    gear_returned_uncleaned: 'gear_return',
+    swap_allocated_unit: 'gear_unit_swap',
+  };
 
   function matchesAdjustmentType(entry, type) {
     if (!type) return true;
     if (type === 'change_log_note') return String(entry.staffNotes || '').indexOf(CHANGE_LOG_NOTE_PREFIX) === 0;
-    if (type === 'gear_returned_uncleaned') return entry.changeType === 'gear_return';
-    if (type === 'trail_day_change') return entry.changeType === 'trail_day_change';
-    if (type === 'swap_allocated_unit') return entry.changeType === 'gear_unit_swap';
-    if (type === 'post_delivery_cancellation') return entry.changeType === 'post_delivery_cancellation';
-    // kit_count_correction, gear_check_log_adjustment, update_delivery_address
-    // don't write their own dedicated Change Log row today — see this
-    // page's header comment.
-    return false;
+    var expectedChangeType = ADJUSTMENT_TYPE_TO_CHANGE_TYPE[type] || type;
+    return entry.changeType === expectedChangeType;
   }
-
-  var NO_SELF_LOG_TYPES = { kit_count_correction: 1, gear_check_log_adjustment: 1, update_delivery_address: 1 };
 
   function renderFilteredLog() {
     var bookingFilter = document.getElementById('log-filter-booking-id').value.trim().toLowerCase();
     var typeFilter = document.getElementById('log-filter-type').value;
     var showSystem = document.getElementById('log-filter-show-system').checked;
-
-    var captionEl = document.getElementById('type-filter-caption');
-    if (typeFilter && NO_SELF_LOG_TYPES[typeFilter]) {
-      captionEl.classList.remove('hidden');
-      captionEl.textContent = 'This adjustment type doesn\'t write its own dedicated log row today — its audit trail is a separate "Change log note" entry staff add afterward, so this filter will show nothing unless one was logged.';
-    } else {
-      captionEl.classList.add('hidden');
-    }
 
     var filtered = allLogEntries.filter(function (e) {
       if (bookingFilter && String(e.bookingId || '').toLowerCase().indexOf(bookingFilter) === -1) return false;

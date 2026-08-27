@@ -6,6 +6,14 @@
 
 This closes out all 10 items from the original kickoff. What follows is the honest built-vs-stubbed picture, the two things you specifically asked to have spelled out end-to-end, and everything this build found that needs a decision from you before it's fully production-ready.
 
+## Your five answers, applied
+
+1. **Custom Tier** — confirmed out of scope for this build (handled entirely offline via email + manual Stripe charge), but you flagged a real gap: there's currently no way to get that booking back into the system afterward. See "Custom Tier's re-entry gap" below — this needs a scoping decision before it gets built, not silently guessed at.
+2. **Standard sweep time locked to 9:00pm** — done, the display text now reads exactly "9:00pm" everywhere it appears (was "after 9:00pm tonight"). Your separate guest-facing pickup-instructions work (location type, time, freeform note) isn't built here — see the forward-compat note below on how it should slot into what already exists.
+3. **Low-stock thresholds** — no change, confirmed fine as-is for now.
+4. **All 3 remaining Manual Adjustment types now auto-log their own Change Log row** — done. `kit_count_correction`, `gear_check_log_adjustment`, and `update_delivery_address` each write their own entry now, matching the other 5 types. All 8 types self-log; the Adjustment Type filter no longer has a "won't show anything" caveat for any of them.
+5. **Git push access** — noted, being handled in the main coordinating chat. No action taken here; the patch-file delivery below still stands as the fallback either way.
+
 ---
 
 ## 1. Status per item
@@ -29,19 +37,25 @@ Nothing in this list is a stub dressed up as done. Where something genuinely isn
 
 ## 2. The two things you asked to have spelled out end-to-end
 
-### Custom Tier's two-step status — **not built, this is a real blocker**
+### Custom Tier's two-step status — confirmed out of scope, but with a real re-entry gap
 
-Confirmed by exhaustive grep across the whole codebase (Node + Apps Script), re-confirmed again this round: **there is no Custom Tier intake anywhere in this system.** No form, no Sheet columns, no backend action. Every place this build needed to reference it (Ops Alerts' tier grouping, All Bookings' tier column) had to render a visible "Custom Tier intake doesn't exist yet" note rather than pretend it works. If Custom Tier bookings are coming in today, they're being handled entirely outside this app — worth confirming that's actually true, because if it isn't, those bookings have no ops visibility at all right now.
+Confirmed by exhaustive grep across the whole codebase (Node + Apps Script): **there is no Custom Tier intake anywhere in this system**, and per your answer, that's by design — the booking flow redirects multi-day inquiries to email, you handle pricing and the Stripe charge manually offline. That part is fine as-is.
+
+**The gap is what happens next.** Once you've charged a guest for a Custom Tier trip, there's currently no way to get that booking into Experience Bookings as a real row — which means it can't flow into gear allocation, trail assignment, delivery scheduling, or any of the ops surfaces this whole redesign just built. Confirmed via the same grep: no "create a booking manually" action exists anywhere in this codebase, for any tier.
+
+This needs a scoping decision, not a guess: what's the minimal set of fields a manually-entered Custom Tier booking needs (contact info, trail day, party size/roster, gear kit count, delivery address, some marker that its payment already happened outside Stripe's normal booking-flow path so downstream deposit-hold logic doesn't try to charge it again)? Building this without confirming the shape first risks a form that doesn't match how you actually work the offline process — flagging it here rather than guessing at a form and shipping it.
 
 ### Return Check-In's pickup default+override — exact end-to-end behavior
 
-1. **Default (the common case, zero staff action):** the moment a booking's gear is delivered, it appears in the Return Check-In queue with `returnStatus` blank. Opening it shows a confirmed-looking card: *"✓ Default — no action needed. Same address as delivery ({address}) · standard nightly sweep, after 9:00pm tonight."* Staff only ever has to pick **Pickup Service** (PSAC Staff / Uber Direct) and click **Schedule Pickup** — nothing else to fill in.
+1. **Default (the common case, zero staff action):** the moment a booking's gear is delivered, it appears in the Return Check-In queue with `returnStatus` blank. Opening it shows a confirmed-looking card: *"✓ Default — no action needed. Same address as delivery ({address}) · standard nightly sweep, 9:00pm."* Staff only ever has to pick **Pickup Service** (PSAC Staff / Uber Direct) and click **Schedule Pickup** — nothing else to fill in.
 2. **Override:** a collapsed "Need a different pickup time or location?" toggle reveals an editable **Return Address** (pre-filled to the delivery address) and a free-text **Return Time note** (not a rigid picker — real constraints like "host asks no visitors after 8pm" don't fit a dropdown). Both fields are blank unless staff actually types something; blank on submit = default, no matter whether the toggle was opened.
 3. Clicking **Schedule Pickup** calls `gearOps_schedulePickup`, writing `returnStatus: 'pickup_scheduled'` plus whatever service/override values were set.
 4. **Picked Up is optional and skippable** — a "Mark Picked Up" button is offered but never required; the real, required gate is **Mark Returned** (`gearOps_markReturned`, sets `returnStatus: 'returned'`), which is what actually reveals the per-item condition-assessment view.
 5. Once every trackable item on the booking has a saved condition, the server sets `returnStatus: 'checked_in'` **automatically** — not a button. This happens via a best-effort call (`gearOps_syncReturnStatusIfSettled`) fired right after every individual item check-in; a sync failure there never masks the check-in write itself, and the next check-in (or a manual glance) catches it.
 
-**One number in this flow is still yours to lock down:** the "standard nightly sweep" pickup time is displayed as "after 9:00pm tonight" everywhere in this build, matching the journey map's own working assumption — but the map itself says explicitly "the exact figure is still Airey's to lock down." It's a display string only right now (the default write path leaves the actual time blank, meaning "use whatever the standing default is" — nothing downstream currently reads or enforces a specific clock time), so changing the displayed number later is a one-line text edit, not a schema change.
+**9:00pm is now locked in** as the displayed standard sweep time (was "after 9:00pm tonight"). It's a display string only — the default write path still leaves the actual time field blank rather than writing a literal "9:00pm" value, so this stays a one-line text change if it ever needs to move.
+
+**On your separate guest-facing pickup-instructions work:** once that's built (pickup location type — front desk / front door / front gate / hand delivery — pickup time, and a freeform note, submitted by the guest), the natural integration point is this override panel: `pickupAddressOverride`/`pickupTimeNote` would get pre-filled from whatever the guest already submitted in Adventure Prep instead of starting blank, so staff sees "here's what the guest asked for, confirm or adjust" rather than a from-scratch form. `pickupServiceType` (PSAC Staff vs. Uber Direct) stays a staff-only operational decision either way — not something a guest would pick. This is flagged in code (`gearOps_schedulePickup`'s own comment in `ops-redesign-round2-actions.gs`) so whoever builds the guest-facing side sees the intended seam.
 
 ---
 
@@ -51,6 +65,7 @@ Confirmed by exhaustive grep across the whole codebase (Node + Apps Script), re-
 2. **`manualAdjustment_trailDayChange`** (new this round, in `ops-redesign-round2-actions.gs`) originally wrote **no Change Log row at all** — unlike its two sibling new types (Swap an allocated unit, Post-delivery cancellation), which each log their own entry inline. Caught while building the Manual Adjustment page's own Adjustment Type filter (a trail day change would have been literally invisible in the audit table). Fixed to log a `trail_day_change` entry the same way its siblings do.
 3. **Retry Allocation, Gear Assembly & Checkout** — the old precondition (`if (!allocation.length || !anyAllocated)`) could never actually surface the Retry button for a real partial-shortage booking (as soon as one item allocated, it looked "done enough"). Fixed to a proper "does anything still lack a unit" check.
 4. **Missing item photo requirement, Return Check-In** — previously required a photo for Missing items exactly like Damaged, even though there's nothing to photograph for an item that isn't there. Fixed (this fix predates this specific handoff but is worth restating): Missing now requires a text note instead; Damaged is untouched.
+5. **Manual Adjustment's 3 non-self-logging types** — per your direct instruction (item 4 above), `manualAdjustment_kitCountCorrection`, `manualAdjustment_gearCheckLogAdjustment`, and `manualAdjustment_updateDeliveryAddress` (all in `manual-adjustment-actions.gs`) now each write their own Change Log row (`kit_count_correction`, `gear_check_log_adjustment`, `update_delivery_address` respectively), reversing their original "no auto-log, staff runs Change log note separately" design. All 8 Manual Adjustment types now self-log consistently.
 
 ---
 
@@ -59,20 +74,17 @@ Confirmed by exhaustive grep across the whole codebase (Node + Apps Script), re-
 - **`depositStatus` → Hold Status mapping**: `refunded` is mapped to "Released" (net capture is zero) and `shortfall_charge_in_progress` (a brief in-flight lock state) to "Captured (partial)" — neither is in the originally-approved 6-value list; both are reasonable but not spec'd. See the header comment on `opsRedesign_holdStatusBucket_` in `ops-redesign-round1-actions.gs`.
 - **Payment Status "Failed" is currently unreachable in live data** — confirmed via `api/save-booking.js`, which refuses to write any booking whose PaymentIntent isn't `succeeded`/`processing`. The bucket exists in the UI for completeness, not because it can currently fire.
 - **Cancellation-awareness window defaults to 7 days** — not explicitly spec'd, a reasonable default, flagged in `ops-redesign-round1-actions.gs`.
-- **Low-stock gear thresholds** (`OPS_ALERT_LOW_STOCK_THRESHOLDS_`) are taken as literally-confirmed figures from the spec doc — worth a final sanity check against real inventory before relying on the alert.
+- **Low-stock gear thresholds** (`OPS_ALERT_LOW_STOCK_THRESHOLDS_`) — confirmed fine as-is for now (your answer above); will need updating as inventory and booking volume grow.
 - **The stalled-bookings call script wording is my own unreviewed draft** — flagged inline in `ops-stalled-bookings.html`, not represented as Airey-approved copy.
-- **Manual Adjustment's Adjustment Type filter**: 3 of the original 5 types (Kit count correction, Gear Check Log adjustment, Update delivery address) don't write their own dedicated Change Log row today — by original design, their audit trail is the separate "Change log note" step staff run afterward. Filtering to one of those 3 will correctly show nothing unless that separate note was also logged. This isn't a bug introduced this round; it's existing logging behavior surfacing through a new filter. Worth deciding whether that's the right long-term behavior or whether those 3 should get their own auto-logged row too, matching the 3 new Round 2 types (all of which do log automatically).
 - **Delivery Time slot options** are hard-coded to 4 fixed 30-minute slots per window (e.g. 7:00/7:30/8:00/8:30pm for the 7-9pm window), matching the approved mockup exactly — not derived from any configurable interval.
 
 ---
 
 ## 5. What this build genuinely needs from you before it's production-ready
 
-1. **Custom Tier intake** — confirm whether it's truly out of scope right now, or whether Custom Tier bookings need real handling this build should have covered.
-2. **Standard pickup sweep time** — lock down the actual figure ("9:00pm" vs. "after 9:00pm, no fixed end" vs. a window like delivery's).
-3. **Low-stock thresholds** — sanity-check the numbers this build assumed against your real inventory counts.
-4. **Manual Adjustment's 3 non-self-logging types** — decide if that's staying as-is or should change.
-5. **Git push access** — this session's GitHub App install doesn't include `PinkMountainVentures/psac-website` in its authorized repo set (403 on push, unchanged from earlier flags this build). See below for the workaround used this round.
+1. **Custom Tier re-entry into the system** — needs a scoping decision on what a manually-entered post-offline booking record requires (see section 2 above) before it gets built. Not yet built.
+2. **Git push access** — being handled in the main coordinating chat, per your note. This session's GitHub App install still doesn't include `PinkMountainVentures/psac-website` in its authorized repo set (403 on push); the patch-file delivery below is the fallback until that's resolved.
+3. **Guest-facing pickup instructions** (location type, time, freeform note) — your own separate build; this session left a clear integration seam for it in `gearOps_schedulePickup`'s comments (see section 2) but didn't build it.
 
 ---
 
@@ -161,6 +173,8 @@ Full file list, all already committed locally as one commit on top of your curre
 
 **New:** `ops-shell.js`, `ops-shell.css`, `ops-all-bookings.html`, `ops-cancellations.html`, `ops-stalled-bookings.html`, `apps-script/ops-redesign-round1-actions.gs`, `apps-script/ops-redesign-round2-actions.gs`.
 
-**Rewritten or extended:** `ops-alerts.html`, `ops-gear-checkout.html`, `ops-gear-checkin.html`, `ops-gear-units.html`, `ops-manual-adjustment.html`, `ops-trail-swap-requests.html`, `ops-reconciliation-review.html`, `api/checkout-gear.js`, `api/check-in-gear-item.js`, `api/manage-gear-units.js`, `api/apply-manual-adjustment.js`, `api/ops-proxy.js`, `lib/trail-selection-engine.js`.
+**Rewritten or extended:** `ops-alerts.html`, `ops-gear-checkout.html`, `ops-gear-checkin.html`, `ops-gear-units.html`, `ops-manual-adjustment.html`, `ops-trail-swap-requests.html`, `ops-reconciliation-review.html`, `api/checkout-gear.js`, `api/check-in-gear-item.js`, `api/manage-gear-units.js`, `api/apply-manual-adjustment.js`, `api/ops-proxy.js`, `lib/trail-selection-engine.js`, `apps-script/manual-adjustment-actions.gs` (already live in your Apps Script project from an earlier round — see the note below on re-pasting it).
+
+**Important — `manual-adjustment-actions.gs` needs re-pasting, not just the two new files.** Unlike the two new `.gs` files below, this one already exists in your live Apps Script project from an earlier round. This build changed 3 of its functions (the auto-logging fix, item 4 above) — you'll need to replace its contents in the Apps Script editor with the updated version attached here, then save and re-deploy. No new dispatch-chain wiring or setup() call needed for this one; it's the same action names as before, just with an added Change Log write inside each.
 
 Every file above was read against the live codebase before being changed — nothing here was built against the spec docs alone.

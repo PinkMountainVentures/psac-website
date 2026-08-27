@@ -242,7 +242,7 @@
       + '</select></div>'
       + '<div class="svc-field"><label>Pickup Time &amp; Location</label>'
       + '<div class="pickup-default-card"><div class="pdc-check">✓ Default — no action needed</div>'
-      + '<div class="pdc-detail">Same address as delivery (' + escapeHtml(addressText) + ') · standard nightly sweep, after 9:00pm tonight</div>'
+      + '<div class="pdc-detail">Same address as delivery (' + escapeHtml(addressText) + ') · standard nightly sweep, 9:00pm</div>'
       + '<div class="pdc-caption">This is the default for every booking unless a guest has a real conflict — most pickups never touch the toggle below.</div>'
       + '</div></div>'
       + '</div>'
@@ -286,7 +286,7 @@
     var overridden = !!(ctx.pickupAddressOverride || ctx.pickupTimeNote);
     var planText = overridden
       ? (ctx.pickupAddressOverride || defaultAddressText(ctx)) + (ctx.pickupTimeNote ? ' — ' + ctx.pickupTimeNote : '')
-      : 'standard sweep, after 9:00pm tonight';
+      : 'standard sweep, 9:00pm';
     var serviceLabel = ctx.pickupServiceType === 'uber_direct' ? 'Uber Direct' : 'PSAC Staff';
 
     var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem;">'

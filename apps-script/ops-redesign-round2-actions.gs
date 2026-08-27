@@ -165,10 +165,23 @@ function gearOps_markDeliveredFinal(payload) {
 
 /**
  * pickupAddressOverride/pickupTimeNote: blank = use the default (same
- * address as delivery, standard nightly sweep time) — Round 2's
+ * address as delivery, standard nightly sweep time, locked in by Airey as
+ * 9:00pm — see ops-gear-checkin.html's display strings) — Round 2's
  * default-plus-override model. Non-blank = the guest/property genuinely
  * needs something different; staff read and act on the free-text note the
  * same way they already handle propertyType gaps elsewhere in this app.
+ *
+ * FORWARD-COMPAT NOTE (Aug 2026): Airey is separately building a
+ * guest-facing pickup-instructions capability (pickup location — front
+ * desk / front door / front gate / hand delivery — pickup time, and a
+ * freeform note, submitted by the guest rather than staff). That isn't
+ * built here. When it lands, the natural integration is for
+ * pickupAddressOverride/pickupTimeNote to be pre-filled from whatever the
+ * guest already submitted (Adventure Prep) rather than starting blank —
+ * this staff-facing override panel would then read as "here's what the
+ * guest asked for, confirm or change it" instead of a from-scratch entry.
+ * pickupServiceType (PSAC Staff / Uber Direct) stays a staff-only decision
+ * either way — that's an operational choice, not something a guest picks.
  */
 function gearOps_schedulePickup(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
