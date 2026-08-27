@@ -91,9 +91,17 @@ function stripeAuthHeader() {
 
 async function cancelOldHold(paymentIntentId) {
   try {
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #3): no
+    // Idempotency-Key on this call — low risk in practice (a repeat cancel
+    // of an already-canceled PI just returns the "already done" error this
+    // function already treats as success, not a duplicate side effect),
+    // but cheap, consistent hygiene with every other Stripe mutation call
+    // in this codebase. Keyed on the PaymentIntent id alone: cancelling the
+    // same PI is the same logical action no matter how many times a retry
+    // reaches this function.
     const res = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(paymentIntentId) + '/cancel', {
       method: 'POST',
-      headers: { Authorization: stripeAuthHeader() },
+      headers: { Authorization: stripeAuthHeader(), 'Idempotency-Key': 'cancel_old_hold_' + paymentIntentId },
     });
     const data = await res.json();
     if (!res.ok) {

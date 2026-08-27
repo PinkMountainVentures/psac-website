@@ -208,6 +208,15 @@ function doPost(e) {
       out = opsAlerts_recordAlert(body);
     } else if (body.action === 'opsAlerts_resolveAlert') {
       out = opsAlerts_resolveAlert(body);
+    } else if (body.action === 'opsAlerts_getAlert') {
+      // BUG FIX (payment-review, Aug 2026, Lower-confidence #10): apps-
+      // script/ops-alerts-actions.gs's own install instructions (step 2)
+      // always specified this branch alongside opsAlerts_recordAlert/
+      // opsAlerts_resolveAlert, but it was never actually pasted in here —
+      // opsAlerts_getAlert has sat fully implemented and unreachable ever
+      // since. Wiring it in now, matching the documented install steps
+      // exactly; no behavior change to anything already live.
+      out = opsAlerts_getAlert(body);
     } else if (body.action === 'opsAlerts_listAll') {
       out = opsAlerts_listAll(body);
     } else if (body.action === 'trailSwap_logIntake') {
@@ -504,10 +513,33 @@ function handleGetBookingByPaymentIntentId(payload) {
     if (String(data[i][12] || '').trim() === pid) {
       var map = adventurePrep_headerMap_(sheet);
       var tokenCol = map['adventurePrepToken'];
+      var recoveredBookingId = data[i][0];
+      // BUG FIX (payment-review, Aug 2026, Lower-confidence #1): this
+      // response used to omit gearLogRowsCreated entirely — api/save-
+      // booking.js's own success response always reports
+      // `data.gearLogRowsCreated || 0` regardless of which path produced
+      // `data`, so a recovered booking (the whole point of this lookup:
+      // the ORIGINAL handleSaveBooking() call genuinely created gear rows,
+      // but its response never made it back to Node) silently reported 0
+      // items packed instead of the real count. Counts matching Gear Check
+      // Log rows directly rather than trusting any stored total, same
+      // "derive from the actual data, don't cache a number that can drift"
+      // posture as everywhere else in this file.
+      var gearSheet = ss.getSheetByName(SHEETS.gearLog);
+      var gearLogRowsCreated = 0;
+      if (gearSheet) {
+        var gearData = gearSheet.getDataRange().getValues();
+        for (var g = 1; g < gearData.length; g++) {
+          if (String(gearData[g][1] || '').trim() === String(recoveredBookingId).trim()) {
+            gearLogRowsCreated++;
+          }
+        }
+      }
       return {
         ok: true,
         personId: data[i][2],
-        bookingId: data[i][0],
+        bookingId: recoveredBookingId,
+        gearLogRowsCreated: gearLogRowsCreated,
         adventurePrepToken: tokenCol ? (data[i][tokenCol - 1] || '') : ''
       };
     }

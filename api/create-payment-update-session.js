@@ -47,13 +47,15 @@ async function stripeGet(path) {
   return res.json();
 }
 
-async function stripePost(path, form) {
+async function stripePost(path, form, idempotencyKey) {
+  const headers = {
+    Authorization: stripeAuthHeader(),
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await fetch(`${STRIPE_API_BASE}${path}`, {
     method: 'POST',
-    headers: {
-      Authorization: stripeAuthHeader(),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers,
     body: new URLSearchParams(form).toString(),
   });
   return res.json();
@@ -106,11 +108,31 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #8): no
+    // Idempotency-Key at all previously — a guest reloading this page, or a
+    // duplicated request, minted a brand-new SetupIntent every time instead
+    // of resuming the same one. Keyed on bookingId + customerId (a fixed
+    // identifier for "this booking's open payment-update need," never a
+    // value this call itself mutates), so repeat hits within Stripe's 24h
+    // idempotency window return the SAME SetupIntent/client secret rather
+    // than orphaning a fresh one on every retry; naturally expires and mints
+    // a new one if the guest genuinely comes back to this flow a second time
+    // on a later, unrelated occasion.
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #9): this
+    // SetupIntent carried no metadata at all — every other Stripe object
+    // this project creates (PaymentIntents, the gear-shortfall charge, etc.)
+    // tags metadata.bookingId so a support/Stripe-Dashboard investigation
+    // starting from the Stripe side (a guest emails about "the card update
+    // link," or a SetupIntent shows up in a Stripe Radar/dispute review)
+    // can trace straight back to the booking without a separate Sheet
+    // lookup. Added for the same traceability reason, no behavior change.
     const setupIntent = await stripePost('/setup_intents', {
       customer: customerId,
       'payment_method_types[]': 'card',
       usage: 'off_session',
-    });
+      'metadata[bookingId]': bookingId,
+      'metadata[kind]': 'payment_method_update',
+    }, 'payment_update_setup_intent_' + bookingId + '_' + customerId);
     if (!setupIntent || setupIntent.error) {
       res.status(500).json({ error: 'setup_intent_failed', detail: setupIntent && setupIntent.error });
       return;

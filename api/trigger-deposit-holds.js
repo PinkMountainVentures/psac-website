@@ -62,6 +62,20 @@ function formatTripDate(isoDateStr) {
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles' });
 }
 
+// BUG FIX (payment-review, Aug 2026, Lower-confidence #2): deposit-hold-
+// failed-email.js used to hardcode "11:00am Pacific" as the guest-facing
+// deadline, assuming this cron's alert always fires at exactly 9:00am
+// Pacific. pacificClockTimeReached(9, 0, now) only gates the FIRST tick
+// allowed to act — a delayed tick, a retry, or ordinary processing lag
+// between the failed hold attempt and the send means the real send time
+// can drift past 9:00am, and "11:00am" would then overstate how much time
+// is actually left. Computes the real deadline from `now` (this run's
+// actual clock time) instead.
+function formatDeadlineTime(now) {
+  const deadline = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  return deadline.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) + ' Pacific';
+}
+
 async function placeHold(bookingId) {
   const res = await fetch(CREATE_DEPOSIT_HOLD_ENDPOINT, {
     method: 'POST',
@@ -71,7 +85,7 @@ async function placeHold(bookingId) {
   return res.json();
 }
 
-async function processOneBooking(booking) {
+async function processOneBooking(booking, now) {
   const holdResult = await placeHold(booking.bookingId);
 
   if (!holdResult || holdResult.status === 'succeeded' || holdResult.status === 'skipped') {
@@ -118,6 +132,7 @@ async function processOneBooking(booking) {
       logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
       guestName: booking.contactName,
       tripDateFormatted: formatTripDate(booking.tripDate),
+      deadlineTimeFormatted: formatDeadlineTime(now),
       updatePaymentLink: 'https://www.palmspringsadventureclub.com/update-payment-method?bookingId='
         + encodeURIComponent(booking.bookingId) + '&token=' + encodeURIComponent(booking.adventurePrepToken || ''),
     });
@@ -158,7 +173,7 @@ module.exports = async function handler(req, res) {
     const results = [];
     for (const b of due) {
       try {
-        results.push({ ...(await processOneBooking(b)), tripDate: tomorrow });
+        results.push({ ...(await processOneBooking(b, now)), tripDate: tomorrow });
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('trigger-deposit-holds: booking failed', b.bookingId, err);

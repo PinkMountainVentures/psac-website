@@ -211,7 +211,17 @@ module.exports = async function handler(req, res) {
 
     const settledItems = ctx.items.filter((i) => i.unitId);
     const chargeableItems = settledItems.filter((i) => i.condition === 'Damaged' || i.condition === 'Missing');
-    const itemizedCents = chargeableItems.reduce((sum, i) => sum + (Number(i.replacementCostCents) || 0), 0);
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #4): replacementCostCents
+    // is read back from the Sheet, so a fractional value (a manual entry
+    // typo'd as dollars instead of cents, or a stray floating-point artifact
+    // from an earlier dollars<->cents conversion elsewhere in the codebase)
+    // is not impossible — and this sum feeds straight into Stripe's
+    // amount_to_capture as a raw String(), plus the scenario comparisons and
+    // gearShortfallCents math below. Stripe requires an integer minor-unit
+    // amount; rounding once here, right after the sum, keeps every
+    // downstream use (the scenario branches, the capture call, the sheet
+    // write-back) consistent instead of each doing its own ad hoc rounding.
+    const itemizedCents = Math.round(chargeableItems.reduce((sum, i) => sum + (Number(i.replacementCostCents) || 0), 0));
 
     // Read the real, current, authoritative hold amount from Stripe —
     // never trust a stored figure.

@@ -203,6 +203,48 @@ function gearOps_setup() {
   adventurePrep_ensureTabWithHeaders_(ss, 'Gear Units', GEAR_UNITS_HEADERS);
   adventurePrep_appendColumnsIfMissing_(ss, 'Gear Check Log', GEAR_CHECK_LOG_NEW_COLUMNS);
   adventurePrep_appendColumnsIfMissing_(ss, 'Experience Bookings', GEAR_OPS_EXPERIENCE_BOOKINGS_NEW_COLUMNS);
+  // BUG FIX (payment-review, Aug 2026, Lower-confidence #12): ITEM_COSTS
+  // (bookings-code.gs, dollars — used to size the deposit hold at booking
+  // time) and GEAR_ITEM_TYPE_CONFIG.defaultReplacementCostCents (this file,
+  // cents — used for actual reconciliation/shortfall charges) are two
+  // independent sources of truth for the same real-world number, currently
+  // numerically consistent by hand-checked coincidence, not by anything
+  // that enforces it. A future price change edited in only one of the two
+  // places would silently undersize the deposit hold relative to what
+  // reconciliation actually charges, or vice versa. Rather than a riskier
+  // refactor collapsing them into one shared source (touches both files'
+  // call sites, more surface area than a Lower-confidence finding
+  // warrants), this just checks the two agree every time setup is re-run
+  // (already the established "safe to re-run, additive" moment in this
+  // codebase) and logs loudly if they ever drift — the same "flag instead
+  // of silently trusting" posture already used for the Stripe Tax $0-
+  // registration check in api/create-payment-intent.js.
+  gearOps_verifyItemCostConsistency_();
+}
+
+function gearOps_verifyItemCostConsistency_() {
+  var mismatches = [];
+  Object.keys(GEAR_ITEM_NAME_TO_TYPE).forEach(function (itemName) {
+    var typeKey = GEAR_ITEM_NAME_TO_TYPE[itemName];
+    var config = GEAR_ITEM_TYPE_CONFIG[typeKey];
+    var dollarCost = ITEM_COSTS[itemName];
+    if (!config || dollarCost == null) return; // one side missing this item — not this check's job to catch
+    var expectedCents = Math.round(dollarCost * 100);
+    if (config.defaultReplacementCostCents !== expectedCents) {
+      mismatches.push(itemName + ': ITEM_COSTS says $' + dollarCost + ' (' + expectedCents +
+        'c), GEAR_ITEM_TYPE_CONFIG.' + typeKey + '.defaultReplacementCostCents is ' +
+        config.defaultReplacementCostCents + 'c');
+    }
+  });
+  if (mismatches.length) {
+    // eslint-disable-next-line no-console
+    console.error('gearOps_verifyItemCostConsistency_: ITEM_COSTS (bookings-code.gs) and ' +
+      'GEAR_ITEM_TYPE_CONFIG (gear-inventory-actions.gs) have drifted apart — deposit-hold ' +
+      'sizing and reconciliation/shortfall charges are now computing from different reference ' +
+      'costs for the same real item(s). Fix by updating whichever side is stale:\n' +
+      mismatches.join('\n'));
+  }
+  return { ok: !mismatches.length, mismatches: mismatches };
 }
 
 /**
@@ -820,7 +862,24 @@ function gearOps_checkInItem(payload) {
     var set = function (col, value) { gearSheet.getRange(found.__rowIndex, gearMap[col]).setValue(value === undefined || value === null ? '' : value); };
 
     set('condition', condition);
-    if (!found.checkedInAt || condition !== 'Missing') set('checkedInAt', nowIso);
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #5): this used to
+    // read `if (!found.checkedInAt || condition !== 'Missing')`, skipping the
+    // restamp whenever a row already had a checkedInAt AND the write's
+    // condition was Missing. gearOps_getReconciliationContext's
+    // lastItemUpdateIso (which api/reconcile-gear-deposit.js's settle buffer
+    // is built on) explicitly documents this function as "re-stamps
+    // checkedInAt on every write, corrections included" — but that was only
+    // true for some corrections. The dangerous case it missed: a staff
+    // correction from Good/Damaged/Recovered to Missing (a newly-discovered
+    // loss, first surfaced here) on a row that already had a checkedInAt from
+    // an earlier check-in did NOT bump checkedInAt, because the write's own
+    // condition is 'Missing' and checkedInAt already existed. That is exactly
+    // the kind of edit the settle buffer exists to protect against (see
+    // SETTLE_BUFFER_MS's header comment) — a correction that newly makes an
+    // item chargeable, landing without ever registering as "recent" to the
+    // buffer. Now unconditional, matching the documented behavior: every
+    // check-in write, correction or not, restamps checkedInAt to now.
+    set('checkedInAt', nowIso);
     set('notes', payload.notes || found.notes || '');
     if (payload.photoUrl) set('photoUrl', payload.photoUrl);
 
@@ -1181,6 +1240,25 @@ function gearOps_recordShortfallCharge(payload) {
   lock.waitLock(15000);
   try {
     var target = adventurePrep_getOrCreateRow_findExperienceBooking_(ss, payload.bookingId);
+
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #7): the `set()`
+    // calls below are naturally idempotent (a retry just overwrites the same
+    // values again), but adventurePrep_appendChangeLog_ is not — it always
+    // inserts a new row. api/charge-gear-shortfall.js's own caller
+    // (callBookingsWebApp) retries on a transient failure (e.g. the Apps
+    // Script call completes and writes for real, but the HTTP response back
+    // to Node times out or drops) — a retry of THIS SAME successful write
+    // would otherwise append a second Change Log row for one real-world
+    // charge. Detect "this exact charge was already recorded" by checking
+    // whether the stored shortfallChargeId already matches the one this call
+    // is trying to write, and skip the append (not the sheet writes
+    // themselves, which stay harmlessly idempotent) when it does.
+    var existingChargeIdCol = target.headerMap['shortfallChargeId'];
+    var existingChargeId = existingChargeIdCol
+      ? String(target.sheet.getRange(target.rowIndex, existingChargeIdCol).getValue() || '')
+      : '';
+    var alreadyRecorded = !!(existingChargeId && payload.shortfallChargeId && existingChargeId === String(payload.shortfallChargeId));
+
     var set = function (col, value) {
       if (!target.headerMap[col]) return;
       target.sheet.getRange(target.rowIndex, target.headerMap[col]).setValue(value === undefined || value === null ? '' : value);
@@ -1197,11 +1275,13 @@ function gearOps_recordShortfallCharge(payload) {
     // (now already-resolved) PaymentIntent id sitting here.
     set('shortfallChargePendingPaymentIntentId', '');
 
-    adventurePrep_appendChangeLog_(ss, {
-      bookingId: payload.bookingId, changeType: 'gear_shortfall_charge', beforeT3Cutoff: false,
-      refundOrChargeAmount: payload.shortfallChargedAmountCents != null ? payload.shortfallChargedAmountCents / 100 : '',
-      stripeTransactionId: payload.shortfallChargeId || '', staffNotes: payload.staffNotes || '',
-    });
+    if (!alreadyRecorded) {
+      adventurePrep_appendChangeLog_(ss, {
+        bookingId: payload.bookingId, changeType: 'gear_shortfall_charge', beforeT3Cutoff: false,
+        refundOrChargeAmount: payload.shortfallChargedAmountCents != null ? payload.shortfallChargedAmountCents / 100 : '',
+        stripeTransactionId: payload.shortfallChargeId || '', staffNotes: payload.staffNotes || '',
+      });
+    }
     return { ok: true, bookingId: payload.bookingId };
   } finally {
     lock.releaseLock();

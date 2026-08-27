@@ -81,7 +81,7 @@ function stripeAuthHeader() {
 // real Calculation object, just one whose tax_amount_exclusive is 0) —
 // this function logs that case explicitly so it's distinguishable in
 // Vercel's logs from an ordinary API failure.
-async function calculateTax(amountCents, reference) {
+async function calculateTax(amountCents, reference, idempotencyKey) {
   try {
     var params = new URLSearchParams();
     params.append('currency', 'usd');
@@ -94,9 +94,20 @@ async function calculateTax(amountCents, reference) {
     params.append('customer_details[address][country]', PSAC_TAX_SOURCE_ADDRESS.country);
     params.append('customer_details[address_source]', 'shipping');
 
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #8): this create
+    // call had no Idempotency-Key — a retry of the same checkout attempt
+    // (same trigger as Critical #1's PaymentIntent fix below) used to mint a
+    // second, independent Tax Calculation object for one real attempt. A
+    // stray extra Calculation doesn't double-charge anyone by itself, but it
+    // does mean Stripe Tax reporting picks up phantom calculations that were
+    // never actually linked to a charge. Reuses the same per-attempt key
+    // material as the PaymentIntent create below (suffixed so the two calls
+    // never collide on one key), passed in by the caller.
+    var headers = { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
     var taxRes = await fetch('https://api.stripe.com/v1/tax/calculations', {
       method: 'POST',
-      headers: { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: headers,
       body: params.toString()
     });
     var taxData = await taxRes.json();
@@ -143,9 +154,19 @@ async function findOrCreateCustomer(email, name) {
     var createParams = new URLSearchParams();
     createParams.append('email', email);
     if (name) createParams.append('name', name);
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #8): this create
+    // call had no Idempotency-Key either. Unlike the tax-calculation and
+    // PaymentIntent keys (which are per-attempt), this one is keyed on the
+    // email alone and deliberately NOT per-attempt — the whole point of this
+    // function is "at most one Stripe Customer per email," so two
+    // near-simultaneous attempts for the same brand-new guest (a double
+    // form submit racing past the list-then-create check above) should
+    // collapse onto the exact same Customer create call, not each mint their
+    // own. Fixed value per email, never a field this call is about to
+    // mutate — same convention as every other idempotency key in this repo.
     var createRes = await fetch('https://api.stripe.com/v1/customers', {
       method: 'POST',
-      headers: { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Authorization': stripeAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded', 'Idempotency-Key': 'customer_create_' + email },
       body: createParams.toString()
     });
     var createData = await createRes.json();
@@ -198,9 +219,27 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    var email = String(body.email || '').slice(0, 200);
+    var name = String(body.name || '').slice(0, 200);
+    var date = String(body.date || '').slice(0, 40);
+
+    // MOVED UP (payment-review, Aug 2026, Lower-confidence #8): email and the
+    // checkoutAttemptId-derived idempotencyKey used to be computed after the
+    // Tax Calculation call below — moved here so the tax call can share the
+    // same per-attempt key material (see Critical #1's comment further down
+    // for the key's own derivation) instead of firing with no key at all.
+    var checkoutAttemptId = String(body.checkoutAttemptId || '').slice(0, 100);
+    var idempotencyKey;
+    if (checkoutAttemptId) {
+      idempotencyKey = 'checkout_' + checkoutAttemptId;
+    } else {
+      var fallbackWindow = Math.floor(Date.now() / (2 * 60 * 1000));
+      idempotencyKey = 'checkout_fallback_' + tierKey + '_' + gearCount + '_' + email + '_' + fallbackWindow;
+    }
+
     // Tax the pre-tax amount actually being charged today (see the block
     // comment above TIERS/PSAC_TAX_SOURCE_ADDRESS for the full reasoning).
-    var taxCalc = await calculateTax(amountCents, 'psac-booking-' + tierKey);
+    var taxCalc = await calculateTax(amountCents, 'psac-booking-' + tierKey, idempotencyKey + '_tax');
     var finalAmountCents = amountCents;
     var taxAmountCents = 0;
     var taxFallbackApplied = false;
@@ -227,31 +266,9 @@ module.exports = async function handler(req, res) {
       );
     }
 
-    var email = String(body.email || '').slice(0, 200);
-    var name = String(body.name || '').slice(0, 200);
-    var date = String(body.date || '').slice(0, 40);
-
-    // BUG FIX (payment-review, Aug 2026, Critical #1): this call previously
-    // had no Idempotency-Key at all - a retried/duplicated request for the
-    // same checkout attempt (flaky network, browser back/forward, anything
-    // beyond the plain double-click adventure-form.js's own button-disable
-    // guard covers) could create two independent PaymentIntents for one
-    // guest. Prefer the client-generated, per-attempt checkoutAttemptId
-    // (adventure-form.js) so the key is stable across true retries of the
-    // exact same attempt; if an older cached front-end bundle hasn't picked
-    // that field up yet, fall back to a deterministic key built from the
-    // request's own defining fields binned into a 2-minute window - not as
-    // strong (a guest who genuinely resubmits after 2+ minutes gets a fresh
-    // PaymentIntent either way), but real, immediate protection against the
-    // common rapid-retry case without waiting on a full front-end rollout.
-    var checkoutAttemptId = String(body.checkoutAttemptId || '').slice(0, 100);
-    var idempotencyKey;
-    if (checkoutAttemptId) {
-      idempotencyKey = 'checkout_' + checkoutAttemptId;
-    } else {
-      var fallbackWindow = Math.floor(Date.now() / (2 * 60 * 1000));
-      idempotencyKey = 'checkout_fallback_' + tierKey + '_' + gearCount + '_' + email + '_' + fallbackWindow;
-    }
+    // email/name/date and idempotencyKey (Critical #1's fix) are now
+    // computed earlier, above the Tax Calculation call — see the
+    // Lower-confidence #8 comment up there for why.
 
     // Find-or-create the Stripe Customer up front so we can attach it to
     // this PaymentIntent and save the payment method on confirmation — the

@@ -24,6 +24,7 @@
 
 'use strict';
 
+const crypto = require('crypto');
 const { callBookingsWebApp } = require('../lib/apps-script-client');
 
 function checkSecret(payload) {
@@ -31,7 +32,21 @@ function checkSecret(payload) {
   // caller-supplied one, so an unset env var never matches an absent
   // payload.secret (undefined === undefined would otherwise pass).
   if (!process.env.OPS_ALERT_SHARED_SECRET) return false;
-  return !!(payload && payload.secret && payload.secret === process.env.OPS_ALERT_SHARED_SECRET);
+  if (!payload || !payload.secret) return false;
+  // BUG FIX (payment-review, Aug 2026, Lower-confidence #11): this used to
+  // be a plain `===` string comparison, which short-circuits at the first
+  // differing character — the same timing side-channel lib/ops-session.js's
+  // own header comment documents (how long the comparison takes leaks how
+  // many leading characters of a guess were correct, letting an attacker
+  // brute-force OPS_ALERT_SHARED_SECRET byte-by-byte without ever seeing it).
+  // Same fix as that file: compare in constant time via
+  // crypto.timingSafeEqual, checking buffer lengths first since
+  // timingSafeEqual throws (rather than returning false) on a length
+  // mismatch — and a length mismatch is itself a legitimate "not equal,"
+  // not a case needing the constant-time path.
+  const secretBuf = Buffer.from(String(payload.secret), 'utf8');
+  const expectedBuf = Buffer.from(process.env.OPS_ALERT_SHARED_SECRET, 'utf8');
+  return secretBuf.length === expectedBuf.length && crypto.timingSafeEqual(secretBuf, expectedBuf);
 }
 
 module.exports = async function handler(req, res) {

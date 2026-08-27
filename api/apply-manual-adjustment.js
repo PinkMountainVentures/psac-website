@@ -73,9 +73,20 @@ function captureResponse() {
 
 async function cancelOldDepositHold(paymentIntentId, bookingId) {
   try {
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #3): this cancel
+    // call carried no Idempotency-Key, so a retried request (a transient
+    // network failure on the first attempt, or an at-least-once caller
+    // upstream) could double-send the cancel. A stray double-send here is
+    // low-risk on its own (Stripe just returns "already canceled" on the
+    // second try, handled below via alreadyDone), but Stripe's own guidance
+    // is to key every state-changing call, and doing so costs nothing.
+    // Fixed value per paymentIntentId (not a fresh key each call) so a true
+    // retry of the same cancel reuses Stripe's cached response instead of
+    // being treated as a new request. Mirrors the identical fix already
+    // applied to api/renew-deposit-hold.js's cancelOldHold.
     const res = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(paymentIntentId) + '/cancel', {
       method: 'POST',
-      headers: { Authorization: stripeAuthHeader() },
+      headers: { Authorization: stripeAuthHeader(), 'Idempotency-Key': 'cancel_old_hold_' + paymentIntentId },
     });
     const data = await res.json();
     if (!res.ok) {

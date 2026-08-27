@@ -144,6 +144,29 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ error: 'bad_request', detail: 'amountCents must be a positive number' });
       return;
     }
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #6): staff-supplied
+    // amountCents had no upper bound at all beyond "positive number" — an
+    // extra-zero typo in the Reconciliation Review page's override field
+    // (e.g. entering the shortfall in dollars, or fat-fingering an extra
+    // zero) would sail straight through to an off-session Stripe charge
+    // against the guest's card on file with no server-side sanity check.
+    // staffNotes is required for ANY adjustment (see the isAdjusted check
+    // below), but that only proves a note was typed, not that the amount is
+    // sane. Cap the override at whichever is larger: 3x the system's own
+    // computed shortfall (room for a genuine staff finding — e.g. an
+    // additional damaged item not yet reflected in gearShortfallCents), or a
+    // flat $1,000 floor so a small computed shortfall doesn't make an
+    // otherwise-reasonable adjustment impossible. Anything beyond that is
+    // rejected here; a legitimately larger charge should be split or handled
+    // outside this automated path.
+    const SHORTFALL_OVERRIDE_CEILING_CENTS = Math.max(ctx.gearShortfallCents * 3, 100000);
+    if (requestedAmountCents > SHORTFALL_OVERRIDE_CEILING_CENTS) {
+      res.status(400).json({
+        error: 'bad_request',
+        detail: `amountCents ($${centsToDollarsStr(requestedAmountCents)}) is too far above the computed shortfall ($${centsToDollarsStr(ctx.gearShortfallCents)}) to accept automatically. If this charge is genuinely correct, it needs a different manual process.`,
+      });
+      return;
+    }
     const isAdjusted = requestedAmountCents !== ctx.gearShortfallCents;
     if (isAdjusted && (!body.staffNotes || !String(body.staffNotes).trim())) {
       res.status(400).json({ error: 'bad_request', detail: 'staffNotes is required when the charge amount is adjusted from the computed shortfall' });

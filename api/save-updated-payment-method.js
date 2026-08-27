@@ -40,13 +40,15 @@ async function stripeGet(path) {
   return res.json();
 }
 
-async function stripePost(path, form) {
+async function stripePost(path, form, idempotencyKey) {
+  const headers = {
+    Authorization: stripeAuthHeader(),
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await fetch(`${STRIPE_API_BASE}${path}`, {
     method: 'POST',
-    headers: {
-      Authorization: stripeAuthHeader(),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers,
     body: new URLSearchParams(form).toString(),
   });
   return res.json();
@@ -146,9 +148,16 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // BUG FIX (payment-review, Aug 2026, Lower-confidence #8): no
+    // Idempotency-Key on this Customer update either. Keyed on customerId +
+    // the target paymentMethodId (a fixed value per "set this customer's
+    // default payment method to this specific card," never a field the call
+    // itself mutates) — a true retry setting the same target reuses the
+    // cached response, while a genuinely different paymentMethodId (a
+    // second, later card update) gets its own key, exactly as intended.
     const updated = await stripePost(`/customers/${encodeURIComponent(customerId)}`, {
       'invoice_settings[default_payment_method]': paymentMethodId,
-    });
+    }, 'payment_method_update_customer_' + customerId + '_' + paymentMethodId);
     if (!updated || updated.error) {
       res.status(500).json({ error: 'customer_update_failed', detail: updated && updated.error });
       return;
