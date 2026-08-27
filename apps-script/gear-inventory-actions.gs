@@ -89,11 +89,16 @@
  *        out = gearOps_listHoldRenewalCandidates(body);
  *      } else if (body.action === 'gearOps_recordHoldRenewed') {
  *        out = gearOps_recordHoldRenewed(body);
+ *      } else if (body.action === 'shortfallPayment_getBookingForToken') {
+ *        out = shortfallPayment_getBookingForToken(body);
  *
  * 3. Run gearOps_setup() once from the Apps Script editor after pasting.
  *    Creates the `Gear Units` tab, appends `unitId`/`photoUrl` to
  *    `Gear Check Log`, and appends every new `Experience Bookings` column
- *    this build needs. Safe to re-run (idempotent, additive-only).
+ *    this build needs — as of the payment-review Medium #33 fix, that now
+ *    includes `shortfallChargePendingPaymentIntentId`, needed before
+ *    api/create-shortfall-payment-session.js and api/confirm-shortfall-
+ *    payment.js can work. Safe to re-run (idempotent, additive-only).
  *
  * 4. Seed the `Gear Units` tab against the real confirmed counts (Section
  *    2/16) — run gearOps_seedInitialInventory() ONCE after gearOps_setup().
@@ -127,6 +132,17 @@ var GEAR_OPS_EXPERIENCE_BOOKINGS_NEW_COLUMNS = [
   'shortfallRefundId', 'shortfallRefundAmountCents',
   'refundedAt', 'refundStaffNotes',
   'depositHoldRenewedAt', 'gearDeliveredAt', 'gearDeliveredBy',
+  // NEW (payment-review, Aug 2026, Medium #33): the guest-facing 3DS
+  // shortfall-payment completion flow needs somewhere to persist WHICH
+  // PaymentIntent is waiting on the guest's own authentication step —
+  // api/charge-gear-shortfall.js's requires_action response is otherwise
+  // only ever visible in that single request/response and as free text in
+  // an Ops Alert, nothing a later guest visit can look back up. Blank
+  // except during the window between a requires_action outcome and either
+  // the guest completing it or staff resolving it another way — see
+  // gearOps_recordShortfallChargeFailure and shortfallPayment_
+  // getBookingForToken below.
+  'shortfallChargePendingPaymentIntentId',
 ];
 
 // Section 2/5/9/16: per-itemType configuration. Reference costs in CENTS
@@ -415,7 +431,16 @@ function gearOps_checkAvailabilityRaw(payload) {
  */
 function gearOps_normalizeDateString_(value) {
   if (value instanceof Date) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    // BUG FIX (payment-review, Aug 2026, Medium #28): this used to read
+    // Session.getScriptTimeZone() — the Apps Script PROJECT's own timezone
+    // setting, which could silently drift from Node's own Pacific-time
+    // filtering (every api/*.js date computation is explicit
+    // 'America/Los_Angeles') if that project setting were ever anything
+    // else. Hardcoded explicit here instead, matching every other
+    // Pacific-time computation in this codebase, so this can never drift
+    // regardless of what the Apps Script project's own setting is or ever
+    // becomes.
+    return Utilities.formatDate(value, 'America/Los_Angeles', 'yyyy-MM-dd');
   }
   return String(value || '');
 }
@@ -921,6 +946,12 @@ function gearOps_getReconciliationContext(payload) {
     tier: booking.tier,
     contactEmail: booking.contactEmail,
     contactName: booking.contactName,
+    // NEW (payment-review, Aug 2026, Medium #33): api/charge-gear-shortfall.js
+    // needs this to build the guest's self-service 3DS-completion link on a
+    // requires_action outcome — same reused adventurePrepToken, same
+    // low-stakes guest-auth pattern as every other guest-facing flow in this
+    // project.
+    adventurePrepToken: booking.adventurePrepToken || '',
     mainPaymentIntentId: booking.mainPaymentIntentId,
     depositPaymentIntentId: booking.depositPaymentIntentId,
     depositStatus: booking.depositStatus || '',
@@ -1159,6 +1190,12 @@ function gearOps_recordShortfallCharge(payload) {
     set('shortfallChargedAmountCents', payload.shortfallChargedAmountCents);
     set('shortfallChargedAt', payload.shortfallChargedAt);
     set('shortfallStaffNotes', payload.staffNotes || '');
+    // NEW (payment-review, Aug 2026, Medium #33): whether this charge just
+    // succeeded directly or via the guest completing a pending 3DS
+    // challenge, there's nothing left to complete — clear any stale pending
+    // reference so a later, unrelated requires_action never finds an old
+    // (now already-resolved) PaymentIntent id sitting here.
+    set('shortfallChargePendingPaymentIntentId', '');
 
     adventurePrep_appendChangeLog_(ss, {
       bookingId: payload.bookingId, changeType: 'gear_shortfall_charge', beforeT3Cutoff: false,
@@ -1190,6 +1227,17 @@ function gearOps_recordShortfallChargeFailure(payload) {
         target.sheet.getRange(target.rowIndex, statusCol).setValue('full_capture_pending_review');
       }
     }
+    // NEW (payment-review, Aug 2026, Medium #33): only a requires_action
+    // outcome ever passes a pendingPaymentIntentId (see api/charge-gear-
+    // shortfall.js's recordFailure) — every other failure reason
+    // (declined, no card on file, an unexpected Stripe error) explicitly
+    // clears this column instead, so a guest link minted for an earlier
+    // requires_action attempt can never be mistaken for still being live
+    // once a later attempt fails a different way.
+    var pendingCol = target.headerMap['shortfallChargePendingPaymentIntentId'];
+    if (pendingCol) {
+      target.sheet.getRange(target.rowIndex, pendingCol).setValue(payload.pendingPaymentIntentId || '');
+    }
   } finally {
     lock.releaseLock();
   }
@@ -1199,6 +1247,52 @@ function gearOps_recordShortfallChargeFailure(payload) {
     staffNotes: payload.detail || 'Shortfall charge attempt failed.',
   });
   return { ok: true, bookingId: payload.bookingId };
+}
+
+/**
+ * NEW (payment-review, Aug 2026, Medium #33): guest-token auth for the
+ * self-service "complete your gear deposit payment" flow — api/create-
+ * shortfall-payment-session.js and api/confirm-shortfall-payment.js. Same
+ * posture and same scoping approach as paymentUpdate_getBookingForToken
+ * (payment-update-actions.gs, Medium #41): reuses the booking's existing
+ * adventurePrepToken rather than minting a new token type, and scopes
+ * itself to only work while there's a genuinely open
+ * gear_shortfall_charge_failed Ops Alert for the booking — bounded
+ * automatically to the life of the actual problem this flow exists to
+ * resolve, no new expiry/single-use bookkeeping needed (a successful
+ * completion resolves this same alert, see api/confirm-shortfall-
+ * payment.js).
+ *
+ * Distinct from paymentUpdate_getBookingForToken in one way: an open
+ * gear_shortfall_charge_failed alert doesn't always mean there's something
+ * this flow can actually complete — a flat decline or "no card on file"
+ * failure raises the exact same alertType but leaves
+ * shortfallChargePendingPaymentIntentId blank (see gearOps_
+ * recordShortfallChargeFailure above), since there's no stuck
+ * authentication step to resume for those. Returns `noResolvablePayment`
+ * in that case so the guest page can show an accurate message instead of
+ * a broken one.
+ */
+function shortfallPayment_getBookingForToken(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var booking = adventurePrep_findExperienceBookingById_(ss, payload.bookingId);
+  if (!booking) return { notFound: true };
+  if (!booking.adventurePrepToken || String(booking.adventurePrepToken) !== String(payload.token)) {
+    return { unauthorized: true };
+  }
+  var openAlert = holdClearance_findOpenDepositAlert({ bookingId: booking.bookingId, alertType: 'gear_shortfall_charge_failed' });
+  if (!openAlert.found) {
+    return { noOpenIssue: true };
+  }
+  if (!booking.shortfallChargePendingPaymentIntentId) {
+    return { noResolvablePayment: true };
+  }
+  return {
+    ok: true,
+    bookingId: booking.bookingId,
+    pendingPaymentIntentId: booking.shortfallChargePendingPaymentIntentId,
+    contactName: booking.contactName,
+  };
 }
 
 /**

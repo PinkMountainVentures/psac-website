@@ -77,6 +77,11 @@ function centsToDollarsStr(cents) {
   return (Math.round(cents) / 100).toFixed(2);
 }
 
+// NEW (payment-review, Aug 2026, Medium #33): base URL for the guest-facing
+// self-service 3DS-completion page — same constant/pattern as api/
+// adventure-prep.js's own SITE_URL.
+const SITE_URL = 'https://www.palmspringsadventureclub.com';
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -253,7 +258,16 @@ module.exports = async function handler(req, res) {
     }
 
     if (chargeRes.data.status === 'requires_action') {
-      await recordFailure(ctx, requestedAmountCents, 'Card requires additional authentication (3D Secure) before the charge can complete.');
+      // BUG FIX (payment-review, Aug 2026, Medium #33): a plain retry of
+      // this endpoint just replays the same cached requires_action state
+      // via the same Idempotency-Key, and an off-session PaymentIntent
+      // generally can't complete 3DS without the guest back in a live
+      // browser session — so until now this outcome had an Ops Alert and
+      // a guest email, but no actual way to collect the money. Passing
+      // chargeRes.data.id through lets recordFailure persist it and hand
+      // the guest a self-service link (complete-shortfall-payment.html)
+      // that finishes this SAME PaymentIntent, never a new one.
+      await recordFailure(ctx, requestedAmountCents, 'Card requires additional authentication (3D Secure) before the charge can complete.', chargeRes.data.id);
       res.status(200).json({ ok: false, outcome: 'requires_action', bookingId: ctx.bookingId, paymentIntentId: chargeRes.data.id });
       return;
     }
@@ -332,9 +346,18 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    async function recordFailure(ctxInner, amountCents, detail) {
+    // BUG FIX (payment-review, Aug 2026, Medium #33): new optional 4th
+    // param, pendingPaymentIntentId — only ever passed by the
+    // requires_action call site above. Persisted (or explicitly cleared,
+    // when absent) via gearOps_recordShortfallChargeFailure so a later
+    // guest visit to complete-shortfall-payment.html can look it back up,
+    // and used here to build that page's link for the failure email.
+    async function recordFailure(ctxInner, amountCents, detail, pendingPaymentIntentId) {
       try {
-        await callBookingsWebApp('gearOps_recordShortfallChargeFailure', { bookingId: ctxInner.bookingId, detail }, { retries: 2 });
+        await callBookingsWebApp('gearOps_recordShortfallChargeFailure', {
+          bookingId: ctxInner.bookingId, detail,
+          pendingPaymentIntentId: pendingPaymentIntentId || '',
+        }, { retries: 2 });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: failed to record shortfall charge failure', ctxInner.bookingId, e);
@@ -354,6 +377,9 @@ module.exports = async function handler(req, res) {
       if (ctxInner.contactEmail) {
         try {
           const { itemsLabel: fItemsLabel, conditionNote: fConditionNote } = summarizeItems(chargeableItems);
+          const actionUrl = (pendingPaymentIntentId && ctxInner.adventurePrepToken)
+            ? SITE_URL + '/complete-shortfall-payment?bookingId=' + encodeURIComponent(ctxInner.bookingId) + '&token=' + encodeURIComponent(ctxInner.adventurePrepToken)
+            : '';
           await sendEmail({
             to: ctxInner.contactEmail,
             subject: "We couldn't process your gear deposit charge",
@@ -362,6 +388,7 @@ module.exports = async function handler(req, res) {
               item: fItemsLabel, conditionNote: fConditionNote,
               holdAmount: centsToDollarsStr(ctxInner.reconciledAmountCents || 0),
               amount: centsToDollarsStr(amountCents),
+              actionUrl: actionUrl || undefined,
             }),
           });
         } catch (e) {

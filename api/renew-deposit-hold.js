@@ -15,10 +15,26 @@
  * (api/check-hold-clearance-deadline.js's header documents two of them);
  * a firmer, earlier buffer costs nothing and leaves more runway.
  *
- * Vercel Cron, gated to a fixed 1pm Pacific instant (pacificClockTimeReached,
- * same convention as every other time-gated cron in this stack) — runs
- * once daily, after both the 9am hold-trigger and the noon hold-clearance
- * check, so it never races either of those over the SAME day's T-1 hold.
+ * Vercel Cron: `vercel.json`'s actual schedule for this endpoint fires
+ * every 15 minutes across a multi-hour Pacific-afternoon window (19,20,21,22
+ * UTC — wide enough to span both PDT and PST), not once daily as this
+ * header used to claim. `pacificClockTimeReached` at 1pm Pacific (TARGET_HOUR_PACIFIC)
+ * gates the intended start time, after both the 9am hold-trigger and the
+ * noon hold-clearance check — but it's a "has 1pm passed yet today" check,
+ * not a same-day dedup guard, so EVERY tick from 1pm through the end of
+ * the window re-runs the full candidate loop, not just the first.
+ *
+ * BUG FIX (payment-review, Aug 2026, Medium #29): this header's "runs once
+ * daily" claim was wrong, and materially misleading — the repeated ticks
+ * it hid are exactly what widens the exposure window for Critical #4's
+ * failure mode. Usually harmless: a candidate actually renewed this cycle
+ * shows depositHoldRenewedAt='today' on the very next candidate list and
+ * reads 'not_due' (see processOneCandidate), so a repeat tick is normally
+ * just a wasted round trip on an already-handled booking. The one case
+ * that wasn't harmless — a write-back failure after a successful Stripe
+ * placement, where the retry tick would read the just-placed NEW hold
+ * back as "old" and cancel it — is closed below (see the
+ * oldPaymentIntentId !== newPaymentIntentId guard in processOneCandidate).
  *
  * Reuses api/create-deposit-hold.js's own hold-placement logic IN-PROCESS,
  * with ZERO changes to that file — the explicit constraint this build was
@@ -175,7 +191,23 @@ async function processOneCandidate(candidate, today) {
   }
 
   const newPaymentIntentId = result.body.paymentIntentId;
-  const cancelResult = oldPaymentIntentId ? await cancelOldHold(oldPaymentIntentId) : { ok: true, skipped: true };
+  // BUG FIX (payment-review, Aug 2026, Medium #29): this cron's Vercel Cron
+  // schedule fires repeatedly across a multi-hour window, not once daily
+  // (see this file's header) — so a candidate can be re-evaluated on a
+  // later tick before this run's own write-back below (gearOps_
+  // recordHoldRenewed) ever succeeds. If a PRIOR tick already placed a new
+  // hold and cancelled the old one, but its write-back then failed, the
+  // candidate still reads as "due" here — and create-deposit-hold.js's own
+  // write already updated depositPaymentIntentId to that prior tick's new
+  // hold, so oldPaymentIntentId above is actually the CURRENTLY LIVE hold,
+  // not a stale one. The renewalCycleId-keyed Idempotency-Key above then
+  // returns that SAME PaymentIntent again as newPaymentIntentId — without
+  // this guard, cancelOldHold would immediately cancel the only live hold
+  // on the booking, exactly the "no hold at all" outcome this endpoint's
+  // own header says it exists to prevent.
+  const cancelResult = (oldPaymentIntentId && oldPaymentIntentId !== newPaymentIntentId)
+    ? await cancelOldHold(oldPaymentIntentId)
+    : { ok: true, skipped: true };
 
   // BUG FIX (payment-review, Aug 2026, High #13): cancelResult was computed
   // but never actually checked before this function returned "renewed" — a

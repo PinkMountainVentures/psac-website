@@ -294,6 +294,10 @@ function doPost(e) {
       out = gearOps_listHoldRenewalCandidates(body);
     } else if (body.action === 'gearOps_recordHoldRenewed') {
       out = gearOps_recordHoldRenewed(body);
+    } else if (body.action === 'shortfallPayment_getBookingForToken') {
+      // NEW (payment-review, Aug 2026, Medium #33): the guest-facing
+      // "complete your gear deposit payment" 3DS flow, gear-inventory-actions.gs.
+      out = shortfallPayment_getBookingForToken(body);
     // ---- Ops App Redesign Round 1 (ops-redesign-round1-actions.gs) ----
     } else if (body.action === 'allBookings_listAll') {
       out = allBookings_listAll(body);

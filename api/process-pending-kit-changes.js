@@ -10,33 +10,23 @@
  * the Stripe charge/refund and Gear Check Log regeneration actually
  * happen. Rows still inside their debounce window are left untouched.
  *
- * WIRED UP, Aug 2026, with one deliberate compromise from the PRD's original
- * 10-15 minute polling suggestion:
+ * WIRED UP, Aug 2026. `vercel.json`'s actual `crons` entry —
+ * `"10,25,40,55 * * * *"` — runs this every 15 minutes, all day, matching
+ * the PRD's original 10-15 minute polling suggestion.
  *
- *   1. `vercel.json` now has a `crons` entry: "15 5 * * *" (05:15 UTC =
- *      10:15pm Pacific during PDT). This project is confirmed on the Vercel
- *      Hobby plan (same plan that hit the 12-serverless-function cap during
- *      the Adventure Prep deploy), and Hobby only allows once-daily cron
- *      invocations — 10-15 minute polling needs a Pro plan. 10:15pm Pacific
- *      was chosen because it's shortly after the fixed 10pm Pacific T-3
- *      cutoff every booking's `computeT3CutoffUtc` resolves to, so one run
- *      per day still catches every booking whose cutoff landed that day,
- *      just later than the original design intended.
- *
- *      Real consequence of once-daily instead of every 10-15 minutes: a
- *      guest's kit-count change now sits in `pending` for up to ~24 hours
- *      before the Stripe charge/refund and Gear Check Log regen actually
- *      happen, not the ~1 hour debounce window the PRD assumed, unless it
- *      also happens to cross a T-3 cutoff. Nothing breaks (each row is
- *      still evaluated correctly whenever the cron does run), it's just
- *      slower than designed. Worth revisiting if that delay ever becomes a
- *      real guest-facing problem — upgrading to Pro is the fix, not more
- *      code here. Also note: this fixed UTC time is not DST-aware, so it
- *      drifts to 9:15pm Pacific during PST (Nov-Mar), a day-level slop this
- *      system already tolerates, not a new risk.
- *
- *   2. CRON_SECRET is now confirmed set in Vercel (Production) and the app
- *      redeployed to pick it up.
+ * BUG FIX (payment-review, Aug 2026, Medium #39): this header used to
+ * claim a deliberate once-daily-at-10:15pm-Pacific compromise, justified
+ * by a Vercel Hobby-plan once-daily-cron-invocation limit — directly
+ * contradicted by the live `vercel.json` above (confirmed against the
+ * actual file, not just this comment) and by CRON_SECRET being live in
+ * Production, which the once-daily claim's own text said hadn't happened
+ * yet either. Whatever Hobby-plan constraint prompted that compromise,
+ * it's not reflected in the deployed config today — this cron already
+ * runs at the PRD's intended cadence, no code or config change needed
+ * here, just a stale comment that risked leading a future change the
+ * wrong direction (e.g. "restoring" a once-daily schedule that was never
+ * actually in effect). CRON_SECRET is confirmed set in Vercel (Production)
+ * and the app redeployed to pick it up.
  *
  * BUG FIX (independent bug pass, Aug 2026): this handler used to wrap its
  * auth check in `if (process.env.CRON_SECRET) { ... }`, unlike its four

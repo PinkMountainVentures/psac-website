@@ -52,6 +52,23 @@ function checkCronAuth(req) {
   return header === 'Bearer ' + secret;
 }
 
+// BUG FIX (payment-review, Aug 2026, Medium #31): this loop had no
+// time-budget/batching — as candidate volume grows, a sequential
+// per-candidate Stripe-plus-Apps-Script round trip risks running past
+// Vercel's function execution limit (this project is on the Hobby plan,
+// per process-pending-kit-changes.js's own header, and no maxDuration is
+// configured anywhere in this repo) and getting killed mid-loop with no
+// response at all — silently dropping whatever candidates hadn't been
+// reached yet that tick, with no error and no Ops Alert anywhere. This
+// cron re-runs every 15 minutes and reconciliation isn't time-critical to
+// the minute (api/reconcile-gear-deposit.js's own idempotency already
+// makes a blind re-check safe), so deferring the remainder to the next
+// tick costs nothing — bailing out explicitly and reporting `truncated`
+// is strictly better than an unannounced kill mid-request. 8s leaves
+// headroom under a 10s Hobby-plan default even including this function's
+// own cold-start/response overhead.
+const TIME_BUDGET_MS = 8000;
+
 function captureResponse() {
   const result = { statusCode: 200, body: null };
   const res = {
@@ -118,11 +135,19 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const startedAt = Date.now();
     const listRes = await callBookingsWebApp('gearOps_listHoldRenewalCandidates', {});
     const candidates = (listRes && listRes.bookings) || [];
 
     const results = [];
+    let truncated = false;
     for (const candidate of candidates) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        truncated = true;
+        // eslint-disable-next-line no-console
+        console.error(`trigger-gear-reconciliation: time budget exceeded, truncating run — processed ${results.length}/${candidates.length} candidates; the rest will be picked up on the next tick`);
+        break;
+      }
       try {
         results.push(await processOneCandidate(candidate));
       } catch (err) {
@@ -132,7 +157,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    res.status(200).json({ ok: true, candidateCount: candidates.length, results });
+    res.status(200).json({ ok: true, candidateCount: candidates.length, processedCount: results.length, truncated, results });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('trigger-gear-reconciliation failed', err);
