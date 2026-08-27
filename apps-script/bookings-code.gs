@@ -294,6 +294,42 @@ function doPost(e) {
       out = gearOps_listHoldRenewalCandidates(body);
     } else if (body.action === 'gearOps_recordHoldRenewed') {
       out = gearOps_recordHoldRenewed(body);
+    // ---- Ops App Redesign Round 1 (ops-redesign-round1-actions.gs) ----
+    } else if (body.action === 'allBookings_listAll') {
+      out = allBookings_listAll(body);
+    } else if (body.action === 'opsAlerts_listExpanded') {
+      out = opsAlerts_listExpanded(body);
+    } else if (body.action === 'stalled_listAll') {
+      out = stalled_listAll(body);
+    } else if (body.action === 'stalled_markCalled') {
+      out = stalled_markCalled(body);
+    } else if (body.action === 'cancellations_listAll') {
+      out = cancellations_listAll(body);
+    // ---- Ops App Redesign Round 2 (ops-redesign-round2-actions.gs) ----
+    } else if (body.action === 'gearOps_markReadyForDelivery') {
+      out = gearOps_markReadyForDelivery(body);
+    } else if (body.action === 'gearOps_scheduleDelivery') {
+      out = gearOps_scheduleDelivery(body);
+    } else if (body.action === 'gearOps_markDeliveredFinal') {
+      out = gearOps_markDeliveredFinal(body);
+    } else if (body.action === 'gearOps_schedulePickup') {
+      out = gearOps_schedulePickup(body);
+    } else if (body.action === 'gearOps_markPickedUp') {
+      out = gearOps_markPickedUp(body);
+    } else if (body.action === 'gearOps_markReturned') {
+      out = gearOps_markReturned(body);
+    } else if (body.action === 'gearOps_getReturnContext') {
+      out = gearOps_getReturnContext(body);
+    } else if (body.action === 'gearOps_getCheckinQueueV2') {
+      out = gearOps_getCheckinQueueV2(body);
+    } else if (body.action === 'gearOps_syncReturnStatusIfSettled') {
+      out = gearOps_syncReturnStatusIfSettled(body);
+    } else if (body.action === 'manualAdjustment_trailDayChange') {
+      out = manualAdjustment_trailDayChange(body);
+    } else if (body.action === 'manualAdjustment_swapAllocatedUnit') {
+      out = manualAdjustment_swapAllocatedUnit(body);
+    } else if (body.action === 'manualAdjustment_postDeliveryCancellation') {
+      out = manualAdjustment_postDeliveryCancellation(body);
     } else {
       out = { ok: false, error: 'Unknown action' };
     }

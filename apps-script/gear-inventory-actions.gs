@@ -1326,9 +1326,24 @@ function gearOps_listHoldRenewalCandidates(payload) {
   // hold never appeared in this candidate list because reconciledAt from
   // the earlier cycle was still sitting on the row. Dropped the clause;
   // depositStatus === 'held' is sufficient on its own.
+  // BUG FIX (2026-08-27, Ops App Redesign Round 2 cross-check): this used
+  // to require status === 'active' only, which silently dropped a booking
+  // the moment it moved to the new 'cancelled_post_delivery' status
+  // (manualAdjustment_postDeliveryCancellation, ops-redesign-round2-actions.gs)
+  // even while it still had a live depositStatus='held' hold on the
+  // guest's card. That hold would then never be captured, released, or
+  // renewed by any automated process — reconciliation and the renewal
+  // safety net both use this same candidate list — so it would just sit
+  // untouched until Stripe's own 5-7 day authorization naturally expired
+  // it uncaptured, silently forfeiting any damage/missing-gear charge
+  // PSAC was owed. A post-delivery cancellation still needs gear picked up
+  // (gearOps_getCheckinQueueV2 already treats it that way) and its hold
+  // still needs to resolve, so it belongs in this list too. Widened the
+  // status check to match that precedent rather than adding a second,
+  // divergent status allowlist.
   var rows = adventurePrep_readRowsAsObjects_(sheet).filter(function (r) {
     var status = r.bookingStatus || 'active';
-    return status === 'active' && r.depositStatus === 'held';
+    return (status === 'active' || status === 'cancelled_post_delivery') && r.depositStatus === 'held';
   });
   return {
     bookings: rows.map(function (r) {
