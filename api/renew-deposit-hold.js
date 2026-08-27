@@ -51,8 +51,13 @@ const RENEWAL_THRESHOLD_DAYS = 3;
 const TARGET_HOUR_PACIFIC = 13; // 1pm — after the 9am hold trigger and noon clearance check
 
 function checkCronAuth(req) {
+  // BUG FIX (payment-review, Aug 2026, Medium #44): fail closed if
+  // CRON_SECRET is unset, instead of matching the literal string
+  // 'Bearer undefined'.
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
   const header = req.headers && req.headers.authorization;
-  return header === 'Bearer ' + process.env.CRON_SECRET;
+  return header === 'Bearer ' + secret;
 }
 
 function captureResponse() {

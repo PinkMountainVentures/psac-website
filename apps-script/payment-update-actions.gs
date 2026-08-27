@@ -16,6 +16,10 @@
  * 1. Paste everything below the marker into Code.gs (or its own .gs file).
  *    Requires apps-script/adventure-prep-actions.gs already pasted in
  *    (reuses adventurePrep_findExperienceBookingById_, shared global scope).
+ *    As of the payment-review Medium #41 fix, also requires apps-script/
+ *    hold-clearance-actions.gs already pasted in (reuses
+ *    holdClearance_findOpenDepositAlert) — already live from an earlier
+ *    round, nothing new to paste for this dependency specifically.
  *
  * 2. Wire the new actions into the existing doPost's action dispatch:
  *
@@ -34,11 +38,33 @@
  */
 
 /**
- * Low-stakes guest-token auth, same posture as api/validate-delivery-
- * address.js: this is called directly from the guest's browser (the deposit-
- * hold-failed email's own link), so it can't safely hold a shared secret.
- * Reuses the booking's existing `adventurePrepToken` rather than minting a
- * new token type — one guest secret per booking, not two.
+ * Guest-token auth, same posture as api/validate-delivery-address.js: this
+ * is called directly from the guest's browser (the deposit-hold-failed
+ * email's own link), so it can't safely hold a shared secret. Reuses the
+ * booking's existing `adventurePrepToken` rather than minting a new token
+ * type — one guest secret per booking, not two.
+ *
+ * BUG FIX (payment-review, Aug 2026, Medium #41): this token authorizes a
+ * meaningfully more sensitive action than validate-delivery-address.js's
+ * own use of it — redirecting a booking's future off-session charges to a
+ * new card, not editing an address — but had no additional scoping,
+ * expiry, or single-use protection: the same long-lived, non-expiring,
+ * many-times-reused adventurePrepToken worked for this forever, for the
+ * life of the booking, even long after any actual card-failure issue was
+ * resolved. Rather than mint and track a whole second token type (a new
+ * Sheet column, an expiry, a mint step wired into the email-send path),
+ * scoped this action to only work while there's a genuinely open
+ * deposit_hold_failed Ops Alert for the booking — the one real situation
+ * this flow exists to resolve (see this file's own header). Reuses
+ * holdClearance_findOpenDepositAlert (already generalized to take an
+ * alertType in the payment-review's Batch-4 alerting pass) rather than a
+ * new lookup. This closes all three gaps the finding named without a
+ * schema change: scoping (only usable during a live, open problem),
+ * expiry (bounded to however long that problem stays open, not
+ * indefinite), and effectively single-use too — api/save-updated-payment-
+ * method.js's own success path already auto-resolves this exact alert
+ * (Medium #40), so a second use of the same leaked token immediately after
+ * a legitimate one now also fails this same check.
  */
 function paymentUpdate_getBookingForToken(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -46,6 +72,10 @@ function paymentUpdate_getBookingForToken(payload) {
   if (!booking) return { notFound: true };
   if (!booking.adventurePrepToken || String(booking.adventurePrepToken) !== String(payload.token)) {
     return { unauthorized: true };
+  }
+  var openAlert = holdClearance_findOpenDepositAlert({ bookingId: booking.bookingId, alertType: 'deposit_hold_failed' });
+  if (!openAlert.found) {
+    return { noOpenIssue: true };
   }
   return {
     ok: true,

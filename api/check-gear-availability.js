@@ -9,12 +9,25 @@
  * result is a separate, not-yet-made decision that belongs elsewhere. This
  * file does not know or care who calls it.
  *
- * Read-only. Shared-secret auth (GEAR_OPS_SHARED_SECRET — this build's one
- * shared secret across every new gear-ops endpoint, see this build's
- * handoff summary for why one secret rather than one per endpoint this
- * round) rather than a staff session, specifically so a future guest-facing
- * caller (which has no staff cookie) can reach it without this file
- * changing.
+ * Read-only. Shared-secret auth rather than a staff session, specifically
+ * so a future guest-facing caller (which has no staff cookie) can reach it
+ * without this file changing.
+ *
+ * BUG FIX (payment-review, Aug 2026, Plausible finding): originally reused
+ * GEAR_OPS_SHARED_SECRET, this build's one shared secret across every
+ * other new gear-ops endpoint (charge/refund/reconcile/checkout/checkin/
+ * manage-units — see those files' own headers for why one secret rather
+ * than one per endpoint that round). That was fine while every caller was
+ * internal staff, but this file's own stated intent is to eventually be
+ * reachable by a guest-facing caller with no staff cookie — the moment
+ * that happens, this secret is necessarily exposed to a less-trusted
+ * context, and a leak of it (client-side exposure, a log, a misconfigured
+ * proxy) would hand out unauthenticated access to every OTHER gear-ops
+ * endpoint sharing it too, including the ones that move real money. Given
+ * its own dedicated, narrower-scoped secret instead —
+ * GEAR_AVAILABILITY_SHARED_SECRET — so a future leak here can't be
+ * replayed against anything else. Read-only endpoint, so the blast radius
+ * of THIS secret leaking on its own stays low either way.
  *
  * Availability math, deliberately conservative — Section 3 doesn't specify
  * an exact algorithm, this is a documented judgment call, flagged for
@@ -52,8 +65,10 @@ function checkSecret(body) {
   // Fail closed: require both a configured secret and a non-empty
   // caller-supplied one, so an unset env var never matches an absent
   // payload.secret (undefined === undefined would otherwise pass).
-  if (!process.env.GEAR_OPS_SHARED_SECRET) return false;
-  return !!(body && body.secret && body.secret === process.env.GEAR_OPS_SHARED_SECRET);
+  // Own dedicated secret, not the shared GEAR_OPS_SHARED_SECRET — see this
+  // file's header comment (payment-review Plausible finding).
+  if (!process.env.GEAR_AVAILABILITY_SHARED_SECRET) return false;
+  return !!(body && body.secret && body.secret === process.env.GEAR_AVAILABILITY_SHARED_SECRET);
 }
 
 function parseBody(req) {

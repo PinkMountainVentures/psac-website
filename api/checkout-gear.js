@@ -83,9 +83,13 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
+      // BUG FIX (payment-review, Aug 2026, Medium #45): used to trust a
+      // client-supplied `deliveredBy` string outright. ops-proxy.js now
+      // forces `staffEmail` from the authenticated session on every
+      // gear-ops call; use that instead of anything the browser sends.
       const result = await callBookingsWebApp('gearOps_markDelivered', {
         bookingId: body.bookingId,
-        deliveredBy: body.deliveredBy || '',
+        deliveredBy: body.staffEmail || '',
       });
       res.status(200).json(result);
       return;
@@ -141,9 +145,12 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
+      // BUG FIX (payment-review, Aug 2026, Medium #45): same fix as
+      // markDelivered above — use the session-forced staffEmail, not a
+      // client-supplied deliveredBy.
       const result = await callBookingsWebApp('gearOps_markDeliveredFinal', {
         bookingId: body.bookingId,
-        deliveredBy: body.deliveredBy || '',
+        deliveredBy: body.staffEmail || '',
       });
       res.status(200).json(result);
       return;

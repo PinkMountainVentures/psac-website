@@ -36,14 +36,11 @@
 
 'use strict';
 
-const { issueSessionCookie, clearSessionCookie, requireStaffSession } = require('../lib/ops-session');
-
-function allowedEmails() {
-  return String(process.env.ALLOWED_STAFF_EMAILS || '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
+// BUG FIX (payment-review, Aug 2026, Medium #47): allowedEmails() moved to
+// lib/ops-session.js, which now also re-checks it on every request (not
+// just at login) — imported from there instead of duplicated here, so the
+// two call sites can't drift apart.
+const { issueSessionCookie, clearSessionCookie, requireStaffSession, allowedEmails } = require('../lib/ops-session');
 
 async function handleLogin(req, res) {
   const { idToken } = req.body || {};

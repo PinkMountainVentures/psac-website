@@ -136,6 +136,15 @@ const GEAR_OPS_PROXY_ACTIONS = {
   gearAvailability_check: checkGearAvailabilityHandler,
 };
 
+// BUG FIX (payment-review, Aug 2026, Plausible finding): gearAvailability_
+// check gets its own secret (GEAR_AVAILABILITY_SHARED_SECRET) instead of
+// the shared GEAR_OPS_SHARED_SECRET every other entry below uses — see
+// check-gear-availability.js's own header for why. Every action not
+// listed here still falls back to GEAR_OPS_SHARED_SECRET.
+const GEAR_OPS_ACTION_SECRET_ENV = {
+  gearAvailability_check: 'GEAR_AVAILABILITY_SHARED_SECRET',
+};
+
 // Maps this proxy's own action name back to the inner handler's own
 // `action` field, for the handful of files that are themselves small
 // dispatchers (manage-gear-units.js, allocate-gear-units.js,
@@ -210,7 +219,16 @@ module.exports = async function handler(req, res) {
       const { res: innerRes, result } = captureResponse();
       await applyManualAdjustmentHandler({
         method: 'POST',
-        body: Object.assign({}, body, { secret: process.env.MANUAL_ADJUSTMENT_SHARED_SECRET }),
+        // BUG FIX (payment-review, Aug 2026, Medium #46): unlike the
+        // resolveOpsAlert/trail-override branches above, this never
+        // injected the authenticated staff identity at all — who
+        // authorized a kit-count correction (which can resize a live
+        // deposit hold) existed nowhere except an optional, unverified
+        // free-text `staffNotes` field the caller could leave blank or
+        // fill with anything. Now forced from the session the same way,
+        // never accepted from the client. apply-manual-adjustment.js
+        // prepends it to the Change Log entry it already writes.
+        body: Object.assign({}, body, { secret: process.env.MANUAL_ADJUSTMENT_SHARED_SECRET, staffEmail: session.email }),
       }, innerRes);
       res.status(result.statusCode).json(result.body);
       return;
@@ -245,12 +263,22 @@ module.exports = async function handler(req, res) {
     if (GEAR_OPS_PROXY_ACTIONS[action]) {
       const innerHandler = GEAR_OPS_PROXY_ACTIONS[action];
       const innerAction = GEAR_OPS_INNER_ACTION[action]; // undefined for single-action files, which is fine — they never read body.action
+      const secretEnvVar = GEAR_OPS_ACTION_SECRET_ENV[action] || 'GEAR_OPS_SHARED_SECRET';
       const { res: innerRes, result } = captureResponse();
       await innerHandler({
         method: 'POST',
         body: Object.assign({}, body, {
-          secret: process.env.GEAR_OPS_SHARED_SECRET,
+          secret: process.env[secretEnvVar],
           action: innerAction,
+          // BUG FIX (payment-review, Aug 2026, Medium #45): forced here,
+          // generically, for every gear-ops action — not just the one
+          // finding named (checkout-gear.js's markDelivered, which used to
+          // trust a client-supplied `deliveredBy` string instead of the
+          // authenticated session). A handler that doesn't use this field
+          // simply ignores it; any handler that records "who did this" now
+          // gets a real, server-verified identity instead of whatever the
+          // browser happened to send, for free.
+          staffEmail: session.email,
         }),
       }, innerRes);
       res.status(result.statusCode).json(result.body);

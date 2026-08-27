@@ -81,6 +81,15 @@ module.exports = async function handler(req, res) {
       res.status(401).json({ error: 'unauthorized' });
       return;
     }
+    // BUG FIX (payment-review, Aug 2026, Medium #41): paymentUpdate_
+    // getBookingForToken now scopes this token to only work while there's
+    // a genuinely open deposit_hold_failed alert on the booking — see that
+    // function's own comment. A stale/leaked/already-used link now comes
+    // back here instead of silently succeeding.
+    if (ctx.noOpenIssue) {
+      res.status(410).json({ error: 'no_open_issue', detail: 'This payment update link is no longer active — either the card issue was already resolved, or there is no open issue on this booking.' });
+      return;
+    }
     if (!ctx.mainPaymentIntentId) {
       res.status(400).json({ error: 'no_payment_on_file' });
       return;

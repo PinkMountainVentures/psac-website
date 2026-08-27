@@ -200,7 +200,8 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const { type, bookingId, staffNotes } = body;
+    const { type, bookingId } = body;
+    const rawStaffNotes = body.staffNotes;
     if (!bookingId) {
       res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
       return;
@@ -209,10 +210,21 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ error: 'bad_request', detail: `type must be one of: ${VALID_TYPES.join(', ')}` });
       return;
     }
-    if (!staffNotes || !staffNotes.trim()) {
+    if (!rawStaffNotes || !rawStaffNotes.trim()) {
       res.status(400).json({ error: 'bad_request', detail: 'staffNotes is required for every manual adjustment' });
       return;
     }
+    // BUG FIX (payment-review, Aug 2026, Medium #46): who authorized an
+    // adjustment (including one that can resize a live deposit hold) used
+    // to exist nowhere except this same optional free-text field, exactly
+    // as staff happened to type it — no reliable record of the actual
+    // authenticated person existed. ops-proxy.js now forces `staffEmail`
+    // from the signed-in session on every applyManualAdjustment call; a
+    // direct server-to-server call (bypassing the proxy, e.g. a manual
+    // curl test) has no session and no staffEmail, so it's left
+    // unprefixed rather than guessed at. Every downstream use of
+    // `staffNotes` below (all 8 types) picks this up automatically.
+    const staffNotes = body.staffEmail ? `[authorized by ${body.staffEmail}] ${rawStaffNotes}` : rawStaffNotes;
 
     let result;
     let extra = {};
