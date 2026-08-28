@@ -64,7 +64,10 @@
   'use strict';
   var escapeHtml = OpsShell.escapeHtml;
   var allBookings = [];
-  var filterBookingId = new URLSearchParams(window.location.search).get('bookingId') || '';
+  // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own comment
+  // — defense in depth here too, in case this ever gets a '#'-prefixed
+  // value (e.g. a hand-built/bookmarked URL).
+  var filterBookingId = OpsShell.normalizeBookingIdInput(new URLSearchParams(window.location.search).get('bookingId') || '');
 
   var TRACK_LABELS = { trail_details: 'Trail Details', waiver: 'Waiver', address: 'Address' };
 

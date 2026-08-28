@@ -196,7 +196,13 @@
   }
 
   function applyFilters() {
-    var q = (new URLSearchParams(window.location.search).get('q') || '').trim().toLowerCase();
+    // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own
+    // comment — 'q' arrives here from the shared search bar (already
+    // normalized as of that fix) but also directly from a hand-typed or
+    // bookmarked URL, which isn't. Stripped here too so a leading '#'
+    // copied from this very page's own '#'-prefixed booking column can
+    // never silently zero out a search that should have matched.
+    var q = OpsShell.normalizeBookingIdInput(new URLSearchParams(window.location.search).get('q') || '').toLowerCase();
     var fBooking = document.getElementById('f-booking').value;
     var fPayment = document.getElementById('f-payment').value;
     var fHold = document.getElementById('f-hold').value;

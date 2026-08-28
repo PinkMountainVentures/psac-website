@@ -95,7 +95,10 @@
   var escapeHtml = OpsShell.escapeHtml;
   var activeCategory = 'All';
   var allData = null;
-  var filterBookingId = new URLSearchParams(window.location.search).get('bookingId') || '';
+  // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own comment
+  // — defense in depth here too, in case this ever gets a '#'-prefixed
+  // value (e.g. a hand-built/bookmarked URL).
+  var filterBookingId = OpsShell.normalizeBookingIdInput(new URLSearchParams(window.location.search).get('bookingId') || '');
 
   var CATEGORIES = ['All', 'Payment & Hold', 'Bookings & Cancellations', 'Reconciliation', 'Manual Adjustment', 'Custom Tier', 'Gear'];
   var CATEGORY_BY_SOURCE = {

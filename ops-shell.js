@@ -57,6 +57,27 @@ var OpsShell = (function () {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  /**
+   * BUG FIX (Aug 2026, trail-selection live-testing investigation
+   * follow-up): every booking ID displayed ANYWHERE in this Ops UX is
+   * rendered with a leading '#' purely for readability — every page does
+   * its own '#' + escapeHtml(b.bookingId), never part of the real stored
+   * value. Staff naturally copy that displayed text into a search box,
+   * filter field, or manual-entry field, so every place a human types or
+   * pastes a booking ID needs to strip that '#' before it's used for an
+   * exact-match lookup or a substring filter — otherwise a perfectly real
+   * booking ID silently fails to match. First found on
+   * ops-trail-swap-requests.html's manual "Start a trail swap" form during
+   * live testing, then audited across every other ops page for the same
+   * gap (the shared search bar, All Bookings' own filter, Manual
+   * Adjustment's booking-id field and its log filter, Cancellations'
+   * filter). Centralized here so every page applies the identical rule
+   * instead of each page maybe/maybe-not remembering to do this itself.
+   */
+  function normalizeBookingIdInput(raw) {
+    return String(raw || '').trim().replace(/^#+/, '').trim();
+  }
+
   function opsCall(action, payload) {
     return fetch('/api/ops-proxy', {
       method: 'POST',
@@ -93,7 +114,7 @@ var OpsShell = (function () {
     var btn = document.getElementById('ops-shell-search-btn');
     if (!input || !btn) return;
     function go() {
-      var q = input.value.trim();
+      var q = normalizeBookingIdInput(input.value);
       window.location.href = 'ops-all-bookings.html' + (q ? ('?q=' + encodeURIComponent(q)) : '');
     }
     btn.addEventListener('click', go);
@@ -166,6 +187,7 @@ var OpsShell = (function () {
 
   return {
     escapeHtml: escapeHtml,
+    normalizeBookingIdInput: normalizeBookingIdInput,
     opsCall: opsCall,
     sidebarHtml: sidebarHtml,
     searchBarHtml: searchBarHtml,

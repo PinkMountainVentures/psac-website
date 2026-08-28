@@ -263,7 +263,10 @@
   }
 
   function renderFilteredLog() {
-    var bookingFilter = document.getElementById('log-filter-booking-id').value.trim().toLowerCase();
+    // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own
+    // comment — this field is a natural place to paste a booking ID copied
+    // from the '#'-prefixed Booking column just above it.
+    var bookingFilter = OpsShell.normalizeBookingIdInput(document.getElementById('log-filter-booking-id').value).toLowerCase();
     var typeFilter = document.getElementById('log-filter-type').value;
     var showSystem = document.getElementById('log-filter-show-system').checked;
 
@@ -290,7 +293,12 @@
   }
 
   function submitForm() {
-    var bookingId = document.getElementById('booking-id').value.trim();
+    // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own
+    // comment — without this, a booking ID copied from anywhere in the Ops
+    // UX (which always displays it '#'-prefixed) fails this exact-match
+    // lookup server-side with no useful error, since '#BK-...' matches no
+    // real booking.
+    var bookingId = OpsShell.normalizeBookingIdInput(document.getElementById('booking-id').value);
     var type = document.getElementById('adjustment-type').value;
     var staffNotes = document.getElementById('staff-notes').value.trim();
 

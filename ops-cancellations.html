@@ -81,8 +81,11 @@
   }
 
   function applyFilter() {
-    var q = document.getElementById('f-booking-id').value.trim().toLowerCase();
-    var urlBookingId = (new URLSearchParams(window.location.search).get('bookingId') || '').toLowerCase();
+    // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own
+    // comment — this field is a natural place to paste a booking ID copied
+    // from the '#'-prefixed Booking column just below it.
+    var q = OpsShell.normalizeBookingIdInput(document.getElementById('f-booking-id').value).toLowerCase();
+    var urlBookingId = OpsShell.normalizeBookingIdInput(new URLSearchParams(window.location.search).get('bookingId') || '').toLowerCase();
     var effective = q || urlBookingId;
     var list = effective ? allCancellations.filter(function (c) { return String(c.bookingId).toLowerCase().indexOf(effective) !== -1; }) : allCancellations;
     renderRows(list);
@@ -106,7 +109,7 @@
     title: 'Cancellations',
     subtitle: 'Every automatic cancellation, its firing reason(s), and its refund reference — read-only.',
     onReady: function () {
-      var urlBookingId = new URLSearchParams(window.location.search).get('bookingId');
+      var urlBookingId = OpsShell.normalizeBookingIdInput(new URLSearchParams(window.location.search).get('bookingId'));
       if (urlBookingId) document.getElementById('f-booking-id').value = urlBookingId;
       loadCancellations();
     },

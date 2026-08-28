@@ -186,7 +186,7 @@
   function handleDeepLink() {
     var qBookingId = getQueryParam('bookingId');
     if (!qBookingId) return;
-    qBookingId = normalizeBookingIdInput(qBookingId); // see normalizeBookingIdInput's own comment — defensive here too, in case of a hand-edited URL
+    qBookingId = OpsShell.normalizeBookingIdInput(qBookingId); // see OpsShell.normalizeBookingIdInput's own comment — defensive here too, in case of a hand-edited URL
     var openRow = lastRequests.filter(function (r) {
       return String(r.bookingId) === String(qBookingId) && r.status !== 'Resolved';
     })[0];
@@ -234,24 +234,15 @@
     });
   }
 
-  // BUG FIX (Aug 2026, trail-selection live-testing investigation
-  // follow-up): every booking ID displayed anywhere in this Ops UX (All
-  // Bookings' table, this very page's own queue) is rendered with a
-  // leading '#' purely for display — '<td>#' + escapeHtml(b.bookingId) —
-  // never part of the real stored value. Staff copying that displayed
-  // text (exactly what happened in testing) pastes '#BK-...' in here,
-  // which then fails an exact-match lookup against the real 'BK-...'
-  // value and reports "No booking found" for a booking ID that's
-  // completely real. Strips a leading '#' (and stray whitespace) before
-  // ever sending it anywhere, so copy-pasting straight from All Bookings
-  // just works.
-  function normalizeBookingIdInput(raw) {
-    return String(raw || '').trim().replace(/^#+/, '').trim();
-  }
-
   function wireNewRequestForm() {
     document.getElementById('new-request-submit').addEventListener('click', function () {
-      var bookingId = normalizeBookingIdInput(document.getElementById('new-request-booking-id').value);
+      // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own
+      // comment (added after this exact gap was hit live testing this
+      // form) — every booking ID displayed anywhere in the Ops UX is
+      // shown '#'-prefixed, so staff copying it in from All Bookings or
+      // this page's own queue need that '#' stripped before it's used for
+      // a lookup.
+      var bookingId = OpsShell.normalizeBookingIdInput(document.getElementById('new-request-booking-id').value);
       if (!bookingId) { showError('Enter a booking ID first.'); return; }
       var concern = document.getElementById('new-request-concern').value.trim();
       startSwapForBooking(bookingId, concern);
