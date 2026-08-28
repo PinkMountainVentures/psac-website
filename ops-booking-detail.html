@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Booking Detail | PSAC Ops</title>
+<!--
+  ops-booking-detail.html
+
+  NEW (Aug 2026): the page All Bookings' "→ Booking detail" link now
+  actually goes to. Before this existed, that link just routed back into
+  All Bookings pre-filtered to one booking ID — the closest approximation
+  available at the time. Airey asked for a real single page showing
+  EVERYTHING known about one booking: booking details, payment details,
+  Adventure Prep (trail preferences, confirmed roster, final gear kit
+  count/assignment, waiver status per roster member), gear checkout, gear
+  delivery/pickup, gear check-in, trail swap history, manual adjustment
+  history, and reconciliation.
+
+  Backed by one new aggregator action, bookingDetail_get
+  (apps-script/booking-detail-actions.gs), wired through
+  api/ops-proxy.js's 'getBookingDetail' READ_ACTIONS entry — one call
+  instead of nine. See that .gs file's own header for why it calls the
+  already-correct gearOps_* / opsRedesign_* helpers directly instead of
+  re-deriving any of their logic.
+
+  Deliberately NOT added to OpsShell.NAV_ITEMS — this page only makes
+  sense with a ?bookingId= in the URL, it's a drill-down from All
+  Bookings (or anywhere else that links to a specific booking), not a
+  section of the app someone browses to directly. No sidebar item is
+  highlighted while here.
+
+  Roster objects and Waiver Signatures rows are rendered generically
+  (whatever keys are actually present on each record) rather than against
+  a hardcoded field list — the roster shape in particular has an
+  unresolved ageRange (lib/trail-selection-engine.js) vs. age
+  (trail-swap-actions.gs's trailSwap_familyTierEligible_) inconsistency
+  elsewhere in this codebase, and this page shouldn't have to be edited
+  every time a roster/waiver field gets added or renamed somewhere else.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-app { max-width:1100px; }
+  .ops-back-link { display:inline-block; font-size:0.78rem; color:#2A6F97; text-decoration:none; margin-bottom:0.9rem; }
+
+  .summary-card { border:1px solid var(--ops-border); border-radius:8px; padding:1.1rem 1.4rem; margin-bottom:1.2rem; display:flex; flex-wrap:wrap; gap:1.6rem; align-items:center; }
+  .summary-id { font-size:1.05rem; font-weight:700; color:var(--dark-pine); }
+  .summary-sub { font-size:0.8rem; color:var(--ops-text-mid); }
+
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.3rem 1.5rem; margin-bottom:1.1rem; }
+  .ops-panel-title { font-size:0.92rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
+  .ops-panel-subtitle { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin:1rem 0 0.5rem; }
+  .ops-panel-subtitle:first-child { margin-top:0; }
+
+  .kv-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:0.7rem 1.4rem; }
+  .kv-item { font-size:0.82rem; }
+  .kv-label { font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); margin-bottom:0.2rem; }
+  .kv-value { color:var(--ops-text); word-break:break-word; }
+  .kv-value.empty { color:var(--ops-text-mid); }
+
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+  .ops-table th { text-align:left; font-size:0.64rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.5rem 0.6rem; border-bottom:2px solid var(--ops-border); white-space:nowrap; }
+  .ops-table td { padding:0.55rem 0.6rem; border-bottom:1px solid var(--ops-border); vertical-align:top; }
+  .ops-table tr:last-child td { border-bottom:none; }
+  .ops-table tr:hover td { background:#FAFBFB; }
+  .table-scroll-wrap { overflow-x:auto; border:1px solid var(--ops-border); border-radius:6px; -webkit-overflow-scrolling:touch; }
+
+  .ops-tag { display:inline-block; font-size:0.64rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.2rem 0.5rem; border-radius:4px; white-space:nowrap; }
+  .ops-tag.confirmed { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.cancelled { background:#EDEDED; color:#6B7378; }
+  .ops-tag.reason { background:#E7ECEE; color:#3E4A50; font-weight:600; text-transform:none; letter-spacing:0; margin-left:0.25rem; }
+  .ops-tag.pay-succeeded, .ops-tag.hold-active, .ops-tag.hold-released, .ops-tag.hold-full { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.pay-pending, .ops-tag.hold-placed, .ops-tag.hold-partial { background:#FFF3D6; color:#8a6300; }
+  .ops-tag.pay-failed, .ops-tag.hold-failed { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.na { background:#EDEDED; color:#8a8f93; }
+  .ops-tag.staff { background:#E7ECEE; color:#3E4A50; }
+  .ops-tag.system { background:#FDECE0; color:#9A5B1E; }
+  .ops-tag.open { background:rgba(245,130,113,0.15); color:#b04a2a; }
+  .ops-tag.resolved { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.yes { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.no { background:#EDEDED; color:#8a8f93; }
+
+  .ops-empty-inline { font-size:0.8rem; color:var(--ops-text-mid); padding:0.4rem 0; }
+  .roster-source-note { font-size:0.72rem; color:var(--ops-text-mid); margin-bottom:0.6rem; font-style:italic; }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div id="ops-search-container"></div>
+      <a class="ops-back-link" href="ops-all-bookings.html">&larr; Back to All Bookings</a>
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var opsCall = OpsShell.opsCall;
+
+  var PAY_LABELS = { succeeded: ['Succeeded', 'pay-succeeded'], pending: ['Pending', 'pay-pending'], failed: ['Failed', 'pay-failed'] };
+  var HOLD_LABELS = { not_yet_placed: ['Not Yet Placed', 'hold-placed'], active: ['Active', 'hold-active'], released: ['Released', 'hold-released'], captured_partial: ['Captured (partial)', 'hold-partial'], captured_full: ['Captured (full)', 'hold-full'], failed: ['Failed', 'hold-failed'] };
+
+  function tag(pair) { return pair ? '<span class="ops-tag ' + pair[1] + '">' + escapeHtml(pair[0]) + '</span>' : ''; }
+  function yesNoTag(v) {
+    if (v === '' || v == null) return '<span class="kv-value empty">—</span>';
+    var truthy = v === true || v === 'true' || v === 'TRUE' || v === 'yes' || v === 'Yes';
+    return '<span class="ops-tag ' + (truthy ? 'yes' : 'no') + '">' + (truthy ? 'Yes' : 'No') + '</span>';
+  }
+
+  function fmtVal(v) {
+    if (v === '' || v == null) return '<span class="kv-value empty">—</span>';
+    if (Array.isArray(v)) return v.length ? escapeHtml(v.join(', ')) : '<span class="kv-value empty">—</span>';
+    if (typeof v === 'object') return '<span class="kv-value">' + escapeHtml(JSON.stringify(v)) + '</span>';
+    return escapeHtml(String(v));
+  }
+
+  function fmtMoney(cents) {
+    if (cents === '' || cents == null || isNaN(Number(cents))) return '<span class="kv-value empty">—</span>';
+    return '$' + (Number(cents) / 100).toFixed(2);
+  }
+
+  // Generic label-ify for a camelCase key when no explicit label is given —
+  // used by genericTable/kvGrid so a field neither this page nor its
+  // backing .gs file was written with foreknowledge of (e.g. whichever of
+  // ageRange/age a given roster row actually has) still renders readably
+  // instead of being silently dropped.
+  function labelize(key) {
+    return String(key)
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/^./, function (c) { return c.toUpperCase(); });
+  }
+
+  function kvGrid(fields) {
+    // fields: array of [label, value] or [label, value, renderer]
+    var items = fields.map(function (f) {
+      var label = f[0], value = f[1], renderer = f[2];
+      var html = renderer ? renderer(value) : fmtVal(value);
+      return '<div class="kv-item"><div class="kv-label">' + escapeHtml(label) + '</div><div class="kv-value">' + html + '</div></div>';
+    }).join('');
+    return '<div class="kv-grid">' + items + '</div>';
+  }
+
+  // Renders an array of plain objects as a table. `columns` is optional —
+  // [{key, label}, ...]; when omitted, columns are the union of keys seen
+  // across every row, in first-seen order, so this never silently hides a
+  // field the backend added that this page doesn't know about yet.
+  function genericTable(rows, columns, emptyMessage) {
+    if (!rows || !rows.length) return '<div class="ops-empty-inline">' + escapeHtml(emptyMessage || 'None on record.') + '</div>';
+    if (!columns) {
+      var seen = {}; var keys = [];
+      rows.forEach(function (r) { Object.keys(r).forEach(function (k) { if (!seen[k]) { seen[k] = true; keys.push(k); } }); });
+      columns = keys.map(function (k) { return { key: k, label: labelize(k) }; });
+    }
+    var thead = '<tr>' + columns.map(function (c) { return '<th>' + escapeHtml(c.label) + '</th>'; }).join('') + '</tr>';
+    var tbody = rows.map(function (r) {
+      return '<tr>' + columns.map(function (c) {
+        var v = c.render ? c.render(r) : fmtVal(r[c.key]);
+        return '<td>' + v + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<div class="table-scroll-wrap"><table class="ops-table"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+  }
+
+  function panel(title, innerHtml, subtitleNote) {
+    return '<div class="ops-panel"><div class="ops-panel-title">' + escapeHtml(title) + '</div>'
+      + (subtitleNote ? '<div class="roster-source-note">' + escapeHtml(subtitleNote) + '</div>' : '')
+      + innerHtml + '</div>';
+  }
+
+  function renderSummary(b) {
+    var statusTag = b.bookingStatusBucket === 'cancelled'
+      ? '<span class="ops-tag cancelled">Cancelled</span>' + (b.cancellationReasons || []).map(function (r) { return '<span class="ops-tag reason">' + escapeHtml(OpsShell.cancellationReasonLabel(r)) + '</span>'; }).join('')
+      : '<span class="ops-tag confirmed">Confirmed</span>';
+    return '<div class="summary-card">'
+      + '<div><div class="summary-id">#' + escapeHtml(b.bookingId) + '</div><div class="summary-sub">' + escapeHtml(b.contactName || '') + ' · ' + escapeHtml(b.contactEmail || '') + '</div></div>'
+      + '<div><div class="kv-label">Trail Day</div><div class="kv-value">' + escapeHtml(String(b.tripDate || '').slice(0, 10) || '—') + '</div></div>'
+      + '<div><div class="kv-label">Tier</div><div class="kv-value">' + fmtVal(b.tier) + '</div></div>'
+      + '<div><div class="kv-label">Status</div><div class="kv-value">' + statusTag + '</div></div>'
+      + '</div>';
+  }
+
+  function renderBookingDetails(b) {
+    return panel('Booking Details', kvGrid([
+      ['Booking ID', b.bookingId],
+      ['Created At', b.createdAt],
+      ['Contact Name', b.contactName],
+      ['Contact Email', b.contactEmail],
+      ['Contact Phone', b.contactPhone],
+      ['Tier', b.tier],
+      ['Trail Day', String(b.tripDate || '').slice(0, 10)],
+      ['Time Preference', b.timePreference],
+      ['Gear Kit Count', b.gearKitCount],
+      ['Duffel Count', b.duffelCount],
+      ['SMS Consent', b.smsConsent, yesNoTag],
+      ['Cancelled At', b.cancelledAt],
+      ['Refund Amount', b.refundAmount],
+    ]));
+  }
+
+  function renderPaymentDetails(p) {
+    return panel('Payment Details', kvGrid([
+      ['Total', p.total, fmtMoney],
+      ['Payment Status', p.paymentStatusBucket, function (v) { return tag(PAY_LABELS[v] || PAY_LABELS.succeeded); }],
+      ['Main Payment Intent', p.mainPaymentIntentId],
+      ['Hold (Deposit) Status', p.holdStatusBucket, function (v) { return tag(HOLD_LABELS[v] || HOLD_LABELS.not_yet_placed); }],
+      ['Deposit Payment Intent', p.depositPaymentIntentId],
+      ['Deposit Status', p.depositStatus],
+    ]));
+  }
+
+  function renderAdventurePrep(ap, waivers) {
+    if (!ap.exists) {
+      return panel('Adventure Prep', '<div class="ops-empty-inline">This booking hasn\'t reached Adventure Prep yet — showing booking-time roster only below.</div>'
+        + '<div class="ops-panel-subtitle">Booking-time Roster</div>'
+        + renderRoster(ap.roster, ap.rosterSource));
+    }
+
+    var trailPrefsHtml = kvGrid([
+      ['Technical Comfort', ap.technicalComfort],
+      ['Heat Comfort', ap.heatComfort],
+      ['Best-For Attributes', ap.bestForAttributes],
+      ['Candidate Trails', ap.candidateTrails],
+      ['Selected Trail', ap.selectedTrailId],
+      ['Assigned At', ap.assignedAt],
+      ['Assignment Method', ap.assignmentMethod],
+    ]);
+
+    var kitHtml = kvGrid([
+      ['Confirmed Kit Count', ap.confirmedKitCount],
+      ['Pending Kit Count', ap.pendingKitCount],
+      ['All Waivers Complete', ap.allWaiversComplete, yesNoTag],
+    ]) + '<div class="ops-panel-subtitle" style="margin-top:0.9rem;">Delivery Address on File</div>' + kvGrid([
+      ['Address Line 1', ap.deliveryAddressLine1],
+      ['Address Line 2', ap.deliveryAddressLine2],
+      ['City', ap.deliveryCity],
+      ['State', ap.deliveryState],
+      ['Zip', ap.deliveryZip],
+      ['Delivery Window', ap.deliveryWindow],
+      ['Return Preference', ap.returnPreference],
+    ]);
+
+    var waiverColumns = [
+      { key: 'signerName', label: 'Signer' },
+      { key: 'role', label: 'Role' },
+      { key: 'rosterRef', label: 'Roster Ref' },
+      { key: 'status', label: 'Status', render: function (r) { var s = String(r.status || '').toLowerCase(); return tag([r.status || '—', s === 'signed' ? 'confirmed' : (s === 'sent' || s === 'opened' ? 'hold-placed' : 'na')]); } },
+      { key: 'sentAt', label: 'Sent At' },
+      { key: 'openedAt', label: 'Opened At' },
+      { key: 'signedAt', label: 'Signed At' },
+      { key: 'isGuardian', label: 'Guardian?', render: function (r) { return yesNoTag(r.isGuardian); } },
+    ];
+
+    return panel('Adventure Prep', ''
+      + '<div class="ops-panel-subtitle">Trail Preferences</div>' + trailPrefsHtml
+      + '<div class="ops-panel-subtitle">Confirmed Roster</div>' + renderRoster(ap.roster, ap.rosterSource)
+      + '<div class="ops-panel-subtitle">Final Gear Kit Count &amp; Delivery</div>' + kitHtml
+      + '<div class="ops-panel-subtitle">Waiver Status per Roster Member</div>' + genericTable(waivers, waiverColumns, 'No waiver records for this booking yet.')
+    );
+  }
+
+  // Roster objects come from either Adventure Prep's reconfirmed roster or
+  // the original booking-time payload — rendered generically (union of
+  // whatever keys are actually present) rather than a hardcoded field list,
+  // since this codebase has an unresolved ageRange/age naming
+  // inconsistency between lib/trail-selection-engine.js and
+  // trail-swap-actions.gs for what is conceptually the same field. This
+  // way the page shows whichever one a given roster row actually has
+  // instead of silently blanking it.
+  function renderRoster(roster, source) {
+    var note = source === 'reconfirmed' ? 'Reconfirmed during Adventure Prep.' : (source === 'booking_time' ? 'Booking-time roster — not yet reconfirmed through Adventure Prep.' : '');
+    var table = genericTable(roster, null, 'No roster on file for this booking.');
+    return (note ? '<div class="roster-source-note">' + escapeHtml(note) + '</div>' : '') + table;
+  }
+
+  function renderGearCheckout(allocation) {
+    var columns = [
+      { key: 'kitNumber', label: 'Kit #' },
+      { key: 'personName', label: 'Assigned To' },
+      { key: 'itemName', label: 'Item' },
+      { key: 'unitId', label: 'Unit ID' },
+      { key: 'checkedOutAt', label: 'Checked Out At' },
+    ];
+    return panel('Gear Checkout Details', genericTable(allocation, columns, 'No gear has been checked out for this booking yet.'));
+  }
+
+  function renderDelivery(d) {
+    if (!d) return panel('Gear Delivery / Pickup Details', '<div class="ops-empty-inline">No delivery/pickup context on record.</div>');
+    return panel('Gear Delivery / Pickup Details', ''
+      + '<div class="ops-panel-subtitle">Delivery</div>' + kvGrid([
+        ['Delivery Status', d.deliveryStatus],
+        ['Delivery Address', [d.deliveryAddressLine1, d.deliveryAddressLine2, d.deliveryCity, d.deliveryState, d.deliveryZip].filter(Boolean).join(', ') || d.deliveryAddressRaw],
+        ['Delivery Window', d.deliveryWindow],
+        ['Service Type', d.deliveryServiceType],
+        ['Time Slot', d.deliveryTimeSlot],
+        ['Ready At', d.deliveryReadyAt],
+        ['Scheduled At', d.deliveryScheduledAt],
+        ['Delivered At', d.gearDeliveredAt],
+        ['Delivered By', d.gearDeliveredBy],
+      ])
+      + '<div class="ops-panel-subtitle">Pickup / Return</div>' + kvGrid([
+        ['Return Status', d.returnStatus],
+        ['Pickup Service Type', d.pickupServiceType],
+        ['Pickup Address Override', d.pickupAddressOverride],
+        ['Pickup Time Note', d.pickupTimeNote],
+        ['Picked Up At', d.pickedUpAt],
+        ['Gear Returned At', d.gearReturnedAt],
+      ])
+    );
+  }
+
+  function renderCheckin(c) {
+    if (!c || !c.items) return panel('Gear Check-In Details', '<div class="ops-empty-inline">No check-in records for this booking yet.</div>');
+    var columns = [
+      { key: 'itemName', label: 'Item' },
+      { key: 'unitId', label: 'Unit ID' },
+      { key: 'personName', label: 'Assigned To' },
+      { key: 'condition', label: 'Condition' },
+      { key: 'checkedInAt', label: 'Checked In At' },
+      { key: 'graceDeadline', label: 'Grace Deadline' },
+      { key: 'recoveredAt', label: 'Recovered At' },
+      { key: 'usesSinceDeepClean', label: 'Uses Since Deep Clean' },
+      { key: 'notes', label: 'Notes' },
+    ];
+    return panel('Gear Check-In Details', genericTable(c.items, columns, 'No check-in records for this booking yet.'));
+  }
+
+  function renderTrailSwaps(swaps) {
+    var columns = [
+      { key: 'guestConcernSummary', label: 'Concern / Flag' },
+      { key: 'status', label: 'Status', render: function (r) { return tag([r.status || '—', r.status === 'Resolved' ? 'resolved' : 'open']); } },
+      { key: 'receivedAt', label: 'Received' },
+      { key: 'newTrailId', label: 'New Trail' },
+      { key: 'reviewedBy', label: 'Reviewed By' },
+      { key: 'resolvedAt', label: 'Resolved At' },
+      { key: 'safetyOverrideReason', label: 'Override Reason' },
+      { key: 'staffNotes', label: 'Staff Notes' },
+    ];
+    return panel('Trail Swap Details', genericTable(swaps, columns, 'No trail swap requests for this booking.'));
+  }
+
+  function renderChangeLog(log) {
+    var columns = [
+      { key: 'timestamp', label: 'When' },
+      { key: 'changeType', label: 'Change Type' },
+      { key: 'staffNotes', label: 'Notes' },
+      { key: 'delta', label: 'Delta' },
+      { key: 'refundOrChargeAmount', label: 'Refund/Charge' },
+      { key: 'beforeT3Cutoff', label: 'Before T-3', render: function (r) { return yesNoTag(r.beforeT3Cutoff); } },
+    ];
+    return panel('Manual Adjustment History', genericTable(log, columns, 'No manual adjustments or logged changes for this booking.'), 'Most recent first.');
+  }
+
+  function renderReconciliation(r) {
+    if (!r || r.notFound) return panel('Reconciliation Details', '<div class="ops-empty-inline">No reconciliation context on record.</div>');
+    var itemColumns = [
+      { key: 'itemName', label: 'Item' },
+      { key: 'unitId', label: 'Unit ID' },
+      { key: 'condition', label: 'Condition' },
+      { key: 'graceDeadline', label: 'Grace Deadline' },
+      { key: 'recoveredAt', label: 'Recovered At' },
+      { key: 'replacementCostCents', label: 'Replacement Cost', render: function (row) { return fmtMoney(row.replacementCostCents); } },
+    ];
+    return panel('Reconciliation Details', ''
+      + kvGrid([
+        ['Settled', r.settled, yesNoTag],
+        ['Last Item Update', r.lastItemUpdateIso],
+        ['Reconciled At', r.reconciledAt],
+        ['Reconciled Amount', r.reconciledAmountCents, fmtMoney],
+        ['Gear Shortfall', r.gearShortfallCents, fmtMoney],
+        ['Shortfall Charge ID', r.shortfallChargeId],
+        ['Shortfall Charged At', r.shortfallChargedAt],
+        ['Shortfall Charged Amount', r.shortfallChargedAmountCents, fmtMoney],
+        ['Deposit Refund ID', r.depositRefundId],
+        ['Deposit Refund Amount', r.depositRefundAmountCents, fmtMoney],
+        ['Shortfall Refund ID', r.shortfallRefundId],
+        ['Shortfall Refund Amount', r.shortfallRefundAmountCents, fmtMoney],
+        ['Refunded At', r.refundedAt],
+      ])
+      + '<div class="ops-panel-subtitle">Itemized Gear Condition</div>' + genericTable(r.items, itemColumns, 'No itemized gear records for this booking.')
+    );
+  }
+
+  function renderAll(data) {
+    var html = renderSummary(data.booking)
+      + renderBookingDetails(data.booking)
+      + renderPaymentDetails(data.payment)
+      + renderAdventurePrep(data.adventurePrep, data.waivers || [])
+      + renderGearCheckout(data.gearAllocation || [])
+      + renderDelivery(data.deliveryContext)
+      + renderCheckin(data.checkinContext)
+      + renderTrailSwaps(data.trailSwaps || [])
+      + renderChangeLog(data.changeLog || [])
+      + renderReconciliation(data.reconciliation);
+    document.getElementById('detail-content').innerHTML = html;
+  }
+
+  function showError(message) {
+    var el = document.getElementById('error-banner');
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  function getQueryParam(name) {
+    var m = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
+  }
+
+  function load() {
+    var bookingId = OpsShell.normalizeBookingIdInput(getQueryParam('bookingId') || '');
+    if (!bookingId) {
+      showError('No booking ID provided — open this page from a booking\'s "Booking detail" link on All Bookings.');
+      return;
+    }
+    document.getElementById('ops-subtitle').textContent = '#' + bookingId;
+    OpsShell.withLoadingState(document.getElementById('detail-content'), function () {
+      return opsCall('getBookingDetail', { bookingId: bookingId }).then(function (result) {
+        if (!result.ok) { showError('Could not load booking detail.'); throw new Error('load failed'); }
+        if (result.data && result.data.notFound) {
+          document.getElementById('detail-content').innerHTML = '';
+          showError('No booking found with that ID — double check it against All Bookings.');
+          return;
+        }
+        renderAll(result.data);
+      });
+    });
+  }
+
+  OpsShell.boot({
+    activeHref: '',
+    title: 'Booking Detail',
+    subtitle: '',
+    onReady: function () {
+      load();
+    },
+  });
+})();
+</script>
+</body>
+</html>

@@ -318,6 +318,9 @@ function doPost(e) {
       out = stalled_markCalled(body);
     } else if (body.action === 'cancellations_listAll') {
       out = cancellations_listAll(body);
+    // ---- Booking Detail page (booking-detail-actions.gs, Aug 2026) ----
+    } else if (body.action === 'bookingDetail_get') {
+      out = bookingDetail_get(body);
     // ---- Ops App Redesign Round 2 (ops-redesign-round2-actions.gs) ----
     } else if (body.action === 'gearOps_markReadyForDelivery') {
       out = gearOps_markReadyForDelivery(body);

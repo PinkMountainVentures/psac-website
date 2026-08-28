@@ -15,11 +15,17 @@
   Link-out stacking order matches the Aug 27 confirmed revision
   (claude/psac-ops-redesign-open-items-confirmed.md item 1): every applicable
   destination shown, stacked, in the six-tier priority order, never a single
-  pick. "→ Booking detail" always last. There is no dedicated booking-detail
-  page yet anywhere in this app — that link currently routes back to this
-  same page pre-filtered to the booking ID, which is the closest existing
-  approximation of "a plain read-only record" until a real detail view is
-  built. Flagged in the handoff doc, not silently invented as a new page.
+  pick. "→ Booking detail" always last.
+
+  Round 2 (Aug 2026): "→ Booking detail" now routes to the real
+  ops-booking-detail.html page (backed by apps-script/booking-detail-
+  actions.gs's bookingDetail_get) instead of back into this same page
+  pre-filtered to one booking ID. Also: Booking Status now defaults to
+  Confirmed (the page's baseline browsing view — a deep link via ?q=
+  overrides back to All so a specific lookup is never hidden by the
+  default), and the list is now explicitly sorted by trail day ascending
+  client-side too, not just trusted to arrive that way from
+  allBookings_listAll.
 -->
 <link rel="stylesheet" href="ops-shell.css">
 <style>
@@ -96,7 +102,7 @@
       <div id="error-banner" class="ops-error-banner hidden"></div>
 
       <div class="filter-bar">
-        <div class="filter-field"><label>Booking Status</label><select id="f-booking"><option value="">All</option><option value="confirmed">Confirmed</option><option value="cancelled">Cancelled</option></select></div>
+        <div class="filter-field"><label>Booking Status</label><select id="f-booking"><option value="">All</option><option value="confirmed" selected>Confirmed</option><option value="cancelled">Cancelled</option></select></div>
         <div class="filter-field"><label>Payment Status</label><select id="f-payment"><option value="">All</option><option value="succeeded">Succeeded</option><option value="failed">Failed</option><option value="pending">Pending</option></select></div>
         <div class="filter-field"><label>Hold Status</label><select id="f-hold"><option value="">All</option><option value="not_yet_placed">Not Yet Placed</option><option value="active">Active</option><option value="released">Released</option><option value="captured_partial">Captured (partial)</option><option value="captured_full">Captured (full)</option><option value="failed">Failed</option></select></div>
         <div class="filter-field"><label>Delivery Status</label><select id="f-delivery"><option value="">All</option><option value="__NA__">N/A</option><option value="ready_for_delivery">Ready for Delivery</option><option value="delivery_scheduled">Delivery Scheduled</option><option value="delivered">Delivered</option></select></div>
@@ -149,7 +155,11 @@
     links.push('<a class="row-link tier3" href="ops-trail-swap-requests.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; ' + (b.hasOpenTrailSwap ? 'Trail Swap Requests' : 'Start Trail Swap') + '</a>');
     if (b.checkoutStarted && !b.checkoutDelivered) links.push('<a class="row-link tier4" href="ops-gear-checkout.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Gear Assembly &amp; Checkout</a>');
     if (b.checkoutDelivered && !b.checkedIn) links.push('<a class="row-link tier5" href="ops-gear-checkin.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Return Check-In</a>');
-    links.push('<a class="row-link tier6" href="ops-all-bookings.html?q=' + encodeURIComponent(b.bookingId) + '">&rarr; Booking detail</a>');
+    // BUG FIX (Aug 2026): this used to route back into this same page,
+    // pre-filtered to the booking ID — the closest approximation available
+    // before a real Booking Detail page existed (see this file's own
+    // header). Now points at the real thing.
+    links.push('<a class="row-link tier6" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Booking detail</a>');
     return '<div class="link-stack">' + links.join('') + '</div>';
   }
 
@@ -223,6 +233,17 @@
       if (fTo && tripDate > fTo) return false;
       return true;
     });
+    // BUG FIX (Aug 2026): the pager row has always claimed "Sort: trail day
+    // ascending", but nothing ever actually sorted `list` — it rendered in
+    // whatever order listAllBookings happened to return. Sorts here now, so
+    // the label is actually true: closest trail day first, farthest last.
+    // A missing/blank trip date sorts to the very end rather than the
+    // start (an empty string would otherwise sort before every real date).
+    list.sort(function (a, b) {
+      var da = String(a.tripDate || '').slice(0, 10) || '9999-99-99';
+      var db = String(b.tripDate || '').slice(0, 10) || '9999-99-99';
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
     renderRows(list);
   }
 
@@ -241,7 +262,11 @@
     document.getElementById(id).addEventListener('change', applyFilters);
   });
   document.getElementById('f-clear').addEventListener('click', function () {
-    ['f-booking', 'f-payment', 'f-hold', 'f-delivery', 'f-return', 'f-date-from', 'f-date-to'].forEach(function (id) { document.getElementById(id).value = ''; });
+    // "Clear filters" resets to this page's own default view — Confirmed
+    // only — not a blank "All", now that Confirmed is the baseline (see
+    // f-booking's default-selected option and boot()'s onReady below).
+    document.getElementById('f-booking').value = 'confirmed';
+    ['f-payment', 'f-hold', 'f-delivery', 'f-return', 'f-date-from', 'f-date-to'].forEach(function (id) { document.getElementById(id).value = ''; });
     var url = new URL(window.location.href); url.searchParams.delete('q'); window.history.replaceState({}, '', url);
     applyFilters();
   });
@@ -257,6 +282,14 @@
       var q = new URLSearchParams(window.location.search).get('q');
       var input = document.getElementById('ops-shell-search-input');
       if (input && q) input.value = q;
+      // BUG FIX (Aug 2026): the Booking Status filter now defaults to
+      // Confirmed (its <option selected> in the HTML) — that's the right
+      // baseline for browsing, but a booking someone deep-linked to by ID
+      // (?q=...), e.g. from Cancellations or Ops Alerts, might genuinely be
+      // Cancelled. Force the filter back to "All" in that one case so a
+      // deliberate lookup of a specific booking is never hidden by a
+      // default the visitor didn't choose.
+      if (q) document.getElementById('f-booking').value = '';
       loadBookings();
     },
   });

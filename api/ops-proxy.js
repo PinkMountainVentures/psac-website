@@ -65,6 +65,7 @@ const READ_ACTIONS = {
   getTrailSwapRequestContext: (body) => callBookingsWebApp('trailSwap_getRequestContext', { swapRequestId: body.swapRequestId }),
   // Ops App Redesign (Aug 2026) — apps-script/ops-redesign-round1-actions.gs.
   listAllBookings: () => callBookingsWebApp('allBookings_listAll', {}),
+  getBookingDetail: (body) => callBookingsWebApp('bookingDetail_get', { bookingId: body.bookingId }),
   listOpsAlertsExpanded: () => callBookingsWebApp('opsAlerts_listExpanded', { nowIso: new Date().toISOString() }),
   listStalledBookings: () => callBookingsWebApp('stalled_listAll', {}),
   listCancellations: () => callBookingsWebApp('cancellations_listAll', {}),
