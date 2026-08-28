@@ -19,6 +19,25 @@
   boilerplate, unaware of the redesign's other new pages (All Bookings,
   Ops Alerts, Stalled Bookings, Cancellations). No functional change to
   the trail-swap review flow itself.
+
+  Round 3 (Aug 2026, trail-selection live-testing investigation follow-up):
+  added the "Start a trail swap" form and ?bookingId= deep-link handling.
+  Before this, the ONLY way into the review panel was clicking an existing
+  row in this page's own queue — the backend's staff-initiated intake path
+  (trailSwap_logIntake, wired via ops-proxy's 'logTrailSwapIntake' action)
+  was already fully built and working, nothing on this page or any other
+  ops page ever called it. There was no way to manually start a trail swap
+  review for an arbitrary booking, system-generated or not. The new form
+  validates the booking exists (a read-only getTrailSwapDropdownOptions
+  call) BEFORE creating a swap-request row for it — creating one for a
+  bad/mistyped booking ID is exactly the "row referencing a booking that
+  doesn't exist" failure this page was just debugged out of, so this
+  checks first instead of finding out after the fact. ops-all-bookings.html
+  now also links here for every booking (label varies: "Start Trail Swap"
+  vs "Trail Swap Requests"), previously only for ones with an open request
+  already — this page's ?bookingId= param jumps straight into review if an
+  open request already exists for that booking, otherwise pre-fills the
+  new form.
 -->
 <link rel="stylesheet" href="ops-shell.css">
 <style>
@@ -69,6 +88,12 @@
       </div>
       <div id="ops-search-container"></div>
       <div id="error-banner" class="ops-error-banner hidden"></div>
+      <div class="ops-panel" id="new-request-panel">
+        <div class="ops-panel-title">Start a trail swap</div>
+        <div class="ops-form-row"><label>Booking ID</label><input class="ops-input" id="new-request-booking-id" placeholder="e.g. BK-00231"></div>
+        <div class="ops-form-row"><label>Concern (optional)</label><textarea class="ops-textarea" id="new-request-concern" placeholder="Why does this booking need a different trail?"></textarea></div>
+        <div class="ops-panel-footer"><button class="ops-btn" id="new-request-submit">Start swap review</button></div>
+      </div>
       <div id="queue-view"></div>
       <div id="review-view"></div>
     </div>
@@ -97,7 +122,16 @@
     technical_ceiling: 'Technical ceiling',
   };
 
+  var lastRequests = [];
+  var deepLinkHandled = false;
+
+  function getQueryParam(name) {
+    var m = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
+  }
+
   function renderQueue(requests) {
+    lastRequests = requests;
     document.getElementById('review-view').innerHTML = '';
     var container = document.getElementById('queue-view');
     if (!requests.length) {
@@ -132,7 +166,79 @@
       return opsCall('listTrailSwapRequests', {}).then(function (result) {
         if (!result.ok) { showError('Could not load Trail Swap Requests.'); return; }
         renderQueue(result.data.requests || []);
+        if (!deepLinkHandled) {
+          deepLinkHandled = true;
+          handleDeepLink();
+        }
       });
+    });
+  }
+
+  /**
+   * ?bookingId=... arrives from ops-all-bookings.html's row link, for EVERY
+   * booking now (not just ones that already have an open request — see this
+   * file's header). If this booking already has an open (non-Resolved)
+   * request, jump straight into reviewing it, same as clicking its row
+   * would. Otherwise there's nothing to review yet — pre-fill the "Start a
+   * trail swap" form so staff just has to add a concern note and submit,
+   * rather than re-typing the booking ID they just came from.
+   */
+  function handleDeepLink() {
+    var qBookingId = getQueryParam('bookingId');
+    if (!qBookingId) return;
+    var openRow = lastRequests.filter(function (r) {
+      return String(r.bookingId) === String(qBookingId) && r.status !== 'Resolved';
+    })[0];
+    if (openRow) {
+      openReview(openRow.swapRequestId, openRow.bookingId);
+      return;
+    }
+    var bidEl = document.getElementById('new-request-booking-id');
+    var concernEl = document.getElementById('new-request-concern');
+    if (bidEl) bidEl.value = qBookingId;
+    if (concernEl) concernEl.focus();
+  }
+
+  /**
+   * Creates a staff-initiated swap-request row (trailSwap_logIntake) for an
+   * arbitrary booking, then opens the review panel for it — the entry point
+   * this page never had (see header comment). Validates the booking exists
+   * FIRST via a read-only getTrailSwapDropdownOptions call before writing
+   * anything: creating a swap-request row that references a booking that
+   * doesn't exist is exactly the failure mode this page was just debugged
+   * out of (a corrupted/garbage bookingId reference makes the row
+   * unreviewable forever, "Could not load trail options for that
+   * booking"), so this checks first instead of finding out after the fact.
+   */
+  function startSwapForBooking(bookingId, guestConcernSummary) {
+    var submitBtn = document.getElementById('new-request-submit');
+    if (submitBtn) submitBtn.disabled = true;
+    opsCall('getTrailSwapDropdownOptions', { bookingId: bookingId }).then(function (checkResult) {
+      if (!checkResult.ok || (checkResult.data && checkResult.data.notFound)) {
+        if (submitBtn) submitBtn.disabled = false;
+        showError('No booking found with that ID — double check it against All Bookings.');
+        return;
+      }
+      opsCall('logTrailSwapIntake', { bookingId: bookingId, guestConcernSummary: guestConcernSummary || '' }).then(function (result) {
+        if (submitBtn) submitBtn.disabled = false;
+        if (!result.ok || !result.data || result.data.ok === false) {
+          showError('Could not start a trail swap for that booking.');
+          return;
+        }
+        document.getElementById('new-request-booking-id').value = '';
+        document.getElementById('new-request-concern').value = '';
+        openReview(result.data.swapRequestId, bookingId);
+        loadQueue();
+      });
+    });
+  }
+
+  function wireNewRequestForm() {
+    document.getElementById('new-request-submit').addEventListener('click', function () {
+      var bookingId = document.getElementById('new-request-booking-id').value.trim();
+      if (!bookingId) { showError('Enter a booking ID first.'); return; }
+      var concern = document.getElementById('new-request-concern').value.trim();
+      startSwapForBooking(bookingId, concern);
     });
   }
 
@@ -230,6 +336,8 @@
       renderPanel(0);
     });
   }
+
+  wireNewRequestForm();
 
   OpsShell.boot({
     activeHref: 'ops-trail-swap-requests.html',

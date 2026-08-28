@@ -138,7 +138,15 @@
     var links = [];
     if (b.openAlertCount > 0) links.push('<a class="row-link tier1" href="ops-alerts.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Ops Alerts</a>');
     if (b.hasReconciliationCase) links.push('<a class="row-link tier2" href="ops-reconciliation-review.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Reconciliation Review</a>');
-    if (b.hasOpenTrailSwap) links.push('<a class="row-link tier3" href="ops-trail-swap-requests.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Trail Swap Requests</a>');
+    // BUG FIX (Aug 2026, trail-selection live-testing investigation
+    // follow-up): this used to only appear when hasOpenTrailSwap was
+    // already true — there was no path anywhere in the Ops UX to start a
+    // trail swap review for a booking that didn't already have one open.
+    // Always shown now; label reflects which case it is. Either way it
+    // deep-links into ops-trail-swap-requests.html?bookingId=..., which now
+    // knows how to handle both: jump straight into an existing open
+    // request, or pre-fill the "Start a trail swap" form for a new one.
+    links.push('<a class="row-link tier3" href="ops-trail-swap-requests.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; ' + (b.hasOpenTrailSwap ? 'Trail Swap Requests' : 'Start Trail Swap') + '</a>');
     if (b.checkoutStarted && !b.checkoutDelivered) links.push('<a class="row-link tier4" href="ops-gear-checkout.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Gear Assembly &amp; Checkout</a>');
     if (b.checkoutDelivered && !b.checkedIn) links.push('<a class="row-link tier5" href="ops-gear-checkin.html?bookingId=' + encodeURIComponent(b.bookingId) + '">&rarr; Return Check-In</a>');
     links.push('<a class="row-link tier6" href="ops-all-bookings.html?q=' + encodeURIComponent(b.bookingId) + '">&rarr; Booking detail</a>');
