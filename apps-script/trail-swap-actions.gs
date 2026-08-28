@@ -386,7 +386,17 @@ function trailSwap_familyTierEligible_(trail, roster) {
   if (!minors.length) return { applies: false, eligible: true };
   var kidFriendly = String(trail['Kid Friendly'] || '').toLowerCase() === 'yes';
   if (!kidFriendly) return { applies: true, eligible: false };
-  var minAgeRec = trail['Min Age Rec'];
+  // BUG FIX (Aug 2026, trail-selection live-testing investigation
+  // follow-up): this read `trail['Min Age Rec']`, missing the trailing
+  // period the real Trail Database column header actually has ("Min Age
+  // Rec."), confirmed against lib/normalize.js's own
+  // `row['Min Age Rec.']` lookup — the already-verified-correct real
+  // engine. The missing-period key always came back `undefined`, so this
+  // fell into the "genuinely uncertain, stays permissive" branch below for
+  // every trail, every time — never a thrown error, just a silently-skipped
+  // age-minimum check. Reads the correct key now, falling back to the old
+  // (wrong) key only for resilience.
+  var minAgeRec = trail['Min Age Rec.'] !== undefined ? trail['Min Age Rec.'] : trail['Min Age Rec'];
   if (minAgeRec === '' || minAgeRec == null || isNaN(Number(minAgeRec))) return { applies: true, eligible: true };
   var minAge = Number(minAgeRec);
   // A bucket only gives a lower bound, never an exact age, so an exact
@@ -471,13 +481,36 @@ function trailSwap_evaluateCeilings_(ss, bookingId, roster) {
  * are advisory flags the dropdown/Apply-button UI uses to trigger the
  * inline warning-and-reason gate.
  */
+// BUG FIX (Aug 2026, trail-selection live-testing investigation follow-up):
+// this used to read ONLY ap.reconfirmedRosterJson, defaulting to an EMPTY
+// roster ('[]') the moment that field was blank — which it always is until
+// the guest completes Adventure Prep's own roster-reconfirmation step
+// (1.2a). An empty roster means trailSwap_computeGroupCeilings_ finds no
+// fitness levels at all, so difficultyCeiling comes back null and the
+// whole ceilings block reports 'not evaluated, use judgment' even for a
+// booking with a perfectly real, known roster from the original booking
+// itself. lib/run-trail-assignment.js already solved this exact problem
+// for the guest-facing engine (see its own header comment: "Prefer
+// Adventure Prep's own reconfirmed roster ... falls back to the
+// booking-time roster only if 1.2a's reconfirmation step hasn't written
+// one yet") — this mirrors that same fallback here, using the Experience
+// Booking row's fullPayloadJson.roster this function already has access to
+// via `booking`. Note this only fixes the DIFFICULTY axis: the technical
+// axis genuinely has no booking-time equivalent (technicalComfort is an
+// Adventure-Prep-only question), so 'not evaluated' for Technical ceiling
+// specifically stays correct and expected until the guest gets there.
 function trailSwap_getDropdownOptions(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var booking = adventurePrep_findExperienceBookingById_(ss, payload.bookingId);
   if (!booking) return { notFound: true };
   var ap = adventurePrep_readAdventurePrepRow_(ss, payload.bookingId);
-  var roster = [];
-  try { roster = JSON.parse((ap && ap.reconfirmedRosterJson) || '[]'); } catch (e) { roster = []; }
+  var reconfirmedRoster = null;
+  if (ap && ap.reconfirmedRosterJson) {
+    try { reconfirmedRoster = JSON.parse(ap.reconfirmedRosterJson); } catch (e) { reconfirmedRoster = null; }
+  }
+  var fullPayload = {};
+  try { fullPayload = JSON.parse(booking.fullPayloadJson || '{}'); } catch (e) { fullPayload = {}; }
+  var roster = (reconfirmedRoster && reconfirmedRoster.length) ? reconfirmedRoster : (fullPayload.roster || []);
 
   var trails = trailSwap_readTrailsTab_(ss).filter(function (t) { return String(t['Bookable?']).toLowerCase() === 'yes'; });
   var parkAccessRows = trailSwap_readParkAccess_(ss);
@@ -490,8 +523,23 @@ function trailSwap_getDropdownOptions(payload) {
 
     var season = trailSwap_seasonStatus_(trail, tripDate);
     var family = trailSwap_familyTierEligible_(trail, roster);
-    var difficultyRating = Number(trail['Difficulty (1-5)'] || trail['Difficulty'] || 0);
-    var technicalRating = Number(trail['Technical Rating (1-5)'] || trail['Technical Rating'] || 0);
+    // BUG FIX (Aug 2026, trail-selection live-testing investigation
+    // follow-up): these read the ASCII-hyphen column names
+    // ('Difficulty (1-5)' / 'Technical Rating (1-5)'), but the real Trail
+    // Database headers use an EN DASH ('Difficulty (1–5)' /
+    // 'Technical Rating (1–5)', U+2013) — confirmed against
+    // lib/normalize.js's own `row['Difficulty (1–5)']` /
+    // `row['Technical Rating (1–5)']` lookups, the already-verified-correct
+    // real engine. The old keys never matched, so both ratings silently
+    // defaulted to 0 for every trail — never a thrown error, just every
+    // difficulty_ceiling/technical_ceiling check on this page comparing
+    // against 0 instead of the trail's real rating (which happens to still
+    // pass, since 0 is never above any ceiling — so this always UNDER-
+    // reported risk here, not over-reported it). Reads the correct
+    // en-dash key now, falling back to the old hyphen key and then the bare
+    // name only for resilience.
+    var difficultyRating = Number(trail['Difficulty (1–5)'] || trail['Difficulty (1-5)'] || trail['Difficulty'] || 0);
+    var technicalRating = Number(trail['Technical Rating (1–5)'] || trail['Technical Rating (1-5)'] || trail['Technical Rating'] || 0);
 
     var failedFilters = [];
     // BUG FIX (independent bug pass, Aug 2026): 'unknown' (a trip month not

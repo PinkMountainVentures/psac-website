@@ -88,10 +88,20 @@ var TRAIL_SELECTION_ADVENTURE_PREP_HEADERS = [
   'phoneFallbackDue', 't3CutoffProcessedAt',
 ];
 
+// BUG FIX (Aug 2026, trail-selection live-testing investigation): this was
+// missing 'swapRequestId' — the real "Trail Swap Requests" tab's actual
+// first column (see trail-swap-actions.gs's TRAIL_SWAP_REQUESTS_HEADERS,
+// the tab's real source of truth). Left as-was, trailSelection_setup()
+// below would silently overwrite the real header row's first 10 columns
+// with this WRONG, off-by-one list the next time anyone re-ran it — a
+// landmine independent of (but related to) the same off-by-one bug fixed
+// in trailSelection_openTrailSwapRequest below. Only used by
+// trailSelection_setup()'s defensive header check now — the write path no
+// longer depends on this array staying in sync with the sheet at all.
 var TRAIL_SELECTION_SWAP_REQUEST_HEADERS = [
-  'bookingId', 'guestConcernSummary', 'receivedAt', 'status', 'reviewedBy',
-  'newTrailId', 'staffNotes', 'resolvedAt', 'tierASafetyFiltersOverridden',
-  'safetyOverrideReason',
+  'swapRequestId', 'bookingId', 'guestConcernSummary', 'receivedAt', 'status',
+  'reviewedBy', 'newTrailId', 'staffNotes', 'resolvedAt',
+  'tierASafetyFiltersOverridden', 'safetyOverrideReason',
 ];
 
 /** Defensive header check for the two tabs this patch writes to. Safe to
@@ -285,22 +295,53 @@ function trailSelection_writeCandidateTrails(data) {
 //    those are staff-entered fields for when a HUMAN overrides Tier A while
 //    working the swap request, not something this system-generated open
 //    event has an opinion about yet.
+//
+// BUG FIX (Aug 2026, trail-selection live-testing investigation — the REAL,
+// CONFIRMED root cause of Symptom #2, "Could not load trail options for that
+// booking"): this used to build the row by mapping over
+// TRAIL_SELECTION_SWAP_REQUEST_HEADERS, a hardcoded local array — which is
+// MISSING the 'swapRequestId' column that's actually the real sheet's very
+// first column (see trail-swap-actions.gs's TRAIL_SWAP_REQUESTS_HEADERS,
+// and trailSelection_setup()'s own header-check against the real tab). That
+// off-by-one meant every system-generated row landed shifted one column to
+// the left of where it belonged: column A (really swapRequestId) got this
+// booking's bookingId, column B (really bookingId) got the
+// guestConcernSummary text, column C (really guestConcernSummary) got the
+// receivedAt timestamp, column D (really receivedAt) got the status string,
+// and so on. Confirmed directly: the Ops UX's "Concern / Flag" column was
+// showing raw ISO timestamps and "Received" was showing the literal word
+// "Open" for every system-generated row — exactly the shifted-by-one
+// signature. When staff clicked Review, the booking id the frontend sent
+// was actually the guestConcernSummary text, which of course matched no
+// real booking — `adventurePrep_findExperienceBookingById_` came back null,
+// this function's own caller (trailSwap_getDropdownOptions) returned
+// `{ notFound: true }`, and the Ops UX showed "Could not load trail options
+// for that booking." Every prior fix to trailSwap_readTrailsTab_ /
+// trailSwap_readTrailsRows_ was real and necessary but could never have
+// fixed THIS — the booking lookup was failing before any of that code ever
+// ran. Rewritten to write by real header name (adventurePrep_headerMap_,
+// the same shared helper trailSwap_logIntake already uses for this exact
+// tab) instead of trusting a hardcoded array to stay in sync with the
+// actual sheet, and to actually assign a swapRequestId — the old code never
+// wrote one at all. NOTE: this fix only prevents NEW system-generated rows
+// from being corrupted; any existing shifted rows already on the sheet stay
+// shifted and will keep failing "Could not load trail options" until
+// manually corrected or resolved/removed.
 // ---------------------------------------------------------------------------
 function trailSelection_openTrailSwapRequest(data) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Trail Swap Requests');
-    var headers = TRAIL_SELECTION_SWAP_REQUEST_HEADERS;
-    var row = headers.map(function (h) {
-      if (h === 'bookingId') return data.bookingId;
-      if (h === 'guestConcernSummary') return data.guestConcernSummary;
-      if (h === 'receivedAt') return data.receivedAt;
-      if (h === 'status') return data.status || 'Open';
-      return ''; // reviewedBy, newTrailId, staffNotes, resolvedAt, override fields — staff fills these in later
-    });
+    var map = adventurePrep_headerMap_(sheet);
+    var row = new Array(sheet.getLastColumn()).fill('');
+    row[map['swapRequestId'] - 1] = adventurePrep_newId_('SWAP');
+    row[map['bookingId'] - 1] = data.bookingId;
+    row[map['guestConcernSummary'] - 1] = data.guestConcernSummary;
+    row[map['receivedAt'] - 1] = data.receivedAt;
+    row[map['status'] - 1] = data.status || 'Open';
     sheet.appendRow(row);
-    return { ok: true };
+    return { ok: true, swapRequestId: row[map['swapRequestId'] - 1] };
   } finally {
     lock.releaseLock();
   }
