@@ -154,6 +154,23 @@
     return '$' + (Number(cents) / 100).toFixed(2);
   }
 
+  // BUG FIX (Aug 2026, live-reported): booking.total is NOT cents like every
+  // other money field on this page — api/save-booking.js's own comment says
+  // it plainly: `body.total = pi.amount / 100;` converts Stripe's cents
+  // amount to a plain dollar figure BEFORE handleSaveBooking() ever writes
+  // it to the Experience Bookings sheet's `total` column (see
+  // apps-script/code.gs/bookings-code.gs — `payload.total || 0` written
+  // as-is, no further conversion). Every *Cents-suffixed field this page
+  // renders (reconciledAmountCents, gearShortfallCents, etc.) genuinely is
+  // cents and correctly goes through fmtMoney's /100. Total was wrongly
+  // routed through fmtMoney too, silently dividing an already-dollar figure
+  // by 100 again — a real $180.00 booking rendered as "$1.80". This
+  // formatter is for `total` (and any other already-in-dollars field) only.
+  function fmtDollars(amount) {
+    if (amount === '' || amount == null || isNaN(Number(amount))) return '<span class="kv-value empty">—</span>';
+    return '$' + Number(amount).toFixed(2);
+  }
+
   // Generic label-ify for a camelCase key when no explicit label is given —
   // used by genericTable/kvGrid so a field neither this page nor its
   // backing .gs file was written with foreknowledge of (e.g. whichever of
@@ -234,7 +251,7 @@
 
   function renderPaymentDetails(p) {
     return panel('Payment Details', kvGrid([
-      ['Total', p.total, fmtMoney],
+      ['Total', p.total, fmtDollars],
       ['Payment Status', p.paymentStatusBucket, function (v) { return tag(PAY_LABELS[v] || PAY_LABELS.succeeded); }],
       ['Main Payment Intent', p.mainPaymentIntentId],
       ['Hold (Deposit) Status', p.holdStatusBucket, function (v) { return tag(HOLD_LABELS[v] || HOLD_LABELS.not_yet_placed); }],
