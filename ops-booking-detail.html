@@ -32,11 +32,29 @@
 
   Roster objects and Waiver Signatures rows are rendered generically
   (whatever keys are actually present on each record) rather than against
-  a hardcoded field list — the roster shape in particular has an
-  unresolved ageRange (lib/trail-selection-engine.js) vs. age
-  (trail-swap-actions.gs's trailSwap_familyTierEligible_) inconsistency
-  elsewhere in this codebase, and this page shouldn't have to be edited
-  every time a roster/waiver field gets added or renamed somewhere else.
+  a hardcoded field list, so this page never has to be edited just because
+  a roster/waiver field gets added or renamed somewhere else.
+
+  AGE FIELD (Aug 2026, investigated live): the roster's age-bucket field is
+  NOT actually inconsistent in the underlying data — every place a roster
+  first gets written (adventure-form.js's booking step, adventure-prep-
+  form.js's 1.2a reconfirm-roster step) stores it as `age`, and every Apps
+  Script reader (trail-swap-actions.gs, adventure-prep-actions.gs) reads
+  `age` too (with a defensive `|| p.ageRange` fallback in
+  adventure-prep-actions.gs, never actually hit in practice). `ageRange`
+  only exists as lib/normalize.js's `normalizeBookingContext()` output — a
+  deliberate one-way rename applied ONLY when feeding
+  lib/trail-selection-engine.js, which is a Node-side module this Apps-
+  Script-side page never touches. Confirmed via lib/run-trail-assignment.js
+  and api/trail-safety-options.js: both call normalizeBookingContext()
+  before the engine ever sees a roster, so `ageRange` never leaks back out
+  to anywhere this page reads from. Given that, `bookingDetail_get`'s
+  roster (from ap.reconfirmedRosterJson or the booking-time payload — see
+  booking-detail-actions.gs) will always carry `age`, never `ageRange` — but
+  renderRoster() below still coalesces `ageRange` into `age` before
+  rendering, purely as cheap insurance in case a stray `ageRange`-shaped
+  record ever shows up here, so the roster table always gets one "Age"
+  column instead of silently splitting across two.
 -->
 <link rel="stylesheet" href="ops-shell.css">
 <style>
@@ -277,15 +295,32 @@
 
   // Roster objects come from either Adventure Prep's reconfirmed roster or
   // the original booking-time payload — rendered generically (union of
-  // whatever keys are actually present) rather than a hardcoded field list,
-  // since this codebase has an unresolved ageRange/age naming
-  // inconsistency between lib/trail-selection-engine.js and
-  // trail-swap-actions.gs for what is conceptually the same field. This
-  // way the page shows whichever one a given roster row actually has
-  // instead of silently blanking it.
+  // whatever keys are actually present) rather than a hardcoded field
+  // list, so this page doesn't need editing every time a roster field is
+  // added elsewhere. See this file's header comment ("AGE FIELD") for why
+  // `age` is the one real field name in practice (`ageRange` only exists
+  // Node-side, inside lib/normalize.js's output, which this page never
+  // reads) — normalizeRosterAge_ below is cheap insurance, not a fix for a
+  // live bug: it coalesces `ageRange` into `age` on each person object
+  // before rendering, so IF a stray ageRange-shaped record ever shows up
+  // here, the table still gets one "Age" column instead of splitting
+  // across an "Age" column for some rows and an "Age Range" column for
+  // others.
+  function normalizeRosterAge_(roster) {
+    return (roster || []).map(function (p) {
+      if (p && p.age === undefined && p.ageRange !== undefined) {
+        var copy = Object.assign({}, p);
+        copy.age = copy.ageRange;
+        delete copy.ageRange;
+        return copy;
+      }
+      return p;
+    });
+  }
+
   function renderRoster(roster, source) {
     var note = source === 'reconfirmed' ? 'Reconfirmed during Adventure Prep.' : (source === 'booking_time' ? 'Booking-time roster — not yet reconfirmed through Adventure Prep.' : '');
-    var table = genericTable(roster, null, 'No roster on file for this booking.');
+    var table = genericTable(normalizeRosterAge_(roster), null, 'No roster on file for this booking.');
     return (note ? '<div class="roster-source-note">' + escapeHtml(note) + '</div>' : '') + table;
   }
 
