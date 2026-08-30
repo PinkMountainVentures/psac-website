@@ -159,7 +159,25 @@
   }
 
   function saveFields(fields) {
-    return apiPost('/api/adventure-prep', { action: 'saveFields', token: TOKEN, fields: fields });
+    return apiPost('/api/adventure-prep', { action: 'saveFields', token: TOKEN, fields: fields }).then(function (res) {
+      // BUG FIX (coordinating-session review, Aug 2026, live-reported): this
+      // used to only POST — it never touched state.ctx.adventurePrep, which
+      // is fetched from the server exactly once, in boot(). Since goHub()
+      // (Trail, Gear Kits, Waivers) only flips state.step and re-renders
+      // the SAME in-memory state.ctx, computeHubStatus() kept reading
+      // whatever it read at page load, so a tile you'd just completed
+      // (e.g. Attendees, once Gear Kits/Trail were already done from an
+      // earlier visit) kept showing "Not done" on the hub until a full
+      // page reload re-fetched context from the server. Mirroring every
+      // successfully-saved field into the local state.ctx.adventurePrep
+      // here fixes every hub tile at once, matching the hub model's own
+      // "always current" premise, without adding an extra round trip.
+      if (res.ok && state.ctx) {
+        state.ctx.adventurePrep = state.ctx.adventurePrep || {};
+        Object.keys(fields).forEach(function (k) { state.ctx.adventurePrep[k] = fields[k]; });
+      }
+      return res;
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -1921,7 +1939,23 @@
           var ecDone = state.ecName || state.ecPhone
             ? apiPost('/api/waiver', { action: 'saveEmergencyContact', token: TOKEN, contactName: state.ecName, contactPhone: state.ecPhone })
             : Promise.resolve({ ok: true });
-          ecDone.then(renderConfirmation);
+          // BUG FIX (coordinating-session review, Aug 2026, live-reported): same
+          // stale-state.ctx issue as saveFields() above. waiverSigners() (used by
+          // computeHubStatus() and the hub tile render) reads state.ctx.waiverSignatures
+          // directly, which was only ever populated once at boot() — so a successful
+          // sign here never made the Waivers hub tile flip to "Done" until a full
+          // page reload re-fetched context. Mirror the new owner signature locally,
+          // matching the exact shape waiverSigners() expects.
+          ecDone.then(function () {
+            state.ctx.waiverSignatures = (state.ctx.waiverSignatures || []).filter(function (w) { return w.role !== 'owner'; });
+            state.ctx.waiverSignatures.push({
+              role: 'owner',
+              status: 'signed',
+              signerName: state.waiverName,
+              participantsCoveredJson: JSON.stringify(participantsCovered),
+            });
+            renderConfirmation();
+          });
         });
       });
     }
