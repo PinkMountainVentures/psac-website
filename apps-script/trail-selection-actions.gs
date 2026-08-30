@@ -77,6 +77,23 @@
 // them directly, not inferred) — kept here as a single source of truth so a
 // header typo shows up as an obvious KeyNotFound rather than a silent
 // undefined write.
+// NEW (Round 2 build, Gear Kits & Delivery/Pickup mockup-04, Aug 2026):
+// appended 6 columns for fields the redesign's return-details screen
+// introduces (Delivery Note, "same as delivery" toggle, an optional
+// different return address, Return Location for the non-hotel path,
+// Return Time — now all 4 windows on both paths — and a Return Note).
+// None of these existed as columns before this build. Appending at the END
+// of this array (not inserting) matters: trailSelection_ensureHeaders_
+// below writes this whole array back over the sheet's header row
+// POSITIONALLY, so appending only ever extends into new, previously-blank
+// columns — inserting partway through would silently relabel every column
+// after the insertion point. After pasting this file in, run
+// trailSelection_setup() once from the Apps Script editor (Run menu) to
+// actually create these header columns on the live "Adventure Prep" tab —
+// this is the one manual step; adventurePrep_saveFields's writable-fields
+// check (adventure-prep-actions.gs) otherwise just silently rejects these
+// fields forever, same as the deliveryLat/deliveryLng bug this file
+// documents above.
 var TRAIL_SELECTION_ADVENTURE_PREP_HEADERS = [
   'bookingId', 'isParticipating', 'participatingRosterRef', 'confirmedKitCount',
   'pendingKitCount', 'pendingSince', 'technicalComfort', 'heatComfort',
@@ -86,6 +103,8 @@ var TRAIL_SELECTION_ADVENTURE_PREP_HEADERS = [
   'deliveryAddressValidated', 'deliveryAddressRaw', 'deliveryWindow',
   'returnPreference', 'allWaiversComplete', 'adventurePrepStalledFlag',
   'phoneFallbackDue', 't3CutoffProcessedAt',
+  'deliveryNote', 'returnSameAsDelivery', 'returnAddressLine1',
+  'returnLocation', 'returnWindow', 'returnNote',
 ];
 
 // BUG FIX (Aug 2026, trail-selection live-testing investigation): this was

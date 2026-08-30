@@ -4,17 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Sign your waiver | Palm Springs Adventure Club</title>
+<title>Your Adventure | Palm Springs Adventure Club</title>
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/ap-styles.css">
 </head>
 <body>
 
-<main id="sb-root" class="sb-page">
-  <div class="sb-hero">
-    <div class="container">
-      <div class="sb-hero-brand">Palm Springs Adventure Club</div>
-      <p class="sb-hero-sub">Loading&hellip;</p>
+<!-- Round 2, Surface B redesign (mockup-07): now reuses Surface A's exact
+     header/shell markup (complete-adventure-prep.html) instead of the old
+     standalone hero-style shell, per the mockup's own explicit design
+     note: "Still using Surface A's visual system here (ap-header, white
+     cards on sand-beige) rather than the live site's completely separate
+     hero-style Surface B shell." -->
+<header class="ap-header">
+  <div class="container">
+    <a href="/" class="ap-logo"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></a>
+    <div class="ap-header-right">Questions? <a href="mailto:hello@palmspringsadventureclub.com">Email us anytime</a></div>
+  </div>
+</header>
+
+<main id="sb-root" class="ap-shell">
+  <div class="container">
+    <div class="ap-card" style="text-align:center; padding:3rem 2rem;">
+      <div class="transition-spinner" style="margin-bottom:1.4rem;"></div>
+      <p class="ap-sub" style="margin:0 auto;">Loading your adventure&hellip;</p>
     </div>
   </div>
 </main>

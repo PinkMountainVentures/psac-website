@@ -20,6 +20,12 @@
  *     -> was GET /api/get-signer
  *   POST /api/waiver { action: 'saveWaiverSignature', token?, signerToken?, ... }
  *     -> was POST /api/save-waiver-signature
+ *   POST /api/waiver { action: 'saveSignerDetails', signerToken, signerEmail?, signerPhone?, smsConsent?, ... }
+ *     -> new, Round 2 (mockup-07): Surface B's "Confirm Your Details" hub
+ *        tile. signerToken only (non-owner action) — see this file's own
+ *        saveSignerDetails() and adventurePrep_saveSignerDetails_'s own
+ *        comment for why this is deliberately NOT folded into
+ *        saveWaiverSignature.
  *   POST /api/waiver { action: 'saveEmergencyContact', token?, signerToken?, ... }
  *     -> was POST /api/save-emergency-contact
  */
@@ -96,6 +102,28 @@ async function saveWaiverSignature(body, req, res) {
   res.status(200).json(result);
 }
 
+// -- saveSignerDetails, Surface B "Confirm Your Details" (Round 2, mockup-07)
+async function saveSignerDetails(body, req, res) {
+  if (!body.signerToken) {
+    res.status(400).json({ error: 'missing_identifier' });
+    return;
+  }
+  const payload = {
+    signerToken: body.signerToken,
+    signerEmail: body.signerEmail,
+    signerPhone: body.signerPhone,
+    smsConsent: body.smsConsent,
+    smsConsentAt: body.smsConsentAt,
+    smsConsentText: body.smsConsentText,
+  };
+  const result = await callBookingsWebApp('adventurePrep_saveSignerDetails', payload);
+  if (!result || result.ok === false) {
+    res.status(404).json({ error: 'invalid_token' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 // -- saveEmergencyContact, was POST /api/save-emergency-contact -------------
 async function saveEmergencyContact(body, req, res) {
   if (!body.token && !body.signerToken) {
@@ -130,6 +158,10 @@ module.exports = async function handler(req, res) {
     const body = parseBody(req);
     if (body.action === 'saveWaiverSignature') {
       await saveWaiverSignature(body, req, res);
+      return;
+    }
+    if (body.action === 'saveSignerDetails') {
+      await saveSignerDetails(body, req, res);
       return;
     }
     if (body.action === 'saveEmergencyContact') {

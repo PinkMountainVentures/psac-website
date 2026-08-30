@@ -32,6 +32,8 @@
  *        out = adventurePrep_selectTrail(body);
  *      } else if (body.action === 'adventurePrep_saveWaiverSignature') {
  *        out = adventurePrep_saveWaiverSignature(body);
+ *      } else if (body.action === 'adventurePrep_saveSignerDetails') {
+ *        out = adventurePrep_saveSignerDetails(body);
  *      } else if (body.action === 'adventurePrep_saveEmergencyContact') {
  *        out = adventurePrep_saveEmergencyContact(body);
  *      } else if (body.action === 'adventurePrep_sendSignerLinks') {
@@ -65,7 +67,11 @@
  *    three new tabs (Waiver Signatures, Emergency Contact, Adventure Prep
  *    Change Log) if missing, and appends new columns to the existing
  *    Adventure Prep tab and Experience Bookings tab if they're not already
- *    there. Safe to re-run.
+ *    there. Safe to re-run. IMPORTANT if you already ran this in a prior
+ *    session: run it again after this update — WAIVER_SIGNATURES_HEADERS
+ *    just gained a new `detailsConfirmedAt` column (Surface B's "Confirm
+ *    Your Details" hub tile, mockup-07) and it only lands on the live
+ *    Waiver Signatures tab's header row when this function re-runs.
  *
  * 4. Experience Bookings needs `adventurePrepToken` populated on every row
  *    for Surface A to be reachable at all. THIS PATCH ADDS THE COLUMN but
@@ -133,6 +139,18 @@ var WAIVER_SIGNATURES_HEADERS = [
   'signerEmail', 'signerPhone', 'smsConsent', 'smsConsentAt', 'smsConsentText',
   'isGuardian', 'guardianForChildrenJson', 'waiverVersion', 'participantsCoveredJson',
   'ipAddress', 'status', 'sentAt', 'openedAt', 'signedAt', 'createdAt',
+  // Round 2, Surface B redesign (mockup-07): "Confirm Your Details" is now
+  // its own hub tile a non-owner signer can complete independently of
+  // signing their waiver (previously phone/SMS-consent only ever got
+  // captured as part of the old linear flow's final step, always after
+  // signing). This column is that tile's own "done" marker — set only by
+  // adventurePrep_saveSignerDetails_, never by
+  // adventurePrep_saveWaiverSignature, so saving contact details can never
+  // accidentally flip a waiver's status to 'signed'. Appended at the END —
+  // do not insert — and run adventurePrep_setup() once after pasting this
+  // in, same append-only requirement as every other schema change in this
+  // file.
+  'detailsConfirmedAt',
 ];
 
 var EMERGENCY_CONTACT_HEADERS = [
@@ -145,7 +163,84 @@ var ADVENTURE_PREP_CHANGE_LOG_HEADERS = [
   'stripeTransactionId', 'staffNotes', 'triggeringInput',
 ];
 
-var ADVENTURE_PREP_WAIVER_VERSION = 'v1.4'; // matches the mockups' waiver text version
+// Section 9 item 3 (waiver content/version management): waiver language
+// needs to be updatable without a code push, and every signature needs to
+// capture which version was actually shown to that signer. Implemented via
+// 3 Script Properties (Apps Script editor -> Project Settings -> Script
+// Properties — no .gs file edit or redeploy needed to change these):
+//   WAIVER_VERSION      e.g. "v1.5"
+//   WAIVER_BODY_HTML    the numbered-section body (h4/p/ul only — no outer
+//                        doc title, since that's rendered client-side from
+//                        WAIVER_VERSION so the version display can never
+//                        drift out of sync with the body it's labeling)
+//   WAIVER_STATUS_TAG   e.g. "Draft — Pending Final Attorney Review", or ''
+//                        once legal signs off and the tag should disappear
+// All 3 fall back to the real Version 1.5 draft text below if unset, so
+// this works out of the box — Airey only needs Script Properties once the
+// text needs to change, never for the initial build.
+function adventurePrep_getWaiverContent_() {
+  var props = PropertiesService.getScriptProperties();
+  var statusTagProp = props.getProperty('WAIVER_STATUS_TAG');
+  return {
+    version: props.getProperty('WAIVER_VERSION') || ADVENTURE_PREP_WAIVER_DEFAULT_VERSION_,
+    // Deliberately not `statusTagProp || default` — an explicitly-set empty
+    // string ('', once legal signs off and the tag should disappear) must
+    // stay '', which `||` would incorrectly override back to the default.
+    // Only an unset property (null — Airey has never touched this yet)
+    // falls back to the default "Draft" tag.
+    statusTag: statusTagProp == null ? ADVENTURE_PREP_WAIVER_DEFAULT_STATUS_TAG_ : statusTagProp,
+    bodyHtml: props.getProperty('WAIVER_BODY_HTML') || ADVENTURE_PREP_WAIVER_DEFAULT_BODY_HTML_,
+  };
+}
+
+var ADVENTURE_PREP_WAIVER_DEFAULT_VERSION_ = 'v1.5';
+var ADVENTURE_PREP_WAIVER_DEFAULT_STATUS_TAG_ = 'Draft — Pending Final Attorney Review';
+
+// Real Version 1.5 draft text (Participant Agreement and Acknowledgment of
+// Risk), confirmed against Airey's Google Doc — still marked draft/pending
+// attorney review per the doc's own header. Sections 1–7 only; the outer
+// "PALM SPRINGS ADVENTURE CLUB" title block and version line are rendered
+// client-side (adventure-prep-form.js) from WAIVER_VERSION, not baked in
+// here, so the two can never show mismatched versions.
+var ADVENTURE_PREP_WAIVER_DEFAULT_BODY_HTML_ =
+  "<p><b>PLEASE READ CAREFULLY. THIS AGREEMENT AFFECTS YOUR LEGAL RIGHTS AND CONTAINS A RELEASE OF LIABILITY.</b></p>" +
+  "<p>In consideration of being permitted to book, rent equipment from, or otherwise participate in any activity, program, or service offered by Palm Springs Adventure Club, a DBA of Pink Mountain Ventures LLC, a California limited liability company, and its owners, members, managers, officers, employees, contractors (including gear delivery and courier providers), volunteers, and agents (collectively, “PSAC”), I agree to the following on behalf of myself, any additional adult participants on this booking, and any minor participants, including any child under 18 who accompanies me on a PSAC activity whether or not that child is formally named on this form or has rented equipment from PSAC. This Agreement is binding on me and on my heirs, next of kin, spouse, executors, administrators, personal representatives, and assigns.</p>" +
+  "<h4>1. Acknowledgment of Risk</h4>" +
+  "<p>I understand that hiking, trail running, and related outdoor recreation activities in desert and mountain terrain, including PSAC's self-guided trail experiences, involve known and unanticipated risks that could result in physical or emotional injury, illness, paralysis, death, or damage to myself, to property, or to third parties. I understand that these risks cannot be eliminated without changing the essential nature of the activity.</p>" +
+  "<p>These risks include, among others:</p>" +
+  "<ul>" +
+  "<li>Walking on uneven, loose, or steep desert and mountain terrain, and the risk of slips, trips, and falls</li>" +
+  "<li>Extreme heat, dehydration, and heat-related illness, including heat exhaustion and heat stroke. Even during PSAC's operating season of September through May, the Palm Springs area can experience high desert temperatures, particularly in the early and late months of that season, and heat-related illness can be severe, disabling, or fatal, even for fit, well-hydrated participants</li>" +
+  "<li>Sun exposure</li>" +
+  "<li>Flash flooding and sudden weather changes</li>" +
+  "<li>Encounters with wildlife and insects, including venomous snakes, scorpions, and stinging or biting insects</li>" +
+  "<li>Contact with cactus and other desert vegetation</li>" +
+  "<li>Elevation gain and physical exertion</li>" +
+  "<li>Becoming lost or disoriented</li>" +
+  "<li>Unreliable or unavailable cellular telephone coverage on many desert and mountain trails</li>" +
+  "<li>My own physical condition and fitness for the activity I have chosen</li>" +
+  "</ul>" +
+  "<p>All PSAC activities I am booking are self-guided. No PSAC employee or guide accompanies me on the trail, PSAC does not track my real-time location, and PSAC has no way of knowing whether I am overdue, lost, injured, or in distress unless I or someone else contacts PSAC or emergency services directly. In an emergency, I understand I should call 911 or the appropriate emergency service rather than relying on PSAC to notice or respond. I am solely responsible for my own navigation, pace, decision-making, and safety, using the route guidance and gear PSAC provides at my own discretion. I understand that PSAC prepares its route guidance in good faith, but that trail, weather, and other conditions can change without notice, and that I am responsible for evaluating conditions and my own ability to safely continue or turn back at any point.</p>" +
+  "<p>I understand that PSAC provides rented outdoor equipment, including packs, trekking poles, hydration equipment, and related gear, as part of certain bookings. I agree to inspect equipment before use and to report any visible defect to PSAC before beginning the activity. I understand that equipment can fail or malfunction despite reasonable care, and I accept this risk.</p>" +
+  "<p>I acknowledge that hiking, trail running, and related outdoor recreation are sport and recreational activities to which California's doctrine of primary assumption of risk applies, meaning PSAC has no legal duty to protect me from risks inherent to the activity itself.</p>" +
+  "<h4>2. Release, Waiver, and Indemnification</h4>" +
+  "<p><b>2.1 Release of PSAC.</b> To the fullest extent permitted by California law, I release and forever discharge PSAC from any and all claims, demands, damages, or causes of action arising out of or in any way connected with my participation in a PSAC activity or my use of PSAC's equipment, gear, or trail guidance, including claims alleging negligence by PSAC. Nothing in this Agreement releases, and PSAC does not seek to release, any claim for PSAC's gross negligence, willful misconduct, or violation of law.</p>" +
+  "<p><b>2.2 My indemnification of PSAC.</b> To the fullest extent permitted by law, I agree to indemnify, defend, and hold harmless PSAC from and against any claims, damages, losses, or costs, including reasonable attorney's fees, that PSAC incurs because of (a) my own negligent, reckless, or intentional acts or omissions, or (b) my breach of this Agreement, including claims brought by third parties arising from my own conduct during a PSAC activity. This indemnification does not apply to any claim, loss, or cost arising from PSAC's own negligence.</p>" +
+  "<h4>2A. Release of the Agua Caliente Band of Cahuilla Indians</h4>" +
+  "<p>Because PSAC trails currently cross land within the Agua Caliente Indian Reservation: (1) I release and forever discharge the Agua Caliente Band of Cahuilla Indians, a federally recognized Indian tribe, and its officers, employees, agents, departments, and enterprises, from any and all claims arising out of or resulting from my participation in a PSAC activity on Reservation land; (2) this release is my personal covenant not to sue and does not waive, limit, or abrogate the Tribe's sovereign immunity, and does not constitute the Tribe's consent to suit, arbitration, or any particular forum; (3) the Agua Caliente Band of Cahuilla Indians is an express third-party beneficiary of this Section 2A and may enforce it directly; and (4) I understand that any trail beginning or ending on Reservation land may require a separate entrance fee payable directly to the Tribe, which is my responsibility and is not collected, remitted, or guaranteed by PSAC.</p>" +
+  "<h4>2B. Release of the United States</h4>" +
+  "<p>Because PSAC's activity includes trail segments on land administered by the Bureau of Land Management (BLM) under a Special Recreation Permit: (1) I release and forever discharge the United States of America, the Department of the Interior, the Bureau of Land Management, and their officers, employees, and agents, from any and all claims arising out of or resulting from my participation in a PSAC activity on BLM-administered land; (2) this release is my personal covenant not to sue and does not waive, limit, or expand any defense, immunity, or claims procedure otherwise available to the United States under the Federal Tort Claims Act or any other applicable law; and (3) I understand this release is provided to BLM as a condition of PSAC's Special Recreation Permit.</p>" +
+  "<h4>3. Assumption of Risk</h4>" +
+  "<p>I expressly agree and promise to accept all of the risks described above. My participation in PSAC activities is voluntary, and I choose to participate despite these risks.</p>" +
+  "<h4>4. Certification of Fitness and Insurance</h4>" +
+  "<p>I certify that I am physically fit to participate in the activity I have selected and that I have no medical condition, including cardiac, respiratory, or heat-sensitivity conditions, that would prevent my safe participation, or that I have disclosed any such condition to PSAC in advance. I understand PSAC's gear rental and trail guidance are not a substitute for consulting a physician about my fitness for strenuous hiking in high desert heat. I certify that I carry adequate health and other insurance to cover any injury I may suffer, or I agree to bear the cost of such injury myself.</p>" +
+  "<h4>5. Governing Law</h4>" +
+  "<p>If a legal action arising from this Agreement or my participation is brought by either party, it shall be brought exclusively in the state or federal courts located in Riverside County, California, and California law governs, without regard to conflict-of-law rules. This Section 5 governs disputes between me and PSAC only; it does not establish the jurisdiction, forum, or governing law for any claim against the Agua Caliente Band of Cahuilla Indians, which is governed by applicable tribal law and the Tribe's own claims procedures, or for any claim against the United States, which is governed by the Federal Tort Claims Act and other applicable federal law. If any part of this Agreement is found void or unenforceable, the remaining portions remain in full force. In any action to enforce or arising out of a breach of this Agreement, the prevailing party is entitled to recover its reasonable attorney's fees and costs.</p>" +
+  "<h4>6. Minor Participants</h4>" +
+  "<p>If any participant, or any child accompanying a participant on a PSAC activity, is under 18 years of age, whether or not that child is formally named on this booking or has rented equipment from PSAC, I represent that I am that child's parent or legal guardian, or have that parent or guardian's express authorization to make decisions regarding that child's participation. By signing, I agree to all of the above on my own behalf and on that child's behalf, including releasing, to the fullest extent permitted by California law, any claim that child might otherwise bring against PSAC, the Agua Caliente Band of Cahuilla Indians, and the United States, arising from their participation. I additionally certify that I will be personally present and directly supervising each such minor for the entire activity, and that PSAC does not permit unaccompanied minors on self-guided bookings.</p>" +
+  "<p><b>6A. Children under age 14.</b> PSAC's gear rental is available only to participants age 14 and older. PSAC maintains trail content, including trails it identifies as generally suitable for young children, to help guests traveling with younger children choose an appropriate trail. I understand this content reflects PSAC's general knowledge of a trail's terrain, shade, and typical experience for families, and is not a personalized fitness, medical, or safety assessment of any specific child, and is not a guarantee that a given trail, or conditions on the day of my hike, will be safe or appropriate for that child. Because PSAC's hikes are self-guided, no PSAC staff member observes or evaluates any child before or during the hike, and PSAC has no ability to verify, monitor, or supervise any child on the trail, or provide gear sized or suited for children under 14. If I choose to bring a child under 14 on a self-guided hike, I understand and agree that the final decision to do so is mine alone, that I am solely responsible for assessing whether the specific trail and conditions on the day of my hike are appropriate for that child given that child's own health and ability, and that I am solely responsible for that child's supervision and safety at all times.</p>" +
+  "<h4>7. Acknowledgment and Signature</h4>" +
+  "<p>I have read this Participant Agreement and Acknowledgment of Risk in its entirety. I understand it contains a release of my legal right to sue PSAC for injuries or damages caused by PSAC's ordinary negligence, and a contractual assumption of risk, and I sign it voluntarily.</p>";
 
 function adventurePrep_setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -360,6 +455,10 @@ function adventurePrep_getContextByToken(payload) {
     adventurePrep: ap,
     waiverSignatures: waivers,
     emergencyContacts: contacts,
+    // Section 9 item 3: waiver text/version served from Script Properties
+    // (or the real v1.5 draft default below) instead of hardcoded in the
+    // client — see adventurePrep_getWaiverContent_'s header comment.
+    waiverContent: adventurePrep_getWaiverContent_(),
   };
 }
 
@@ -381,13 +480,25 @@ function adventurePrep_getContextByToken(payload) {
 // `rejectedFields` instead of ever reaching the column-lookup at all).
 // Added now that Surface A's address step actually calls the validation
 // endpoint and has real lat/lng to save.
+// NEW (Round 2 build, Gear Kits & Delivery/Pickup mockup-04): the redesign
+// adds a Delivery Note, a "return same address" toggle, an optional
+// different return address, a Return Location (non-hotel path only), a
+// Return Time (now all 4 windows, both paths), and a Return Note — none of
+// which had columns on the live "Adventure Prep" tab before this build
+// (confirmed against TRAIL_SELECTION_ADVENTURE_PREP_HEADERS in
+// trail-selection-actions.gs, which is the tab's real source of truth).
+// Added there too — see that file's comment for the one-time setup step
+// this requires (running trailSelection_setup() once after pasting these
+// changes in, to actually create the new header columns).
 var ADVENTURE_PREP_WRITABLE_FIELDS = [
   'isParticipating', 'participatingRosterRef', 'reconfirmedRosterJson',
   'technicalComfort', 'heatComfort', 'bestForAttributes',
   'propertyType', 'deliveryAddressLine1', 'deliveryAddressLine2',
   'deliveryCity', 'deliveryState', 'deliveryZip', 'deliveryAddressRaw',
   'deliveryAddressValidated', 'deliveryLat', 'deliveryLng',
-  'deliveryWindow', 'returnPreference',
+  'deliveryWindow', 'returnPreference', 'deliveryNote',
+  'returnSameAsDelivery', 'returnAddressLine1', 'returnLocation',
+  'returnWindow', 'returnNote',
 ];
 
 function adventurePrep_saveFields(payload) {
@@ -517,7 +628,14 @@ function adventurePrep_saveWaiverSignature(payload) {
     }
     set('isGuardian', !!payload.isGuardian);
     set('guardianForChildrenJson', JSON.stringify(payload.guardianForChildren || []));
-    set('waiverVersion', ADVENTURE_PREP_WAIVER_VERSION);
+    // BUG FIX (Round 2 build, Section 9 item 3): was the hardcoded
+    // ADVENTURE_PREP_WAIVER_VERSION constant, which could silently drift
+    // from whatever text was actually shown to this signer if the
+    // Script Properties content was ever updated without also updating
+    // this constant (or vice versa). Now reads the same live source the
+    // client displayed, so a signature's stored version always matches
+    // what that signer actually read and agreed to.
+    set('waiverVersion', adventurePrep_getWaiverContent_().version);
     set('participantsCoveredJson', JSON.stringify(payload.participantsCovered || []));
     set('ipAddress', payload.ipAddress || '');
     set('status', 'signed');
@@ -527,6 +645,55 @@ function adventurePrep_saveWaiverSignature(payload) {
     adventurePrep_recomputeAllWaiversComplete_(ss, bookingId);
 
     return { ok: true, bookingId: bookingId, signedAt: now };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 5b. saveSignerDetails — Surface B's "Confirm Your Details" hub tile
+ * (mockup-07, Round 2). Deliberately separate from
+ * adventurePrep_saveWaiverSignature above: that function unconditionally
+ * sets status='signed' every time it's called, which was fine while phone/
+ * SMS-consent could only ever be saved AFTER the waiver step in the old
+ * linear flow, but would be a real bug now that Confirm Your Details is
+ * its own hub tile a guest can complete before ever opening Your Waiver —
+ * calling saveWaiverSignature here would mark an unsigned waiver as
+ * signed. This function only ever touches contact fields and
+ * detailsConfirmedAt; it never writes status, signedAt, isGuardian, or any
+ * of the fields the actual waiver signature owns. signerToken only — this
+ * is a non-owner (Surface B) action, there is no owner equivalent because
+ * the booking owner's own contact info is edited in the booking flow, not
+ * here.
+ */
+function adventurePrep_saveSignerDetails(payload) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    if (!payload.signerToken) return { ok: false, error: 'Missing signerToken' };
+    var sheet = ss.getSheetByName('Waiver Signatures');
+    var map = adventurePrep_headerMap_(sheet);
+    var found = adventurePrep_findRowByColumnValue_(sheet, 'signerToken', payload.signerToken);
+    if (!found) return { ok: false, error: 'Invalid or expired signer link' };
+    var rowIndex = found.rowIndex;
+    var now = adventurePrep_nowIso_();
+
+    function set(name, value) {
+      if (!map[name]) return;
+      sheet.getRange(rowIndex, map[name]).setValue(value === undefined || value === null ? '' : value);
+    }
+
+    if (payload.signerEmail !== undefined) set('signerEmail', payload.signerEmail || '');
+    if (payload.signerPhone !== undefined) set('signerPhone', payload.signerPhone || '');
+    if (payload.smsConsent !== undefined) {
+      set('smsConsent', !!payload.smsConsent);
+      set('smsConsentAt', payload.smsConsentAt || now);
+      set('smsConsentText', payload.smsConsentText || '');
+    }
+    set('detailsConfirmedAt', now);
+
+    return { ok: true, detailsConfirmedAt: now };
   } finally {
     lock.releaseLock();
   }
@@ -725,6 +892,20 @@ function adventurePrep_sendSignerLinks(payload) {
  * roster's minor rows (for the guardian certification checklist, PRD
  * Section 5/12) and this signer's own current row state (so re-visiting an
  * already-signed link renders the done screen instead of the form again).
+ *
+ * Round 2 (mockup-07): Surface B is now a scoped Adventure Home hub, not a
+ * single linear form, so this also returns candidateTrails/selectedTrailId
+ * (for the read-only "Your Trail" tile — every non-owner signer is
+ * themselves an attending adult already on the roster, see
+ * adventurePrep_sendSignerLinks's own signer list, which excludes both the
+ * owner and minors, so a "Your Trail" tile is always meaningful here) and
+ * waiverContent. Adding waiverContent here fixes a real drift bug: before
+ * this, Surface B never received it at all and waiver-signer-form.js
+ * hardcoded its own separate, stale "v1.4" placeholder legal text —
+ * completely disconnected from the real Script-Properties-driven content
+ * Surface A has used since Section 9 item 3 was resolved. A guest signing
+ * through Surface B was shown a different waiver than a guest signing
+ * through Surface A. Both surfaces now read the exact same live source.
  */
 function adventurePrep_getSignerContext(payload) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -773,6 +954,9 @@ function adventurePrep_getSignerContext(payload) {
     ownerName: booking.contactName,
     tripDate: booking.date,
     minors: minors,
+    candidateTrails: ap ? ap.candidateTrails : '',
+    selectedTrailId: ap ? ap.selectedTrailId : '',
+    waiverContent: adventurePrep_getWaiverContent_(),
     signer: signerRow,
   };
 }
