@@ -1,31 +1,34 @@
 /**
  * api/check-in-gear-item.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). See lib/gear-service.js's own header for the full
+ * scope of this migration.
+ *
  * Gear Inventory PRD Section 5/9: consolidated dispatcher for Return
  * Check-In. Server-to-server only (api/ops-proxy.js), GEAR_OPS_SHARED_SECRET.
  *
- *   - 'getQueue'    -> gearOps_getCheckinQueue
- *   - 'getContext'  -> gearOps_getCheckinContext (per-item state, rubric-
- *     relevant fields, deep-clean threshold/progress — everything the
- *     check-in screen needs in one call)
- *   - 'uploadPhoto' -> lib/gear-photo-upload.js's uploadGearPhoto(). Takes
- *     a base64 data URL rather than multipart form data — Vercel
- *     serverless functions parse a JSON body for free, multipart parsing
- *     would be a new dependency this build doesn't otherwise need. Mobile
- *     browsers' `capture="environment"` file input already hands JS a
- *     File/Blob that's trivial to base64-encode client-side before this
- *     call (see ops-gear-return-checkin.html).
- *   - 'checkIn'     -> gearOps_checkInItem. Photo required (enforced HERE,
- *     not just trusted from the client's own form validation or the Sheet
- *     layer) for Damaged and Missing, per Section 5/10. The 48-hour grace
- *     deadline is computed HERE in Node from the real clock, not read from
- *     `new Date()` inside Apps Script — matching this project's established
- *     cross-boundary date-math convention (see lib/cadence.js's own header).
+ *   - 'getQueue'    -> getCheckinQueue (V1)
+ *   - 'getContext'  -> getCheckinContext (per-item state, rubric-relevant
+ *     fields, deep-clean threshold/progress — everything the check-in
+ *     screen needs in one call)
+ *   - 'uploadPhoto' -> lib/gear-photo-upload.js's uploadGearPhoto(),
+ *     unchanged by this migration (Vercel Blob, not Apps Script)
+ *   - 'checkIn'     -> checkInItem. Photo required (enforced HERE, not
+ *     just trusted from the client's own form validation) for Damaged,
+ *     required text note for Missing, per Section 5/10 (Round 2 item 6).
+ *     The 48-hour grace deadline is computed HERE in Node from the real
+ *     clock.
+ *   - 'getQueueV2' / 'getReturnContext' / 'schedulePickup' / 'markPickedUp'
+ *     / 'markReturned' -> the Round 2 inbound-leg state machine (Pickup
+ *     Scheduled -> optional Picked Up -> Returned (required gate) ->
+ *     Checked-In (automatic, via syncReturnStatusIfSettled below))
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const { uploadGearPhoto } = require('../lib/gear-photo-upload');
 
 const VALID_CONDITIONS = ['Good', 'Damaged', 'Missing', 'Recovered'];
@@ -66,7 +69,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'tripDate is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_getCheckinQueue', { tripDate: body.tripDate });
+      const result = await gearService.getCheckinQueue({ tripDate: body.tripDate });
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -76,7 +79,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_getCheckinContext', { bookingId: body.bookingId });
+      const result = await gearService.getCheckinContext({ bookingId: body.bookingId });
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -112,12 +115,10 @@ module.exports = async function handler(req, res) {
         return;
       }
       // BUG FIX (Ops App Redesign, Aug 2026 — Round 2 item 6, resolves P2d):
-      // this used to require photoUrl for BOTH Damaged and Missing, even
-      // though there's nothing to physically photograph for an item that
-      // isn't there — confirmed live gap, Phase 1/2 of the journey map.
-      // Photo requirement now applies to Damaged only. Missing gets its own
-      // required text note instead (below) — the 48-hour grace-period
-      // countdown and guest notification are unchanged either way.
+      // photo requirement applies to Damaged only (nothing to photograph
+      // for an item that isn't there); Missing gets its own required text
+      // note instead. The 48-hour grace-period countdown and guest
+      // notification are unchanged either way.
       if (condition === 'Damaged' && !body.photoUrl) {
         res.status(400).json({ error: 'bad_request', detail: 'photoUrl is required when condition is Damaged' });
         return;
@@ -132,7 +133,7 @@ module.exports = async function handler(req, res) {
         ? new Date(Date.now() + GRACE_PERIOD_HOURS * 60 * 60 * 1000).toISOString()
         : '';
 
-      const result = await callBookingsWebApp('gearOps_checkInItem', {
+      const result = await gearService.checkInItem({
         bookingId: body.bookingId,
         unitId: String(body.unitId).trim(),
         condition,
@@ -147,10 +148,10 @@ module.exports = async function handler(req, res) {
       // condition, never a button staff clicks. Best-effort — a sync
       // failure here never masks the check-in write that already
       // succeeded above; the next check-in on this booking (or a manual
-      // Sheet glance) will catch it if this one call happens to fail.
+      // glance) will catch it if this one call happens to fail.
       if (result && result.ok !== false) {
         try {
-          await callBookingsWebApp('gearOps_syncReturnStatusIfSettled', { bookingId: body.bookingId, nowIso });
+          await gearService.syncReturnStatusIfSettled({ bookingId: body.bookingId, nowIso });
         } catch (syncErr) {
           // eslint-disable-next-line no-console
           console.error('check-in-gear-item: returnStatus sync failed', body.bookingId, syncErr);
@@ -164,9 +165,9 @@ module.exports = async function handler(req, res) {
         try {
           const { sendEmail } = require('../lib/send-email');
           const { renderGracePeriodEmail, gracePeriodSubject } = require('../lib/email-templates/grace-period-email');
-          const ctx = await callBookingsWebApp('gearOps_getCheckinContext', { bookingId: body.bookingId });
+          const ctx = await gearService.getCheckinContext({ bookingId: body.bookingId });
           const missingItems = (ctx.items || []).filter((i) => i.unitId === body.unitId).map((i) => i.itemName);
-          const contactRes = await callBookingsWebApp('gearOps_getReconciliationContext', { bookingId: body.bookingId });
+          const contactRes = await gearService.getReconciliationContext({ bookingId: body.bookingId });
           if (contactRes && contactRes.contactEmail && missingItems.length) {
             const deadlineDisplay = new Date(graceDeadline).toLocaleString('en-US', {
               timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short',
@@ -194,15 +195,14 @@ module.exports = async function handler(req, res) {
     }
 
     // Ops App Redesign (Aug 2026) — Round 2 item 6: the inbound return leg.
-    // See apps-script/ops-redesign-round2-actions.gs for the state-machine
-    // detail (Pickup Scheduled -> optional Picked Up -> Returned (required
-    // gate) -> Checked-In (automatic, handled above)).
+    // Pickup Scheduled -> optional Picked Up -> Returned (required gate) ->
+    // Checked-In (automatic, handled above).
     if (action === 'getQueueV2') {
       if (!body.tripDate) {
         res.status(400).json({ error: 'bad_request', detail: 'tripDate is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_getCheckinQueueV2', { tripDate: body.tripDate });
+      const result = await gearService.getCheckinQueueV2({ tripDate: body.tripDate });
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -212,7 +212,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_getReturnContext', { bookingId: body.bookingId });
+      const result = await gearService.getReturnContext({ bookingId: body.bookingId });
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -222,7 +222,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId and pickupServiceType are required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_schedulePickup', {
+      const result = await gearService.schedulePickup({
         bookingId: body.bookingId,
         pickupServiceType: body.pickupServiceType,
         pickupAddressOverride: body.pickupAddressOverride || '',
@@ -237,7 +237,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_markPickedUp', { bookingId: body.bookingId });
+      const result = await gearService.markPickedUp({ bookingId: body.bookingId });
       res.status(200).json(result);
       return;
     }
@@ -247,7 +247,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_markReturned', { bookingId: body.bookingId });
+      const result = await gearService.markReturned({ bookingId: body.bookingId });
       res.status(200).json(result);
       return;
     }

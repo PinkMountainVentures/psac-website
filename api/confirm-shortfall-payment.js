@@ -13,11 +13,20 @@
  * actions.gs) unchanged — the exact same write-back api/charge-gear-
  * shortfall.js's own direct-success path already uses — rather than a
  * second, parallel write-back function that could drift out of sync.
+ *
+ * MIGRATED (Task 18, 2026-08-31): I/O rewritten against Postgres — every
+ * function this file calls (shortfallPaymentGetBookingForToken,
+ * recordShortfallCharge in lib/gear-service.js; recordOpsAlert,
+ * findOpenAlert also in lib/gear-service.js; resolveAlert in
+ * lib/hold-clearance-service.js) already existed from the gear-ops and
+ * deposit-hold migrations — this file only needed its own I/O layer
+ * swapped, no new backend logic.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { shortfallPaymentGetBookingForToken, recordShortfallCharge, recordOpsAlert, findOpenAlert } = require('../lib/gear-service');
+const { resolveAlert } = require('../lib/hold-clearance-service');
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
@@ -45,7 +54,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('shortfallPayment_getBookingForToken', { bookingId, token });
+    const ctx = await shortfallPaymentGetBookingForToken({ bookingId, token });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'not_found' });
       return;
@@ -99,25 +108,25 @@ module.exports = async function handler(req, res) {
 
     const chargedAt = new Date().toISOString();
     try {
-      await callBookingsWebApp('gearOps_recordShortfallCharge', {
+      await recordShortfallCharge({
         bookingId,
         shortfallChargeId: pi.id,
         shortfallChargedAmountCents: pi.amount,
         shortfallChargedAt: chargedAt,
         staffNotes: 'Guest completed 3D Secure authentication via the self-service payment link.',
-      }, { retries: 2 });
+      });
     } catch (writeBackErr) {
       // eslint-disable-next-line no-console
       console.error('confirm-shortfall-payment: charge succeeded but write-back failed', bookingId, pi.id, writeBackErr);
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await recordOpsAlert({
           bookingId,
           alertType: 'gear_shortfall_charge_writeback_failed',
           amount: pi.amount / 100,
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: `Shortfall charge ${pi.id} for $${(pi.amount / 100).toFixed(2)} succeeded via the guest's self-service 3DS completion link, but the booking record could not be updated.`,
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('confirm-shortfall-payment: also failed to write the write-back-failed Ops Alert', bookingId, alertErr);
@@ -128,13 +137,13 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-      const alertLookup = await callBookingsWebApp('holdClearance_findOpenDepositAlert', { bookingId, alertType: 'gear_shortfall_charge_failed' });
+      const alertLookup = await findOpenAlert({ bookingId, alertType: 'gear_shortfall_charge_failed' });
       if (alertLookup && alertLookup.found) {
-        await callBookingsWebApp('opsAlerts_resolveAlert', {
+        await resolveAlert({
           alertId: alertLookup.alertId,
           resolvedBy: 'system (guest completed 3D Secure authentication)',
           notes: 'Guest completed the 3D Secure challenge via the self-service payment link, and the shortfall charge succeeded.',
-        }, { retries: 2 });
+        });
       }
     } catch (resolveErr) {
       // eslint-disable-next-line no-console

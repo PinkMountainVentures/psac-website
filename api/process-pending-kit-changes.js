@@ -2,13 +2,23 @@
  * api/process-pending-kit-changes.js
  *
  * Vercel Cron target. Closes debounce windows opened by
- * api/adjust-gear-kit-count.js: lists every Adventure Prep row with a
- * pending kit-count change, decides which ones have actually closed (1
- * hour since the latest edit, OR the trip's own T-3 10pm Pacific cutoff,
- * whichever comes first), and finalizes exactly those via
- * lib/finalize-kit-change.js's finalizePendingKitChange — the only place
- * the Stripe charge/refund and Gear Check Log regeneration actually
+ * api/adventure-prep.js's adjustGearKitCount action: lists every Adventure
+ * Prep row with a pending kit-count change, decides which ones have
+ * actually closed (1 hour since the latest edit, OR the trip's own T-3
+ * 10pm Pacific cutoff, whichever comes first), and finalizes exactly those
+ * via lib/finalize-kit-change.js's finalizePendingKitChange — the only
+ * place the Stripe charge/refund and Gear Check Log regeneration actually
  * happen. Rows still inside their debounce window are left untouched.
+ *
+ * MIGRATED (2026-08-31 build session): both the listing/discovery step and
+ * the finalize step now go through lib/finalize-kit-change.js's Postgres-
+ * native functions (listPendingKitChanges/finalizePendingKitChange)
+ * instead of lib/apps-script-client.js's callBookingsWebApp(). This
+ * closes the other half of the adjustGearKitCount launch-blocking gap —
+ * the finalize step alone wasn't enough, since a Postgres-only booking's
+ * pending change would never have been found by a listing call still
+ * aimed at the old Apps Script backend. See lib/finalize-kit-change.js's
+ * own header comment (point 5) for the full reasoning.
  *
  * WIRED UP, Aug 2026. `vercel.json`'s actual `crons` entry —
  * `"10,25,40,55 * * * *"` — runs this every 15 minutes, all day, matching
@@ -45,8 +55,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
-const { finalizePendingKitChange } = require('../lib/finalize-kit-change');
+const { finalizePendingKitChange, listPendingKitChanges } = require('../lib/finalize-kit-change');
 const { computeT3CutoffUtc } = require('../lib/t3-cutoff');
 
 const DEBOUNCE_WINDOW_MS = 60 * 60 * 1000; // 1 hour, per PRD Section 1
@@ -64,8 +73,7 @@ module.exports = async function handler(req, res) {
   const failed = [];
 
   try {
-    const listRes = await callBookingsWebApp('adventurePrep_listPendingKitChanges', {});
-    const rows = (listRes && listRes.rows) || [];
+    const rows = await listPendingKitChanges();
 
     for (const row of rows) {
       const bookingId = row.bookingId;

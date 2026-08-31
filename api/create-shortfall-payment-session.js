@@ -27,11 +27,16 @@
  * stale if it was resolved through some other path (staff canceled it
  * manually, a later attempt superseded it) between being written and this
  * call.
+ *
+ * MIGRATED (Task 18, 2026-08-31): I/O rewritten against Postgres —
+ * shortfallPayment_getBookingForToken already has a Postgres equivalent,
+ * lib/gear-service.js's shortfallPaymentGetBookingForToken (built during
+ * the gear-ops migration), reused here unchanged rather than duplicated.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { shortfallPaymentGetBookingForToken } = require('../lib/gear-service');
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
@@ -59,7 +64,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('shortfallPayment_getBookingForToken', { bookingId, token });
+    const ctx = await shortfallPaymentGetBookingForToken({ bookingId, token });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'not_found' });
       return;

@@ -294,7 +294,7 @@
     var waiverColumns = [
       { key: 'signerName', label: 'Signer' },
       { key: 'role', label: 'Role' },
-      { key: 'rosterRef', label: 'Roster Ref' },
+      { key: 'participantId', label: 'Roster Ref' }, // FIXED (Task 11 frontend request-shape check, 2026-08-31): lib/booking-detail-service.js's mapWaiverRow (Postgres) emits `participantId`, not the old .gs field name `rosterRef` -- this column silently rendered blank for every waiver row until now.
       { key: 'status', label: 'Status', render: function (r) { var s = String(r.status || '').toLowerCase(); return tag([r.status || '—', s === 'signed' ? 'confirmed' : (s === 'sent' || s === 'opened' ? 'hold-placed' : 'na')]); } },
       { key: 'sentAt', label: 'Sent At' },
       { key: 'openedAt', label: 'Opened At' },

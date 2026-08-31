@@ -35,11 +35,28 @@
  * type: 'gear_returned_uncleaned') — a Stripe-and-sheet endpoint has no way
  * to know what's physically sitting on a packing table, so that step is
  * never automated here.
+ *
+ * MIGRATED (2026-08-31, cancel-and-refund-booking build session): the two
+ * callBookingsWebApp calls that had no Postgres equivalent yet
+ * (cancelRefund_getBookingContext / cancelRefund_writeCancellation) now go
+ * through the new lib/cancel-refund-service.js. The three opsAlerts_
+ * recordAlert calls now go through lib/gear-service.js's already-exported
+ * recordOpsAlert (built in the gear-ops migration, already returns
+ * {ok, alertId}) instead — no new alert primitive needed here. The
+ * {retries: 2} option on every callBookingsWebApp call is dropped: that
+ * existed to paper over Apps Script Web App flakiness over HTTP, and has
+ * no equivalent need against a direct Postgres query (matches the same
+ * simplification already made in the deposit-hold engine's api/*.js
+ * files). Every Stripe call, idempotency key, and business-logic branch
+ * below — including releaseDepositHoldIfLive's three-way self-heal and the
+ * two independent-bug-pass fixes in the main refund path — is completely
+ * unchanged.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const cancelRefundService = require('../lib/cancel-refund-service');
+const gearService = require('../lib/gear-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderCancellationEmail } = require('../lib/email-templates/cancellation-email');
 
@@ -204,7 +221,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('cancelRefund_getBookingContext', { bookingId: body.bookingId });
+    const ctx = await cancelRefundService.getBookingContext(body.bookingId);
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'booking_not_found' });
       return;
@@ -281,13 +298,13 @@ module.exports = async function handler(req, res) {
         // stuck 'active' with nobody told. Best-effort, never blocks the
         // 502 response below.
         try {
-          await callBookingsWebApp('opsAlerts_recordAlert', {
+          await gearService.recordOpsAlert({
             bookingId: body.bookingId,
             alertType: 'cancel_refund_declined',
             stripeErrorDetail: (stripeErr && stripeErr.message) || 'unknown',
             urgency: 'urgent_same_day',
             notes: 'This booking should be cancelled (reasons: ' + reasons.join(',') + '), but Stripe declined the refund on PaymentIntent ' + ctx.mainPaymentIntentId + ': ' + ((stripeErr && stripeErr.message) || 'unknown') + '. The booking was NOT marked cancelled — it is still active. Needs manual review.',
-          }, { retries: 2 });
+          });
         } catch (alertErr) {
           // eslint-disable-next-line no-console
           console.error('cancel-and-refund-booking: also failed to write the cancel_refund_declined Ops Alert', body.bookingId, alertErr);
@@ -308,13 +325,13 @@ module.exports = async function handler(req, res) {
     const depositRelease = await releaseDepositHoldIfLive(ctx, body.bookingId);
     if (depositRelease.attempted && !depositRelease.ok) {
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: body.bookingId,
           alertType: 'deposit_hold_release_failed_on_cancellation',
           stripeErrorDetail: depositRelease.detail,
           urgency: 'urgent_same_day',
           notes: 'This booking was cancelled and its main charge refunded, but its live gear deposit hold (' + ctx.depositPaymentIntentId + ') could not be released: ' + depositRelease.detail + '. Left untouched — Stripe will release it on its own after ~5-7 days if nothing else acts on it first, but reconciliation could otherwise still capture against a cancelled booking.',
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('cancel-and-refund-booking: also failed to write the deposit-hold-release-failed Ops Alert', body.bookingId, alertErr);
@@ -340,7 +357,7 @@ module.exports = async function handler(req, res) {
     let writeBackFailed = false;
     try {
       const depositWasReleased = depositRelease.attempted && depositRelease.ok && !depositRelease.alreadyCaptured;
-      await callBookingsWebApp('cancelRefund_writeCancellation', {
+      await cancelRefundService.writeCancellation({
         bookingId: body.bookingId,
         bookingStatus,
         cancelledAt,
@@ -353,20 +370,20 @@ module.exports = async function handler(req, res) {
         depositReconciledAt: depositWasReleased ? cancelledAt : undefined,
         depositReconciledAmountCents: depositWasReleased ? 0 : undefined,
         depositHoldPaymentIntentId: depositWasReleased ? ctx.depositPaymentIntentId : undefined,
-      }, { retries: 2 });
+      });
     } catch (writeBackErr) {
       writeBackFailed = true;
       // eslint-disable-next-line no-console
       console.error('cancel-and-refund-booking: refund succeeded but the booking write-back failed', body.bookingId, refundId, writeBackErr);
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: body.bookingId,
           alertType: 'cancel_refund_writeback_failed',
           amount: refundAmount,
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: 'Refund ' + refundId + ' for $' + refundAmount + ' succeeded on Stripe, but the booking record could not be updated (bookingStatus/refundId/cancelledAt). A retry of this same cancellation should self-heal it automatically; if this alert is still Open, it did not.',
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('cancel-and-refund-booking: also failed to write the orphaned-refund Ops Alert', body.bookingId, alertErr);

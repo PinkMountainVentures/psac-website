@@ -28,11 +28,15 @@
  * goes live; if PaymentIntents aren't created with a Customer, this
  * endpoint's 500 `no_customer_on_payment_intent` response is exactly where
  * that would surface.
+ *
+ * MIGRATED (Task 18, 2026-08-31): I/O rewritten against Postgres via
+ * lib/payment-update-service.js. Nothing about this endpoint's request/
+ * response shape, Stripe logic, or the flagged assumption above changed.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { paymentUpdateGetBookingForToken } = require('../lib/payment-update-service');
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
@@ -74,7 +78,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('paymentUpdate_getBookingForToken', { bookingId, token });
+    const ctx = await paymentUpdateGetBookingForToken({ bookingId, token });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'not_found' });
       return;

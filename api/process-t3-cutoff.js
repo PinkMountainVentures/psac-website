@@ -38,15 +38,40 @@
  * unenforced one — the closing already happened at the write layer before
  * this cron ever sees the booking.
  * ============================================================================
+ *
+ * MIGRATED (2026-08-31, process-t3-cutoff build session): the six
+ * callBookingsWebApp calls that had no Postgres equivalent yet now go
+ * through the new lib/t3-cutoff-service.js. The three opsAlerts_recordAlert
+ * calls go through lib/gear-service.js's already-exported recordOpsAlert
+ * instead (no new alert primitive needed here), dropping the {retries: 2}
+ * option (no equivalent need against a direct Postgres query — same
+ * simplification already made in the deposit-hold and cancel-refund
+ * builds). lib/t3-cutoff.js (isBeforeT3Cutoff) and
+ * lib/finalize-kit-change.js (finalizePendingKitChange) are both untouched
+ * — pure date math and an already-migrated Postgres-backed finalizer,
+ * respectively. Step 3's roster-JSON-parsing + findUncoveredRosterMembers
+ * is GONE: there is no reconfirmedRosterJson in Postgres (roster is real
+ * booking_participants rows). getProcessingContext now resolves the
+ * uncovered-kit set server-side (Postgres join against gear_check_log +
+ * waiver_signatures, by real participant_id — see lib/t3-cutoff-service.js's
+ * own header for the 2026-08-31 roster/gear-kit ID-link fix) and hands
+ * back {participantId, personName} pairs to iterate — functionally
+ * equivalent to what findUncoveredRosterMembers computed, just computed in
+ * SQL instead of parsed from JSON that no longer exists, and matched by a
+ * real ID instead of rosterRef/name. Every cancellation-gate order, the
+ * external cancelBooking() HTTP call, and every payment-review bug fix
+ * documented below are unchanged.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const t3CutoffService = require('../lib/t3-cutoff-service');
+const gearService = require('../lib/gear-service');
 const { isBeforeT3Cutoff } = require('../lib/t3-cutoff');
 const { finalizePendingKitChange } = require('../lib/finalize-kit-change');
 
 const CANCEL_ENDPOINT = 'https://www.palmspringsadventureclub.com/api/cancel-and-refund-booking';
+const T3_CUTOFF_JOB_NAME = 'process-t3-cutoff';
 
 function checkCronAuth(req) {
   // BUG FIX (payment-review, Aug 2026, Medium #44): fail closed if
@@ -89,40 +114,6 @@ function hasDeliveryAddress(ctx) {
   return !!(ctx.deliveryAddressLine1 || ctx.deliveryAddressRaw);
 }
 
-/**
- * Section 9's per-kit removal for a `partial` waiver track: any roster
- * member without a `signed` Waiver Signatures row loses their kit. Matches
- * rosterRef first (the reliable key waiver rows and roster entries both
- * carry), falling back to name only if rosterRef is missing on either side
- * — a defensive fallback, not the primary matching path, since name
- * collisions are possible in a group booking.
- *
- * BUG FIX (independent bug pass, Aug 2026): this used to return every
- * uncovered roster member regardless of whether they actually had their own
- * kit. A roster member sharing someone else's kit (`gearKit: false`) who
- * lacks a valid waiver was still passed to t3Cutoff_removeUncoveredKit,
- * which found zero matching Gear Check Log rows for them but still
- * unconditionally decremented confirmedKitCount and logged a "kit removed"
- * entry for a kit that never existed for that person. Filtered to
- * `gearKit === true` roster members only — the only ones who actually have
- * a kit to remove.
- */
-function findUncoveredRosterMembers(roster, waiverRows) {
-  const coveredRefs = new Set(
-    waiverRows.filter((r) => r.status === 'signed').map((r) => String(r.rosterRef || ''))
-  );
-  const coveredNames = new Set(
-    waiverRows.filter((r) => r.status === 'signed').map((r) => String(r.signerName || ''))
-  );
-  return (roster || []).filter((person) => {
-    if (!person.gearKit) return false;
-    const ref = String(person.rosterRef || person.id || '');
-    if (ref && coveredRefs.has(ref)) return false;
-    if (!ref && person.name && coveredNames.has(String(person.name))) return false;
-    return true;
-  });
-}
-
 // BUG FIX (payment-review, Aug 2026, High #23): all three of this file's
 // cancellation gates used to report outcome: 'cancelled' regardless of
 // whether the downstream cancel-and-refund-booking.js call actually
@@ -133,13 +124,13 @@ function findUncoveredRosterMembers(roster, waiverRows) {
 async function reportCancelOutcome(bookingId, reason, result) {
   if (!result || result.ok !== true) {
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await gearService.recordOpsAlert({
         bookingId,
         alertType: 'cancellation_gate_call_failed',
         stripeErrorDetail: (result && (result.detail || result.error)) || 'no response',
         urgency: 'urgent_same_day',
         notes: 'process-t3-cutoff (the T-3, 10pm gate: ' + reason + ') tried to cancel this booking, but cancel-and-refund-booking.js did not report success: ' + JSON.stringify(result) + '. The booking was NOT cancelled — it is still active. Needs manual review.',
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('process-t3-cutoff: also failed to write the cancellation_gate_call_failed Ops Alert', bookingId, alertErr);
@@ -150,7 +141,7 @@ async function reportCancelOutcome(bookingId, reason, result) {
 }
 
 async function processOneBooking(bookingId) {
-  const ctx = await callBookingsWebApp('t3Cutoff_getProcessingContext', { bookingId });
+  const ctx = await t3CutoffService.getProcessingContext(bookingId);
   if (!ctx || ctx.notFound) return { bookingId, outcome: 'not_found' };
   if (ctx.bookingStatus !== 'active') return { bookingId, outcome: 'already_inactive' };
 
@@ -181,21 +172,17 @@ async function processOneBooking(bookingId) {
 
   // Step 3: partial-waiver kit removal. `zero` already exited via the gate
   // above; only `partial` reaches here (`complete` needs no action).
+  // BUG FIX (2026-08-31, roster/gear-kit ID-link fix): ctx.uncoveredKitParticipants
+  // (was uncoveredKitPersonNames) now carries participantId alongside
+  // personName, and removeUncoveredKit matches by that ID — see
+  // lib/t3-cutoff-service.js's header for the full fix.
   if (ctx.waiverTrack === 'partial') {
-    let roster = [];
-    try {
-      roster = JSON.parse(ctx.reconfirmedRosterJson || '[]');
-    } catch (e) {
-      roster = [];
-    }
-    const uncovered = findUncoveredRosterMembers(roster, ctx.waiverRows || []);
     stepResults.kitsRemoved = [];
-    for (const person of uncovered) {
-      const removeResult = await callBookingsWebApp('t3Cutoff_removeUncoveredKit', {
-        bookingId,
-        personName: person.name,
+    for (const uncovered of ctx.uncoveredKitParticipants || []) {
+      const removeResult = await t3CutoffService.removeUncoveredKit({
+        bookingId, participantId: uncovered.participantId, personName: uncovered.personName,
       });
-      stepResults.kitsRemoved.push({ personName: person.name, removeResult });
+      stepResults.kitsRemoved.push({ personName: uncovered.personName, participantId: uncovered.participantId, removeResult });
     }
   }
 
@@ -212,7 +199,7 @@ async function processOneBooking(bookingId) {
   // is a Trail Swap Requests problem, not a reason to hold up this booking
   // or any other in the same cron tick.
   if (!ctx.rideWithGpsExperienceAccess && ctx.selectedTrailId) {
-    stepResults.rideWithGps = await callBookingsWebApp('t3Cutoff_writeRideWithGpsAccess', {
+    stepResults.rideWithGps = await t3CutoffService.writeRideWithGpsAccess({
       bookingId,
       trailId: ctx.selectedTrailId,
     });
@@ -220,7 +207,7 @@ async function processOneBooking(bookingId) {
     stepResults.rideWithGps = 'skipped_no_selected_trail';
   }
 
-  await callBookingsWebApp('t3Cutoff_markProcessed', { bookingId });
+  await t3CutoffService.markProcessed(bookingId);
 
   return { bookingId, outcome: 'processed', stepResults };
 }
@@ -231,12 +218,13 @@ module.exports = async function handler(req, res) {
   // cancellation/Stripe calls per candidate. With no invocation-level
   // overlap guard, a slow tick still in flight when the next tick starts
   // could pull the same candidate list and run the same cancellation gate
-  // for the same booking twice concurrently. t3Cutoff_acquireRunLock (see
-  // its own header in t3-cutoff-actions.gs) is a simple whole-run mutex —
-  // acquired here before the candidate loop, released in the finally below
-  // so a run that errors out still frees it for the next tick, and a run
-  // that never gets the chance to release (a crash/timeout) self-expires
-  // after 10 minutes rather than wedging every future tick permanently.
+  // for the same booking twice concurrently. t3CutoffService.acquireRunLock
+  // (see lib/t3-cutoff-service.js's own header) is a simple whole-run mutex
+  // — acquired here before the candidate loop, released in the finally
+  // below so a run that errors out still frees it for the next tick, and a
+  // run that never gets the chance to release (a crash/timeout) self-
+  // expires after 10 minutes rather than wedging every future tick
+  // permanently.
   let runLockAcquired = false;
   try {
     if (!checkCronAuth(req)) {
@@ -244,14 +232,14 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const lockResult = await callBookingsWebApp('t3Cutoff_acquireRunLock', {});
+    const lockResult = await t3CutoffService.acquireRunLock(T3_CUTOFF_JOB_NAME, 'process-t3-cutoff-cron');
     if (!lockResult || !lockResult.ok) {
       res.status(200).json({ ok: true, skipped: 'run_in_progress' });
       return;
     }
     runLockAcquired = true;
 
-    const listRes = await callBookingsWebApp('t3Cutoff_listActiveBookings', {});
+    const listRes = await t3CutoffService.listActiveBookings();
     const candidates = (listRes && listRes.bookings) || [];
     const due = candidates.filter((b) => !isBeforeT3Cutoff(b.tripDate));
 
@@ -280,7 +268,7 @@ module.exports = async function handler(req, res) {
   } finally {
     if (runLockAcquired) {
       try {
-        await callBookingsWebApp('t3Cutoff_releaseRunLock', {});
+        await t3CutoffService.releaseRunLock(T3_CUTOFF_JOB_NAME);
       } catch (releaseErr) {
         // eslint-disable-next-line no-console
         console.error('process-t3-cutoff: failed to release the run lock — next tick(s) will wait out the 10-minute staleness window instead', releaseErr);

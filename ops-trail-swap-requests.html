@@ -274,6 +274,13 @@
       }
       var options = result.data.options || [];
       var ceilingsEvaluatable = result.data.ceilingsEvaluatable;
+      // BUG FIX (ops-UX audit, Aug 2026): getTrailSwapDropdownOptions now
+      // returns the booking's real tripDate (already computed server-side
+      // for its own park/season filtering) so it can be threaded into
+      // applyTrailSwapOverride below — without it, write-manual-trail-
+      // override.js's guest-notification email always fell back to the
+      // generic "your trail day" text instead of a real T-3 date.
+      var tripDate = result.data.tripDate || '';
 
       if (!options.length) {
         reviewView.innerHTML = '<div class="ops-panel"><div class="ops-panel-title">No bookable trails available for this booking\'s date/park.</div>'
@@ -328,6 +335,7 @@
             safetyOverrideReason: reason,
             skipGuestEmail: document.getElementById('skip-email').checked,
             reviewedBy: currentUserEmail,
+            tripDate: tripDate,
           }).then(function (applyResult) {
             if (!applyResult.ok) {
               showError((applyResult.data && applyResult.data.detail) || 'Could not apply that trail change.');

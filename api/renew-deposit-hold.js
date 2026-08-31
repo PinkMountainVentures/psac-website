@@ -1,6 +1,18 @@
 /**
  * api/renew-deposit-hold.js
  *
+ * MIGRATED (2026-08-31, deposit-hold engine build session): now calls
+ * lib/gear-service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). `listHoldRenewalCandidates`/`recordHoldRenewed`/
+ * `recordOpsAlert` already existed in lib/gear-service.js — built during
+ * the gear-ops migration since api/trigger-gear-reconciliation.js reuses
+ * the exact same candidate list (see that function's own header: "active
+ * bookings, depositStatus='held', not yet reconciled" is exactly the right
+ * candidate set for BOTH reconciliation and hold renewal). Nothing new
+ * needed there. The in-process call into api/create-deposit-hold.js is
+ * UNCHANGED — that file's own migration (also this session) is what makes
+ * this in-process reuse actually work against Postgres now.
+ *
  * Gear Inventory PRD Section 8: the hold-renewal safety net. Stripe
  * authorization holds expire on their own after roughly 5-7 days (Visa
  * specifically caps online holds at 5 days) — a booking sitting
@@ -37,13 +49,14 @@
  * oldPaymentIntentId !== newPaymentIntentId guard in processOneCandidate).
  *
  * Reuses api/create-deposit-hold.js's own hold-placement logic IN-PROCESS,
- * with ZERO changes to that file — the explicit constraint this build was
- * given. Calling its exported handler directly with a synthetic req/res
- * (same technique api/ops-proxy.js already uses to reuse
- * api/resolve-ops-alert.js etc.) means every safeguard already inside that
- * file (Custom-tier skip, Customer default-payment-method preference, the
- * requires_action/unavailable/failed response shapes) applies here too,
- * automatically, with no duplicated logic to drift out of sync.
+ * with ZERO changes to that file's own business logic — the explicit
+ * constraint this build was given. Calling its exported handler directly
+ * with a synthetic req/res (same technique api/ops-proxy.js already uses
+ * to reuse api/resolve-ops-alert.js etc.) means every safeguard already
+ * inside that file (Custom-tier skip, Customer default-payment-method
+ * preference, the requires_action/unavailable/failed response shapes)
+ * applies here too, automatically, with no duplicated logic to drift out
+ * of sync.
  *
  * Order of operations matters: place the NEW hold first, and only cancel
  * the OLD one after the new one succeeds. If the new hold fails, the old
@@ -59,7 +72,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const { pacificDateString, addDaysToDateString, daysBetweenDateStrings, pacificClockTimeReached } = require('../lib/cadence');
 const createDepositHoldHandler = require('./create-deposit-hold');
 
@@ -184,13 +197,13 @@ async function processOneCandidate(candidate, today) {
     // eslint-disable-next-line no-console
     console.error('renew-deposit-hold: renewal attempt did not succeed', candidate.bookingId, detail);
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await gearService.recordOpsAlert({
         bookingId: candidate.bookingId,
         alertType: 'hold_renewal_failed',
         stripeErrorDetail: typeof detail === 'string' ? detail : JSON.stringify(detail),
         urgency: 'urgent_same_day',
         notes: `The deposit hold has been open ${daysSince} days without reconciliation and the automated renewal attempt did not succeed (status: ${result.body && result.body.status}). The old hold (${oldPaymentIntentId}) has been left untouched. Reconcile this booking's gear check-in or follow up on the card on file before the original hold's own ~5-7 day expiry.`,
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('renew-deposit-hold: also failed to write the hold_renewal_failed Ops Alert', candidate.bookingId, alertErr);
@@ -227,13 +240,13 @@ async function processOneCandidate(candidate, today) {
   const oldHoldCancelFailed = !!(oldPaymentIntentId && !cancelResult.ok);
   if (oldHoldCancelFailed) {
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await gearService.recordOpsAlert({
         bookingId: candidate.bookingId,
         alertType: 'hold_renewal_old_hold_cancel_failed',
         stripeErrorDetail: cancelResult.detail,
         urgency: 'urgent_same_day',
         notes: 'A new deposit hold (' + newPaymentIntentId + ') was placed by the 3-day renewal safety net, but cancelling the old hold (' + oldPaymentIntentId + ') failed: ' + cancelResult.detail + '. The guest\'s card now has TWO live holds. Needs manual review — cancel the old hold directly in the Stripe Dashboard once confirmed safe to do so.',
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('renew-deposit-hold: also failed to write the old-hold-cancel-failed Ops Alert', candidate.bookingId, alertErr);
@@ -242,7 +255,7 @@ async function processOneCandidate(candidate, today) {
 
   const renewedAt = new Date().toISOString();
   try {
-    await callBookingsWebApp('gearOps_recordHoldRenewed', {
+    await gearService.recordHoldRenewed({
       bookingId: candidate.bookingId,
       renewedAt,
       oldPaymentIntentId: oldPaymentIntentId || '',
@@ -251,18 +264,18 @@ async function processOneCandidate(candidate, today) {
       // say the truth instead of always saying "cancelled" — see that
       // function's own comment (defaults to true/unchanged when omitted).
       oldHoldCancelSucceeded: !oldHoldCancelFailed,
-    }, { retries: 2 });
+    });
   } catch (writeBackErr) {
     // eslint-disable-next-line no-console
     console.error('renew-deposit-hold: new hold placed but write-back failed', candidate.bookingId, newPaymentIntentId, writeBackErr);
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await gearService.recordOpsAlert({
         bookingId: candidate.bookingId,
         alertType: 'hold_renewal_writeback_failed',
         stripeErrorDetail: writeBackErr.message,
         urgency: 'urgent_same_day',
         notes: `A new deposit hold (${newPaymentIntentId}) was placed to renew the safety net, but the booking record could not be updated with depositHoldRenewedAt. The next daily run will likely attempt to renew again using the same stale reference point — flagged in case that happens more than once.`,
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('renew-deposit-hold: also failed to write the writeback-failed Ops Alert', candidate.bookingId, alertErr);
@@ -291,7 +304,7 @@ module.exports = async function handler(req, res) {
     }
 
     const today = pacificDateString(now);
-    const listRes = await callBookingsWebApp('gearOps_listHoldRenewalCandidates', {});
+    const listRes = await gearService.listHoldRenewalCandidates();
     const candidates = (listRes && listRes.bookings) || [];
 
     const results = [];

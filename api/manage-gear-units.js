@@ -1,6 +1,11 @@
 /**
  * api/manage-gear-units.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). See lib/gear-service.js's own header for the full
+ * scope of this migration.
+ *
  * Gear Inventory PRD Section 2/11: consolidated dispatcher for the Gear
  * Units page — the standing inventory list, Add Unit, Retire Unit, Mark
  * Clean, and Mark Deep-Cleaned. Server-to-server only (api/ops-proxy.js),
@@ -9,7 +14,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 
 const VALID_ITEM_TYPES = ['backpack_standard', 'backpack_plus', 'poles', 'bottle', 'first_aid_kit', 'duffel'];
 
@@ -44,7 +49,7 @@ module.exports = async function handler(req, res) {
     const action = body.action;
 
     if (action === 'listUnits') {
-      const result = await callBookingsWebApp('gearOps_listUnits', { itemType: body.itemType || '' });
+      const result = await gearService.listUnits({ itemType: body.itemType || '' });
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -54,7 +59,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: `unitId is required and itemType must be one of: ${VALID_ITEM_TYPES.join(', ')}` });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_addUnit', {
+      const result = await gearService.addUnit({
         unitId: String(body.unitId).trim(),
         itemType: body.itemType,
         replacementCostCents: body.replacementCostCents != null ? Number(body.replacementCostCents) : undefined,
@@ -69,7 +74,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'unitId and retiredReason are required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_retireUnit', { unitId: body.unitId, retiredReason: body.retiredReason });
+      const result = await gearService.retireUnit({ unitId: body.unitId, retiredReason: body.retiredReason });
       res.status(200).json(result);
       return;
     }
@@ -79,7 +84,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'unitId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_markClean', { unitId: body.unitId });
+      const result = await gearService.markClean({ unitId: body.unitId });
       res.status(200).json(result);
       return;
     }
@@ -89,7 +94,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'unitId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_markDeepCleaned', { unitId: body.unitId });
+      const result = await gearService.markDeepCleaned({ unitId: body.unitId });
       res.status(200).json(result);
       return;
     }
@@ -98,16 +103,13 @@ module.exports = async function handler(req, res) {
     // (claude/psac-ops-redesign-open-items-confirmed.md item 3): a repaired
     // unit returns straight to Available, matching Mark Clean/Mark Deep-
     // Cleaned, NOT routed through Needs Cleaning first — so this reuses
-    // gearOps_markClean directly rather than a new Apps Script function.
-    // gearOps_markClean has no status precondition at all, confirmed live
-    // (Phase 1, Surface 3) — this is a pure front-end-facing action name,
-    // zero backend risk.
+    // markClean directly rather than a new gear-service function.
     if (action === 'markRepaired') {
       if (!body.unitId) {
         res.status(400).json({ error: 'bad_request', detail: 'unitId is required' });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_markClean', { unitId: body.unitId });
+      const result = await gearService.markClean({ unitId: body.unitId });
       res.status(200).json(result);
       return;
     }

@@ -1,38 +1,35 @@
 /**
  * api/waiver.js
  *
- * CONSOLIDATED, build-review Aug 2026, same reason and same treatment as
- * api/adventure-prep.js (see that file's header for the full "why one file
- * now instead of many" explanation) — this merges get-signer.js,
- * save-waiver-signature.js, and save-emergency-contact.js. These three
- * were already conceptually one family (Surface B's own load/save calls,
- * plus the two save endpoints Surface A's owner flow shares with Surface
- * B), so they get their own file separate from api/adventure-prep.js's
- * Surface-A-primary actions rather than being folded into one single
- * mega-dispatcher.
+ * MIGRATED (2026-08-31 build session): every action now calls
+ * lib/waiver-service.js (Postgres) instead of
+ * lib/apps-script-client.js's callBookingsWebApp() — this was the other
+ * half of the guardian hybrid model gap alongside api/adventure-prep.js's
+ * sendSignerLinks, since Surface B (the non-owner signer hub) is entirely
+ * served by this file's getSigner action, and neither Surface A's own
+ * waiver step nor Surface B could have worked for any real post-cutover
+ * booking (no row in the old Sheet for callBookingsWebApp to find) until
+ * this moved too.
  *
- * Every action below is a byte-for-byte-behavior port of its original
- * file — same auth, same validation order, same response shapes and status
- * codes. Only the URL and the need to say which action changed.
+ * Request/response shapes are the same as the pre-migration version, with
+ * one change: saveWaiverSignature's `guardianForChildren` becomes
+ * `guardianForChildrenParticipantIds` (an array of
+ * booking_participants.participant_id, not child names) — see
+ * lib/waiver-service.js's own header comment, point 1, for why. Frontend
+ * request-shape reconciliation (waiver-signer-form.js) is a pending task,
+ * same as adventure-prep-form.js's roster screen — see the migration
+ * progress doc.
  *
  * Request shapes:
  *   GET  /api/waiver?signerToken=...
- *     -> was GET /api/get-signer
- *   POST /api/waiver { action: 'saveWaiverSignature', token?, signerToken?, ... }
- *     -> was POST /api/save-waiver-signature
+ *   POST /api/waiver { action: 'saveWaiverSignature', token?, signerToken?, signerName, signerEmail?, signerPhone?, smsConsent?, isGuardian?, guardianForChildrenParticipantIds?, participantsCovered? }
  *   POST /api/waiver { action: 'saveSignerDetails', signerToken, signerEmail?, signerPhone?, smsConsent?, ... }
- *     -> new, Round 2 (mockup-07): Surface B's "Confirm Your Details" hub
- *        tile. signerToken only (non-owner action) — see this file's own
- *        saveSignerDetails() and adventurePrep_saveSignerDetails_'s own
- *        comment for why this is deliberately NOT folded into
- *        saveWaiverSignature.
- *   POST /api/waiver { action: 'saveEmergencyContact', token?, signerToken?, ... }
- *     -> was POST /api/save-emergency-contact
+ *   POST /api/waiver { action: 'saveEmergencyContact', token?, signerToken?, contactName, contactPhone, contactEmail }
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const waiverService = require('../lib/waiver-service');
 
 function parseBody(req) {
   var body = req.body;
@@ -59,13 +56,13 @@ async function getSigner(req, res) {
     res.status(400).json({ error: 'missing_signer_token' });
     return;
   }
-  const ctx = await callBookingsWebApp('adventurePrep_getSignerContext', { signerToken });
+  const ctx = await waiverService.getSignerContext(signerToken);
   if (!ctx || ctx.notFound) {
     res.status(404).json({ error: 'invalid_signer_token' });
     return;
   }
   try {
-    await callBookingsWebApp('adventurePrep_markSignerOpened', { signerToken });
+    await waiverService.markSignerOpened(signerToken);
   } catch (markErr) {
     // eslint-disable-next-line no-console
     console.error('waiver/getSigner: markSignerOpened failed (non-fatal)', signerToken, markErr);
@@ -82,7 +79,6 @@ async function saveWaiverSignature(body, req, res) {
   const payload = {
     token: body.token,
     signerToken: body.signerToken,
-    rosterRef: body.rosterRef,
     signerName: body.signerName,
     signerEmail: body.signerEmail,
     signerPhone: body.signerPhone,
@@ -90,11 +86,11 @@ async function saveWaiverSignature(body, req, res) {
     smsConsentAt: body.smsConsentAt,
     smsConsentText: body.smsConsentText,
     isGuardian: body.isGuardian,
-    guardianForChildren: body.guardianForChildren,
+    guardianForChildrenParticipantIds: body.guardianForChildrenParticipantIds,
     participantsCovered: body.participantsCovered,
     ipAddress: clientIp(req),
   };
-  const result = await callBookingsWebApp('adventurePrep_saveWaiverSignature', payload);
+  const result = await waiverService.saveWaiverSignature(payload);
   if (!result || result.ok === false) {
     res.status(404).json({ error: 'invalid_token' });
     return;
@@ -116,7 +112,7 @@ async function saveSignerDetails(body, req, res) {
     smsConsentAt: body.smsConsentAt,
     smsConsentText: body.smsConsentText,
   };
-  const result = await callBookingsWebApp('adventurePrep_saveSignerDetails', payload);
+  const result = await waiverService.saveSignerDetails(payload);
   if (!result || result.ok === false) {
     res.status(404).json({ error: 'invalid_token' });
     return;
@@ -137,7 +133,7 @@ async function saveEmergencyContact(body, req, res) {
     contactPhone: body.contactPhone,
     contactEmail: body.contactEmail,
   };
-  const result = await callBookingsWebApp('adventurePrep_saveEmergencyContact', payload);
+  const result = await waiverService.saveEmergencyContact(payload);
   if (!result || result.ok === false) {
     res.status(404).json({ error: 'invalid_token' });
     return;

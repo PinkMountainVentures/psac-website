@@ -14,20 +14,45 @@
    Waiver, and Adventure Summary (locked until the first two are done).
    No Attendees tile, no Gear Kits tile — both stay owner-managed.
 
-   WHAT THIS BUILD COULD NOT DO (flagged, not silently worked around):
+   REWRITTEN (Task 16, 2026-08-31, Postgres migration): this file was
+   built against the pre-migration name-keyed guardian model
+   (guardianForChildren as an array of child NAMES, submitted straight to
+   adventurePrep_saveWaiverSignature). lib/waiver-service.js's real
+   saveWaiverSignature only reads guardianForChildrenParticipantIds — the
+   name-based key this file sent was silently ignored, so
+   applyGuardianCertification never ran for anyone signing here on behalf
+   of a child. Also found in the same pass: getSignerContext never
+   returned signer.guardianForChildrenJson at all (a real gap, since
+   saveWaiverSignature has written it since this file was built) — see
+   that function's own header comment for the backend fix. This rewrite:
+   state.guardianForChildren -> state.guardianForChildrenParticipantIds
+   (keyed by participantId, matching state.ctx.minors' own shape), and
+   the guardian checklist now pre-checks any minor getSignerContext flags
+   as preAssignedToThisSigner (Section 6's assignment half — the booker
+   named this signer as the guardian at roster-confirmation time) rather
+   than always starting unchecked, while still requiring the affirmative
+   click to actually submit (never auto-certifying).
+
+   WHAT THIS BUILD STILL COULD NOT DO (flagged, not silently worked
+   around, and now more precisely scoped than before this rewrite):
    mockup-07 also shows a second scenario — "Taylor," an adult who is
    named as a guardian for a minor but is NOT herself attending or on the
-   roster. That scenario needs a real guardian-assignment data model
-   (the booker naming an external, non-attending adult as a signing
-   guardian for a child), which is Section 9 item 1 of the handoff and is
-   still explicitly unbuilt — adventurePrep_sendSignerLinks only ever
-   issues signerTokens to adults already on the roster (see that
-   function's own comment in adventure-prep-actions.gs). So every real
-   signerToken today belongs to an attending adult (the "Jordan" shape),
-   and that's the only shape this file builds. If/when the guardian-
-   assignment model is built, this file's hub will need a second branch
-   for a non-attending guardian (no Your Trail tile, "[Child]'s Waiver"
-   instead of "Your Waiver") — flagged here rather than guessed at now.
+   roster. PRD Section 6's guardian hybrid model (built earlier this
+   migration — see lib/waiver-service.js's own header comment) DOES now
+   support this at the data/backend level: confirmRoster's
+   guardianAssignment can name a non-attending external guardian
+   ({name, email}), which creates a real booking_participants row
+   (role_on_booking = 'guardian_only') and sendSignerLinksForBooking does
+   send that person a real signerToken. What's still missing is UI: there
+   is no screen anywhere in this codebase for the booker to actually NAME
+   that external guardian (see adventure-prep-form.js's own header comment
+   for the same flag from the booker's side), so no real "Taylor" token
+   has ever been issued in practice — every real signerToken today still
+   belongs to an attending adult (the "Jordan" shape), and that's the only
+   shape this file builds. If/when that assignment UI is built, this
+   file's hub would need a second branch for a non-attending guardian (no
+   Your Trail tile, "[Child]'s Waiver" instead of "Your Waiver") — flagged
+   here rather than guessed at now.
 
    Two screens have no mockup frame to build against (Your Trail's detail
    view, and Adventure Summary's unlocked content) — both are deliberately
@@ -51,9 +76,25 @@
     smsConsent: false,
     // Your Waiver (sign sub-flow)
     waiverName: '',
-    guardianForChildren: [],
+    guardianForChildrenParticipantIds: [], // NEW (Task 16): array of participant_ids, replaces the old name-keyed guardianForChildren — matches lib/waiver-service.js's real saveWaiverSignature contract
     ecName: '',
     ecPhone: '',
+  };
+
+  // Matches lib/adventure-prep-service.js's own AGE_BUCKET_MAP (reversed)
+  // — getSignerContext returns each minor's raw age_bucket enum value
+  // (ageBucket), not a human-readable label; this file's own copy of the
+  // same small lookup table every migrated file keeps for itself (see
+  // lib/finalize-kit-change.js's own header comment on that convention).
+  var AGE_BUCKET_LABELS = {
+    under_14: 'Under 14',
+    '14_17': '14–17',
+    '18_24': '18–24',
+    '25_34': '25–34',
+    '35_44': '35–44',
+    '45_54': '45–54',
+    '55_64': '55–64',
+    '65_plus': '65+',
   };
 
   // Matches the live booking flow's own SMS opt-in structure exactly
@@ -140,12 +181,27 @@
     var candidateTrails = parseCandidateTrails();
     var selectedTrailId = state.ctx.selectedTrailId;
     var trailMatch = candidateTrails.filter(function (c) { return c.trailId === selectedTrailId; })[0];
-    var guardianForChildren = [];
-    try { guardianForChildren = JSON.parse(signer.guardianForChildrenJson || '[]'); } catch (e) { guardianForChildren = []; }
+    // NEW (Task 16): guardianForChildrenParticipantIds is a real JSONB
+    // column (guardian_for_children_json) that lib/waiver-service.js's
+    // getSignerContext already returns pre-parsed as a JS array — NOT a
+    // JSON string to re-parse here, despite the column's own _json name
+    // (the Neon driver deserializes JSONB automatically). Mapped to
+    // display names via state.ctx.minors (the only roster subset Surface
+    // B's context carries) for the hub tile/summary sub-labels below. A
+    // minor certified in a PRIOR visit that's since aged off
+    // state.ctx.minors (shouldn't happen in practice — minors aren't
+    // removed from the roster) would silently drop from the label only,
+    // never from the underlying certification itself.
+    var guardianForChildrenParticipantIds = signer.guardianForChildrenParticipantIds || [];
+    var minorsById = {};
+    (state.ctx.minors || []).forEach(function (m) { minorsById[m.participantId] = m; });
+    var guardianForChildrenNames = guardianForChildrenParticipantIds
+      .map(function (pid) { return minorsById[pid] ? minorsById[pid].name : null; })
+      .filter(Boolean);
     return {
       detailsDone: detailsDone,
       waiverDone: waiverDone,
-      guardianForChildren: guardianForChildren,
+      guardianForChildren: guardianForChildrenNames,
       trailAssigned: !!selectedTrailId,
       trailName: trailMatch ? trailMatch.trailName : '',
       trailDescription: trailMatch ? (trailMatch.description || (trailMatch.matchedAttributes || []).join(', ')) : '',
@@ -461,9 +517,24 @@
       });
     }
 
+    // REWRITTEN (Task 16): keyed on participantId now, not the child's
+    // display name (see this file's header comment). Also pre-checks any
+    // minor getSignerContext flags as preAssignedToThisSigner — the
+    // booker already named THIS signer as that child's guardian at
+    // roster-confirmation time (confirmRoster's guardianAssignment,
+    // Section 6) — while still requiring the "Yes" tap above and leaving
+    // every box independently toggleable; nothing here auto-submits
+    // without the signer's own affirmative action.
     function renderGuardianQuestion() {
       var minors = state.ctx.minors || [];
       var isGuardian = null;
+      // Pre-seed with any pre-assigned minors so the checklist starts
+      // correctly checked the first time it renders (before the signer
+      // has touched anything) — matches getSignerContext's own stated
+      // purpose for this flag.
+      state.guardianForChildrenParticipantIds = minors
+        .filter(function (m) { return m.preAssignedToThisSigner; })
+        .map(function (m) { return m.participantId; });
 
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
@@ -485,17 +556,19 @@
           '<div class="sb-additive">Since a child is joining too, we build the day around who’s actually on the trail.</div>' +
           minors.map(function (m) {
             var name = m.name || 'this child';
-            return '<div class="ap-toggle-row" data-guardian-name="' + escapeHtml(name) + '" style="cursor:pointer;">' +
-              '<div class="ap-toggle-row-text" style="font-weight:500; font-size:0.78rem;">I am the parent or legal guardian of ' + escapeHtml(name) + ' (' + escapeHtml(m.age || m.ageRange || '') + '), or have their parent or guardian’s authorization, and I am signing on their behalf</div>' +
-              '<div class="ap-switch' + (state.guardianForChildren.indexOf(name) !== -1 ? ' on' : '') + '"></div>' +
+            var age = AGE_BUCKET_LABELS[m.ageBucket] || '';
+            var alreadyNote = m.alreadyVerified ? '<div class="ap-helper" style="margin:0.1rem 0 0.4rem;">A guardian has already confirmed this — checking again just adds your own confirmation too.</div>' : '';
+            return '<div class="ap-toggle-row" data-guardian-participant-id="' + escapeHtml(m.participantId) + '" style="cursor:pointer;">' +
+              '<div class="ap-toggle-row-text" style="font-weight:500; font-size:0.78rem;">I am the parent or legal guardian of ' + escapeHtml(name) + ' (' + escapeHtml(age) + '), or have their parent or guardian’s authorization, and I am signing on their behalf' + alreadyNote + '</div>' +
+              '<div class="ap-switch' + (state.guardianForChildrenParticipantIds.indexOf(m.participantId) !== -1 ? ' on' : '') + '"></div>' +
               '</div>';
           }).join('');
-        Array.prototype.forEach.call(checklistEl.querySelectorAll('[data-guardian-name]'), function (row) {
+        Array.prototype.forEach.call(checklistEl.querySelectorAll('[data-guardian-participant-id]'), function (row) {
           row.addEventListener('click', function () {
-            var name = row.getAttribute('data-guardian-name');
-            var idx = state.guardianForChildren.indexOf(name);
-            if (idx === -1) state.guardianForChildren.push(name); else state.guardianForChildren.splice(idx, 1);
-            row.querySelector('.ap-switch').classList.toggle('on', state.guardianForChildren.indexOf(name) !== -1);
+            var participantId = row.getAttribute('data-guardian-participant-id');
+            var idx = state.guardianForChildrenParticipantIds.indexOf(participantId);
+            if (idx === -1) state.guardianForChildrenParticipantIds.push(participantId); else state.guardianForChildrenParticipantIds.splice(idx, 1);
+            row.querySelector('.ap-switch').classList.toggle('on', state.guardianForChildrenParticipantIds.indexOf(participantId) !== -1);
           });
         });
       }
@@ -503,7 +576,7 @@
       Array.prototype.forEach.call(contentEl.querySelectorAll('.sb-guardian-btn'), function (btn) {
         btn.addEventListener('click', function () {
           isGuardian = btn.getAttribute('data-val') === 'yes';
-          if (!isGuardian) state.guardianForChildren = [];
+          if (!isGuardian) state.guardianForChildrenParticipantIds = [];
           Array.prototype.forEach.call(contentEl.querySelectorAll('.sb-guardian-btn'), function (b) {
             b.classList.toggle('is-selected', b === btn);
           });
@@ -511,30 +584,51 @@
           renderChecklist();
         });
       });
+      // If a pre-assignment already pre-checked at least one box, jump
+      // straight to "Yes" and render the checklist — a signer who was
+      // named as a guardian shouldn't have to re-answer a question the
+      // booker already answered on their behalf, though they can still
+      // switch to "No" and clear it themselves.
+      if (state.guardianForChildrenParticipantIds.length) {
+        var yesBtn = contentEl.querySelector('.sb-guardian-btn[data-val="yes"]');
+        if (yesBtn) yesBtn.click();
+      }
 
       var guardianContinueBtn = contentEl.querySelector('#sb-guardian-continue');
       contentEl.querySelector('#sb-flow-back').addEventListener('click', goHub);
       guardianContinueBtn.addEventListener('click', function () {
-        if (isGuardian && minors.length && !state.guardianForChildren.length) {
+        if (isGuardian && minors.length && !state.guardianForChildrenParticipantIds.length) {
           contentEl.querySelector('#sb-guardian-error').textContent = 'Check at least one child you’re certifying for, or answer "No" above.';
           return;
         }
         guardianContinueBtn.disabled = true;
-        submitSignature(state.guardianForChildren, function () {
+        submitSignature(state.guardianForChildrenParticipantIds, function () {
           guardianContinueBtn.disabled = false;
           contentEl.querySelector('#sb-guardian-error').textContent = 'Something went wrong saving that, try again.';
         });
       });
     }
 
-    function submitSignature(guardianForChildren, onError) {
-      var participantsCovered = [state.waiverName].concat(guardianForChildren);
+    // BUG FIX (Task 16): this used to send `guardianForChildren` (child
+    // names). lib/waiver-service.js's saveWaiverSignature only ever reads
+    // `guardianForChildrenParticipantIds` — the old key was silently
+    // ignored, so applyGuardianCertification never ran for anyone signing
+    // here on behalf of a child. participantsCovered stays name-based
+    // (still stored for the record on the signature row, same as
+    // adventure-prep-form.js's own renderSign), resolved from
+    // state.ctx.minors since that's this call's only source of names for
+    // these participantIds.
+    function submitSignature(guardianForChildrenParticipantIds, onError) {
+      var minorsById = {};
+      (state.ctx.minors || []).forEach(function (m) { minorsById[m.participantId] = m; });
+      var childNames = guardianForChildrenParticipantIds.map(function (pid) { return minorsById[pid] ? minorsById[pid].name : pid; });
+      var participantsCovered = [state.waiverName].concat(childNames);
       apiPost('/api/waiver', {
         action: 'saveWaiverSignature',
         signerToken: SIGNER_TOKEN,
         signerName: state.waiverName,
-        isGuardian: guardianForChildren.length > 0,
-        guardianForChildren: guardianForChildren,
+        isGuardian: guardianForChildrenParticipantIds.length > 0,
+        guardianForChildrenParticipantIds: guardianForChildrenParticipantIds,
         participantsCovered: participantsCovered,
       }).then(function (res) {
         if (!res.ok) {
@@ -545,7 +639,10 @@
           ? apiPost('/api/waiver', { action: 'saveEmergencyContact', signerToken: SIGNER_TOKEN, contactName: state.ecName, contactPhone: state.ecPhone })
           : Promise.resolve({ ok: true });
         state.ctx.signer.status = 'signed';
-        state.ctx.signer.guardianForChildrenJson = JSON.stringify(guardianForChildren);
+        // NOT JSON.stringify()'d — see this function's own comment on
+        // guardianForChildrenParticipantIds above; it's a real array both
+        // in the server's response and in this local mirror.
+        state.ctx.signer.guardianForChildrenParticipantIds = guardianForChildrenParticipantIds;
         ecDone.then(renderConfirmation);
       });
     }

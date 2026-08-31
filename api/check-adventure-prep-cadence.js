@@ -1,11 +1,16 @@
 /**
  * api/check-adventure-prep-cadence.js
  *
+ * MIGRATED (2026-08-31, check-adventure-prep-cadence build session):
  * Operations UX PRD Sections 3-4: the daily stall-detection/escalation
  * cadence job, run via Vercel Cron once daily (~9am Pacific, per Section 3's
  * table — Vercel Cron's own schedule granularity should be set as close to
  * that as the platform allows; see the deployment note at the bottom of this
- * file).
+ * file). Completes Task 9 (the other half, api/process-t3-cutoff.js, was
+ * migrated in the prior build turn) — swaps lib/apps-script-client's
+ * callBookingsWebApp for lib/cadence-service.js's Postgres-backed calls.
+ * lib/cadence.js's own date math (determineCadenceStage and friends) is
+ * pure and untouched by this migration.
  *
  * What this endpoint does NOT do, on purpose:
  *
@@ -58,13 +63,13 @@
  *          that skipped its midwindow check (Section 4: 48 hours or less
  *          remaining) still gets flagged at T-3 even though nothing set it
  *          true earlier.
- *      Every actual send records its stage via cadence_recordStageSent so a
+ *      Every actual send records its stage via recordStageSent so a
  *      retried or duplicate cron tick never double-sends.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const cadenceService = require('../lib/cadence-service');
 const { determineCadenceStage } = require('../lib/cadence');
 const { sendEmail } = require('../lib/send-email');
 const { renderAdventurePrepT7NudgeEmail } = require('../lib/email-templates/adventure-prep-t7-nudge-email');
@@ -95,7 +100,7 @@ function adventurePrepLinkFor(token) {
 }
 
 async function processOneBooking(bookingSummary, now) {
-  const ctx = await callBookingsWebApp('cadence_getBookingContext', { bookingId: bookingSummary.bookingId });
+  const ctx = await cadenceService.getBookingContext(bookingSummary.bookingId);
   if (!ctx || ctx.notFound) return { bookingId: bookingSummary.bookingId, outcome: 'not_found' };
 
   const assignedAtMissing = !ctx.assignedAt;
@@ -105,7 +110,7 @@ async function processOneBooking(bookingSummary, now) {
 
   if (fullyComplete) {
     if (ctx.adventurePrepStalledFlag || ctx.phoneFallbackDue) {
-      await callBookingsWebApp('cadence_setStallFlags', {
+      await cadenceService.setStallFlags({
         bookingId: ctx.bookingId,
         adventurePrepStalledFlag: false,
         phoneFallbackDue: false,
@@ -118,8 +123,7 @@ async function processOneBooking(bookingSummary, now) {
   const { isCompressed, stage } = determineCadenceStage({ tripDate: ctx.tripDate, createdAt: ctx.createdAt }, now);
   if (!stage) return { bookingId: ctx.bookingId, outcome: 'no_stage_today', isCompressed };
 
-  const stagesSent = ctx.cadenceStagesSent ? ctx.cadenceStagesSent.split(',') : [];
-  if (stagesSent.indexOf(stage) !== -1) {
+  if (ctx.cadenceStagesSent.includes(stage)) {
     return { bookingId: ctx.bookingId, outcome: 'stage_already_sent', stage };
   }
 
@@ -128,13 +132,13 @@ async function processOneBooking(bookingSummary, now) {
   const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || '';
 
   // BUG FIX (independent bug pass, Aug 2026): every stage block used to call
-  // sendEmail(...) and only THEN record cadence_recordStageSent. This cron
-  // is recommended (see this file's own deployment note) to run every
-  // 15-30 minutes for DST-drift tolerance, same as process-t3-cutoff.js. If
-  // the marker-write step failed transiently right after a successful send
-  // (a Sheet lock timeout, a dropped connection), stagesSent never picked up
-  // the stage, so the very next tick — 15-30 minutes later — would see
-  // "stage not yet sent" and send the same escalating-urgency reminder
+  // sendEmail(...) and only THEN record the stage sent. This cron is
+  // recommended (see this file's own deployment note) to run every 15-30
+  // minutes for DST-drift tolerance, same as process-t3-cutoff.js. If the
+  // marker-write step failed transiently right after a successful send (a
+  // dropped connection, a transient DB error), the stage would never be
+  // recorded as sent, so the very next tick — 15-30 minutes later — would
+  // see "stage not yet sent" and send the same escalating-urgency reminder
   // again, with no upper bound on how many times that could repeat for the
   // rest of that Pacific calendar day. Reordered so the marker is recorded
   // BEFORE the send: worst case on a failure is one missed reminder for a
@@ -150,7 +154,7 @@ async function processOneBooking(bookingSummary, now) {
     // actually sends it today (psac-email-sms-infrastructure-setup-guide.md
     // lists it among several drafted-but-never-wired touchpoints). This is
     // the real, only implementation, not a duplicate.
-    await callBookingsWebApp('cadence_recordStageSent', { bookingId: ctx.bookingId, stage: 't7' });
+    await cadenceService.recordStageSent(ctx.bookingId, 't7');
     const html = renderAdventurePrepT7NudgeEmail({ logoUrl, guestName: ctx.contactName, tripDateFormatted, adventurePrepLink });
     if (ctx.contactEmail) {
       await sendEmail({
@@ -163,8 +167,8 @@ async function processOneBooking(bookingSummary, now) {
   }
 
   if (stage === 't5' || stage === 'midwindow') {
-    await callBookingsWebApp('cadence_setStallFlags', { bookingId: ctx.bookingId, adventurePrepStalledFlag: true });
-    await callBookingsWebApp('cadence_recordStageSent', { bookingId: ctx.bookingId, stage });
+    await cadenceService.setStallFlags({ bookingId: ctx.bookingId, adventurePrepStalledFlag: true });
+    await cadenceService.recordStageSent(ctx.bookingId, stage);
     const html = renderStallReminderEmail({
       logoUrl, guestName: ctx.contactName, tripDateFormatted, adventurePrepLink,
       variant: 'reminder',
@@ -178,12 +182,12 @@ async function processOneBooking(bookingSummary, now) {
   }
 
   if (stage === 't3') {
-    await callBookingsWebApp('cadence_setStallFlags', {
+    await cadenceService.setStallFlags({
       bookingId: ctx.bookingId,
       adventurePrepStalledFlag: true,
       phoneFallbackDue: true,
     });
-    await callBookingsWebApp('cadence_recordStageSent', { bookingId: ctx.bookingId, stage: 't3' });
+    await cadenceService.recordStageSent(ctx.bookingId, 't3');
     const html = renderStallReminderEmail({
       logoUrl, guestName: ctx.contactName, tripDateFormatted, adventurePrepLink,
       variant: 'action_needed',
@@ -207,7 +211,7 @@ module.exports = async function handler(req, res) {
     }
 
     const now = new Date();
-    const listRes = await callBookingsWebApp('cadence_listActiveBookings', {});
+    const listRes = await cadenceService.listActiveBookings();
     const bookings = (listRes && listRes.bookings) || [];
 
     const results = [];
@@ -244,7 +248,7 @@ module.exports = async function handler(req, res) {
  * near 9am Pacific, not continuously — but it's still SAFE to run more
  * often than once daily (e.g. every 15-30 minutes, matching the existing
  * job's cadence) because every send path is idempotent via
- * cadenceStagesSent. Recommend scheduling this the same way as
+ * booking_cadence_log. Recommend scheduling this the same way as
  * process-t3-cutoff.js (frequent, cheap ticks) rather than trying to pin an
  * exact UTC cron expression to "9am Pacific" and having it drift a full
  * hour across DST transitions twice a year.

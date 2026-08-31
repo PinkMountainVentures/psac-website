@@ -1,6 +1,14 @@
 /**
  * api/trigger-deposit-holds.js
  *
+ * MIGRATED (2026-08-31, deposit-hold engine build session): now calls
+ * lib/gear-service.js and lib/hold-clearance-service.js (Postgres) instead
+ * of lib/apps-script-client.js's callBookingsWebApp(). The HTTP call to
+ * api/create-deposit-hold.js itself is UNCHANGED — this file always called
+ * that endpoint over the network (not in-process) even before this
+ * migration, and that's preserved exactly; only the two ops-alert lookups
+ * and the trip-date candidate list moved off Apps Script.
+ *
  * ============================================================================
  * FLAGGED ADDITION — not one of Section 13's five named endpoints, built to
  * close a real gap found while implementing check-hold-clearance-deadline.js
@@ -38,7 +46,8 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
+const holdClearanceService = require('../lib/hold-clearance-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderDepositHoldFailedEmail } = require('../lib/email-templates/deposit-hold-failed-email');
 const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = require('../lib/cadence');
@@ -98,10 +107,12 @@ async function processOneBooking(booking, now) {
   // sitting at 'scheduled_t1'/blank — so an unresolved hold failure used to
   // re-raise this alert and re-send the guest's "act within 2 hours" email
   // on every single tick, a dozen+ duplicates for one underlying problem.
-  // holdClearance_findOpenDepositAlert already exists for exactly this (used
-  // by api/check-hold-clearance-deadline.js to auto-resolve); reused here as
-  // a dedup check before alerting/emailing again.
-  const existingAlert = await callBookingsWebApp('holdClearance_findOpenDepositAlert', {
+  // findOpenAlert (holdClearance_findOpenDepositAlert's Postgres
+  // equivalent, generalized past hold-clearance's own original use — see
+  // lib/gear-service.js's own header) already exists for exactly this
+  // (used by api/check-hold-clearance-deadline.js to auto-resolve); reused
+  // here as a dedup check before alerting/emailing again.
+  const existingAlert = await gearService.findOpenAlert({
     bookingId: booking.bookingId,
     alertType: 'deposit_hold_failed',
   });
@@ -110,7 +121,7 @@ async function processOneBooking(booking, now) {
   }
 
   // requires_action / unavailable / failed — Section 6's immediate-alert path.
-  const alert = await callBookingsWebApp('opsAlerts_recordAlert', {
+  const alert = await gearService.recordOpsAlert({
     bookingId: booking.bookingId,
     alertType: 'deposit_hold_failed',
     amount: holdResult.amount != null ? holdResult.amount : null,
@@ -161,7 +172,7 @@ module.exports = async function handler(req, res) {
     }
 
     const tomorrow = addDaysToDateString(pacificDateString(now), 1);
-    const listRes = await callBookingsWebApp('holdClearance_listBookingsForTripDate', { tripDate: tomorrow });
+    const listRes = await holdClearanceService.listBookingsForTripDate({ tripDate: tomorrow });
     const bookings = (listRes && listRes.bookings) || [];
     // Only bookings that haven't already had a hold attempted today —
     // depositStatus starting from booking-time's 'scheduled_t1' default is
@@ -179,28 +190,28 @@ module.exports = async function handler(req, res) {
         console.error('trigger-deposit-holds: booking failed', b.bookingId, err);
         // BUG FIX (payment-review, Aug 2026, High #11): a non-Stripe
         // exception here (e.g. a network failure reaching create-deposit-
-        // hold.js, or reaching the Sheet itself) used to be console.error
+        // hold.js, or reaching the DB itself) used to be console.error
         // only, no alert of any kind — and since this cron re-processes
         // every still-due booking on every 15-minute tick across the whole
         // window, the same underlying problem could recur a dozen+ times
         // before the noon auto-cancel fires, with nobody ever told. Deduped
         // the same way as the deposit_hold_failed alert above, via the same
-        // generalized holdClearance_findOpenDepositAlert lookup, so a
-        // persistent problem alerts once, not every tick.
+        // generalized findOpenAlert lookup, so a persistent problem alerts
+        // once, not every tick.
         let alertId = null;
         try {
-          const existingErrorAlert = await callBookingsWebApp('holdClearance_findOpenDepositAlert', {
+          const existingErrorAlert = await gearService.findOpenAlert({
             bookingId: b.bookingId,
             alertType: 'deposit_hold_trigger_error',
           });
           if (!existingErrorAlert || !existingErrorAlert.found) {
-            const errorAlert = await callBookingsWebApp('opsAlerts_recordAlert', {
+            const errorAlert = await gearService.recordOpsAlert({
               bookingId: b.bookingId,
               alertType: 'deposit_hold_trigger_error',
               stripeErrorDetail: err.message,
               urgency: 'same_day_2hr',
               notes: 'trigger-deposit-holds hit a non-Stripe error trying to place this booking\'s T-1 deposit hold: ' + err.message + '. This cron retries every 15 minutes until noon Pacific; if this alert is still Open close to noon, the hold may never get placed and the booking could be wrongly auto-cancelled.',
-            }, { retries: 2 });
+            });
             alertId = errorAlert && errorAlert.alertId;
           } else {
             alertId = existingErrorAlert.alertId;

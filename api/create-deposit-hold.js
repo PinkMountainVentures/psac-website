@@ -6,23 +6,29 @@
    roughly 5-7 days and a booking can happen weeks before the trip, so the
    hold itself has to wait until it's actually close to being needed.
 
+   MIGRATED (2026-08-31, deposit-hold engine build session): now calls
+   lib/booking-service.js (Postgres) instead of a raw fetch to
+   process.env.BOOKINGS_WEBAPP_URL / lib/apps-script-client.js's
+   callBookingsWebApp(). Every Stripe call, every idempotency-key/CAS
+   design decision, and every bug-fix documented below is UNCHANGED from
+   the pre-migration version — this migration only replaced the
+   booking-context read and the two write-back call sites.
+
    Request shape: { bookingId, secret }. No amount, tier, or kit count is
    ever accepted from the caller — this endpoint looks all of that up
-   itself from the Bookings & Operations sheet (via the same Apps Script
-   Web App save-booking.js already talks to), the same "never trust a
-   caller-supplied money-adjacent value" posture used in
-   create-payment-intent.js.
+   itself from Postgres, the same "never trust a caller-supplied
+   money-adjacent value" posture used in create-payment-intent.js.
 
    Auth: a shared secret in the request body, same pattern as
-   BOOKINGS_WEBAPP_SECRET's check inside bookings-code.gs's doPost(), just
-   a separate secret (DEPOSIT_HOLD_SHARED_SECRET) since this is a distinct
-   caller (the Operations UX, not this site's own /api/save-booking).
+   BOOKINGS_WEBAPP_SECRET's check inside bookings-code.gs's doPost() used
+   to be, just a separate secret (DEPOSIT_HOLD_SHARED_SECRET) since this is
+   a distinct caller (the Operations UX, not this site's own /api/save-booking).
 
    Places a manual-capture authorization hold for the refundable gear
    deposit ($65/kit Trail Guide, $100/kit Peaks to Pools) on the card saved
    against the booking's main PaymentIntent, no second card entry. Once
-   placed, writes the result back to the booking's row in the Bookings
-   sheet so both the sheet and the Operations UX know the outcome.
+   placed, writes the result back to the booking's row so both Postgres and
+   the Operations UX know the outcome.
 
    This hold is released (canceled) or captured — in full or partially —
    later, once gear is checked back in. That resolution is a separate,
@@ -32,7 +38,8 @@
 // Deposit-per-kit deliberately matches the existing gear line-item price
 // per tier (see TIERS.gear in create-payment-intent.js) — not a
 // coincidence, a decision made explicitly for this feature.
-var { callBookingsWebApp } = require('../lib/apps-script-client');
+var bookingService = require('../lib/booking-service');
+var gearService = require('../lib/gear-service');
 
 var TIERS = {
   trail: { name: 'Trail Guide Experience', gear: 65 },
@@ -43,29 +50,8 @@ function stripeAuthHeader() {
   return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
 }
 
-// Looks up a booking's tier, gear kit count, and main PaymentIntent id from
-// the Bookings & Operations sheet via the same Apps Script Web App
-// api/save-booking.js already calls. Returns null on any failure so the
-// caller gets a clean error rather than a half-parsed result.
-async function getBookingRecord(bookingId) {
-  var res = await fetch(process.env.BOOKINGS_WEBAPP_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'getBooking',
-      bookingId: bookingId,
-      secret: process.env.BOOKINGS_WEBAPP_SECRET
-    })
-  });
-  var text = await res.text();
-  var data;
-  try { data = JSON.parse(text); } catch (e) { return null; }
-  if (!res.ok || !data || data.ok === false) return null;
-  return data;
-}
-
-// Writes the hold outcome back to the booking's row so the Bookings sheet
-// (and anyone reading it, including the Operations UX) reflects the actual
+// Writes the hold outcome back to the booking's row so Postgres (and
+// anyone reading it, including the Operations UX) reflects the actual
 // result instead of staying on the "scheduled_t1" placeholder written at
 // booking time. Best-effort: a failure here never unwinds the hold that
 // was already placed on Stripe's side, just gets logged for a manual look.
@@ -82,18 +68,18 @@ async function getBookingRecord(bookingId) {
 // ever passed true for a renewal write) makes this refuse the write and
 // return `{stale:true, currentDepositStatus}` instead, mirroring the exact
 // compare-and-swap pattern already used for the forward direction of this
-// same race in `gearOps_writeReconciliation`. Now RETURNS the Apps Script
-// response (previously fire-and-forget) so the caller can react to a
-// refused write, in particular releasing an orphaned just-placed hold —
-// see the 'requires_capture' branch below.
+// same race in `gearOps_writeReconciliation`. RETURNS the result
+// (previously fire-and-forget) so the caller can react to a refused write,
+// in particular releasing an orphaned just-placed hold — see the
+// 'requires_capture' branch below.
 async function updateBookingDepositStatus(bookingId, depositPaymentIntentId, depositStatus, opts) {
   try {
-    var data = await callBookingsWebApp('updateDepositStatus', {
+    var data = await bookingService.updateDepositStatus({
       bookingId: bookingId,
       depositPaymentIntentId: depositPaymentIntentId || '',
       depositStatus: depositStatus,
       guardReconciled: !!(opts && opts.guardReconciled)
-    }, { retries: 2 });
+    });
     if (data && data.ok === false) {
       if (data.stale) {
         console.error('updateBookingDepositStatus: write refused, booking was already reconciled (renewal-vs-reconciliation race)', bookingId, depositStatus, data.currentDepositStatus);
@@ -114,8 +100,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!process.env.STRIPE_SECRET_KEY || !process.env.BOOKINGS_WEBAPP_URL || !process.env.BOOKINGS_WEBAPP_SECRET || !process.env.DEPOSIT_HOLD_SHARED_SECRET) {
-    console.error('Missing one or more required env vars for create-deposit-hold (STRIPE_SECRET_KEY, BOOKINGS_WEBAPP_URL, BOOKINGS_WEBAPP_SECRET, DEPOSIT_HOLD_SHARED_SECRET)');
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.DEPOSIT_HOLD_SHARED_SECRET) {
+    console.error('Missing one or more required env vars for create-deposit-hold (STRIPE_SECRET_KEY, DEPOSIT_HOLD_SHARED_SECRET)');
     res.status(500).json({ error: 'Deposit hold endpoint is not configured yet.' });
     return;
   }
@@ -146,8 +132,8 @@ module.exports = async function handler(req, res) {
     // safely differently.
     var purpose = body.purpose === 'renewal' ? 'renewal' : 'initial';
 
-    var booking = await getBookingRecord(bookingId);
-    if (!booking) {
+    var booking = await bookingService.getBooking(bookingId);
+    if (!booking || booking.ok === false) {
       res.status(404).json({ error: 'Booking not found.' });
       return;
     }
@@ -158,7 +144,7 @@ module.exports = async function handler(req, res) {
       // Custom Experience (and anything else) has no deposit hold — nothing
       // to do, not an error.
       // BUG FIX (independent bug pass, Aug 2026): this used to return
-      // without ever calling updateBookingDepositStatus, so the Sheet's
+      // without ever calling updateBookingDepositStatus, so the booking's
       // depositStatus stayed at its booking-time default ('scheduled_t1')
       // forever for every Custom-tier booking. api/check-hold-clearance-
       // deadline.js's noon check only special-cases the literal string
@@ -188,12 +174,12 @@ module.exports = async function handler(req, res) {
       && rawGearKitCount !== '' && Number.isFinite(parsedGearKitCount);
     if (hasExplicitGearKitCount && parsedGearKitCount <= 0) {
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: bookingId,
           alertType: 'invalid_gear_kit_count',
           urgency: 'urgent_same_day',
           notes: 'Stored gearKitCount is ' + parsedGearKitCount + ', which should never happen — every booking requires at least 1 kit. Falling back to 1 kit for this deposit hold; worth checking how the stored value went to 0 or below.',
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('create-deposit-hold: failed to record invalid_gear_kit_count Ops Alert', bookingId, alertErr);
@@ -212,7 +198,7 @@ module.exports = async function handler(req, res) {
     // replace the existing hold with a fresh one. This is a fast-path
     // optimization, not the only safety net: the Idempotency-Key on the
     // actual Stripe call below is what protects the case where the
-    // Sheet's own depositStatus never made it past 'scheduled_t1' because
+    // booking's own depositStatus never made it past 'scheduled_t1' because
     // the write-back itself failed.
     if (purpose !== 'renewal' && booking.depositStatus === 'held') {
       res.status(200).json({
@@ -317,7 +303,7 @@ module.exports = async function handler(req, res) {
     // Idempotency-Key (added 2026-08-24, revised payment-review Aug 2026 —
     // Critical #4 and the paired unverified 'initial'-branch finding):
     // stable across a raw retry of the SAME logical placement, so a retry
-    // after a write-back failure (the Sheet's depositStatus never left
+    // after a write-back failure (the booking's depositStatus never left
     // 'scheduled_t1', so the guard above couldn't catch it) still can't
     // create a second live hold - Stripe itself returns the original
     // PaymentIntent instead of creating a new one. Keyed differently for a
@@ -327,10 +313,10 @@ module.exports = async function handler(req, res) {
     // Renewal: previously keyed off booking.depositPaymentIntentId, read
     // fresh here - but that's the very field this call is about to
     // overwrite, so a retry after a partial write-back (new PaymentIntent
-    // written, but the separate depositHoldRenewedAt write then failing)
-    // silently built a DIFFERENT key than the first attempt and placed a
-    // genuine, unwanted second renewal. api/renew-deposit-hold.js now
-    // passes an explicit renewalCycleId that stays fixed for the whole
+    // written, but the separate gearOps_recordHoldRenewed call then
+    // failing) silently built a DIFFERENT key than the first attempt and
+    // placed a genuine, unwanted second renewal. api/renew-deposit-hold.js
+    // now passes an explicit renewalCycleId that stays fixed for the whole
     // "not yet fully renewed" cycle - prefer that; fall back to the old
     // depositPaymentIntentId-based key only for a caller that doesn't
     // supply one (defensive, not the expected path today).
@@ -409,12 +395,12 @@ module.exports = async function handler(req, res) {
           console.error('create-deposit-hold: failed to release the orphaned renewal hold after a reconciliation race', bookingId, depositData.id, releaseErr);
         }
         try {
-          await callBookingsWebApp('opsAlerts_recordAlert', {
+          await gearService.recordOpsAlert({
             bookingId: bookingId,
             alertType: 'hold_renewal_race_with_reconciliation',
-            stripeErrorDetail: 'Renewal placed a new hold (' + depositData.id + ') on Stripe, but by the time it tried to write back, this booking had already been reconciled to depositStatus \'' + (writeBackResult.currentDepositStatus || '?') + '\'. The Sheet was NOT overwritten and still reflects the real reconciled outcome. Attempted to release the now-unwanted new hold on Stripe — confirm it actually shows canceled on the guest\'s card.',
+            stripeErrorDetail: 'Renewal placed a new hold (' + depositData.id + ') on Stripe, but by the time it tried to write back, this booking had already been reconciled to depositStatus \'' + (writeBackResult.currentDepositStatus || '?') + '\'. The booking record was NOT overwritten and still reflects the real reconciled outcome. Attempted to release the now-unwanted new hold on Stripe — confirm it actually shows canceled on the guest\'s card.',
             urgency: 'urgent_same_day'
-          }, { retries: 2 });
+          });
         } catch (alertErr) {
           console.error('create-deposit-hold: also failed to write the hold_renewal_race_with_reconciliation Ops Alert', bookingId, alertErr);
         }

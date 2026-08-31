@@ -26,12 +26,27 @@
  *
  * Consolidated as a single function (same Vercel-function-cap reasoning as
  * every other consolidated file in this project).
+ *
+ * MIGRATED (2026-08-31, bookingDetail_get rewrite): `getBookingDetail` was
+ * the first READ_ACTIONS entry moved off `callBookingsWebApp` — it calls
+ * lib/booking-detail-service.js directly, same in-process reuse pattern as
+ * every other migrated subsystem in this project.
+ *
+ * MIGRATED (2026-08-31, Task 8 ops-proxy migration): every remaining
+ * READ_ACTIONS entry, plus the `markStalledCalled` write branch, now calls
+ * lib/ops-list-service.js / lib/all-bookings-service.js /
+ * lib/trail-swap-service.js directly instead of `callBookingsWebApp` — no
+ * more Apps Script round trip anywhere in this file. `callBookingsWebApp`
+ * itself is no longer imported here.
  */
 
 'use strict';
 
 const { requireStaffSession } = require('../lib/ops-session');
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const bookingDetailService = require('../lib/booking-detail-service');
+const opsListService = require('../lib/ops-list-service');
+const allBookingsService = require('../lib/all-bookings-service');
+const trailSwapService = require('../lib/trail-swap-service');
 const resolveOpsAlertHandler = require('./resolve-ops-alert');
 const applyManualAdjustmentHandler = require('./apply-manual-adjustment');
 const writeManualTrailOverrideHandler = require('./write-manual-trail-override');
@@ -58,17 +73,17 @@ function captureResponse() {
 }
 
 const READ_ACTIONS = {
-  listOpsAlerts: () => callBookingsWebApp('opsAlerts_listAll', {}),
-  listTrailSwapRequests: () => callBookingsWebApp('trailSwap_listAll', {}),
-  listChangeLogRecent: () => callBookingsWebApp('changeLog_listRecent', {}),
-  getTrailSwapDropdownOptions: (body) => callBookingsWebApp('trailSwap_getDropdownOptions', { bookingId: body.bookingId }),
-  getTrailSwapRequestContext: (body) => callBookingsWebApp('trailSwap_getRequestContext', { swapRequestId: body.swapRequestId }),
+  listOpsAlerts: () => opsListService.listOpsAlerts(),
+  listTrailSwapRequests: () => opsListService.listTrailSwapRequests(),
+  listChangeLogRecent: () => opsListService.listChangeLogRecent(),
+  getTrailSwapDropdownOptions: (body) => trailSwapService.getDropdownOptions({ bookingId: body.bookingId }),
+  getTrailSwapRequestContext: (body) => trailSwapService.getRequestContext({ swapRequestId: body.swapRequestId }),
   // Ops App Redesign (Aug 2026) — apps-script/ops-redesign-round1-actions.gs.
-  listAllBookings: () => callBookingsWebApp('allBookings_listAll', {}),
-  getBookingDetail: (body) => callBookingsWebApp('bookingDetail_get', { bookingId: body.bookingId }),
-  listOpsAlertsExpanded: () => callBookingsWebApp('opsAlerts_listExpanded', { nowIso: new Date().toISOString() }),
-  listStalledBookings: () => callBookingsWebApp('stalled_listAll', {}),
-  listCancellations: () => callBookingsWebApp('cancellations_listAll', {}),
+  listAllBookings: () => allBookingsService.listAllBookings(),
+  getBookingDetail: (body) => bookingDetailService.getBookingDetail({ bookingId: body.bookingId }),
+  listOpsAlertsExpanded: () => allBookingsService.listOpsAlertsExpanded({ nowIso: new Date().toISOString() }),
+  listStalledBookings: () => allBookingsService.listStalledBookings(),
+  listCancellations: () => allBookingsService.listCancellations(),
 };
 
 // Aug 2026: added 'update_delivery_address' — staff correcting/entering a
@@ -207,7 +222,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const data = await callBookingsWebApp('stalled_markCalled', { bookingId: body.bookingId, calledBy: session.email });
+      const data = await allBookingsService.markStalledCalled({ bookingId: body.bookingId, calledBy: session.email });
       res.status(200).json(Object.assign({ ok: true }, data));
       return;
     }

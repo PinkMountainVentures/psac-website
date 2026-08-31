@@ -3,38 +3,29 @@
  *
  * Operations UX PRD Section 7 / Section 13, amended by the finalized Trail
  * Selection Logic PRD (Sections 2, 7, 8) — the Trail Swap Requests page's
- * backing endpoint. Consolidated as an action-dispatched file (matching
- * api/adventure-prep.js's and api/waiver.js's own consolidation, forced by
- * the Vercel Hobby plan's 12-function cap), not three separate serverless
- * functions:
+ * backing endpoint. Consolidated as an action-dispatched file:
  *
- *   - action: 'logIntake'          — staff-initiated intake only (the
- *                                     system-generated intake path is 2.2's
- *                                     own code, not this file's)
- *   - action: 'getDropdownOptions' — the live Bookable?=Yes trail list,
+ *   - action: 'logIntake'          — staff-initiated intake only
+ *   - action: 'getDropdownOptions' — the live bookable=true trail list,
  *                                     annotated per-trail with which Tier A
  *                                     filters it fails for this booking
  *   - action: 'applyOverride'      — the actual write-back (default action,
  *                                     for backward-compatible callers that
  *                                     don't pass one)
  *
+ * MIGRATED (2026-08-31, Task 8 ops-proxy migration): all three actions now
+ * call lib/trail-swap-service.js directly (in-process, no more
+ * callBookingsWebApp/Apps Script round trip). Validation, the shared-secret
+ * gate, and the guest-notification email are all unchanged.
+ *
  * Shared-secret pattern, same convention as every other server-to-server
  * endpoint in this stack: TRAIL_OVERRIDE_SHARED_SECRET, its own dedicated
  * env var, never reused from another endpoint.
- *
- * See apps-script/trail-swap-actions.gs's header for the one real open
- * dependency this endpoint has: the difficulty/technical ceiling checks
- * assume a `trailSelection_computeBookingCeilings_` helper already exists in
- * the deployed 2.2 rules engine. If it doesn't, `getDropdownOptions`
- * degrades to `ceilingsEvaluatable: false` rather than a guessed pass/fail —
- * this endpoint still fully functions (Apply isn't blocked by that), staff
- * just don't get the two ceiling checks' inline warning and fall back to
- * the PRD's own documented "eyeball it" posture at 7 launch trails.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const trailSwapService = require('../lib/trail-swap-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderTrailSwapResolutionEmail } = require('../lib/email-templates/trail-swap-resolution-email');
 const { addDaysToDateString } = require('../lib/cadence');
@@ -75,7 +66,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const result = await callBookingsWebApp('trailSwap_logIntake', {
+      const result = await trailSwapService.logIntake({
         bookingId: body.bookingId,
         guestConcernSummary: body.guestConcernSummary || '',
       });
@@ -88,7 +79,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const result = await callBookingsWebApp('trailSwap_getDropdownOptions', { bookingId: body.bookingId });
+      const result = await trailSwapService.getDropdownOptions({ bookingId: body.bookingId });
       res.status(200).json(result);
       return;
     }
@@ -114,7 +105,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const applyResult = await callBookingsWebApp('trailSwap_applyOverride', {
+    const applyResult = await trailSwapService.applyOverride({
       swapRequestId: swapRequestId || '',
       bookingId,
       newTrailId,
@@ -122,7 +113,6 @@ module.exports = async function handler(req, res) {
       staffNotes: body.staffNotes || '',
       tierASafetyFiltersOverridden: overrides,
       safetyOverrideReason: body.safetyOverrideReason || '',
-      difficultyRating: body.difficultyRating != null ? body.difficultyRating : null,
     });
 
     if (!applyResult || applyResult.ok !== true) {

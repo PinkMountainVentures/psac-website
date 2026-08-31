@@ -29,6 +29,10 @@
     {
       "path": "/api/trigger-gear-reconciliation",
       "schedule": "3,18,33,48 * * * *"
+    },
+    {
+      "path": "/api/sync-kit-subscribers",
+      "schedule": "20 */4 * * *"
     }
   ],
   "redirects": [

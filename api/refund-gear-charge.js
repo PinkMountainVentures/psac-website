@@ -1,6 +1,12 @@
 /**
  * api/refund-gear-charge.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). Every direct Stripe call in this file is
+ * unchanged. See lib/gear-service.js's own header for the full scope of
+ * this migration.
+ *
  * Gear Inventory PRD Section 10 addendum: the refund/partial-refund gap
  * the design pass explicitly flagged as real, in-scope work — "there is no
  * staff-facing refund/partial-refund action anywhere in gear
@@ -14,9 +20,7 @@
  *
  * Server-to-server only (api/ops-proxy.js), GEAR_OPS_SHARED_SECRET.
  *
- * `refundTarget` distinguishes which prior action is being reversed —
- * matching the two distinct pairs of columns
- * apps-script/gear-inventory-actions.gs's gearOps_recordRefund() writes:
+ * `refundTarget` distinguishes which prior action is being reversed:
  *   - 'deposit'   -> refunds against depositPaymentIntentId (the
  *                    reconciliation capture from Scenarios 2/3/4)
  *   - 'shortfall' -> refunds against shortfallChargeId (the Scenario 4
@@ -31,7 +35,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderGearRefundConfirmationEmail } = require('../lib/email-templates/gear-refund-confirmation-email');
 
@@ -104,7 +108,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('gearOps_getReconciliationContext', { bookingId: body.bookingId });
+    const ctx = await gearService.getReconciliationContext({ bookingId: body.bookingId });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'booking_not_found' });
       return;
@@ -140,17 +144,15 @@ module.exports = async function handler(req, res) {
     // BUG FIX (payment-review, Aug 2026, Critical #6): this key used to be
     // bookingId + refundTarget + PaymentIntent + amount alone. Since
     // per-itemType replacementCostCents is fixed, two separate, legitimate
-    // partial refunds of the same amount against the same target (e.g. two
-    // different recovered items that happen to cost the same) built the
+    // partial refunds of the same amount against the same target built the
     // identical key — Stripe's idempotency contract silently returned the
     // first refund object for the second call instead of actually
     // refunding a second time, with no error and a normal-looking
     // write-back. staffNotes is already required on every call and is the
-    // one field staff naturally vary per distinct action (which item,
-    // which correction) — folding it in distinguishes two real refunds
-    // while staying retry-safe: a genuine retry of the exact same
-    // submission (browser resend after a network hiccup) reuses the same
-    // notes and still collapses to one key, so Stripe still dedupes it.
+    // one field staff naturally vary per distinct action — folding it in
+    // distinguishes two real refunds while staying retry-safe: a genuine
+    // retry of the exact same submission reuses the same notes and still
+    // collapses to one key, so Stripe still dedupes it.
     const idempotencyKey = 'gearrefund_' + ctx.bookingId + '_' + refundTarget + '_' + sourcePaymentIntentId + '_'
       + (amountCents != null ? amountCents : 'full') + '_' + String(body.staffNotes).trim().slice(0, 200);
 
@@ -189,27 +191,27 @@ module.exports = async function handler(req, res) {
     const refundedAt = new Date().toISOString();
     let writeBackFailed = false;
     try {
-      await callBookingsWebApp('gearOps_recordRefund', {
+      await gearService.recordRefund({
         bookingId: ctx.bookingId,
         refundTarget,
         refundId,
         refundAmountCents,
         refundedAt,
         staffNotes: body.staffNotes,
-      }, { retries: 2 });
+      });
     } catch (writeBackErr) {
       writeBackFailed = true;
       // eslint-disable-next-line no-console
       console.error('refund-gear-charge: refund succeeded but the booking write-back failed', ctx.bookingId, refundId, writeBackErr);
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: ctx.bookingId,
           alertType: 'gear_refund_writeback_failed',
           amount: refundAmountCents / 100,
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: `Refund ${refundId} for $${centsToDollarsStr(refundAmountCents)} (${refundTarget}) succeeded on Stripe, but the booking record could not be updated. A retry with the same amount reuses the same Idempotency-Key and should self-heal; if this alert is still Open, it did not.`,
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('refund-gear-charge: also failed to write the write-back-failed Ops Alert', ctx.bookingId, alertErr);

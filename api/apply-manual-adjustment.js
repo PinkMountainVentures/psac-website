@@ -4,33 +4,38 @@
  * Operations UX PRD Section 8/13: "a constrained form for the three
  * off-system playbooks, a fixed set of adjustment types ... each calling
  * the new api/apply-manual-adjustment.js endpoint below, not an open-ended
- * cell edit." Consolidated action-dispatched file (same Vercel-12-function
- * consolidation as api/adventure-prep.js), one of five fixed `type` values:
+ * cell edit." Consolidated action-dispatched file, one of eight fixed
+ * `type` values:
  *
  *   - 'kit_count_correction'      (Section 8a)
  *   - 'gear_check_log_adjustment' (Section 8a)
  *   - 'change_log_note'           (Section 8a)
  *   - 'gear_returned_uncleaned'   (Section 8c)
- *   - 'update_delivery_address'   (Aug 2026, Airey's direct request: staff
- *                                  need to correct/enter a guest's delivery
- *                                  address after a phone/SMS/email
- *                                  interaction, not just via Surface A.
- *                                  Not in the original locked PRD's Section
- *                                  8 list, added as a fifth fixed type
- *                                  rather than an open-ended field edit, to
- *                                  keep this endpoint's whole design intent
- *                                  intact.)
+ *   - 'update_delivery_address'   (Aug 2026, Airey's direct request)
+ *   - 'trail_day_change'          (Ops App Redesign, Round 2 item 8)
+ *   - 'swap_allocated_unit'       (Ops App Redesign, Round 2 item 8)
+ *   - 'post_delivery_cancellation' (Ops App Redesign, Round 2 item 8)
  *
  * Note Section 8b (post-T-3 trail re-issuance) is deliberately NOT one of
- * these — that playbook reuses api/write-manual-trail-override.js directly
- * (Section 8b: "staff uses the same Trail Swap Requests page and
- * api/write-manual-trail-override.js endpoint from Section 7"), not this
- * file.
+ * these — that playbook reuses api/write-manual-trail-override.js directly.
  *
  * `staffNotes` is required on every type — this is inherently an audit-
- * trail action (Section 8's whole point is that off-system steps still
- * leave a record), so an adjustment with no explanation defeats the
- * purpose of the endpoint existing at all.
+ * trail action, so an adjustment with no explanation defeats the purpose
+ * of the endpoint existing at all.
+ *
+ * MIGRATED (2026-08-31, Task 8 ops-proxy migration): all 8
+ * `manualAdjustment_*` calls now go to lib/manual-adjustment-service.js
+ * in-process. Everything else — the deposit-hold-resize flow around
+ * kit_count_correction (still calling api/create-deposit-hold.js in-process
+ * and Stripe directly), the trail_day_change re-run of
+ * lib/run-trail-assignment.js, and every validation branch — is unchanged;
+ * only the calls that used to hit Apps Script now hit Postgres directly.
+ * The two other former callBookingsWebApp call sites this file made
+ * (cancelRefund_getBookingContext, gearOps_recordHoldRenewed/
+ * opsAlerts_recordAlert) now call their already-migrated Postgres
+ * equivalents: lib/cancel-refund-service.js's getBookingContext and
+ * lib/gear-service.js's recordHoldRenewed/recordOpsAlert (exact signature
+ * matches, confirmed before this rewrite).
  *
  * Shared-secret pattern (server-to-server, called by the internal ops
  * app's own backend, same as api/resolve-ops-alert.js), its own dedicated
@@ -39,7 +44,9 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { getBookingContext } = require('../lib/cancel-refund-service');
+const { recordHoldRenewed, recordOpsAlert } = require('../lib/gear-service');
+const manualAdjustmentService = require('../lib/manual-adjustment-service');
 const { validateAddress } = require('../lib/validate-address');
 const createDepositHoldHandler = require('./create-deposit-hold');
 // Ops App Redesign (Aug 2026) — Manual Adjustment item 8's "Trail day /
@@ -73,17 +80,9 @@ function captureResponse() {
 
 async function cancelOldDepositHold(paymentIntentId, bookingId) {
   try {
-    // BUG FIX (payment-review, Aug 2026, Lower-confidence #3): this cancel
-    // call carried no Idempotency-Key, so a retried request (a transient
-    // network failure on the first attempt, or an at-least-once caller
-    // upstream) could double-send the cancel. A stray double-send here is
-    // low-risk on its own (Stripe just returns "already canceled" on the
-    // second try, handled below via alreadyDone), but Stripe's own guidance
-    // is to key every state-changing call, and doing so costs nothing.
-    // Fixed value per paymentIntentId (not a fresh key each call) so a true
-    // retry of the same cancel reuses Stripe's cached response instead of
-    // being treated as a new request. Mirrors the identical fix already
-    // applied to api/renew-deposit-hold.js's cancelOldHold.
+    // Fixed Idempotency-Key per paymentIntentId (not a fresh key each
+    // call) so a true retry of the same cancel reuses Stripe's cached
+    // response instead of being treated as a new request.
     const res = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(paymentIntentId) + '/cancel', {
       method: 'POST',
       headers: { Authorization: stripeAuthHeader(), 'Idempotency-Key': 'cancel_old_hold_' + paymentIntentId },
@@ -106,10 +105,9 @@ async function cancelOldDepositHold(paymentIntentId, bookingId) {
 }
 
 // Resizes a live deposit hold to match a just-applied kit_count_correction.
-// Called AFTER the Sheet's confirmedKitCount has already been updated, so
-// create-deposit-hold.js's own getBooking lookup (fixed 2026-08-25 to read
-// confirmedKitCount) picks up the corrected count automatically — no
-// amount is computed or passed here.
+// Called AFTER adventure_prep.confirmed_kit_count has already been updated,
+// so create-deposit-hold.js's own getBooking lookup picks up the corrected
+// count automatically — no amount is computed or passed here.
 async function resizeDepositHoldForCorrection(bookingId, oldPaymentIntentId) {
   const { res: innerRes, result } = captureResponse();
   await createDepositHoldHandler({
@@ -126,41 +124,27 @@ async function resizeDepositHoldForCorrection(bookingId, oldPaymentIntentId) {
 
   const newPaymentIntentId = result.body.paymentIntentId;
   const cancelResult = oldPaymentIntentId ? await cancelOldDepositHold(oldPaymentIntentId, bookingId) : { ok: true, skipped: true };
-  // BUG FIX (payment-review, Aug 2026, High #20): this used to return
-  // ok: true unconditionally once the NEW hold succeeded, even when
-  // cancelOldDepositHold genuinely failed — cancelResult was computed but
-  // never actually checked, so this function's own caller (the
-  // kit_count_correction_hold_resize_failed alert, gated on `!resize.ok`)
-  // could never fire for this specific failure mode. The guest ended up
-  // with two live holds (potentially $1,235+ combined) and nobody told.
   const oldHoldCancelFailed = !!(oldPaymentIntentId && !cancelResult.ok);
 
   try {
-    await callBookingsWebApp('gearOps_recordHoldRenewed', {
+    await recordHoldRenewed({
       bookingId,
       renewedAt: new Date().toISOString(),
       oldPaymentIntentId: oldPaymentIntentId || '',
       newPaymentIntentId,
-      // NEW (High #13/#20): same fix as renew-deposit-hold.js — lets the
-      // Change Log entry say the truth instead of always saying "cancelled".
       oldHoldCancelSucceeded: !oldHoldCancelFailed,
-    }, { retries: 2 });
+    });
   } catch (writeBackErr) {
-    // BUG FIX (payment-review, Aug 2026, Medium #36): this used to be
-    // console.error-only, unlike the identical write-back this function was
-    // copied from (renew-deposit-hold.js's own hold_renewal_writeback_failed
-    // alert) — a resized hold could place correctly, and its Change Log
-    // entry silently never get written, with nobody told.
     // eslint-disable-next-line no-console
     console.error('apply-manual-adjustment: resized hold placed but write-back failed', bookingId, newPaymentIntentId, writeBackErr);
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await recordOpsAlert({
         bookingId,
         alertType: 'kit_count_correction_hold_resize_writeback_failed',
         stripeErrorDetail: writeBackErr.message,
         urgency: 'urgent_same_day',
         notes: `A resized deposit hold (${newPaymentIntentId}) was placed for a manual kit-count correction, but the booking's Change Log entry could not be written. The hold itself is live and correctly sized — this only means the audit trail is incomplete.`,
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('apply-manual-adjustment: also failed to write the hold-resize-writeback-failed Ops Alert', bookingId, alertErr);
@@ -183,7 +167,6 @@ const VALID_TYPES = [
   'change_log_note',
   'gear_returned_uncleaned',
   'update_delivery_address',
-  // Ops App Redesign (Aug 2026) — Manual Adjustment item 8's three new types.
   'trail_day_change',
   'swap_allocated_unit',
   'post_delivery_cancellation',
@@ -225,16 +208,13 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ error: 'bad_request', detail: 'staffNotes is required for every manual adjustment' });
       return;
     }
-    // BUG FIX (payment-review, Aug 2026, Medium #46): who authorized an
-    // adjustment (including one that can resize a live deposit hold) used
-    // to exist nowhere except this same optional free-text field, exactly
-    // as staff happened to type it — no reliable record of the actual
-    // authenticated person existed. ops-proxy.js now forces `staffEmail`
-    // from the signed-in session on every applyManualAdjustment call; a
-    // direct server-to-server call (bypassing the proxy, e.g. a manual
-    // curl test) has no session and no staffEmail, so it's left
-    // unprefixed rather than guessed at. Every downstream use of
-    // `staffNotes` below (all 8 types) picks this up automatically.
+    // Who authorized an adjustment (including one that can resize a live
+    // deposit hold) is forced from the signed-in session by ops-proxy.js
+    // (staffEmail), never accepted as-is from an unverified free-text
+    // field. A direct server-to-server call bypassing the proxy has no
+    // session and no staffEmail, so it's left unprefixed rather than
+    // guessed at. Every downstream use of `staffNotes` below (all 8 types)
+    // picks this up automatically.
     const staffNotes = body.staffEmail ? `[authorized by ${body.staffEmail}] ${rawStaffNotes}` : rawStaffNotes;
 
     let result;
@@ -244,59 +224,43 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'newConfirmedKitCount (a number) is required for kit_count_correction' });
         return;
       }
-      // BUG FIX (payment-review, Aug 2026, Critical #7, floor corrected per
-      // Airey): this used to accept any finite number with no bounds check.
-      // A staff typo (e.g. -8 meant to be 8) wrote a negative
-      // confirmedKitCount that nothing downstream caught - the deposit-hold
-      // resize above is separately clamped to [1,20] so nothing looked
-      // wrong at correction time, but the next routine kit-count change
-      // (lib/finalize-kit-change.js) computed its delta off the
-      // uncorrected negative value and issued a real off-session charge
-      // for far more kits than the guest actually requested. Clamp to
-      // [1,20] - every booking requires at least 1 kit, 1 person = 1 kit
-      // minimum, there is no valid 0-kit booking - and reject out-of-range
-      // explicitly rather than silently clamping a value staff didn't intend.
+      // Clamp to [1,20] — every booking requires at least 1 kit, there is
+      // no valid 0-kit booking — and reject out-of-range explicitly rather
+      // than silently clamping a value staff didn't intend.
       const newConfirmedKitCountNum = Number(body.newConfirmedKitCount);
       if (!Number.isInteger(newConfirmedKitCountNum) || newConfirmedKitCountNum < 1 || newConfirmedKitCountNum > 20) {
         res.status(400).json({ error: 'bad_request', detail: 'newConfirmedKitCount must be a whole number between 1 and 20' });
         return;
       }
-      // ADDED (2026-08-25): check for a live T-1 deposit hold BEFORE
-      // applying the correction, so we still have the old PaymentIntent id
-      // on hand afterward if a resize turns out to be needed.
-      const depositCtxBefore = await callBookingsWebApp('cancelRefund_getBookingContext', { bookingId });
-      result = await callBookingsWebApp('manualAdjustment_kitCountCorrection', {
+      // Check for a live T-1 deposit hold BEFORE applying the correction,
+      // so we still have the old PaymentIntent id on hand afterward if a
+      // resize turns out to be needed.
+      const depositCtxBefore = await getBookingContext(bookingId);
+      result = await manualAdjustmentService.kitCountCorrection({
         bookingId, newConfirmedKitCount: Number(body.newConfirmedKitCount), staffNotes,
       });
       if (result && result.ok && depositCtxBefore && depositCtxBefore.depositStatus === 'held') {
         const resize = await resizeDepositHoldForCorrection(bookingId, depositCtxBefore.depositPaymentIntentId);
         if (!resize.ok) {
           try {
-            await callBookingsWebApp('opsAlerts_recordAlert', {
+            await recordOpsAlert({
               bookingId,
               alertType: 'kit_count_correction_hold_resize_failed',
               stripeErrorDetail: resize.detail,
               urgency: 'urgent_same_day',
               notes: 'Kit count was manually corrected to ' + body.newConfirmedKitCount + ', but resizing the live deposit hold (' + depositCtxBefore.depositPaymentIntentId + ') failed: ' + resize.detail + '. The OLD hold has been left untouched (still sized for the pre-correction kit count) — needs a manual look before reconciliation runs against it.',
-            }, { retries: 2 });
+            });
           } catch (alertErr) {
             // eslint-disable-next-line no-console
             console.error('apply-manual-adjustment: also failed to write the hold-resize-failed Ops Alert', bookingId, alertErr);
           }
         }
-        // BUG FIX (payment-review, Aug 2026, Medium #37): this used to only
-        // ever surface a resize failure in this buried, easy-to-miss nested
-        // field — the endpoint's own top-level response (below, `ok: true`
-        // unconditionally once `result.ok` was true) never reflected it. A
-        // naive UI toast reading only the top-level `ok` reported plain
-        // success on a call that just left the guest with a stale-sized
-        // hold and an Open Ops Alert. The kit-count correction ITSELF did
-        // succeed (that's `result.ok`, untouched here) — this only flips
-        // the top-level `ok` on a genuine resize failure, via `extra.ok`
-        // overriding the `{ok:true}` spread below (Object.assign applies
-        // `extra` last). `partialFailure` names which part actually failed,
-        // since `ok:false` alone reads like the whole adjustment was
-        // rejected, which isn't true.
+        // The kit-count correction ITSELF did succeed (result.ok, untouched
+        // here) — this only flips the top-level `ok` on a genuine resize
+        // failure, via `extra.ok` overriding the `{ok:true}` spread below
+        // (Object.assign applies `extra` last). `partialFailure` names
+        // which part actually failed, since `ok:false` alone reads like
+        // the whole adjustment was rejected, which isn't true.
         extra = Object.assign({}, extra, {
           depositHoldResized: resize.ok,
           depositHoldResizeDetail: resize.ok ? undefined : resize.detail,
@@ -312,15 +276,15 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'kitNumbersToRemove (non-empty array) is required for gear_check_log_adjustment' });
         return;
       }
-      result = await callBookingsWebApp('manualAdjustment_gearCheckLogAdjustment', {
+      result = await manualAdjustmentService.gearCheckLogAdjustment({
         bookingId, kitNumbersToRemove: body.kitNumbersToRemove, staffNotes,
       });
     } else if (type === 'change_log_note') {
-      result = await callBookingsWebApp('manualAdjustment_changeLogNote', {
+      result = await manualAdjustmentService.changeLogNote({
         bookingId, changeType: body.changeType || 'kit_count', staffNotes,
       });
     } else if (type === 'gear_returned_uncleaned') {
-      result = await callBookingsWebApp('manualAdjustment_gearReturnedUncleaned', {
+      result = await manualAdjustmentService.gearReturnedUncleaned({
         bookingId, staffNotes,
       });
     } else if (type === 'update_delivery_address') {
@@ -339,7 +303,7 @@ module.exports = async function handler(req, res) {
         line1: input.line1, line2: input.line2 || '', city: input.city || '',
         state: input.state || 'CA', zip: input.zip || '', lat: null, lng: null,
       };
-      result = await callBookingsWebApp('manualAdjustment_updateDeliveryAddress', {
+      result = await manualAdjustmentService.updateDeliveryAddress({
         bookingId,
         deliveryAddressLine1: std.line1,
         deliveryAddressLine2: std.line2 || input.line2 || '',
@@ -358,7 +322,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'newTripDate (YYYY-MM-DD) is required for trail_day_change' });
         return;
       }
-      result = await callBookingsWebApp('manualAdjustment_trailDayChange', {
+      result = await manualAdjustmentService.trailDayChange({
         bookingId, newTripDate: body.newTripDate, staffNotes,
       });
       if (result && result.ok) {
@@ -366,9 +330,7 @@ module.exports = async function handler(req, res) {
         // — Airey's own confirmed answer (Section 2 Amendment 2): a date
         // change discards and replaces the `source: rules_v1` candidates,
         // and re-checks any preserved `source: manual_override` entry
-        // against the NEW date's Tier A filters (lib/trail-selection-
-        // engine.js's runTrailSelection, refresh branch — see that file's
-        // own Aug 2026 fix for the re-check this used to skip).
+        // against the NEW date's Tier A filters.
         try {
           const refresh = await runTrailAssignmentForBooking({ bookingId, operation: 'refresh' });
           extra = {
@@ -395,7 +357,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'newUnitId is required unless noSubstitute is true' });
         return;
       }
-      result = await callBookingsWebApp('manualAdjustment_swapAllocatedUnit', {
+      result = await manualAdjustmentService.swapAllocatedUnit({
         bookingId,
         originalUnitId: body.originalUnitId,
         reason: body.reason,
@@ -404,7 +366,7 @@ module.exports = async function handler(req, res) {
         staffNotes,
       });
     } else if (type === 'post_delivery_cancellation') {
-      result = await callBookingsWebApp('manualAdjustment_postDeliveryCancellation', {
+      result = await manualAdjustmentService.postDeliveryCancellation({
         bookingId, cancellationReason: body.cancellationReason || 'post_delivery_cancellation', staffNotes,
       });
     }

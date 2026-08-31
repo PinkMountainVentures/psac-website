@@ -9,7 +9,7 @@
    .env.local for `vercel dev`). Never hardcode it here, never commit it.
    ============================================ */
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { recordOpsAlert } = require('../lib/gear-service');
 
 // Standard tiers only. Custom Experience is bespoke-priced and never
 // charged through this endpoint — that flow stays a personal follow-up.
@@ -345,8 +345,19 @@ module.exports = async function handler(req, res) {
     // fails the guest's checkout if the alert write itself has a problem.
     if (taxFallbackApplied) {
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
-          bookingId: '',
+        // MIGRATED (Task 11 follow-up, 2026-08-31): was
+        // callBookingsWebApp('opsAlerts_recordAlert', ...) -- a straggler
+        // call site this file's own scope (Stripe PaymentIntent creation)
+        // meant it was never touched by the gear-ops/ops-alerts migration
+        // turns, which only rewrote api/*.js dispatchers, not this one.
+        // lib/gear-service.js's recordOpsAlert is the real Postgres
+        // equivalent, already used by every other alert-raising call site
+        // in this migration -- same field names, no shape change.
+        // {retries: 2} is dropped, same simplification already made
+        // everywhere else callBookingsWebApp was removed (it existed only
+        // to paper over Apps Script Web App HTTP flakiness).
+        await recordOpsAlert({
+          bookingId: null,
           alertType: 'tax_fallback_applied',
           amount: taxAmountCents / 100,
           stripeErrorDetail: 'Stripe Tax Calculation API call failed for PaymentIntent ' + data.id +
@@ -355,7 +366,7 @@ module.exports = async function handler(req, res) {
           urgency: 'standard_24hr',
           notes: 'paymentIntentId=' + data.id + ', tier=' + tierKey + ', gearCount=' + gearCount +
             ', fallbackTaxAmountCents=' + taxAmountCents,
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         console.error('create-payment-intent: also failed to write the tax_fallback_applied Ops Alert', alertErr);
       }

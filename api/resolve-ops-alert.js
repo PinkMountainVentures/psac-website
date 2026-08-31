@@ -5,6 +5,15 @@
  * "a button plus a note field, that calls a small resolution endpoint, not
  * a status cell a human edits directly."
  *
+ * MIGRATED (2026-08-31, Task 8 ops-proxy migration): the one call this file
+ * makes moves from `callBookingsWebApp('opsAlerts_resolveAlert', ...)` to
+ * lib/hold-clearance-service.js's `resolveAlert` — an exact-match Postgres
+ * equivalent already built for the shortfall-charge/reconciliation flow
+ * (same overwrite-not-append semantics, same `{ok:false,error:'Alert not
+ * found'}` / `{ok:true,alertId}` shapes), so this is a one-line require
+ * swap, everything else about this endpoint (secret check, validation,
+ * response shape) is unchanged.
+ *
  * Server-to-server (called by the internal ops app's own backend, which
  * gates staff access via Google sign-in + the explicit allowlist Section 13
  * specifies — not called directly from a browser the way
@@ -25,7 +34,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { resolveAlert } = require('../lib/hold-clearance-service');
 
 function checkSecret(payload) {
   // Fail closed: require both a configured secret and a non-empty
@@ -33,17 +42,9 @@ function checkSecret(payload) {
   // payload.secret (undefined === undefined would otherwise pass).
   if (!process.env.OPS_ALERT_SHARED_SECRET) return false;
   if (!payload || !payload.secret) return false;
-  // BUG FIX (payment-review, Aug 2026, Lower-confidence #11): this used to
-  // be a plain `===` string comparison, which short-circuits at the first
-  // differing character — the same timing side-channel lib/ops-session.js's
-  // own header comment documents (how long the comparison takes leaks how
-  // many leading characters of a guess were correct, letting an attacker
-  // brute-force OPS_ALERT_SHARED_SECRET byte-by-byte without ever seeing it).
-  // Same fix as that file: compare in constant time via
-  // crypto.timingSafeEqual, checking buffer lengths first since
-  // timingSafeEqual throws (rather than returning false) on a length
-  // mismatch — and a length mismatch is itself a legitimate "not equal,"
-  // not a case needing the constant-time path.
+  // Constant-time comparison (same fix already applied to this file
+  // independently of this migration — see lib/ops-session.js's own header
+  // comment for the timing-side-channel reasoning this mirrors).
   const secretBuf = Buffer.from(String(payload.secret), 'utf8');
   const expectedBuf = Buffer.from(process.env.OPS_ALERT_SHARED_SECRET, 'utf8');
   return secretBuf.length === expectedBuf.length && crypto.timingSafeEqual(secretBuf, expectedBuf);
@@ -67,11 +68,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const result = await callBookingsWebApp('opsAlerts_resolveAlert', {
-      alertId,
-      resolvedBy,
-      notes: body.notes || '',
-    });
+    const result = await resolveAlert({ alertId, resolvedBy, notes: body.notes || '' });
 
     if (!result || result.ok !== true) {
       res.status(404).json({ error: 'not_found', detail: result });

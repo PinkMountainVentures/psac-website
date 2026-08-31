@@ -1,6 +1,14 @@
 /**
  * api/reconcile-gear-deposit.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). Every direct Stripe call in this file is
+ * unchanged — this migration only replaces the booking-context reads and
+ * write-backs; the Stripe decision tree, self-heal logic, and settle
+ * buffer are exactly as they were. See lib/gear-service.js's own header
+ * for the full scope of this migration.
+ *
  * Gear Inventory PRD Section 7: the deposit-hold resolution step, run once
  * a booking's every trackable item is settled (zero items still sitting in
  * Missing-with-grace-period-open). Server-to-server only (api/ops-proxy.js
@@ -26,17 +34,15 @@
  * Idempotent: a booking whose depositStatus has already left 'held' is a
  * no-op success (this endpoint is the only thing that ever moves it off
  * 'held'). If a *previous* call's Stripe action succeeded but the
- * write-back then threw (Sheet lock timeout, transient Apps Script error),
- * a retry here detects Stripe's own "already captured"/"already canceled"
- * error and self-heals by reading the real outcome back from Stripe rather
- * than either erroring out a second time or attempting a second capture —
- * the exact template api/cancel-and-refund-booking.js already established
- * for this bug class.
+ * write-back then threw, a retry here detects Stripe's own "already
+ * captured"/"already canceled" error and self-heals by reading the real
+ * outcome back from Stripe rather than either erroring out a second time
+ * or attempting a second capture.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const { sendEmail } = require('../lib/send-email');
 const { summarizeItems } = require('../lib/gear-item-summary');
 const { renderDepositFullReleaseEmail } = require('../lib/email-templates/deposit-full-release-email');
@@ -44,12 +50,11 @@ const { renderDepositPartialCaptureEmail } = require('../lib/email-templates/dep
 const { renderDepositFullHoldNoChargeEmail } = require('../lib/email-templates/deposit-full-hold-no-charge-email');
 
 // 'refunded' added (payment-review, Aug 2026, Medium #35): the new terminal
-// status apps-script/gear-inventory-actions.gs's gearOps_recordRefund now
-// writes once every dollar captured/charged against a booking has been
-// fully refunded. Without it here, a stray reconciliation retry against an
-// already-fully-refunded booking fell through to the generic
-// 'unexpected_deposit_status' 400 below instead of this clean idempotent
-// no-op.
+// status gearService.recordRefund now writes once every dollar captured/
+// charged against a booking has been fully refunded. Without it here, a
+// stray reconciliation retry against an already-fully-refunded booking
+// fell through to the generic 'unexpected_deposit_status' 400 below
+// instead of this clean idempotent no-op.
 const ALREADY_RECONCILED_STATUSES = ['released', 'partial_capture', 'full_capture', 'full_capture_pending_review', 'shortfall_charged', 'refunded'];
 const NO_VALID_HOLD_STATUSES = ['requires_action', 'unavailable', 'failed', 'skipped', 'scheduled_t1', ''];
 
@@ -132,7 +137,7 @@ module.exports = async function handler(req, res) {
     // since every other action here is the single "run reconciliation for
     // this booking" verb.
     if (body.action === 'list') {
-      const result = await callBookingsWebApp('gearOps_listReconciliationQueue', {});
+      const result = await gearService.listReconciliationQueue();
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -145,7 +150,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: 'bookingId is required' });
         return;
       }
-      const ctxOnly = await callBookingsWebApp('gearOps_getReconciliationContext', { bookingId: body.bookingId });
+      const ctxOnly = await gearService.getReconciliationContext({ bookingId: body.bookingId });
       res.status(200).json(Object.assign({ ok: true }, ctxOnly));
       return;
     }
@@ -156,7 +161,7 @@ module.exports = async function handler(req, res) {
     }
 
     const nowIso = new Date().toISOString();
-    const ctx = await callBookingsWebApp('gearOps_getReconciliationContext', { bookingId: body.bookingId, nowIso });
+    const ctx = await gearService.getReconciliationContext({ bookingId: body.bookingId, nowIso });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'booking_not_found' });
       return;
@@ -212,14 +217,14 @@ module.exports = async function handler(req, res) {
     const settledItems = ctx.items.filter((i) => i.unitId);
     const chargeableItems = settledItems.filter((i) => i.condition === 'Damaged' || i.condition === 'Missing');
     // BUG FIX (payment-review, Aug 2026, Lower-confidence #4): replacementCostCents
-    // is read back from the Sheet, so a fractional value (a manual entry
+    // is read back from the row, so a fractional value (a manual entry
     // typo'd as dollars instead of cents, or a stray floating-point artifact
     // from an earlier dollars<->cents conversion elsewhere in the codebase)
     // is not impossible — and this sum feeds straight into Stripe's
     // amount_to_capture as a raw String(), plus the scenario comparisons and
     // gearShortfallCents math below. Stripe requires an integer minor-unit
     // amount; rounding once here, right after the sum, keeps every
-    // downstream use (the scenario branches, the capture call, the sheet
+    // downstream use (the scenario branches, the capture call, the
     // write-back) consistent instead of each doing its own ad hoc rounding.
     const itemizedCents = Math.round(chargeableItems.reduce((sum, i) => sum + (Number(i.replacementCostCents) || 0), 0));
 
@@ -233,7 +238,7 @@ module.exports = async function handler(req, res) {
     const pi = piRes.data;
 
     // Self-heal: a previous call's Stripe action already succeeded, but its
-    // write-back never landed (depositStatus is still 'held' in the Sheet).
+    // write-back never landed (depositStatus is still 'held' in the DB).
     // Recognize the PI's own terminal state and recover from it rather than
     // attempting a second capture/cancel, which Stripe would reject anyway.
     if (pi.status === 'canceled') {
@@ -257,31 +262,22 @@ module.exports = async function handler(req, res) {
       // conditions — but the capture on Stripe (capturedCents) already
       // happened, at whatever itemized total was in effect at that earlier
       // moment, and can't be un-captured. If a staff correction landed in
-      // the gap between that earlier capture and this retry (the exact
-      // write-back-failure recovery window this self-heal path exists for),
-      // the CURRENT itemizedCents can be lower than what was actually
-      // captured — e.g. captured $100 against a $150 itemized total
-      // (scenario 4, shortfall to be charged separately), then corrected
-      // down to $80 before the write-back retry: this recomputes as a clean
-      // 'full_capture' with no gearShortfallCents, silently absorbing a $20
-      // overcharge with no alert and no record that a refund review is
-      // owed. The SETTLE_BUFFER_MS check above only guards the normal path
-      // (from ctx.lastItemUpdateIso at THIS read) — it was never in a
-      // position to protect a capture that already happened before this
-      // retry began. Alert instead of silently absorbing it; the Stripe
-      // capture itself is irreversible from here, so this is flagged for a
-      // manual refund/adjustment decision rather than auto-corrected.
+      // the gap between that earlier capture and this retry, the CURRENT
+      // itemizedCents can be lower than what was actually captured. Alert
+      // instead of silently absorbing it; the Stripe capture itself is
+      // irreversible from here, so this is flagged for a manual refund/
+      // adjustment decision rather than auto-corrected.
       const possibleOverchargeCents = capturedCents - itemizedCents;
       if (possibleOverchargeCents > 0) {
         try {
-          await callBookingsWebApp('opsAlerts_recordAlert', {
+          await gearService.recordOpsAlert({
             bookingId: ctx.bookingId,
             alertType: 'gear_reconciliation_self_heal_possible_overcharge',
             amount: possibleOverchargeCents / 100,
             stripeErrorDetail: `Self-healed a previously-successful capture of $${centsToDollarsStr(capturedCents)} on PaymentIntent ${pi.id}, but the CURRENT itemized total is only $${centsToDollarsStr(itemizedCents)} — a $${centsToDollarsStr(possibleOverchargeCents)} gap. This likely means an item condition was corrected after the original capture ran but before its write-back retried. The capture already happened and cannot be reversed from here; a manual refund of the difference (or confirmation the correction was itself wrong) needs staff review.`,
             urgency: 'urgent_same_day',
             notes: `Reconciled as '${depositStatus}', reconciledAmountCents=${capturedCents}, but current itemizedCents=${itemizedCents}.`,
-          }, { retries: 2 });
+          });
         } catch (alertErr) {
           // eslint-disable-next-line no-console
           console.error('reconcile-gear-deposit: also failed to write the self-heal-overcharge Ops Alert', ctx.bookingId, alertErr);
@@ -370,7 +366,7 @@ module.exports = async function handler(req, res) {
 async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, holdCents, gearShortfallCents, chargeableItems, stripeTransactionId, nowIso, expectedPaymentIntentId }) {
   let writeResult;
   try {
-    writeResult = await callBookingsWebApp('gearOps_writeReconciliation', {
+    writeResult = await gearService.writeReconciliation({
       bookingId: ctx.bookingId,
       depositStatus,
       reconciledAt: nowIso,
@@ -379,19 +375,19 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
       stripeTransactionId,
       itemizedItems: chargeableItems.map((i) => ({ itemName: i.itemName, unitId: i.unitId, condition: i.condition, replacementCostCents: i.replacementCostCents })),
       expectedPaymentIntentId,
-    }, { retries: 2 });
+    });
   } catch (writeBackErr) {
     // eslint-disable-next-line no-console
     console.error('reconcile-gear-deposit: Stripe action succeeded but the booking write-back failed', ctx.bookingId, stripeTransactionId, writeBackErr);
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await gearService.recordOpsAlert({
         bookingId: ctx.bookingId,
         alertType: 'gear_reconciliation_writeback_failed',
         amount: reconciledAmountCents != null ? reconciledAmountCents / 100 : 0,
         stripeErrorDetail: writeBackErr.message,
         urgency: 'urgent_same_day',
         notes: `Deposit reconciliation (${depositStatus}) for PaymentIntent ${stripeTransactionId} succeeded on Stripe, but the booking record could not be updated. A retry of this same reconciliation call should self-heal automatically (this endpoint reads the PaymentIntent's real Stripe status back on retry); if this alert is still Open, it did not.`,
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('reconcile-gear-deposit: also failed to write the write-back-failed Ops Alert', ctx.bookingId, alertErr);
@@ -399,32 +395,31 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
     throw writeBackErr;
   }
 
-  // BUG FIX (payment-review, Aug 2026, High #14): gearOps_writeReconciliation
-  // now refuses the write (and returns {stale:true}) when
-  // depositPaymentIntentId on the Sheet no longer matches the PaymentIntent
-  // this Stripe action actually ran against — meaning a renewal
-  // (create-deposit-hold.js, purpose:'renewal') swapped in a NEW live hold
-  // for this booking sometime between when this endpoint read the old PI and
-  // when it finished acting on it. The Stripe action above already happened
-  // for real (a real capture/cancel on the OLD PaymentIntent), but writing
-  // depositStatus/reconciledAmountCents now would silently clobber the
-  // Sheet's record of the NEW hold with stale figures describing the old
-  // one. Alert instead of writing, and skip the guest email below — the
-  // guest's deposit situation is not actually what depositStatus/
-  // reconciledAmountCents here would claim (see checklist for the reverse-
-  // direction race this does not cover).
+  // BUG FIX (payment-review, Aug 2026, High #14): gearService.writeReconciliation
+  // refuses the write (and returns {stale:true}) when depositPaymentIntentId
+  // on the booking no longer matches the PaymentIntent this Stripe action
+  // actually ran against — meaning a renewal (create-deposit-hold.js,
+  // purpose:'renewal') swapped in a NEW live hold for this booking sometime
+  // between when this endpoint read the old PI and when it finished acting
+  // on it. The Stripe action above already happened for real (a real
+  // capture/cancel on the OLD PaymentIntent), but writing depositStatus/
+  // reconciledAmountCents now would silently clobber the record of the NEW
+  // hold with stale figures describing the old one. Alert instead of
+  // writing, and skip the guest email below — the guest's deposit situation
+  // is not actually what depositStatus/reconciledAmountCents here would
+  // claim.
   if (writeResult && writeResult.stale) {
     // eslint-disable-next-line no-console
     console.error('reconcile-gear-deposit: write-back skipped, stale PaymentIntent (renewal race)', ctx.bookingId, stripeTransactionId, writeResult.currentPaymentIntentId);
     try {
-      await callBookingsWebApp('opsAlerts_recordAlert', {
+      await gearService.recordOpsAlert({
         bookingId: ctx.bookingId,
         alertType: 'gear_reconciliation_race_with_renewal',
         amount: reconciledAmountCents != null ? reconciledAmountCents / 100 : 0,
-        stripeErrorDetail: `Reconciled PaymentIntent ${stripeTransactionId}, but the Sheet's current depositPaymentIntentId is ${writeResult.currentPaymentIntentId} — a deposit hold renewal ran in between and put a NEW live hold in place. The Stripe action (${depositStatus}) already happened for real on the OLD PaymentIntent (${stripeTransactionId}), but the Sheet write was skipped to avoid overwriting the record of the new hold.`,
+        stripeErrorDetail: `Reconciled PaymentIntent ${stripeTransactionId}, but the booking's current depositPaymentIntentId is ${writeResult.currentPaymentIntentId} — a deposit hold renewal ran in between and put a NEW live hold in place. The Stripe action (${depositStatus}) already happened for real on the OLD PaymentIntent (${stripeTransactionId}), but the booking write was skipped to avoid overwriting the record of the new hold.`,
         urgency: 'urgent_same_day',
         notes: 'Needs manual review: confirm the old PaymentIntent\'s resolution is correct, and reconcile the new hold (depositPaymentIntentId currently on file) separately once this booking is ready again.',
-      }, { retries: 2 });
+      });
     } catch (alertErr) {
       // eslint-disable-next-line no-console
       console.error('reconcile-gear-deposit: also failed to write the race-with-renewal Ops Alert', ctx.bookingId, alertErr);

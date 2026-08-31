@@ -17,9 +17,9 @@
  *
  * Response:
  *   200 { bookingId, options: [
- *           { trailId, trailName, park, difficultyRating, bookable,
+ *           { trailId, trailName, difficultyRating,
  *             clearsAllTierA: boolean,
- *             overridableFailures: [{ key, label, detail }],
+ *             overridableFailures: string[],
  *             // absolute failures (not bookable, no park/date match) are
  *             // omitted from `options` entirely — see checkTrailSafety's
  *             // own doc comment for why those are never override-able.
@@ -33,23 +33,25 @@
  * Auth: same TRAIL_SELECTION_SHARED_SECRET as api/assign-trail.js — this is
  * still bucket 2.2's surface area, just a read-only second entry point into
  * it, so it reuses that endpoint's secret rather than inventing a third one.
+ *
+ * MIGRATED (Task 18, 2026-08-31): I/O rewritten against Postgres via the
+ * new lib/trail-safety-options-service.js, which builds the identical
+ * booking-context shape lib/run-trail-assignment.js already builds and
+ * tests for the same untouched trail-selection-engine.js — reusing that
+ * file's normalizeTrailRow/normalizeParkAccessRow/AGE_BUCKET_LABELS rather
+ * than a second copy. Roster now comes directly from booking_participants
+ * (no fullPayloadJson/reconfirmedRosterJson fallback needed — this schema's
+ * booking_participants is a complete, always-current roster on its own,
+ * per Finding #29 in the migration progress doc). Request/response shape
+ * and auth are unchanged; the response's `park`/`bookable` fields mentioned
+ * in an earlier draft of this comment were never actually part of
+ * getTrailSafetyOptions's real output — corrected above to match what this
+ * endpoint has always actually returned.
  */
 
 'use strict';
 
-const { getTrailSafetyOptions, computeGroupCeilings, toDate } = require('../lib/trail-selection-engine');
-const { normalizeTrailRow, normalizeParkAccessRow, normalizeBookingContext } = require('../lib/normalize');
-const { callBookingsWebApp } = require('../lib/apps-script-client');
-
-function parseMaybeJson(value, fallback) {
-  if (value == null) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value);
-  } catch (err) {
-    return fallback;
-  }
-}
+const { getSafetyOptionsForBooking } = require('../lib/trail-safety-options-service');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -69,70 +71,18 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const ctx = await callBookingsWebApp('getAdventurePrepContext', { bookingId });
-    if (!ctx || ctx.notFound) {
+    const result = await getSafetyOptionsForBooking({ bookingId });
+
+    if (result.notFound) {
       res.status(404).json({ error: 'booking_not_found' });
       return;
     }
-    if (!ctx.adventurePrep || !ctx.experienceBooking) {
+    if (result.missingInputs) {
       res.status(400).json({ error: 'missing_1_2a_inputs' });
       return;
     }
 
-    const [trailDb, parkAccess] = await Promise.all([
-      callBookingsWebApp('getTrailDatabase', {}),
-      callBookingsWebApp('getParkAccess', {}),
-    ]);
-
-    // BUG FIX (Aug 2026, trail-selection live-testing investigation): see
-    // the identical fix + full explanation in lib/run-trail-assignment.js.
-    // Apps Script always answers HTTP 200 even when the dispatched action
-    // threw (doPost's own try/catch wraps a throw as
-    // `{ ok: false, error: ... }`), so callBookingsWebApp() doesn't throw
-    // on it — the old `(trailDb.rows || [])` / `(parkAccess.rows || [])`
-    // silently turned that failure into "zero trails," here surfacing as a
-    // Trail Swap Requests dropdown that looks empty/broken with no error
-    // anywhere. Fail loudly instead so the real cause shows up as a
-    // diagnosable engineering_error.
-    if (!trailDb || trailDb.ok === false || !Array.isArray(trailDb.rows)) {
-      throw new Error(
-        'trail-safety-options: getTrailDatabase did not return rows — ' +
-          ((trailDb && trailDb.error) || 'Apps Script webapp response missing rows array')
-      );
-    }
-    if (!parkAccess || parkAccess.ok === false || !Array.isArray(parkAccess.rows)) {
-      throw new Error(
-        'trail-safety-options: getParkAccess did not return rows — ' +
-          ((parkAccess && parkAccess.error) || 'Apps Script webapp response missing rows array')
-      );
-    }
-
-    const fullPayload = parseMaybeJson(ctx.experienceBooking.fullPayloadJson, {});
-    const bookingTimeRoster = fullPayload.roster || [];
-    const booking = normalizeBookingContext(ctx.adventurePrep, ctx.experienceBooking, bookingTimeRoster);
-    const trails = (trailDb.rows || []).map(normalizeTrailRow);
-    const parkAccessRows = (parkAccess.rows || []).map(normalizeParkAccessRow);
-
-    // getTrailSafetyOptions expects the SAME internal ctx shape
-    // runTrailSelection builds for itself (roster + precomputed groupCeilings,
-    // not the raw normalized booking) plus an explicit reference date — see
-    // trail-selection-engine.js's own runTrailSelection for the identical
-    // construction. Building it any other way here would risk silently
-    // drifting from what the candidate-pool filter actually checks.
-    const groupCeilings = computeGroupCeilings(booking.roster, booking.technicalComfort);
-    const safetyCtx = {
-      roster: booking.roster,
-      groupCeilings,
-      bestForAttributes: booking.bestForAttributes || [],
-      heatComfort: booking.heatComfort,
-      duration: booking.duration,
-      activityType: booking.activityType,
-    };
-    const referenceDate = toDate(booking.confirmedDate);
-
-    const options = getTrailSafetyOptions(safetyCtx, trails, parkAccessRows, referenceDate);
-
-    res.status(200).json({ bookingId, options });
+    res.status(200).json({ bookingId, options: result.options });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('trail-safety-options failed', bookingId, err);

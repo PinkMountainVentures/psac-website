@@ -1,6 +1,12 @@
 /**
  * api/charge-gear-shortfall.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). Every direct Stripe call in this file is
+ * unchanged. See lib/gear-service.js's own header for the full scope of
+ * this migration.
+ *
  * Gear Inventory PRD Section 10: the manual-review follow-up charge for
  * Scenario 4 (itemized loss/damage exceeds the deposit hold). Deliberately
  * NOT automatic — a staff member reviews photos on the Reconciliation
@@ -17,12 +23,7 @@
  * this specific reconciliation event (`ctx.reconciledAt`, written once by
  * reconcile-gear-deposit.js and read back unchanged here), never a live/
  * regenerated timestamp — combined with the actual amount this call
- * intends to charge. Using the amount as part of the key is deliberate,
- * not an oversight: a pure retry of the identical staff decision (same
- * amount) reuses the same key, so Stripe correctly dedupes it; a genuinely
- * different staff-adjusted amount is a different decision and gets a
- * different key, which is correct — Stripe would reject reusing one key
- * with two different amounts anyway.
+ * intends to charge.
  *
  * Amount: defaults to the stored `gearShortfallCents` computed at
  * reconciliation time. Staff may override via `amountCents` in the
@@ -33,7 +34,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const { sendEmail } = require('../lib/send-email');
 const { summarizeItems } = require('../lib/gear-item-summary');
 const { renderDepositCaptureExceedingHoldEmail } = require('../lib/email-templates/deposit-capture-exceeding-hold-email');
@@ -98,7 +99,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('gearOps_getReconciliationContext', { bookingId: body.bookingId });
+    const ctx = await gearService.getReconciliationContext({ bookingId: body.bookingId });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'booking_not_found' });
       return;
@@ -123,11 +124,10 @@ module.exports = async function handler(req, res) {
     // genuine data-integrity anomaly (a booking marked pending review with
     // no reconciledAt/gearShortfallCents on file). Deliberately NOT routed
     // through recordFailure below: no shortfall-charge claim has been taken
-    // yet at this point (gearOps_beginShortfallCharge hasn't run), and no
-    // Stripe charge was ever attempted, so recordFailure's "we couldn't
-    // process your charge" guest email would be false — this is a data
-    // problem for staff to investigate, not a failed charge to notify the
-    // guest about.
+    // yet at this point (beginShortfallCharge hasn't run), and no Stripe
+    // charge was ever attempted, so recordFailure's "we couldn't process
+    // your charge" guest email would be false — this is a data problem for
+    // staff to investigate, not a failed charge to notify the guest about.
     if (!ctx.reconciledAt) {
       await recordDataIntegrityAlert(ctx, 'booking is pending review but has no reconciledAt on file');
       res.status(500).json({ error: 'engineering_error', detail: 'booking is pending review but has no reconciledAt on file' });
@@ -145,20 +145,10 @@ module.exports = async function handler(req, res) {
       return;
     }
     // BUG FIX (payment-review, Aug 2026, Lower-confidence #6): staff-supplied
-    // amountCents had no upper bound at all beyond "positive number" — an
-    // extra-zero typo in the Reconciliation Review page's override field
-    // (e.g. entering the shortfall in dollars, or fat-fingering an extra
-    // zero) would sail straight through to an off-session Stripe charge
-    // against the guest's card on file with no server-side sanity check.
-    // staffNotes is required for ANY adjustment (see the isAdjusted check
-    // below), but that only proves a note was typed, not that the amount is
-    // sane. Cap the override at whichever is larger: 3x the system's own
-    // computed shortfall (room for a genuine staff finding — e.g. an
-    // additional damaged item not yet reflected in gearShortfallCents), or a
-    // flat $1,000 floor so a small computed shortfall doesn't make an
-    // otherwise-reasonable adjustment impossible. Anything beyond that is
-    // rejected here; a legitimately larger charge should be split or handled
-    // outside this automated path.
+    // amountCents had no upper bound at all beyond "positive number". Cap
+    // the override at whichever is larger: 3x the system's own computed
+    // shortfall, or a flat $1,000 floor so a small computed shortfall
+    // doesn't make an otherwise-reasonable adjustment impossible.
     const SHORTFALL_OVERRIDE_CEILING_CENTS = Math.max(ctx.gearShortfallCents * 3, 100000);
     if (requestedAmountCents > SHORTFALL_OVERRIDE_CEILING_CENTS) {
       res.status(400).json({
@@ -175,16 +165,14 @@ module.exports = async function handler(req, res) {
 
     // BUG FIX (payment-review, Aug 2026, High #17): the ctx.depositStatus
     // check above is a plain read with no lock — two overlapping requests
-    // can both read 'full_capture_pending_review' and both proceed. This is
-    // the real, authoritative gate: gearOps_beginShortfallCharge atomically
-    // claims the booking (inside its own LockService lock) before this
-    // endpoint ever calls Stripe, so a genuinely concurrent second request
-    // — even one with a different, differently-idempotency-keyed
-    // requestedAmountCents — is turned away here instead of creating a
-    // second real charge. Every failure branch below (recordFailure) undoes
-    // this claim via gearOps_recordShortfallChargeFailure so a legitimate
-    // retry isn't blocked by its own earlier failed attempt.
-    const beginResult = await callBookingsWebApp('gearOps_beginShortfallCharge', { bookingId: ctx.bookingId, nowIso: new Date().toISOString() }, { retries: 2 });
+    // can both read 'full_capture_pending_review' and both proceed.
+    // beginShortfallCharge atomically claims the booking (a guarded UPDATE)
+    // before this endpoint ever calls Stripe, so a genuinely concurrent
+    // second request is turned away here instead of creating a second real
+    // charge. Every failure branch below (recordFailure) undoes this claim
+    // via recordShortfallChargeFailure so a legitimate retry isn't blocked
+    // by its own earlier failed attempt.
+    const beginResult = await gearService.beginShortfallCharge({ bookingId: ctx.bookingId, nowIso: new Date().toISOString() });
     if (!beginResult || !beginResult.ok) {
       const reason = (beginResult && beginResult.reason) || 'unknown';
       if (reason === 'charge_in_progress') {
@@ -195,23 +183,20 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // MOVED UP (payment-review, Aug 2026, High #18): used to be computed
-    // just before the Stripe charge attempt itself, which meant recordFailure
-    // couldn't be called from the mainPaymentIntentId lookup failure branch
-    // below (it closes over chargeableItems, which didn't exist yet at that
-    // point in execution). Only depends on ctx.items, already available —
-    // safe to compute this early.
+    // MOVED UP (payment-review, Aug 2026, High #18): computed early so
+    // recordFailure can be called from the mainPaymentIntentId lookup
+    // failure branch below (it closes over chargeableItems). Only depends
+    // on ctx.items, already available — safe to compute this early.
     const chargeableItems = (ctx.items || []).filter((i) => i.condition === 'Damaged' || i.condition === 'Missing');
 
     if (!ctx.mainPaymentIntentId) {
       // BUG FIX (payment-review, Aug 2026, Medium #32): unlike the two
       // reconciledAt/gearShortfallCents checks above, this one runs AFTER
-      // gearOps_beginShortfallCharge has already claimed the booking (line
-      // ~146) — a bare 500 here used to leave that claim stuck in
-      // 'shortfall_charge_in_progress' with no release and no alert.
-      // requestedAmountCents is already computed above, so this is a normal
-      // recordFailure call, same as the sibling Stripe-lookup-failure branch
-      // just below.
+      // beginShortfallCharge has already claimed the booking — a bare 500
+      // here used to leave that claim stuck in 'shortfall_charge_in_progress'
+      // with no release and no alert. requestedAmountCents is already
+      // computed above, so this is a normal recordFailure call, same as the
+      // sibling Stripe-lookup-failure branch just below.
       await recordFailure(ctx, requestedAmountCents, 'Booking has no main PaymentIntent on file — cannot look up a saved card to charge.');
       res.status(500).json({ error: 'engineering_error', detail: 'booking has no main PaymentIntent on file' });
       return;
@@ -220,10 +205,9 @@ module.exports = async function handler(req, res) {
     if (!mainRes.ok) {
       // BUG FIX (payment-review, Aug 2026, High #18): this used to return a
       // raw 502 with no recordFailure call, unlike every other failure
-      // branch in this function — no Ops Alert, no gearOps_
-      // recordShortfallChargeFailure write, no guest email, for a real
-      // failure to look up the very PaymentIntent this whole charge depends
-      // on. requestedAmountCents is already validated above.
+      // branch in this function — no Ops Alert, no claim release, no guest
+      // email, for a real failure to look up the very PaymentIntent this
+      // whole charge depends on.
       await recordFailure(ctx, requestedAmountCents, 'Could not retrieve the main PaymentIntent from Stripe (' + JSON.stringify((mainRes.data && mainRes.data.error) || {}) + ').');
       res.status(502).json({ error: 'stripe_error', detail: 'Could not retrieve the main PaymentIntent.' });
       return;
@@ -285,11 +269,10 @@ module.exports = async function handler(req, res) {
       // this endpoint just replays the same cached requires_action state
       // via the same Idempotency-Key, and an off-session PaymentIntent
       // generally can't complete 3DS without the guest back in a live
-      // browser session — so until now this outcome had an Ops Alert and
-      // a guest email, but no actual way to collect the money. Passing
-      // chargeRes.data.id through lets recordFailure persist it and hand
-      // the guest a self-service link (complete-shortfall-payment.html)
-      // that finishes this SAME PaymentIntent, never a new one.
+      // browser session. Passing chargeRes.data.id through lets
+      // recordFailure persist it and hand the guest a self-service link
+      // (complete-shortfall-payment.html) that finishes this SAME
+      // PaymentIntent, never a new one.
       await recordFailure(ctx, requestedAmountCents, 'Card requires additional authentication (3D Secure) before the charge can complete.', chargeRes.data.id);
       res.status(200).json({ ok: false, outcome: 'requires_action', bookingId: ctx.bookingId, paymentIntentId: chargeRes.data.id });
       return;
@@ -303,25 +286,25 @@ module.exports = async function handler(req, res) {
 
     const chargedAt = new Date().toISOString();
     try {
-      await callBookingsWebApp('gearOps_recordShortfallCharge', {
+      await gearService.recordShortfallCharge({
         bookingId: ctx.bookingId,
         shortfallChargeId: chargeRes.data.id,
         shortfallChargedAmountCents: requestedAmountCents,
         shortfallChargedAt: chargedAt,
         staffNotes: body.staffNotes || '',
-      }, { retries: 2 });
+      });
     } catch (writeBackErr) {
       // eslint-disable-next-line no-console
       console.error('charge-gear-shortfall: charge succeeded but write-back failed', ctx.bookingId, chargeRes.data.id, writeBackErr);
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: ctx.bookingId,
           alertType: 'gear_shortfall_charge_writeback_failed',
           amount: requestedAmountCents / 100,
           stripeErrorDetail: writeBackErr.message,
           urgency: 'urgent_same_day',
           notes: `Shortfall charge ${chargeRes.data.id} for $${centsToDollarsStr(requestedAmountCents)} succeeded on Stripe, but the booking record could not be updated. Retrying this same call reuses the same Idempotency-Key so it should self-heal; if this alert is still Open, it did not.`,
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: also failed to write the write-back-failed Ops Alert', ctx.bookingId, alertErr);
@@ -357,12 +340,12 @@ module.exports = async function handler(req, res) {
     // "your charge failed" guest email (nothing was ever attempted).
     async function recordDataIntegrityAlert(ctxInner, detail) {
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: ctxInner.bookingId,
           alertType: 'gear_shortfall_data_integrity_error',
           stripeErrorDetail: detail,
           urgency: 'urgent_same_day',
-        }, { retries: 2 });
+        });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: failed to record data-integrity Ops Alert', ctxInner.bookingId, e);
@@ -372,27 +355,27 @@ module.exports = async function handler(req, res) {
     // BUG FIX (payment-review, Aug 2026, Medium #33): new optional 4th
     // param, pendingPaymentIntentId — only ever passed by the
     // requires_action call site above. Persisted (or explicitly cleared,
-    // when absent) via gearOps_recordShortfallChargeFailure so a later
-    // guest visit to complete-shortfall-payment.html can look it back up,
-    // and used here to build that page's link for the failure email.
+    // when absent) via recordShortfallChargeFailure so a later guest visit
+    // to complete-shortfall-payment.html can look it back up, and used
+    // here to build that page's link for the failure email.
     async function recordFailure(ctxInner, amountCents, detail, pendingPaymentIntentId) {
       try {
-        await callBookingsWebApp('gearOps_recordShortfallChargeFailure', {
+        await gearService.recordShortfallChargeFailure({
           bookingId: ctxInner.bookingId, detail,
           pendingPaymentIntentId: pendingPaymentIntentId || '',
-        }, { retries: 2 });
+        });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: failed to record shortfall charge failure', ctxInner.bookingId, e);
       }
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await gearService.recordOpsAlert({
           bookingId: ctxInner.bookingId,
           alertType: 'gear_shortfall_charge_failed',
           amount: amountCents / 100,
           stripeErrorDetail: detail,
           urgency: 'urgent_same_day',
-        }, { retries: 2 });
+        });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('charge-gear-shortfall: failed to record Ops Alert for shortfall charge failure', ctxInner.bookingId, e);

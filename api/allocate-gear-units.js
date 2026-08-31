@@ -1,6 +1,11 @@
 /**
  * api/allocate-gear-units.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). See lib/gear-service.js's own header for the full
+ * scope of this migration.
+ *
  * Gear Inventory PRD Section 3/4: consolidated dispatcher for the
  * allocation step of gear assembly — pick specific Gear Units for a
  * booking's already-existing Gear Check Log rows, size-matched where
@@ -8,12 +13,11 @@
  * api/ops-proxy.js (staff session already checked there) with the real
  * secret injected — never called directly from a browser.
  *
- * Three actions, matching the three Sheet-side functions this build added
- * in apps-script/gear-inventory-actions.gs:
- *   - 'allocate'      -> gearOps_allocateUnits (idempotent/incremental —
- *     safe to call again if staff reopens a checkout record)
- *   - 'getAllocation' -> gearOps_getAllocation (reopen without re-running)
- *   - 'recordShortageResolution' -> gearOps_recordShortageResolution
+ * Three actions:
+ *   - 'allocate'      -> gearService.allocateUnits (idempotent/incremental
+ *     — safe to call again if staff reopens a checkout record)
+ *   - 'getAllocation' -> gearService.getAllocation (reopen without re-running)
+ *   - 'recordShortageResolution' -> gearService.recordShortageResolution
  *     (Section 3/16's confirmed-sufficient oversell handling: one staff
  *     pick from reassign/expedite/contact-guest, logged, nothing more —
  *     no reassignment engine, no PO form, no message composer)
@@ -21,7 +25,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 
 const SHORTAGE_RESOLUTIONS = ['reassign', 'expedite', 'contact-guest'];
 
@@ -60,13 +64,13 @@ module.exports = async function handler(req, res) {
     const action = body.action || 'allocate';
 
     if (action === 'allocate') {
-      const result = await callBookingsWebApp('gearOps_allocateUnits', { bookingId: body.bookingId });
+      const result = await gearService.allocateUnits({ bookingId: body.bookingId });
       res.status(200).json(result);
       return;
     }
 
     if (action === 'getAllocation') {
-      const result = await callBookingsWebApp('gearOps_getAllocation', { bookingId: body.bookingId });
+      const result = await gearService.getAllocation({ bookingId: body.bookingId });
       res.status(200).json(Object.assign({ ok: true }, result));
       return;
     }
@@ -76,7 +80,7 @@ module.exports = async function handler(req, res) {
         res.status(400).json({ error: 'bad_request', detail: `resolution must be one of: ${SHORTAGE_RESOLUTIONS.join(', ')}` });
         return;
       }
-      const result = await callBookingsWebApp('gearOps_recordShortageResolution', {
+      const result = await gearService.recordShortageResolution({
         bookingId: body.bookingId,
         itemType: body.itemType || '',
         resolution: body.resolution,

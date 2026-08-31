@@ -44,26 +44,29 @@
  * adjustment.js's new `update_delivery_address` type (staff correcting an
  * address after a phone/SMS/email interaction with the guest) — one source
  * of truth instead of two copies that could drift.
+ *
+ * MIGRATED (Task 18, 2026-08-31): the token->booking auth check now
+ * calls lib/adventure-prep-service.js's own findBookingByToken directly
+ * (the same lookup getContextByToken already uses) instead of the old
+ * Apps Script adventurePrep_getContextByToken action — no behavior
+ * change, just I/O.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { findBookingByToken } = require('../lib/adventure-prep-service');
 const { validateAddress } = require('../lib/validate-address');
 
 /**
- * Reuses the existing adventurePrep_getContextByToken action purely as an
+ * Reuses lib/adventure-prep-service.js's findBookingByToken purely as an
  * auth check — confirms the token resolves to a real, active booking
  * before this repo spends Google Maps quota on the caller's behalf.
- * Slightly more work than a dedicated token-check action would need, but
- * avoids adding yet another near-duplicate Apps Script action for a check
- * this one already does as a side effect of existing.
  */
 async function tokenIsActiveBooking(token) {
   if (!token) return false;
-  const ctx = await callBookingsWebApp('adventurePrep_getContextByToken', { token });
-  if (!ctx || ctx.notFound) return false;
-  const status = ctx.experienceBooking?.bookingStatus || 'active';
+  const booking = await findBookingByToken(token);
+  if (!booking) return false;
+  const status = booking.booking_status || 'active';
   return status === 'active';
 }
 

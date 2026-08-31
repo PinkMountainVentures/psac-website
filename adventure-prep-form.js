@@ -13,31 +13,94 @@
    Apps Script webapp or the Trail Selection engine directly.
 
    ============================================================================
-   FLAGGED FOR AIREY — two things the PRD (Section 8) left open on purpose,
-   this build's own answers, not silently invented:
-   ============================================================================
+   REWRITTEN (Task 15, 2026-08-31, Postgres migration) — this file was
+   built against the pre-migration positional-index roster model
+   described just below in the two items this replaces. Once
+   lib/adventure-prep-service.js moved the roster onto real
+   booking_participants rows (Task 14), this file's own roster/waiver
+   code was found to be completely non-functional against the real
+   backend: the roster never loaded (hydrateWorkingStateFromCtx read
+   fullPayloadJson/reconfirmedRosterJson, neither of which exist anymore),
+   and every save silently no-opped (saveFields REJECTS isParticipating/
+   participatingRosterRef/reconfirmedRosterJson now — confirmRoster is the
+   only path that can touch them). This rewrite:
 
-   1. "Confirm which roster row is you" — implemented as a tap-to-select
-      list folded into the top of the roster-reconfirmation step (matching
-      the mockup), storing the SELECTED ROW'S ARRAY INDEX (stringified,
-      e.g. "0") into adventurePrep.participatingRosterRef. "None of these
-      are me" stores '' and leaves isParticipating's own yes/no answer as
-      the only participation signal. This assumes reconfirmedRosterJson's
-      array order stays stable within a session, true since only this
-      page ever writes it. If a future edit ever reorders that array
-      independent of this flow, participatingRosterRef would need to
-      become a stabler identifier than a positional index — flagged here
-      rather than solved speculatively.
+   1. "Confirm which roster row is you" now stores the REAL
+      booking_participants.participant_id (state.ownerParticipantId), not
+      a positional array index — the old design's own flagged risk ("if a
+      future edit ever reorders that array independent of this flow,
+      participatingRosterRef would need to become a stabler identifier
+      than a positional index") is exactly what the Postgres migration did,
+      so this closes that gap for real rather than hypothetically. The one
+      capability this screen still doesn't have (unchanged from before):
+      there's no "none of these are me, add me as a new person" option —
+      isParticipating true always requires picking an existing roster row.
+      That's a real product decision, not an oversight; flagging it again
+      here rather than quietly building new UI for confirmRoster's
+      ownerNewEntry path, which this screen never calls.
 
-   2. Non-owner adult email collection needed a place to live. Rather than
-      a separate field/table, each roster entry in reconfirmedRosterJson
-      optionally carries its own `email` property (adults only, never
-      collected for a minor), read back out at Step 10 (Review & Send) to
-      build the signer list api/send-signer-links.js emails. Simpler than
-      a parallel array that has to stay in sync with the roster by index.
+   2. Non-owner adult email still lives on the roster entry itself
+      (entry.email), now persisted through confirmRoster's real
+      per-participant write path instead of a JSON blob column that no
+      longer exists.
 
-   Both are real product decisions, not just implementation details —
-   confirm or redirect before this ships.
+   3. Per-person gear-kit toggle (Gear Kits screen) had the exact same
+      problem — it saved via the same dead reconfirmedRosterJson blob.
+      Now posts { action: 'setRosterGearKits', updates: [{participantId,
+      gearKit}] } — a new, narrow action (lib/adventure-prep-service.js),
+      deliberately NOT folded into confirmRoster (see that function's own
+      header comment for why).
+
+   4. waiverSigners() (feeds the hub tile, Waivers screen, and Adventure
+      Summary) used to match waiver_signatures rows to roster entries by
+      positional `rosterRef` string and infer minor guardian coverage by
+      scanning participantsCoveredJson for a name match. Both are gone:
+      waiver_signatures.participant_id is now a real column, and a
+      minor's guardian coverage is booking_participants.guardian_verified_at
+      (set by lib/waiver-service.js's applyGuardianCertification) — a
+      real, structured fact instead of a name-string scan.
+
+   5. The owner's own waiver-signing screen (renderSign) sent
+      guardianForChildren as an array of NAMES. lib/waiver-service.js's
+      saveWaiverSignature only reads guardianForChildrenParticipantIds —
+      the name-based key was silently ignored, so applyGuardianCertification
+      never ran for a booker signing on behalf of their own child. Fixed
+      to send participant IDs (state.guardianForChildrenParticipantIds).
+
+   6. Attendees' invite-sending screen (renderInvite) used to build its
+      own `signers` array (name/email/rosterRef) and POST it to
+      sendSignerLinks. lib/waiver-service.js's sendSignerLinksForBooking
+      now derives its own signer list server-side (PRD Section 6) —
+      the request is just { token }; this screen's `signers` value is
+      now local-preview-only, built the same way the server derives
+      eligibility, never sent.
+
+   FLAG FOR AIREY, still open, NOT solved here: the invite screen's copy
+   still says guardian assignment "isn't built yet" for a non-attending
+   external guardian. That's now stale — confirmRoster's
+   guardianAssignment (PRD Section 6 hybrid model) and
+   sendSignerLinksForBooking's guardian_only handling are both real and
+   live — but there is still no UI anywhere in this screen for the
+   booker to actually NAME a guardian for a minor (existing-adult or
+   external). Building that UI is a real, undecided product surface (what
+   it looks like, where it lives), not a mechanical fix, so it's flagged
+   again here rather than invented. Without it, minor waiver coverage
+   still only ever happens via the self-declare fallback (Model 1,
+   preserved) — an attending adult (this screen, renderSign, or
+   waiver-signer-form.js) checking "I'm the parent/guardian of ___" when
+   THEY sign, which works today and is what this rewrite fixes end to
+   end.
+
+   Also flagged, not fixed here (pre-existing, separate from roster): the
+   single-person "Send Reminder" button (renderWaiverDetail) posts to the
+   same sendSignerLinks action, which now unconditionally re-sends to
+   EVERY eligible signer, not just the one tapped — the backend commits to
+   bulk-derive-and-send only (see lib/waiver-service.js's own header
+   comment). This is a real behavior change from the pre-migration
+   single-recipient resend, not a bug this file can fix on its own; the
+   button still works (mechanically the same call this build already
+   makes for group-level sends), its copy is just updated below to stop
+   promising a single-recipient send it can no longer make.
    ============================================================================ */
 
 (function () {
@@ -92,7 +155,7 @@
     // Working copies the guest edits before each step's own save call.
     roster: [],
     isParticipating: null,
-    participatingRosterRef: '',
+    ownerParticipantId: '', // NEW (Task 15): real booking_participants.participant_id, replaces the old positional participatingRosterRef
     bestForAttributes: [],
     technicalComfort: null,
     heatComfort: null,
@@ -112,7 +175,7 @@
     gearStep: 0, // 0 kit toggle | 1 delivery | 2 pickup — Round 2 (mockup-04) split of the old single-screen gear/delivery form
     waiverName: '',
     waiverAgreed: false,
-    guardianForChildren: [],
+    guardianForChildrenParticipantIds: [], // NEW (Task 15): array of participant_ids, replaces the old name-keyed guardianForChildren — matches lib/waiver-service.js's real saveWaiverSignature contract
     ecName: '',
     ecPhone: '',
     prefStep: 0, // 0 | 1 | 2 — which of the 3 Trail Recommendation question screens (Round 2, handoff Section 2: "Each question screen gets a step progress bar...")
@@ -264,18 +327,52 @@
 
   function hydrateWorkingStateFromCtx() {
     var ap = state.ctx.adventurePrep || {};
-    var fullPayload = {};
-    try { fullPayload = JSON.parse(state.ctx.experienceBooking.fullPayloadJson || '{}'); } catch (e) { fullPayload = {}; }
 
-    try {
-      state.roster = ap.reconfirmedRosterJson ? JSON.parse(ap.reconfirmedRosterJson) : (fullPayload.roster || []);
-    } catch (e) { state.roster = fullPayload.roster || []; }
-    if (!Array.isArray(state.roster)) state.roster = [];
+    // NEW (Task 15, 2026-08-31): state.ctx.roster is now real,
+    // camelCase-mapped booking_participants rows (lib/adventure-prep-
+    // service.js's mapRosterRowForContext), not a JSON blob parsed out of
+    // fullPayloadJson/reconfirmedRosterJson (neither field exists in the
+    // new schema at all — see that file's own header comment, point 2).
+    // Copied into a fresh array of fresh objects (not just aliased) so
+    // this screen's in-place edits (renderRosterRows et al mutate
+    // state.roster[i].name/.age/... directly) never mutate state.ctx
+    // itself before a save actually commits — same behavior the old
+    // JSON.parse() copy gave for free.
+    state.roster = (state.ctx.roster || []).map(function (r) {
+      return {
+        participantId: r.participantId,
+        name: r.name,
+        age: r.age,
+        fitness: r.fitness,
+        email: r.email || '',
+        gearKit: r.gearKit,
+        roleOnBooking: r.roleOnBooking,
+        isParticipating: r.isParticipating,
+        guardianPersonId: r.guardianPersonId,
+        guardianVerifiedAt: r.guardianVerifiedAt,
+      };
+    });
 
-    state.isParticipating = ap.isParticipating === true || ap.isParticipating === 'true' ? true
-      : (ap.isParticipating === false || ap.isParticipating === 'false' ? false : null);
-    state.participatingRosterRef = ap.participatingRosterRef != null ? String(ap.participatingRosterRef) : '';
-    state.bestForAttributes = ap.bestForAttributes ? String(ap.bestForAttributes).split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+    // ap.isParticipating is a real Postgres boolean/null now (mapped
+    // straight off adventure_prep.is_participating) — no more '"true"'/
+    // '"false"' string tolerance needed, that was for the old Sheet-cell
+    // storage, which serialized everything as text.
+    state.isParticipating = ap.isParticipating === true ? true : (ap.isParticipating === false ? false : null);
+    // NEW (Task 15): the booker's identity is now a real participant_id,
+    // resolved from whichever roster row confirmRoster last marked
+    // role_on_booking = 'owner' — replaces the old positional
+    // participatingRosterRef entirely.
+    var ownerRow = state.roster.filter(function (r) { return r.roleOnBooking === 'owner'; })[0];
+    state.ownerParticipantId = ownerRow ? ownerRow.participantId : '';
+
+    // bestForAttributes now comes back as a real TEXT[] (mapAdventurePrepRow),
+    // not a comma-joined string cell — the old String(...).split(',') only
+    // ever worked on an array by accident (Array.prototype.toString()
+    // happens to comma-join). Handled explicitly here instead of relying
+    // on that coincidence.
+    state.bestForAttributes = Array.isArray(ap.bestForAttributes)
+      ? ap.bestForAttributes
+      : (ap.bestForAttributes ? String(ap.bestForAttributes).split(',').map(function (s) { return s.trim(); }).filter(Boolean) : []);
     state.technicalComfort = ap.technicalComfort || null;
     state.heatComfort = ap.heatComfort || null;
     state.propertyType = ap.propertyType || null;
@@ -286,7 +383,13 @@
     state.deliveryWindow = ap.deliveryWindow || state.deliveryWindow;
     state.returnPreference = ap.returnPreference || state.returnPreference;
     state.deliveryNote = ap.deliveryNote || '';
-    state.returnSameAsDelivery = ap.returnSameAsDelivery === 'false' ? false : true;
+    // BUG FIX (Task 15): ap.returnSameAsDelivery is a real Postgres
+    // boolean now, never the string 'false' — the old `=== 'false'` check
+    // could never match a real false value, so a guest who explicitly set
+    // a different return address always hydrated back to true (same
+    // address) on their next visit. Compare to the real boolean instead;
+    // undefined/null (never saved yet) still defaults to true.
+    state.returnSameAsDelivery = ap.returnSameAsDelivery === false ? false : true;
     state.returnAddressLine1 = ap.returnAddressLine1 || '';
     state.returnLocation = ap.returnLocation || null;
     state.returnWindow = ap.returnWindow || null;
@@ -451,40 +554,51 @@
    * action available from this screen, which is honest about the gap
    * rather than guessing who it should be.
    */
+  // REWRITTEN (Task 15, 2026-08-31): used to match waiver_signatures rows
+  // to roster entries by positional index (`String(w.rosterRef) === String(i)`)
+  // and infer minor guardian coverage by scanning
+  // waiverSignatures[].participantsCoveredJson for a name match — both
+  // gone now that waiver_signatures.participant_id is a real column
+  // (lib/waiver-service.js) and guardian coverage is a real fact on the
+  // roster row itself (guardianVerifiedAt, set by that file's
+  // applyGuardianCertification). `index` is gone from this function's
+  // return shape too — every caller now keys off `participantId`.
+  // Also now excludes anyone the booker has marked not participating
+  // (isParticipating === false) from the list entirely — a person who's
+  // not on the trip doesn't need a waiver, matching
+  // sendSignerLinksForBooking's own server-side eligibility filter — but
+  // keeps guardian_only rows (non-attending assigned guardians, who do
+  // still need to sign).
   function waiverSigners() {
     var signatures = state.ctx.waiverSignatures || [];
-    var ownerIdx = state.participatingRosterRef === '' || state.participatingRosterRef === 'none'
-      ? -1 : Number(state.participatingRosterRef);
-    return state.roster.map(function (p, i) {
-      var age = p.age || p.ageRange || '';
-      var isMinor = !!MINOR_BUCKETS[age];
-      var isOwner = i === ownerIdx;
-      var name = p.name || (isOwner ? 'You' : 'Unnamed');
-      if (isMinor) {
-        var coveringSig = signatures.filter(function (w) {
-          var covered = [];
-          try { covered = JSON.parse(w.participantsCoveredJson || '[]'); } catch (e) { covered = []; }
-          return covered.indexOf(p.name) !== -1;
-        })[0];
+    return state.roster
+      .filter(function (p) { return p.isParticipating !== false || p.roleOnBooking === 'guardian_only'; })
+      .map(function (p) {
+        var isOwner = p.roleOnBooking === 'owner';
+        var isMinor = !!MINOR_BUCKETS[p.age];
+        var name = p.name || (isOwner ? 'You' : 'Unnamed');
+        if (isMinor) {
+          var isDone = !!p.guardianVerifiedAt;
+          return {
+            participantId: p.participantId, name: name, isOwner: false, isMinor: true,
+            isDone: isDone,
+            subLabel: isDone ? 'Guardian confirmed' : (p.guardianPersonId ? 'Guardian invited, not yet confirmed' : 'Needs a signing guardian assigned'),
+            canRemind: false,
+            email: '',
+          };
+        }
+        var sig = isOwner
+          ? signatures.filter(function (w) { return w.role === 'owner'; })[0]
+          : signatures.filter(function (w) { return w.participant_id === p.participantId; })[0];
+        var isDone = !!sig && sig.status === 'signed';
         return {
-          index: i, name: name, isOwner: false, isMinor: true,
-          isDone: !!coveringSig,
-          subLabel: coveringSig ? ('Signed by ' + (coveringSig.signerName || 'their guardian') + ', guardian') : 'Needs a signing guardian assigned',
-          canRemind: false,
+          participantId: p.participantId, name: name, isOwner: isOwner, isMinor: false,
+          isDone: isDone,
+          subLabel: isDone ? 'Signed' : (sig ? 'Not yet' : (isOwner ? 'Not yet' : 'Not yet invited')),
+          canRemind: !isDone && !isOwner && !!sig && !!p.email,
+          email: p.email || '',
         };
-      }
-      var sig = isOwner
-        ? signatures.filter(function (w) { return w.role === 'owner'; })[0]
-        : signatures.filter(function (w) { return String(w.rosterRef) === String(i); })[0];
-      var isDone = !!sig && sig.status === 'signed';
-      return {
-        index: i, name: name, isOwner: isOwner, isMinor: false,
-        isDone: isDone,
-        subLabel: isDone ? 'Signed' : (sig ? 'Not yet' : (isOwner ? 'Not yet' : 'Not yet invited')),
-        canRemind: !isDone && !isOwner && !!sig && !!p.email,
-        email: p.email || '',
-      };
-    });
+      });
   }
 
   function computeHubStatus() {
@@ -492,7 +606,13 @@
     var candidateTrails = ap.candidateTrails;
     try { candidateTrails = typeof candidateTrails === 'string' ? JSON.parse(candidateTrails || '[]') : (candidateTrails || []); } catch (e) { candidateTrails = []; }
     var hasUnreviewedManualPick = candidateTrails.some(function (c) { return c.source === 'manual_override' && c.trailId !== ap.selectedTrailId; });
-    var rosterDone = !!ap.reconfirmedRosterJson;
+    // BUG FIX (Task 15): ap.reconfirmedRosterJson no longer exists (see
+    // this file's header comment) — "has the roster reconfirmation step
+    // run at least once" is now the same signal confirmRoster itself
+    // commits to: adventure_prep.is_participating starts NULL (see
+    // db/schema.sql) and is only ever set (true or false) by a real
+    // confirmRoster call.
+    var rosterDone = ap.isParticipating !== null && ap.isParticipating !== undefined;
     var gearDone = !!ap.propertyType && !!ap.deliveryAddressLine1;
     var signers = state.roster.length ? waiverSigners() : [];
     var waiversDone = signers.length > 0 && signers.every(function (s) { return s.isDone; });
@@ -632,6 +752,12 @@
   // renderRosterRows() to rebuild the row correctly; a <select> has no
   // cursor position to lose, so that's safe. Fitness is also a <select>,
   // doesn't affect layout, so it just updates state.
+  // `index` (the roster row's position in state.roster) is still used
+  // here purely as a DOM-wiring convenience (data-idx, read back via
+  // state.roster[idx]) — safe within one render cycle since state.roster
+  // doesn't reorder itself; it is NEVER sent to the server anymore (see
+  // renderRoster's save handlers below, which build their payload from
+  // each entry's real participantId).
   function rosterRowHtml(person, index, isOwnerRow) {
     var age = person.age || person.ageRange || '';
     var isMinor = !!MINOR_BUCKETS[age];
@@ -691,8 +817,8 @@
       '</div></div>'
     );
 
-    function ownerIndex() { return state.participatingRosterRef === '' ? -1 : Number(state.participatingRosterRef); }
-
+    // REWRITTEN (Task 15): keyed on the real participantId now, not a
+    // positional array index (see this file's header comment, point 1).
     function renderWhoIsYou() {
       var el = wrap.querySelector('#ap-whoisyou-opts');
       // BUG FIX (coordinating-session review, Aug 2026): this screen's
@@ -701,14 +827,14 @@
       // of these are me' option removed from the 'which one is you'
       // screen, per your future-state note" — but it was still rendered
       // here. Removed to match the locked decision.
-      el.innerHTML = state.roster.map(function (p, i) {
+      el.innerHTML = state.roster.map(function (p) {
         var age = p.age || p.ageRange || '';
         var label = (p.name || 'Unnamed') + ' · ' + age + (p.fitness ? ' · ' + p.fitness : '');
-        return '<button type="button" class="paf-option-btn' + (ownerIndex() === i ? ' is-selected' : '') + '" data-idx="' + i + '">' + escapeHtml(label) + '</button>';
+        return '<button type="button" class="paf-option-btn' + (state.ownerParticipantId === p.participantId ? ' is-selected' : '') + '" data-participant-id="' + escapeHtml(p.participantId) + '">' + escapeHtml(label) + '</button>';
       }).join('');
       Array.prototype.forEach.call(el.querySelectorAll('button'), function (btn) {
         btn.addEventListener('click', function () {
-          state.participatingRosterRef = btn.getAttribute('data-idx');
+          state.ownerParticipantId = btn.getAttribute('data-participant-id');
           renderWhoIsYou();
           renderRosterRows();
         });
@@ -716,9 +842,8 @@
     }
 
     function renderRosterRows() {
-      var oi = ownerIndex();
       wrap.querySelector('#ap-roster-rows').innerHTML = state.roster.map(function (p, i) {
-        return rosterRowHtml(p, i, i === oi);
+        return rosterRowHtml(p, i, p.participantId === state.ownerParticipantId);
       }).join('');
       // Name: plain text input, update state on 'input' only, no
       // re-render — matches the existing email field's pattern below, so
@@ -774,30 +899,89 @@
     renderWhoIsYou();
     renderRosterRows();
 
+    // REWRITTEN (Task 15): calls confirmRoster now, not saveFields (which
+    // actively rejects isParticipating/participatingRosterRef/
+    // reconfirmedRosterJson — see this file's header comment). The
+    // `roster` array sent here deliberately EXCLUDES whichever row is
+    // designated as the owner — that row is updated via ownerParticipantId
+    // instead (a separate write inside confirmRoster), and the two paths
+    // are mutually exclusive by design (see lib/adventure-prep-service.js's
+    // confirmRoster, step 4's `role_on_booking != 'owner'` guard). Every
+    // entry here always carries a real participantId (this screen has no
+    // "add a new person" capability — see this file's header comment,
+    // point 1) and is always sent isParticipating: true — this screen has
+    // no per-attendee opt-out control either, matching its existing
+    // "email us to add/remove someone" copy.
+    function saveConfirmRoster() {
+      var participating = !!state.isParticipating;
+      var payload = {
+        action: 'confirmRoster',
+        token: TOKEN,
+        isParticipating: participating,
+        ownerParticipantId: participating ? (state.ownerParticipantId || null) : null,
+        roster: state.roster
+          .filter(function (p) { return p.participantId !== state.ownerParticipantId; })
+          .map(function (p) {
+            return { participantId: p.participantId, name: p.name, age: p.age, fitness: p.fitness, email: p.email, isParticipating: true };
+          }),
+      };
+      return apiPost('/api/adventure-prep', payload).then(function (res) {
+        // Mirror locally, same "don't wait for a reload to reflect a save"
+        // reasoning as saveFields()'s own state.ctx.adventurePrep mirroring
+        // above — computeHubStatus() reads state.ctx.adventurePrep.isParticipating,
+        // not state.isParticipating.
+        if (res.ok && state.ctx) {
+          state.ctx.adventurePrep = state.ctx.adventurePrep || {};
+          state.ctx.adventurePrep.isParticipating = !!state.isParticipating;
+        }
+        // BUG FIX (Task 17 jsdom smoke test, 2026-08-31): the above only
+        // ever mirrored adventurePrep.isParticipating — nothing mirrored the
+        // roster's own ownership designation into state.roster (as opposed
+        // to state.ctx.roster, which is never re-fetched until a reload).
+        // waiverSigners() and renderInvite() both read state.roster's
+        // per-entry roleOnBooking directly, so without this, a guest who
+        // just confirmed the roster for the first time couldn't tap their
+        // own row on the Waivers screen (nothing was recognized as
+        // roleOnBooking==='owner' yet) and the invite screen would still
+        // list them as someone to send a waiver link to — both wrong until
+        // a full page reload re-fetched context. Mirrors exactly what
+        // lib/adventure-prep-service.js's confirmRoster itself does
+        // server-side: reset any previous owner back to 'attendee', then
+        // (only when participating) mark the designated row 'owner'; every
+        // other roster entry actually sent keeps its existing
+        // roleOnBooking and just gets isParticipating: true, matching what
+        // was posted.
+        if (res.ok) {
+          var sentIds = {};
+          payload.roster.forEach(function (e) { sentIds[e.participantId] = true; });
+          state.roster.forEach(function (p) {
+            if (participating && p.participantId === state.ownerParticipantId) {
+              p.roleOnBooking = 'owner';
+              p.isParticipating = true;
+            } else if (p.roleOnBooking === 'owner') {
+              p.roleOnBooking = 'attendee';
+            }
+            if (sentIds[p.participantId]) p.isParticipating = true;
+          });
+        }
+        return res;
+      });
+    }
+
     wrap.querySelector('#ap-flow-back').addEventListener('click', function () { state.step = 'hub'; render(); });
     wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
-      var participatingRosterRefValue = state.participatingRosterRef === 'none' ? '' : state.participatingRosterRef;
-      saveFields({
-        isParticipating: state.isParticipating,
-        participatingRosterRef: participatingRosterRefValue,
-        reconfirmedRosterJson: state.roster,
-      }).then(function () { state.step = 'hub'; render(); });
+      saveConfirmRoster().then(function () { state.step = 'hub'; render(); });
     });
     wrap.querySelector('#ap-next').addEventListener('click', function () {
       if (state.isParticipating === null) {
         wrap.querySelector('#ap-roster-error').textContent = 'Let us know if you’re joining the adventure.';
         return;
       }
-      if (state.isParticipating && !state.participatingRosterRef) {
+      if (state.isParticipating && !state.ownerParticipantId) {
         wrap.querySelector('#ap-roster-error').textContent = 'Tap which row on the roster is you.';
         return;
       }
-      var participatingRosterRefValue = state.participatingRosterRef === 'none' ? '' : state.participatingRosterRef;
-      saveFields({
-        isParticipating: state.isParticipating,
-        participatingRosterRef: participatingRosterRefValue,
-        reconfirmedRosterJson: state.roster,
-      }).then(function (res) {
+      saveConfirmRoster().then(function (res) {
         if (!res.ok) { wrap.querySelector('#ap-roster-error').textContent = 'Something went wrong saving that, try again.'; return; }
         // Attendees is now roster + invite only (handoff Section 3) — the
         // old linear flow's one-time end-of-flow "Confirm & Send" gate
@@ -832,14 +1016,25 @@
   // column), called out here rather than bolted on as a workaround.
   // ---------------------------------------------------------------------
 
+  // REWRITTEN (Task 15): `signers` here is now local-preview-only — it
+  // mirrors lib/waiver-service.js's sendSignerLinksForBooking's own
+  // eligibility filter (attending, non-owner, non-minor adults, plus any
+  // guardian_only rows) purely so the guest can see who's about to get a
+  // link. It is NEVER sent to the server — the server derives its own
+  // list from booking_participants now (see this file's header comment,
+  // point 6).
   function renderInvite() {
     var ap = state.ctx.adventurePrep || {};
-    var ownerIdx = state.participatingRosterRef === '' || state.participatingRosterRef === 'none' ? -1 : Number(state.participatingRosterRef);
-    var signers = state.roster.filter(function (p, i) {
-      var age = p.age || p.ageRange || '';
-      return i !== ownerIdx && !MINOR_BUCKETS[age];
+    var signers = state.roster.filter(function (p) {
+      return p.roleOnBooking !== 'owner'
+        && (p.roleOnBooking === 'guardian_only' || (p.isParticipating !== false && !MINOR_BUCKETS[p.age]));
     });
     var missingEmail = signers.filter(function (p) { return !p.email; });
+    // ap.linksSentAt never existed in the new schema — this field was
+    // never written by sendSignerLinksForBooking, which only ever touches
+    // waiver_signatures, not adventure_prep. Approximate the same "have we
+    // sent before" signal locally instead of a field that doesn't exist.
+    var hasSentBefore = (state.ctx.waiverSignatures || []).some(function (w) { return w.role === 'non_owner'; });
 
     var wrap = h(
       '<div class="container"><div class="ap-shell">' +
@@ -856,7 +1051,7 @@
       '<div class="ap-helper" style="margin:0.6rem 0 1.2rem;">Any minors on this booking need a guardian assigned before we can reach them, that’s not built yet, see the note in Waivers.</div>' +
       (missingEmail.length ? '<div class="ap-error" style="margin-bottom:1rem;">Add an email for ' + missingEmail.map(function (p) { return escapeHtml(p.name || 'this person'); }).join(', ') + ' before sending, they need it for their own link. <a href="#" id="ap-back-to-roster" style="color:var(--mountain-pink);">Go back and add it</a></div>' : '') +
       '<div id="ap-invite-error" class="ap-error"></div>' +
-      '<button class="ap-nav-next" id="ap-send-invites" style="width:100%; padding:1rem;"' + (missingEmail.length ? ' disabled' : '') + '>' + (ap.linksSentAt ? 'Resend Invites' : 'Send Invites') + '</button>' +
+      '<button class="ap-nav-next" id="ap-send-invites" style="width:100%; padding:1rem;"' + (missingEmail.length ? ' disabled' : '') + '>' + (hasSentBefore ? 'Resend Invites' : 'Send Invites') + '</button>' +
       '</div>' +
       '</div></div>'
     );
@@ -867,10 +1062,11 @@
 
     wrap.querySelector('#ap-send-invites').addEventListener('click', function (e) {
       e.target.disabled = true;
+      // No `signers` payload anymore — the server derives its own list
+      // (see this function's own header comment above).
       apiPost('/api/adventure-prep', {
         action: 'sendSignerLinks',
         token: TOKEN,
-        signers: signers.map(function (s) { return { rosterRef: String(state.roster.indexOf(s)), name: s.name, email: s.email }; }),
       }).then(function (res) {
         if (!res.ok) {
           wrap.querySelector('#ap-invite-error').textContent = 'Something went wrong sending those links, try again.';
@@ -1403,6 +1599,21 @@
     }
     function isHotelPath() { return state.propertyType === 'Hotel / resort'; }
 
+    // NEW (Task 15, 2026-08-31): reconfirmedRosterJson no longer exists
+    // (see this file's header comment, point 3) — saveFields silently
+    // rejected it, so this screen's kit toggle never actually persisted
+    // against the real backend. Posts to the new, narrow
+    // setRosterGearKits action instead (lib/adventure-prep-service.js),
+    // sending every roster entry's current gearKit value (not just the
+    // eligible ones — harmless to also write false for an ineligible
+    // entry, and simpler than tracking which entries actually changed).
+    function saveRosterGearKits() {
+      var updates = state.roster.map(function (p) {
+        return { participantId: p.participantId, gearKit: p.gearKit !== false };
+      });
+      return apiPost('/api/adventure-prep', { action: 'setRosterGearKits', token: TOKEN, updates: updates });
+    }
+
     // ---- Screen 0: gear kit toggles ----
     function renderKitScreen() {
       var infoOpen = false;
@@ -1432,14 +1643,14 @@
         contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
         contentEl.querySelector('#ap-kit-info-toggle').addEventListener('click', function () { infoOpen = !infoOpen; draw(); });
         contentEl.querySelector('#ap-save-and-return').addEventListener('click', function () {
-          saveFields({ reconfirmedRosterJson: state.roster }).then(goHub);
+          saveRosterGearKits().then(goHub);
         });
         contentEl.querySelector('#ap-next').addEventListener('click', function () {
           if (kitCount < 1) {
             contentEl.querySelector('#ap-kit-error').textContent = 'At least 1 gear kit is required to continue.';
             return;
           }
-          saveFields({ reconfirmedRosterJson: state.roster }).then(function (res) {
+          saveRosterGearKits().then(function (res) {
             if (!res.ok) { contentEl.querySelector('#ap-kit-error').textContent = 'Something went wrong saving that, try again.'; return; }
             state.gearStep = 1;
             render();
@@ -1844,9 +2055,9 @@
         '<div class="ap-field-label">Type your full legal name to sign</div>' +
         '<input class="ap-field-input" type="text" id="ap-waiver-name" placeholder="Full legal name" value="' + escapeHtml(state.waiverName) + '">' +
         (minors.length ? minors.map(function (m) {
-          return '<div class="ap-toggle-row" data-guardian-name="' + escapeHtml(m.name || '') + '" style="cursor:pointer;">' +
+          return '<div class="ap-toggle-row" data-guardian-participant-id="' + escapeHtml(m.participantId || '') + '" style="cursor:pointer;">' +
             '<div class="ap-toggle-row-text" style="font-weight:500; font-size:0.78rem;">I am the parent/guardian of ' + escapeHtml(m.name || 'this child') + ' (' + escapeHtml(m.age || m.ageRange || '') + ') and I’m signing on their behalf</div>' +
-            '<div class="ap-switch' + (state.guardianForChildren.indexOf(m.name) !== -1 ? ' on' : '') + '"></div>' +
+            '<div class="ap-switch' + (state.guardianForChildrenParticipantIds.indexOf(m.participantId) !== -1 ? ' on' : '') + '"></div>' +
             '</div>';
         }).join('') : '') +
         '<div class="ap-section-label">Emergency Contact (optional)</div>' +
@@ -1894,12 +2105,12 @@
         agreeBox.innerHTML = checked ? '&check;' : '';
         signCta.disabled = !checked;
       });
-      Array.prototype.forEach.call(contentEl.querySelectorAll('[data-guardian-name]'), function (row) {
+      Array.prototype.forEach.call(contentEl.querySelectorAll('[data-guardian-participant-id]'), function (row) {
         row.addEventListener('click', function () {
-          var name = row.getAttribute('data-guardian-name');
-          var idx = state.guardianForChildren.indexOf(name);
-          if (idx === -1) state.guardianForChildren.push(name); else state.guardianForChildren.splice(idx, 1);
-          row.querySelector('.ap-switch').classList.toggle('on', state.guardianForChildren.indexOf(name) !== -1);
+          var participantId = row.getAttribute('data-guardian-participant-id');
+          var idx = state.guardianForChildrenParticipantIds.indexOf(participantId);
+          if (idx === -1) state.guardianForChildrenParticipantIds.push(participantId); else state.guardianForChildrenParticipantIds.splice(idx, 1);
+          row.querySelector('.ap-switch').classList.toggle('on', state.guardianForChildrenParticipantIds.indexOf(participantId) !== -1);
         });
       });
 
@@ -1921,14 +2132,26 @@
           return;
         }
         signCta.disabled = true;
-        var participantsCovered = [state.waiverName].concat(state.guardianForChildren);
+        // BUG FIX (Task 15): this used to send `guardianForChildren`
+        // (an array of names). lib/waiver-service.js's saveWaiverSignature
+        // only ever reads `guardianForChildrenParticipantIds` — the old key
+        // was silently ignored, so applyGuardianCertification never ran
+        // for a booker signing on behalf of their own child.
+        // participantsCovered stays name-based (still stored for the
+        // record on the signature row), but is no longer this file's own
+        // source of truth for guardian coverage — waiverSigners() now
+        // reads booking_participants.guardian_verified_at instead (see
+        // that function's own header comment).
+        var participantsCovered = [state.waiverName].concat(
+          state.roster.filter(function (p) { return state.guardianForChildrenParticipantIds.indexOf(p.participantId) !== -1; }).map(function (p) { return p.name; })
+        );
         apiPost('/api/waiver', {
           action: 'saveWaiverSignature',
           token: TOKEN,
           signerName: state.waiverName,
           signerEmail: state.ctx.experienceBooking.contactEmail,
-          isGuardian: state.guardianForChildren.length > 0,
-          guardianForChildren: state.guardianForChildren,
+          isGuardian: state.guardianForChildrenParticipantIds.length > 0,
+          guardianForChildrenParticipantIds: state.guardianForChildrenParticipantIds,
           participantsCovered: participantsCovered,
         }).then(function (res) {
           if (!res.ok) {
@@ -2082,7 +2305,7 @@
           '<div class="ap-waiver-avatar">' + escapeHtml(initials(s.name).toUpperCase()) + '</div>' +
           '<div class="ap-waiver-mid"><div class="ap-waiver-name">' + escapeHtml(s.name) + (s.isOwner ? ' (you)' : '') + '</div>' +
           (s.subLabel && !s.isDone ? '<div class="ap-waiver-sub">' + escapeHtml(s.subLabel) + '</div>' : '') +
-          (s.canRemind ? '<button type="button" class="ap-waiver-remind-btn" data-idx="' + s.index + '">Send reminder</button>' : '') +
+          (s.canRemind ? '<button type="button" class="ap-waiver-remind-btn" data-participant-id="' + escapeHtml(s.participantId) + '">Send reminder</button>' : '') +
           '</div>' +
           '<div class="ap-waiver-status ' + (s.isDone ? 'signed' : 'pending') + '">' + (s.isDone ? 'Signed' : 'Not yet') + '</div>' +
           '</div>';
@@ -2097,18 +2320,26 @@
     wrap.querySelector('#ap-back-to-summary').addEventListener('click', goBack);
     wrap.querySelector('#ap-back-to-summary-2').addEventListener('click', goBack);
 
+    // BUG FIX (Task 15): sendSignerLinks no longer accepts a `signers`
+    // subset (lib/waiver-service.js's sendSignerLinksForBooking derives
+    // and re-sends to EVERY eligible signer every time it's called — see
+    // this file's header comment for the flagged behavior change from the
+    // old single-recipient resend). This button still triggers the same
+    // real call this build already makes elsewhere (renderInvite's own
+    // "Send/Resend Invites"), just with honest copy about what it
+    // actually does now, rather than a `signers` payload the server
+    // ignores.
     Array.prototype.forEach.call(wrap.querySelectorAll('.ap-waiver-remind-btn'), function (btn) {
       btn.addEventListener('click', function () {
-        var idx = Number(btn.getAttribute('data-idx'));
-        var person = signers.filter(function (s) { return s.index === idx; })[0];
+        var participantId = btn.getAttribute('data-participant-id');
+        var person = signers.filter(function (s) { return s.participantId === participantId; })[0];
         btn.disabled = true;
         apiPost('/api/adventure-prep', {
           action: 'sendSignerLinks',
           token: TOKEN,
-          signers: [{ rosterRef: String(idx), name: person.name, email: person.email }],
         }).then(function (res) {
           wrap.querySelector('#ap-remind-status').textContent = res.ok
-            ? 'Reminder sent to ' + person.name + '.'
+            ? 'Reminder emails resent to everyone who hasn\'t signed yet (including ' + (person ? person.name : 'this person') + ').'
             : 'Something went wrong sending that reminder, try again.';
           btn.disabled = false;
         });

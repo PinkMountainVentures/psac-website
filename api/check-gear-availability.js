@@ -1,8 +1,14 @@
 /**
  * api/check-gear-availability.js
  *
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp() — one of 9 gear-ops api/*.js files migrated in this
+ * pass. See lib/gear-service.js's own header for the full scope of this
+ * migration and what's deliberately NOT included in it yet.
+ *
  * Gear Inventory PRD Section 3: real-time gear availability, computed from
- * the Gear Units tab's live status column, never a static/expected count.
+ * the Gear Units table's live status column, never a static/expected count.
  * Section 3/16 is explicit that this is a CAPABILITY, not an activation:
  * built correct and complete here, but the guest-facing booking-flow
  * calendar's own decision to actually call this endpoint and gate on its
@@ -56,7 +62,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const { pacificDateString } = require('../lib/cadence');
 
 const POOLED_BACKPACK_TYPES = ['backpack_standard', 'backpack_plus'];
@@ -94,7 +100,7 @@ module.exports = async function handler(req, res) {
     const tripDate = String(body.tripDate || pacificDateString(new Date())).slice(0, 10);
     const kitsNeeded = body.kitsNeeded != null ? Math.max(0, parseInt(body.kitsNeeded, 10) || 0) : null;
 
-    const raw = await callBookingsWebApp('gearOps_checkAvailabilityRaw', {});
+    const raw = await gearService.checkAvailabilityRaw();
     const units = raw.units || [];
     const tripDates = raw.bookingTripDates || {};
 

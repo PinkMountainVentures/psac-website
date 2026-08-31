@@ -21,11 +21,20 @@
  * api/trigger-deposit-holds.js, called again the next dispatch-day morning
  * or by staff directly; this endpoint's only job is making sure that next
  * attempt has a working card to charge.
+ *
+ * MIGRATED (Task 18, 2026-08-31): I/O rewritten against Postgres — see
+ * lib/payment-update-service.js (booking/token lookup, card-update audit
+ * log entry), lib/gear-service.js (recordOpsAlert, findOpenAlert — both
+ * already-generalized Postgres primitives reused unchanged), and
+ * lib/hold-clearance-service.js (resolveAlert). Nothing about this
+ * endpoint's request/response shape or Stripe/security logic changed.
  */
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const { paymentUpdateGetBookingForToken, recordCardUpdated } = require('../lib/payment-update-service');
+const { recordOpsAlert, findOpenAlert } = require('../lib/gear-service');
+const { resolveAlert } = require('../lib/hold-clearance-service');
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
@@ -67,7 +76,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const ctx = await callBookingsWebApp('paymentUpdate_getBookingForToken', { bookingId, token });
+    const ctx = await paymentUpdateGetBookingForToken({ bookingId, token });
     if (!ctx || ctx.notFound) {
       res.status(404).json({ error: 'not_found' });
       return;
@@ -134,12 +143,12 @@ module.exports = async function handler(req, res) {
       // eslint-disable-next-line no-console
       console.error('save-updated-payment-method: setupIntentId Customer mismatch', { bookingId, setupIntentId, expectedCustomerId, gotCustomerId: customerId });
       try {
-        await callBookingsWebApp('opsAlerts_recordAlert', {
+        await recordOpsAlert({
           bookingId,
           alertType: 'payment_method_update_customer_mismatch',
           stripeErrorDetail: `setupIntentId ${setupIntentId} belongs to Customer ${customerId}, but booking ${bookingId}'s main PaymentIntent (${ctx.mainPaymentIntentId}) belongs to Customer ${expectedCustomerId}. Rejected — likely a stale/replayed/edited setupIntentId, possibly from a different booking. No payment method was changed.`,
           urgency: 'urgent_same_day',
-        }, { retries: 2 });
+        });
       } catch (alertErr) {
         // eslint-disable-next-line no-console
         console.error('save-updated-payment-method: also failed to write the customer-mismatch Ops Alert', bookingId, alertErr);
@@ -170,19 +179,19 @@ module.exports = async function handler(req, res) {
     // best-effort: the Stripe-side update above already succeeded, so
     // neither should block or fail this response if the Sheet side hiccups.
     try {
-      await callBookingsWebApp('paymentUpdate_recordCardUpdated', { bookingId, paymentMethodId }, { retries: 2 });
+      await recordCardUpdated({ bookingId, paymentMethodId });
     } catch (writeBackErr) {
       // eslint-disable-next-line no-console
       console.error('save-updated-payment-method: card updated but Change Log write-back failed', bookingId, writeBackErr);
     }
     try {
-      const alertLookup = await callBookingsWebApp('holdClearance_findOpenDepositAlert', { bookingId, alertType: 'deposit_hold_failed' });
+      const alertLookup = await findOpenAlert({ bookingId, alertType: 'deposit_hold_failed' });
       if (alertLookup && alertLookup.found) {
-        await callBookingsWebApp('opsAlerts_resolveAlert', {
+        await resolveAlert({
           alertId: alertLookup.alertId,
           resolvedBy: 'system (guest updated payment method)',
           notes: 'Guest updated their card via the self-service payment-method-update link. The next scheduled hold attempt (or a manual retry) should now have a working card to charge.',
-        }, { retries: 2 });
+        });
       }
     } catch (resolveErr) {
       // eslint-disable-next-line no-console

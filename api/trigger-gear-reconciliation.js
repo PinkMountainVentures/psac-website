@@ -1,24 +1,28 @@
 /**
  * api/trigger-gear-reconciliation.js
  *
- * Gear Inventory PRD Section 7: closes the trigger gap found during the
- * 2026-08-25 live verification pass — gearReconcile_run (the handler this
- * file drives, api/reconcile-gear-deposit.js) had zero call sites anywhere
- * in the codebase. No cron, no button, nothing. Every reconciliation
- * scenario was silently defaulting to "the hold expires on its own after
- * ~5-7 days," which only happens to be an acceptable outcome for Scenario
- * 1 (itemized === 0, nothing owed) — for Scenarios 2-4, letting the hold
- * lapse means Stripe releases it uncaptured and PSAC collects nothing for
- * damaged/missing gear it is owed for. This cron actively drives all four
- * scenarios through the same reconciliation endpoint the Reconciliation
- * Review page already calls for manual re-runs, rather than leaving any of
- * them to passive expiry.
+ * MIGRATED (2026-08-31, gear-ops build session): now calls lib/gear-
+ * service.js (Postgres) instead of lib/apps-script-client.js's
+ * callBookingsWebApp(). See lib/gear-service.js's own header for the full
+ * scope of this migration.
  *
- * Candidate list: reuses gearOps_listHoldRenewalCandidates unchanged (the
- * same "active bookings, depositStatus='held', not yet reconciled" set
+ * Gear Inventory PRD Section 7: closes the trigger gap found during the
+ * 2026-08-25 live verification pass — api/reconcile-gear-deposit.js had
+ * zero call sites anywhere in the codebase. No cron, no button, nothing.
+ * Every reconciliation scenario was silently defaulting to "the hold
+ * expires on its own after ~5-7 days," which only happens to be an
+ * acceptable outcome for Scenario 1 (itemized === 0, nothing owed) — for
+ * Scenarios 2-4, letting the hold lapse means Stripe releases it
+ * uncaptured and PSAC collects nothing for damaged/missing gear it is owed
+ * for. This cron actively drives all four scenarios through the same
+ * reconciliation endpoint the Reconciliation Review page already calls for
+ * manual re-runs, rather than leaving any of them to passive expiry.
+ *
+ * Candidate list: reuses listHoldRenewalCandidates unchanged (the same
+ * "active bookings, depositStatus='held', not yet reconciled" set
  * api/renew-deposit-hold.js already relies on) — confirmed during this
  * build that it's exactly the right candidate set for reconciliation too,
- * no new Apps Script function needed.
+ * no new gear-service function needed.
  *
  * Runs continuously every 15 minutes (offset from every other 15-minute
  * cron's minutes to avoid a collision), same posture as
@@ -39,7 +43,7 @@
 
 'use strict';
 
-const { callBookingsWebApp } = require('../lib/apps-script-client');
+const gearService = require('../lib/gear-service');
 const reconcileHandler = require('./reconcile-gear-deposit');
 
 function checkCronAuth(req) {
@@ -54,10 +58,8 @@ function checkCronAuth(req) {
 
 // BUG FIX (payment-review, Aug 2026, Medium #31): this loop had no
 // time-budget/batching — as candidate volume grows, a sequential
-// per-candidate Stripe-plus-Apps-Script round trip risks running past
-// Vercel's function execution limit (this project is on the Hobby plan,
-// per process-pending-kit-changes.js's own header, and no maxDuration is
-// configured anywhere in this repo) and getting killed mid-loop with no
+// per-candidate Stripe-plus-write-back round trip risks running past
+// Vercel's function execution limit and getting killed mid-loop with no
 // response at all — silently dropping whatever candidates hadn't been
 // reached yet that tick, with no error and no Ops Alert anywhere. This
 // cron re-runs every 15 minutes and reconciliation isn't time-critical to
@@ -114,13 +116,13 @@ async function processOneCandidate(candidate) {
   // eslint-disable-next-line no-console
   console.error('trigger-gear-reconciliation: reconciliation attempt did not succeed', candidate.bookingId, detail);
   try {
-    await callBookingsWebApp('opsAlerts_recordAlert', {
+    await gearService.recordOpsAlert({
       bookingId: candidate.bookingId,
       alertType: 'gear_reconciliation_trigger_failed',
       stripeErrorDetail: typeof detail === 'string' ? detail : JSON.stringify(detail),
       urgency: 'urgent_same_day',
       notes: `The automated reconciliation trigger attempted to resolve this booking's gear deposit hold and did not succeed (${typeof detail === 'string' ? detail : JSON.stringify(detail)}). The hold is still live — needs a manual look via the Reconciliation Review page before it's at risk of expiring uncaptured.`,
-    }, { retries: 2 });
+    });
   } catch (alertErr) {
     // eslint-disable-next-line no-console
     console.error('trigger-gear-reconciliation: also failed to write the trigger-failed Ops Alert', candidate.bookingId, alertErr);
@@ -136,7 +138,7 @@ module.exports = async function handler(req, res) {
     }
 
     const startedAt = Date.now();
-    const listRes = await callBookingsWebApp('gearOps_listHoldRenewalCandidates', {});
+    const listRes = await gearService.listHoldRenewalCandidates();
     const candidates = (listRes && listRes.bookings) || [];
 
     const results = [];
