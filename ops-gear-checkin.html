@@ -338,12 +338,12 @@
       document.getElementById('detail-content').innerHTML = '<div class="ops-empty">No trackable gear on this booking.</div>';
       return;
     }
-    var allSettled = items.every(itemIsSettled);
-    var uncheckedInAlready = (currentReturnContext || {}).returnStatus === 'checked_in';
+    var alreadyCheckedIn = (currentReturnContext || {}).returnStatus === 'checked_in';
 
     var html = '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.6rem;">'
       + '<strong>#' + escapeHtml(currentBookingId) + '</strong>'
-      + (uncheckedInAlready ? '<span class="ops-tag ret-default">Checked-In</span>' : '<button class="ops-btn-secondary" id="mark-all-good-btn">Mark all remaining Good</button>')
+      + (alreadyCheckedIn ? '<span class="ops-tag ret-default">Checked-In</span>' : '')
+      + '<button class="ops-btn-secondary" id="mark-all-good-btn">Set unmarked items to Good</button>'
       + '</div>';
 
     items.forEach(function (item) {
@@ -368,7 +368,6 @@
 
       html += '<textarea class="ops-textarea" placeholder="Notes (optional)" data-notes>' + escapeHtml(item.notes || '') + '</textarea>';
 
-      // Damaged: photo required, unchanged from the original design.
       html += '<div class="photo-drop' + (item.condition === 'Damaged' ? ' show' : '') + '" data-photo-drop>'
         + 'Required for Damaged<br>'
         + '<input type="file" accept="image/*" capture="environment" style="display:none;" data-photo-input>'
@@ -376,12 +375,6 @@
         + '<div class="photo-thumb" data-photo-status>' + (item.photoUrl && item.condition === 'Damaged' ? 'Photo attached' : '') + '</div>'
         + '</div>';
 
-      // BUG FIX (Ops App Redesign, Aug 2026 — Round 2 item 6, resolves P2d):
-      // Missing no longer shows the photo-upload area at all — there's
-      // nothing to physically photograph for an item that isn't there.
-      // Replaced with a required text note. api/check-in-gear-item.js
-      // already enforces this server-side (notes required, photo no
-      // longer required, for condition === 'Missing').
       html += '<div class="missing-note-drop' + (item.condition === 'Missing' ? ' show' : '') + '" data-missing-note-drop>'
         + '<label>Missing — describe what\'s known (required)</label>'
         + '<textarea class="ops-textarea" data-missing-note placeholder="e.g. never came back from the trail, guest reports it fell out of the pack...">' + (item.condition === 'Missing' ? escapeHtml(item.notes || '') : '') + '</textarea>'
@@ -396,17 +389,17 @@
       }
 
       html += '<input type="hidden" data-photo-url value="' + escapeHtml(item.photoUrl || '') + '">'
-        + '<div style="margin-top:0.6rem; text-align:right;"><button class="ops-btn-secondary" data-save-item>Save</button></div>'
         + '</div>';
     });
 
     html += '<div class="ops-panel" style="border:1px solid var(--ops-border); border-radius:8px; padding:1rem;">'
-      + (uncheckedInAlready
-        ? '<div style="color:#2a7a4a; font-weight:600;">Checked-In — every trackable item has a judged condition. This booking is ready for reconciliation.</div>'
-        + '<button class="ops-btn" style="margin-top:0.6rem;" data-go-reconcile>Go to Reconciliation Review</button>'
-        : allSettled
-          ? '<div style="color:#2a7a4a; font-weight:600;">Every trackable item is settled — Checked-In will be set automatically.</div>'
-          : '<div style="color:var(--ops-text-mid);">Checked-In is set automatically once every item above is Good, Damaged, Recovered, or Missing past its grace deadline.</div>')
+      + (alreadyCheckedIn
+        ? '<div style="color:#2a7a4a; font-weight:600; margin-bottom:0.8rem;">Checked-In — every trackable item has a judged condition. Noticed something after the fact? Update any item above and click Save Changes below — this is the same screen, corrections work here any time.</div>'
+        : '<div style="color:var(--ops-text-mid); margin-bottom:0.8rem;">Set a condition for every item above, then Check In. Nothing saves until you click the button below.</div>')
+      + '<div style="display:flex; justify-content:flex-end; gap:0.6rem;">'
+      + (alreadyCheckedIn ? '<button class="ops-btn-secondary" data-go-reconcile>Go to Reconciliation Review</button>' : '')
+      + '<button class="ops-btn" id="submit-checkin-btn">' + (alreadyCheckedIn ? 'Save Changes' : 'Check In All Items') + '</button>'
+      + '</div>'
       + '</div>';
 
     document.getElementById('detail-content').innerHTML = html;
@@ -452,52 +445,84 @@
         };
         reader.readAsDataURL(file);
       });
-
-      card.querySelector('[data-save-item]').addEventListener('click', function () { saveItem(card); });
     });
 
     var reconcileBtn = document.querySelector('[data-go-reconcile]');
     if (reconcileBtn) reconcileBtn.addEventListener('click', function () { window.location.href = 'ops-reconciliation-review.html'; });
 
     var markAllGoodBtn = document.getElementById('mark-all-good-btn');
-    if (markAllGoodBtn) markAllGoodBtn.addEventListener('click', function () { markAllRemainingGood(items); });
+    if (markAllGoodBtn) markAllGoodBtn.addEventListener('click', markAllRemainingGoodLocal);
+
+    var submitBtn = document.getElementById('submit-checkin-btn');
+    if (submitBtn) submitBtn.addEventListener('click', submitCheckIn);
   }
 
-  function saveItem(card) {
-    var unitId = card.getAttribute('data-unit');
-    var selectedBtn = card.querySelector('[data-cond].sel-good, [data-cond].sel-damaged, [data-cond].sel-missing, [data-cond].sel-recovered');
-    if (!selectedBtn) { showBanner('error', 'Select a condition before saving.'); return; }
-    var condition = selectedBtn.getAttribute('data-cond');
-    var photoUrl = card.querySelector('[data-photo-url]').value.trim();
-    var notes;
-
-    if (condition === 'Missing') {
-      notes = card.querySelector('[data-missing-note]').value.trim();
-      if (!notes) { showBanner('error', 'A note describing the missing item is required.'); return; }
-    } else {
-      notes = card.querySelector('[data-notes]').value.trim();
-      if (condition === 'Damaged' && !photoUrl) { showBanner('error', 'A photo is required for Damaged items.'); return; }
-    }
-
-    return opsCall('gearCheckin_checkIn', { bookingId: currentBookingId, unitId: unitId, condition: condition, notes: notes, photoUrl: condition === 'Damaged' ? photoUrl : '' }).then(function (result) {
-      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not save this item.'); return false; }
-      return true;
+  // Client-side only — sets any item card that doesn't yet have a condition
+  // selected to Good, so staff can quickly clear a full-Good return before
+  // hitting the one real submit button below. Nothing is saved to the
+  // server until Check In All Items / Save Changes is clicked; reuses the
+  // existing per-button click handler (via .click()) rather than
+  // duplicating its class/photo-panel toggling logic.
+  function markAllRemainingGoodLocal() {
+    document.querySelectorAll('.item-card').forEach(function (card) {
+      var alreadySelected = card.querySelector('[data-cond].sel-good, [data-cond].sel-damaged, [data-cond].sel-missing, [data-cond].sel-recovered');
+      if (alreadySelected) return;
+      var goodBtn = card.querySelector('[data-cond="Good"]');
+      if (goodBtn) goodBtn.click();
     });
   }
 
-  // Always available, no precondition — acts on whatever hasn't been
-  // individually judged (saved) yet. If nothing has been touched, marks
-  // 100% Good; if one item is already flagged Damaged/Missing/Recovered,
-  // marks every OTHER still-unjudged item Good and leaves it alone.
-  function markAllRemainingGood(items) {
-    var unjudged = items.filter(function (item) { return !item.condition; });
-    if (!unjudged.length) { showBanner('success', 'Nothing left to mark — every item already has a recorded condition.'); return; }
-    Promise.all(unjudged.map(function (item) {
-      return opsCall('gearCheckin_checkIn', { bookingId: currentBookingId, unitId: item.unitId, condition: 'Good', notes: '', photoUrl: '' });
-    })).then(function (results) {
+  // Single point of persistence for this whole screen — reads whatever's
+  // currently selected on every item card and submits all of them together
+  // in one batch, only when this button is clicked. Replaces the old
+  // per-item Save button, which had two real bugs found live testing
+  // against Neon (2026-09-01): a successful save gave no visible feedback,
+  // and because the front end never synced its own local item list after a
+  // save, the old "mark remaining Good" bulk action could silently
+  // overwrite an already-saved item's condition. Reading straight from the
+  // DOM at submit time instead of tracking incremental per-item state makes
+  // that whole bug class impossible, and doubles as the correction path:
+  // this same screen, same button (relabeled "Save Changes"), works
+  // identically whether or not the booking has already been Checked-In —
+  // checkInItem has no lock against rewriting an already-judged item, and
+  // already raises a review alert if a correction lands after the deposit
+  // is reconciled (see lib/gear-service.js), so no new gating is added
+  // here.
+  function submitCheckIn() {
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.item-card'));
+    var payloads = [];
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      var unitId = card.getAttribute('data-unit');
+      var selectedBtn = card.querySelector('[data-cond].sel-good, [data-cond].sel-damaged, [data-cond].sel-missing, [data-cond].sel-recovered');
+      if (!selectedBtn) { showBanner('error', 'Select a condition for every item before continuing — ' + unitId + ' is missing one.'); return; }
+      var condition = selectedBtn.getAttribute('data-cond');
+      var photoUrl = card.querySelector('[data-photo-url]').value.trim();
+      var notes;
+      if (condition === 'Missing') {
+        notes = card.querySelector('[data-missing-note]').value.trim();
+        if (!notes) { showBanner('error', 'A note describing the missing item is required for ' + unitId + '.'); return; }
+      } else {
+        notes = card.querySelector('[data-notes]').value.trim();
+        if (condition === 'Damaged' && !photoUrl) { showBanner('error', 'A photo is required for Damaged item ' + unitId + '.'); return; }
+      }
+      payloads.push({ bookingId: currentBookingId, unitId: unitId, condition: condition, notes: notes, photoUrl: condition === 'Damaged' ? photoUrl : '' });
+    }
+
+    var submitBtn = document.getElementById('submit-checkin-btn');
+    var wasAlreadyCheckedIn = (currentReturnContext || {}).returnStatus === 'checked_in';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving…';
+
+    Promise.all(payloads.map(function (p) { return opsCall('gearCheckin_checkIn', p); })).then(function (results) {
       var failed = results.filter(function (r) { return !r.ok; }).length;
-      if (failed) showBanner('error', failed + ' item(s) could not be marked Good — please check them individually.');
-      else showBanner('success', 'Marked ' + unjudged.length + ' remaining item(s) Good.');
+      if (failed) {
+        showBanner('error', failed + ' item(s) could not be saved — nothing else was affected, please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = wasAlreadyCheckedIn ? 'Save Changes' : 'Check In All Items';
+        return;
+      }
+      showBanner('success', 'Saved ' + payloads.length + ' item(s).' + (wasAlreadyCheckedIn ? '' : ' Checked-In once every item has settled.'));
       loadDetail();
     });
   }
