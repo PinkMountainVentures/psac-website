@@ -51,8 +51,9 @@ const holdClearanceService = require('../lib/hold-clearance-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderDepositHoldFailedEmail } = require('../lib/email-templates/deposit-hold-failed-email');
 const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = require('../lib/cadence');
+const { getSiteUrl } = require('../lib/site-url');
 
-const CREATE_DEPOSIT_HOLD_ENDPOINT = 'https://www.palmspringsadventureclub.com/api/create-deposit-hold';
+const CREATE_DEPOSIT_HOLD_ENDPOINT = `${getSiteUrl()}/api/create-deposit-hold`;
 
 function checkCronAuth(req) {
   // BUG FIX (payment-review, Aug 2026, Medium #44): fail closed if
@@ -144,7 +145,7 @@ async function processOneBooking(booking, now) {
       guestName: booking.contactName,
       tripDateFormatted: formatTripDate(booking.tripDate),
       deadlineTimeFormatted: formatDeadlineTime(now),
-      updatePaymentLink: 'https://www.palmspringsadventureclub.com/update-payment-method?bookingId='
+      updatePaymentLink: `${getSiteUrl()}/update-payment-method?bookingId=`
         + encodeURIComponent(booking.bookingId) + '&token=' + encodeURIComponent(booking.adventurePrepToken || ''),
     });
     await sendEmail({ to: booking.contactEmail, subject: 'Action needed within 2 hours, your gear hold didn’t go through', html });

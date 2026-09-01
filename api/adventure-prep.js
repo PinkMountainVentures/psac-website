@@ -71,10 +71,11 @@ const waiverService = require('../lib/waiver-service');
 const { runTrailAssignmentForBooking } = require('../lib/run-trail-assignment');
 const { getKitAdjustContextByToken, setPendingKitChange } = require('../lib/finalize-kit-change');
 const { isBeforeT3Cutoff } = require('../lib/t3-cutoff');
+const { getSiteUrl } = require('../lib/site-url');
 const { sendEmail } = require('../lib/send-email');
 const { renderSignerWaiverInviteEmail } = require('../lib/email-templates/signer-waiver-invite-email');
 
-const SITE_URL = 'https://www.palmspringsadventureclub.com';
+const SITE_URL = getSiteUrl();
 const MAX_KIT_COUNT = 20; // matches lib/finalize-kit-change.js's own clamp
 
 function formatTripDate(dateStr) {

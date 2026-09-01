@@ -39,6 +39,7 @@ const { sendEmail } = require('../lib/send-email');
 const { summarizeItems } = require('../lib/gear-item-summary');
 const { renderDepositCaptureExceedingHoldEmail } = require('../lib/email-templates/deposit-capture-exceeding-hold-email');
 const { renderGearShortfallChargeFailedEmail } = require('../lib/email-templates/gear-shortfall-charge-failed-email');
+const { getSiteUrl } = require('../lib/site-url');
 
 function checkSecret(body) {
   // Fail closed: require both a configured secret and a non-empty
@@ -81,7 +82,7 @@ function centsToDollarsStr(cents) {
 // NEW (payment-review, Aug 2026, Medium #33): base URL for the guest-facing
 // self-service 3DS-completion page — same constant/pattern as api/
 // adventure-prep.js's own SITE_URL.
-const SITE_URL = 'https://www.palmspringsadventureclub.com';
+const SITE_URL = getSiteUrl();
 
 module.exports = async function handler(req, res) {
   try {

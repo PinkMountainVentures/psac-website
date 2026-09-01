@@ -74,8 +74,9 @@ const { determineCadenceStage } = require('../lib/cadence');
 const { sendEmail } = require('../lib/send-email');
 const { renderAdventurePrepT7NudgeEmail } = require('../lib/email-templates/adventure-prep-t7-nudge-email');
 const { renderStallReminderEmail } = require('../lib/email-templates/adventure-prep-stall-reminder-email');
+const { getSiteUrl } = require('../lib/site-url');
 
-const ADVENTURE_PREP_BASE_URL = 'https://www.palmspringsadventureclub.com/complete-adventure-prep';
+const ADVENTURE_PREP_BASE_URL = `${getSiteUrl()}/complete-adventure-prep`;
 
 function checkCronAuth(req) {
   // BUG FIX (payment-review, Aug 2026, Medium #44): 'Bearer ' + undefined

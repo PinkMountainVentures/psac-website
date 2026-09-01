@@ -29,6 +29,7 @@ const trailSwapService = require('../lib/trail-swap-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderTrailSwapResolutionEmail } = require('../lib/email-templates/trail-swap-resolution-email');
 const { addDaysToDateString } = require('../lib/cadence');
+const { getSiteUrl } = require('../lib/site-url');
 
 const VALID_SAFETY_FILTERS = ['difficulty_ceiling', 'technical_ceiling', 'family_tier', 'seasonal_safety'];
 
@@ -133,7 +134,7 @@ module.exports = async function handler(req, res) {
         newTrailName: body.newTrailName || newTrailId,
         overviewBlurb: body.overviewBlurb || '',
         entryFeeFragment: body.entryFeeFragment || '',
-        adventurePrepLink: body.adventurePrepLink || 'https://www.palmspringsadventureclub.com/complete-adventure-prep',
+        adventurePrepLink: body.adventurePrepLink || `${getSiteUrl()}/complete-adventure-prep`,
         t3DateFormatted: formatDate(tripT3DateStr) || 'your trail day',
       });
       const emailResult = await sendEmail({ to: applyResult.contactEmail, subject: "We've updated your trail", html });

@@ -69,8 +69,9 @@ const t3CutoffService = require('../lib/t3-cutoff-service');
 const gearService = require('../lib/gear-service');
 const { isBeforeT3Cutoff } = require('../lib/t3-cutoff');
 const { finalizePendingKitChange } = require('../lib/finalize-kit-change');
+const { getSiteUrl } = require('../lib/site-url');
 
-const CANCEL_ENDPOINT = 'https://www.palmspringsadventureclub.com/api/cancel-and-refund-booking';
+const CANCEL_ENDPOINT = `${getSiteUrl()}/api/cancel-and-refund-booking`;
 const T3_CUTOFF_JOB_NAME = 'process-t3-cutoff';
 
 function checkCronAuth(req) {

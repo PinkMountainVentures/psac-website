@@ -80,8 +80,9 @@ const gearService = require('../lib/gear-service');
 const holdClearanceService = require('../lib/hold-clearance-service');
 const bookingService = require('../lib/booking-service');
 const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = require('../lib/cadence');
+const { getSiteUrl } = require('../lib/site-url');
 
-const CANCEL_ENDPOINT = 'https://www.palmspringsadventureclub.com/api/cancel-and-refund-booking';
+const CANCEL_ENDPOINT = `${getSiteUrl()}/api/cancel-and-refund-booking`;
 
 // Must match api/create-deposit-hold.js's own TIERS keys — the two tiers a
 // deposit hold ever applies to. Duplicated rather than shared (no shared

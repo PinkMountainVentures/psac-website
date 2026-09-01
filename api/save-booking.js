@@ -33,12 +33,13 @@ var { sendBookingConfirmationEmail } = require('../lib/send-booking-confirmation
 var { sendBookingConfirmationSms } = require('../lib/send-booking-confirmation-sms');
 var { saveBooking } = require('../lib/booking-service');
 var { query } = require('../lib/db');
+var { getSiteUrl } = require('../lib/site-url');
 
 // Same constant/pattern as api/adventure-prep.js's own SITE_URL (kept
 // local rather than shared, matching this repo's existing convention of
 // each api/*.js file declaring what it needs rather than importing a
 // shared constants module).
-var SITE_URL = 'https://www.palmspringsadventureclub.com';
+var SITE_URL = getSiteUrl();
 
 // UNCHANGED from the pre-migration version of this file (still calling
 // Stripe directly, not Apps Script) — see this file's header comment.
