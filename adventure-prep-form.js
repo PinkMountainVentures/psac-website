@@ -442,6 +442,22 @@
       '<div class="ap-progress-labels">' + labels + '</div>';
   }
 
+  // Attendees micro-flow (roster -> invite) progress bar (feedback round,
+  // Sep 2026): "should there be a progress bar on this micro flow? ...
+  // something like: 'Participants ----- Adventure Invites'" — reuses the
+  // .ap-progress-bar/.ap-progress-labels/.ap-progress-section markup above
+  // rather than renderPreferences()'s "Step X of 3" mini-progress variant,
+  // since the ask was specifically for both step names to show together.
+  function attendeesProgressHtml(stepIndex) {
+    var sections = ['Participants', 'Adventure Invites'];
+    var pct = stepIndex === 0 ? 50 : 100;
+    var labels = sections.map(function (s, i) {
+      return '<span class="ap-progress-section' + (i === stepIndex ? ' is-active' : '') + '">' + s + '</span>';
+    }).join('');
+    return '<div class="ap-progress-bar"><div class="ap-progress-fill" style="width:' + pct + '%;"></div></div>' +
+      '<div class="ap-progress-labels">' + labels + '</div>';
+  }
+
   function renderMessage(title, body) {
     root.innerHTML = '';
     root.appendChild(h(
@@ -808,8 +824,9 @@
     // match, wired to the same state.step = 'hub' / saveFields() pattern
     // every other screen in this file already uses.
     var wrap = h(
-      '<div class="container"><div class="ap-shell">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-flow-top"><div class="ap-back-link" id="ap-flow-back" style="cursor:pointer; margin-bottom:0;">&larr; Adventure Home</div><div></div></div>' +
+      attendeesProgressHtml(0) +
       '<div class="ap-eyebrow">Your Adventure</div>' +
       '<h1 class="ap-q">Will you be out on the trail with them?</h1>' +
       '<p class="ap-sub">We ask everyone this directly, booking for a group doesn’t always mean joining it.</p>' +
@@ -905,6 +922,23 @@
         btn.classList.toggle('is-selected', btn.getAttribute('data-val') === val);
       });
       wrap.querySelector('#ap-whoisyou-wrap').style.display = state.isParticipating ? '' : 'none';
+      // BUG FIX (Attendees walkthrough, Sep 2026): switching the answer to
+      // "No" needs to clear any prior "which one of these is you" selection
+      // -- otherwise that roster row keeps its "You" tag (and its email
+      // field stays hidden) with no way left on this screen to un-mark it.
+      if (!state.isParticipating) {
+        if (state.ownerParticipantId) {
+          state.ownerParticipantId = '';
+          renderWhoIsYou();
+          renderRosterRows();
+        }
+      } else if (state.roster.length === 1 && !state.ownerParticipantId) {
+        // On a single-person booking there’s nothing to ask "which
+        // one of these is you" -- it can only be them.
+        state.ownerParticipantId = state.roster[0].participantId;
+        renderWhoIsYou();
+        renderRosterRows();
+      }
     }
 
     Array.prototype.forEach.call(wrap.querySelectorAll('#ap-joining-opts .paf-option-btn'), function (btn) {
@@ -1053,12 +1087,48 @@
     // sent before" signal locally instead of a field that doesn't exist.
     var hasSentBefore = (state.ctx.waiverSignatures || []).some(function (w) { return w.role === 'non_owner'; });
 
+    // BUG FIX (Attendees walkthrough, Sep 2026): "this screen is useless on
+    // a solo booking" — when the booker is the only person on the roster
+    // and they said "Yes, I'm joining", `signers` is always empty by
+    // construction (the owner is filtered out and there's no one else).
+    // The old copy ("Let's reach the rest of your group") plus an enabled
+    // "Send Invites" button that sent to zero people was confusing on
+    // exactly this booking shape. Split into two variants: a pure
+    // roster-confirmation screen here, and the existing send-links screen
+    // for every other booking shape (booker not participating, or more
+    // than one person on the roster).
+    var soloBookerOnly = state.roster.length === 1 && state.isParticipating === true;
+
+    if (soloBookerOnly) {
+      var soloWrap = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-back-link" id="ap-back-to-hub" style="cursor:pointer;">&larr; Adventure Home</div>' +
+        attendeesProgressHtml(1) +
+        '<div class="ap-eyebrow">Attendees</div>' +
+        '<h1 class="ap-q">Your roster is confirmed</h1>' +
+        '<p class="ap-sub">It’s just you on this booking, so there’s no one else to invite.</p>' +
+        '<div class="ap-card">' +
+        state.roster.map(function (s) {
+          var meta = [s.age, s.fitness].filter(Boolean).join(' · ');
+          return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(meta) + '</div></div><span class="review-recipient-tag">You</span></div>';
+        }).join('') +
+        '<p class="ap-helper" style="margin:0.6rem 0 0;">No one else on this booking needs their own waiver link.</p>' +
+        '</div>' +
+        '<button type="button" class="ap-cta-primary" id="ap-invite-done">Return to Adventure Home</button>' +
+        '</div></div>'
+      );
+      soloWrap.querySelector('#ap-back-to-hub').addEventListener('click', function () { state.step = 'hub'; render(); });
+      soloWrap.querySelector('#ap-invite-done').addEventListener('click', function () { state.step = 'hub'; render(); });
+      return soloWrap;
+    }
+
     var wrap = h(
-      '<div class="container"><div class="ap-shell">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-back-link" id="ap-back-to-hub" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      attendeesProgressHtml(1) +
       '<div class="ap-eyebrow">Attendees</div>' +
-      '<h1 class="ap-q">Let’s reach the rest of your group</h1>' +
-      '<p class="ap-sub">Everyone we haven’t already reached gets their own link to confirm their details and sign their own waiver.</p>' +
+      '<h1 class="ap-q">Send invites to your group</h1>' +
+      '<p class="ap-sub">Confirm the roster below, then invites go out so the rest of your group can join the adventure and sign their own waivers.</p>' +
       '<div class="ap-card">' +
       (signers.length
         ? signers.map(function (s) {
@@ -1068,7 +1138,9 @@
       '<div class="ap-helper" style="margin:0.6rem 0 1.2rem;">Any minors on this booking need a guardian assigned before we can reach them, that’s not built yet, see the note in Waivers.</div>' +
       (missingEmail.length ? '<div class="ap-error" style="margin-bottom:1rem;">Add an email for ' + missingEmail.map(function (p) { return escapeHtml(p.name || 'this person'); }).join(', ') + ' before sending, they need it for their own link. <a href="#" id="ap-back-to-roster" style="color:var(--mountain-pink);">Go back and add it</a></div>' : '') +
       '<div id="ap-invite-error" class="ap-error"></div>' +
-      '<button class="ap-nav-next" id="ap-send-invites" style="width:100%; padding:1rem;"' + (missingEmail.length ? ' disabled' : '') + '>' + (hasSentBefore ? 'Resend Invites' : 'Send Invites') + '</button>' +
+      (signers.length
+        ? '<button class="ap-nav-next" id="ap-send-invites" style="width:100%; padding:1rem;"' + (missingEmail.length ? ' disabled' : '') + '>' + (hasSentBefore ? 'Resend Invites' : 'Send Invites') + '</button>'
+        : '') +
       '</div>' +
       '</div></div>'
     );
@@ -1077,7 +1149,8 @@
     var backLink = wrap.querySelector('#ap-back-to-roster');
     if (backLink) backLink.addEventListener('click', function (e) { e.preventDefault(); state.step = 'roster'; render(); });
 
-    wrap.querySelector('#ap-send-invites').addEventListener('click', function (e) {
+    var sendBtn = wrap.querySelector('#ap-send-invites');
+    if (sendBtn) sendBtn.addEventListener('click', function (e) {
       e.target.disabled = true;
       // No `signers` payload anymore — the server derives its own list
       // (see this function's own header comment above).
