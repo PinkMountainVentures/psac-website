@@ -33,9 +33,10 @@
  * frequent, blind re-check across every candidate safe to run over and
  * over with no dedup logic needed here.
  *
- * A candidate whose items aren't all settled yet is the expected, common
- * case (409 not_settled from api/reconcile-gear-deposit.js) — not an
- * error, no alert, just skipped until a later run. Anything else that
+ * A candidate whose items aren't all settled yet, or has settled but is
+ * still inside the 15-minute settle buffer, is the expected, common case
+ * (409 not_settled / 409 settle_buffer from api/reconcile-gear-deposit.js)
+ * — not an error, no alert, just skipped until a later run. Anything else that
  * fails raises an Ops Alert (gear_reconciliation_trigger_failed) so staff
  * know a specific booking's hold needs a manual look before it's at risk
  * of expiring uncaptured.
@@ -106,6 +107,19 @@ async function processOneCandidate(candidate) {
     // Expected, common case — one or more items still Missing with the
     // grace period open. Not an error, nothing to alert on.
     return { bookingId: candidate.bookingId, outcome: 'not_settled' };
+  }
+
+  if (result.statusCode === 409 && body.reason === 'settle_buffer') {
+    // BUG FIX (coordinating chat, 2026-09-02, live-verification pass):
+    // just as expected/common as not_settled above, and was previously
+    // falling through to the "unexpected" branch below — every booking
+    // whose gear gets checked in less than SETTLE_BUFFER_MS (15 min)
+    // before this cron's next tick hit this, firing a false-positive
+    // gear_reconciliation_trigger_failed Ops Alert even though nothing
+    // was actually wrong; the very next tick reconciles it fine. Found
+    // live: all three round-2 cutover-verification test bookings raised
+    // this alert despite reconciling correctly moments later.
+    return { bookingId: candidate.bookingId, outcome: 'settle_buffer', readyAt: body.readyAt };
   }
 
   // Anything else (no_valid_hold, unexpected_deposit_status, a Stripe

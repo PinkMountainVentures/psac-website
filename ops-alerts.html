@@ -244,6 +244,15 @@
       + '<button class="ops-btn" id="resolve-confirm">Mark Resolved</button>'
       + '</div></div>';
 
+    // BUG FIX (coordinating chat, 2026-09-02, live-verification pass):
+    // #resolve-container sits below #tiers-container, which on a page with
+    // any real number of alerts runs well past one screen. Nothing here
+    // ever scrolled the newly-filled panel into view, so clicking Resolve
+    // on any row that wasn't already near the bottom of the page silently
+    // rendered a fully-functional panel off-screen — reported live as "the
+    // Resolve buttons don't do anything."
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     document.getElementById('resolve-cancel').addEventListener('click', function () { container.innerHTML = ''; });
     document.getElementById('resolve-confirm').addEventListener('click', function () {
       var notes = document.getElementById('resolve-notes').value;
