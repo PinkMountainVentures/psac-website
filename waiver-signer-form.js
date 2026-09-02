@@ -750,8 +750,10 @@
         '<div class="ap-eyebrow">Your Waiver</div>' +
         '<div class="ap-recap-title">Your waiver is complete.</div>' +
         '<div class="ap-recap-body">This is confirmation of your waiver signature and emergency contact.</div>' +
+        '<div class="ap-recap-card">' +
         '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
         '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +
+        '</div>' +
         '<button type="button" class="ap-cta-primary" id="sb-return-hub">Return to Adventure Home</button>';
       contentEl.querySelector('#sb-flow-back').addEventListener('click', goHub);
       contentEl.querySelector('#sb-return-hub').addEventListener('click', goHub);

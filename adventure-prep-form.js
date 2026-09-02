@@ -2485,8 +2485,10 @@
         '<div class="ap-eyebrow">Waivers</div>' +
         '<div class="ap-recap-title">Your waiver is complete.</div>' +
         '<div class="ap-recap-body">This is confirmation of your waiver signature and emergency contact.</div>' +
+        '<div class="ap-recap-card">' +
         '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
         '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +
+        '</div>' +
         '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-return-hub-2">Return to Adventure Home</button>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
