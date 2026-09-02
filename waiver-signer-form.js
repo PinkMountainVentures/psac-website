@@ -458,12 +458,13 @@
   function renderTrail() {
     var status = computeStatus();
     var wrap = h(
-      '<div class="container"><div class="ap-shell">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-back-link" id="sb-back" style="cursor:pointer;">&larr; Back to Your Adventure</div>' +
       '<div class="ap-eyebrow">Your Trail</div>' +
       '<div class="ap-q-title">' + escapeHtml(status.trailName || 'Not yet assigned') + '</div>' +
       (status.trailDescription ? '<div class="ap-q-help">' + escapeHtml(status.trailDescription) + '</div>' : '') +
-      '<div class="ap-helper" style="display:block;">Your trip organizer handles picking and adjusting the trail — this is just here so you know where you’re headed.</div>' +
+      (status.trailDetail ? '<div style="margin:1.2rem 0;">' + compareCardHtml(status.trailDetail) + '</div>' : '') +
+      '<div class="ap-helper" style="display:block;">Your trip organizer selected this trail for the group.</div>' +
       '</div></div>'
     );
     wrap.querySelector('#sb-back').addEventListener('click', goHub);
