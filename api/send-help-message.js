@@ -72,11 +72,33 @@ function parseBody(req) {
   return body || {};
 }
 
-function formatTripDate(dateStr) {
-  if (!dateStr) return null;
-  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return String(dateStr);
-  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+// BUG FIX (Airey, 2026-09-02, caught in a live test send): the "Trip
+// date" row showed a raw JS Date.toString() ("Sat Sep 05 2026 00:00:00
+// GMT+0000 (Coordinated Universal Time)") instead of a clean date. Root
+// cause: experience_bookings.date comes back from
+// @neondatabase/serverless as a native JS Date object, not a "YYYY-MM-DD"
+// string -- this function's regex only ever matched the string case, so
+// a Date object silently fell through to the final `return
+// String(dateInput)`, i.e. its default toString(). Handles both shapes
+// now, always reading UTC calendar fields (safe here since a Postgres
+// DATE column has no time component and the driver parses it at UTC
+// midnight for that day) so this can't drift a day either direction
+// regardless of server timezone.
+function formatTripDate(dateInput) {
+  if (!dateInput) return null;
+  var year, month, day;
+  if (dateInput instanceof Date) {
+    year = dateInput.getUTCFullYear();
+    month = dateInput.getUTCMonth();
+    day = dateInput.getUTCDate();
+  } else {
+    const m = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(dateInput);
+    year = Number(m[1]);
+    month = Number(m[2]) - 1;
+    day = Number(m[3]);
+  }
+  const d = new Date(Date.UTC(year, month, day));
   return d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
