@@ -1876,7 +1876,7 @@
   // one pickup screen) a presentation simplification, not a data-model
   // change — same posture kept here.
   function renderPlanning() {
-    var wrap = h('<div class="container"><div class="ap-shell"><div id="ap-gear-content"></div></div></div>');
+    var wrap = h('<div class="container"><div class="ap-shell" style="padding-top:0;"><div id="ap-gear-content"></div></div></div>');
     var contentEl = wrap.querySelector('#ap-gear-content');
 
     function flowTopHtml(backLabel) {
@@ -1899,7 +1899,11 @@
     // entry, and simpler than tracking which entries actually changed).
     function saveRosterGearKits() {
       var updates = state.roster.map(function (p) {
-        return { participantId: p.participantId, gearKit: p.gearKit !== false };
+        return {
+          participantId: p.participantId,
+          gearKit: p.gearKit !== false,
+          packSizePreference: p.packSizePreference === 'plus' ? 'plus' : 'standard',
+        };
       });
       return apiPost('/api/adventure-prep', { action: 'setRosterGearKits', token: TOKEN, updates: updates });
     }
@@ -1914,7 +1918,7 @@
           flowTopHtml('&larr; Adventure Home') +
           '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
           '<div class="ap-q-title">Is everyone renting a gear kit?</div>' +
-          '<div class="ap-q-help">We recommend 1 gear kit per person so everyone can carry enough water, electrolytes, and snacks for a trek in the desert.</div>' +
+          '<div class="ap-q-help">We recommend 1 gear kit per person so everyone can carry enough water, electrolytes, and snacks for an adventure in the desert.</div>' +
           '<div class="ap-kit-info-link" id="ap-kit-info-toggle">What’s inside a gear kit? ' + (infoOpen ? '&ndash;' : '+') + '</div>' +
           (infoOpen
             ? '<div class="ap-kit-info-panel">' +
@@ -1948,6 +1952,7 @@
         });
       }
       function drawRows() {
+        var kitSelectedCount = state.roster.filter(function (p) { return isGearEligible(p) && p.gearKit !== false; }).length;
         contentEl.querySelector('#ap-kit-rows').innerHTML = state.roster.map(function (p, i) {
           var age = p.age || p.ageRange || '';
           var eligible = isGearEligible(p);
@@ -1960,18 +1965,45 @@
               '<div class="ap-kit-unavailable">Not included</div>' +
               '</div>';
           }
-          return '<div class="ap-kit-row">' +
+          // Every booking needs at least one gear kit -- whoever is
+          // currently the only remaining "yes" (which trivially covers a
+          // solo booking) has their "no" option locked so the count can
+          // never drop to zero. Mirrors the same rule already used on
+          // Surface A's original booking flow (see adventure-form.js,
+          // cardGearList).
+          var isLastYes = hasKit && kitSelectedCount === 1;
+          var packSize = p.packSizePreference === 'plus' ? 'plus' : 'standard';
+          return '<div class="ap-kit-row' + (hasKit ? ' has-pack' : '') + '">' +
+            '<div class="ap-kit-row-top">' +
             '<div class="ap-kit-avatar">' + escapeHtml(initialsOf(p.name)) + '</div>' +
             '<div class="ap-kit-name">' + escapeHtml(p.name || '') + '</div>' +
             '<div class="ap-kit-toggle" data-idx="' + i + '">' +
             '<div class="ap-kit-toggle-opt' + (hasKit ? ' on' : '') + '" data-kit="true">Yes</div>' +
-            '<div class="ap-kit-toggle-opt' + (!hasKit ? ' on' : '') + '" data-kit="false">No</div>' +
-            '</div></div>';
+            '<div class="ap-kit-toggle-opt' + (!hasKit ? ' on' : '') + (isLastYes ? ' disabled' : '') + '" data-kit="false"' + (isLastYes ? ' title="Every booking needs at least one gear kit"' : '') + '>No</div>' +
+            '</div>' +
+            '</div>' +
+            (hasKit
+              ? '<div class="ap-kit-pack-row">' +
+                '<div class="ap-kit-pack-label">Backpack size</div>' +
+                '<div class="ap-kit-pack-toggle" data-idx="' + i + '">' +
+                '<div class="ap-kit-pack-opt' + (packSize === 'standard' ? ' on' : '') + '" data-pack="standard">Standard</div>' +
+                '<div class="ap-kit-pack-opt' + (packSize === 'plus' ? ' on' : '') + '" data-pack="plus">Plus</div>' +
+                '</div></div>'
+              : '') +
+            '</div>';
         }).join('');
         Array.prototype.forEach.call(contentEl.querySelectorAll('.ap-kit-toggle-opt'), function (el) {
           el.addEventListener('click', function () {
+            if (el.classList.contains('disabled')) return;
             var idx = Number(el.parentElement.getAttribute('data-idx'));
             state.roster[idx].gearKit = el.getAttribute('data-kit') === 'true';
+            draw();
+          });
+        });
+        Array.prototype.forEach.call(contentEl.querySelectorAll('.ap-kit-pack-opt'), function (el) {
+          el.addEventListener('click', function () {
+            var idx = Number(el.parentElement.getAttribute('data-idx'));
+            state.roster[idx].packSizePreference = el.getAttribute('data-pack');
             draw();
           });
         });

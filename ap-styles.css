@@ -442,6 +442,14 @@
 .ap-kit-toggle { margin-left: auto; display: flex; background: var(--sand-beige); border-radius: 16px; padding: 2px; flex-shrink: 0; }
 .ap-kit-toggle-opt { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; padding: 0.4rem 0.9rem; border-radius: 14px; color: var(--ap-muted); cursor: pointer; }
 .ap-kit-toggle-opt.on { background: var(--desert-green); color: white; }
+.ap-kit-toggle-opt.disabled { opacity: 0.3; cursor: not-allowed; }
+.ap-kit-row.has-pack { flex-direction: column; align-items: stretch; }
+.ap-kit-row-top { display: flex; align-items: center; gap: 0.75rem; width: 100%; }
+.ap-kit-pack-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.65rem; margin-left: calc(36px + 0.75rem); padding-top: 0.65rem; border-top: 1px solid rgba(42,71,71,0.08); }
+.ap-kit-pack-label { font-size: 0.7rem; font-weight: 600; color: var(--ap-muted); }
+.ap-kit-pack-toggle { display: flex; background: var(--sand-beige); border-radius: 14px; padding: 2px; flex-shrink: 0; }
+.ap-kit-pack-opt { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.03em; padding: 0.32rem 0.7rem; border-radius: 12px; color: var(--ap-muted); cursor: pointer; }
+.ap-kit-pack-opt.on { background: var(--dark-pine); color: white; }
 .ap-kit-unavailable { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ap-muted); background: rgba(42,71,71,0.07); padding: 0.4rem 0.75rem; border-radius: 14px; margin-left: auto; flex-shrink: 0; white-space: nowrap; }
 .ap-kit-count { font-size: 0.78rem; color: var(--ap-muted); text-align: center; margin: 0.4rem 0 1.2rem; max-width: 640px; }
 .ap-min-note { font-size: 0.76rem; color: var(--ap-muted); line-height: 1.55; background: rgba(42,71,71,0.05); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 1.2rem; max-width: 640px; }
