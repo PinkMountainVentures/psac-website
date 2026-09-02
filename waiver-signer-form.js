@@ -230,8 +230,9 @@
     // Icons: Style B ("Line, salmon accent"), matching
     // adventure-prep-form.js's hub tiles for the 3 shared concepts
     // (Your Trail / Your Waiver / Adventure Summary), 2026-09-02.
-    // Confirm Your Details keeps its emoji -- no reviewed Style B icon
-    // exists for it.
+    // Confirm Your Details' phone icon (2026-09-02 follow-up) is new --
+    // no equivalent existed in the hub's 5-tile set -- drawn to match
+    // the same geometry/weight/accent convention as the rest.
     function tile(icon, title, sub, statusLabel, opts) {
       opts = opts || {};
       return { icon: icon, title: title, sub: sub, statusLabel: statusLabel, locked: !!opts.locked, readonly: !!opts.readonly, onClick: opts.onClick };
@@ -242,7 +243,7 @@
       : 'Needs your signature';
 
     var tiles = [
-      tile('📱', 'Confirm Your Details',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="7.6" y="2.7" width="8.8" height="18.6" rx="2.1" stroke="#2A4747" stroke-width="1.3"/><path d="M10.6 5.3h2.8" stroke="#2A4747" stroke-width="1.1" stroke-linecap="round"/><path d="M9.6 9.6h4.8M9.6 12.4h3.2" stroke="#2A4747" stroke-width="1" stroke-linecap="round"/><circle cx="12" cy="18.4" r="1.15" fill="#F58271"/></svg>', 'Confirm Your Details',
         status.detailsDone ? 'Saved' : 'Your email & phone, so we can reach you',
         status.detailsDone ? 'Done' : 'Not done',
         { onClick: function () { state.step = 'confirmDetails'; render(); } }),
