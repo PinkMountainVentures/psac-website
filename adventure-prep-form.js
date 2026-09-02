@@ -1331,7 +1331,7 @@
       '<div><div class="ap-compare-stat-label">Technical</div><div class="ap-compare-stat-value">' + technicalLabel(candidate.technicalRating) + '</div></div>' +
       '</div>' +
       '<div class="ap-compare-desc">' + escapeHtml(desc) + '</div>' +
-      (ctaLabel ? '<button type="button" class="ap-compare-cta"' + (ctaDisabled ? ' disabled' : '') + ' data-trail-id="' + escapeHtml(candidate.trailId) + '">' + escapeHtml(ctaLabel) + '</button>' : '') +
+      (ctaLabel ? '<button type="button" class="ap-compare-cta' + (badge && badge.cls === 'badge-recommended' ? ' ap-compare-cta-primary' : '') + '"' + (ctaDisabled ? ' disabled' : '') + ' data-trail-id="' + escapeHtml(candidate.trailId) + '">' + escapeHtml(ctaLabel) + '</button>' : '') +
       '</div></div>';
   }
 

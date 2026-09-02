@@ -260,7 +260,7 @@
 .trail-card-cta.is-current:hover { background: transparent; }
 .trail-card-cta:disabled { opacity: 0.6; cursor: wait; }
 
-.reveal-footnote { max-width: 820px; margin-top: 1.6rem; font-size: 0.78rem; color: rgba(42,71,71,0.5); line-height: 1.7; }
+.reveal-footnote { max-width: 700px; margin: 1.6rem auto 0; font-size: 0.78rem; color: rgba(42,71,71,0.5); line-height: 1.7; text-align: center; }
 .reveal-footnote a { color: var(--mountain-pink); text-decoration: underline; cursor: pointer; }
 
 /* ── pacing transition (before reveal) ── */
@@ -366,34 +366,40 @@
 .ap-radio-text { font-size: 0.86rem; font-weight: 500; color: var(--dark-pine); line-height: 1.45; }
 .ap-radio.selected .ap-radio-text { color: var(--mountain-pink); }
 
-.ap-cta-primary { display: block; width: 100%; max-width: 640px; background: var(--desert-green); color: white; border: none; padding: 0.95rem; border-radius: 24px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; cursor: pointer; margin-bottom: 0.7rem; }
+.ap-cta-primary { display: block; width: 100%; max-width: 640px; background: var(--desert-green); color: white; border: none; padding: 0.95rem; border-radius: 24px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; cursor: pointer; margin: 0 auto 0.7rem; }
 .ap-cta-primary:hover { background: #63a677; }
 .ap-cta-primary:disabled { background: rgba(122,189,145,0.35); cursor: not-allowed; }
-.ap-cta-secondary { display: block; width: 100%; max-width: 640px; background: transparent; color: var(--dark-pine); border: none; padding: 0.5rem; font-size: 0.76rem; font-weight: 600; text-align: center; cursor: pointer; opacity: 0.75; }
+.ap-cta-secondary { display: block; width: 100%; max-width: 640px; background: transparent; color: var(--dark-pine); border: none; padding: 0.5rem; font-size: 0.76rem; font-weight: 600; text-align: center; cursor: pointer; opacity: 0.75; margin: 0 auto; }
 
 .ap-compare-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-bottom: 1rem; }
 .ap-compare-grid.is-thin { grid-template-columns: repeat(2, 1fr); max-width: 820px; }
-.ap-compare-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); max-width: 420px; }
+.ap-compare-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); max-width: 420px; display: flex; flex-direction: column; }
 /* max-width above only matters standalone (renderConfirmation, one card,
    no grid) -- inside .ap-compare-grid the grid track (repeat(3,1fr) or
    the .is-thin 2-col track) is already narrower than 420px, so grid
    sizing is unaffected. */
-.ap-compare-photo { height: 130px; background: linear-gradient(135deg, #3a5a5a, #2A4747); position: relative; background-color: #6a7a6a; }
+.ap-compare-photo { height: 130px; flex-shrink: 0; background: linear-gradient(135deg, #3a5a5a, #2A4747); position: relative; background-color: #6a7a6a; }
 .ap-compare-badge { position: absolute; top: 0.7rem; left: 0.8rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 10px; }
 .badge-recommended { background: var(--mountain-pink); color: white; }
 .badge-easier { background: rgba(122,189,145,0.92); color: white; }
 .badge-harder { background: rgba(231,111,81,0.92); color: white; }
 .badge-staff { background: var(--dark-pine); color: var(--sand-beige); }
 .badge-current { background: var(--dark-pine); color: var(--sand-beige); }
-.ap-compare-body { padding: 1rem 1.1rem 1.2rem; }
+.ap-compare-body { padding: 1rem 1.1rem 1.2rem; flex: 1; display: flex; flex-direction: column; }
 .ap-compare-name { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; margin-bottom: 0.6rem; color: var(--dark-pine); }
 .ap-compare-stats { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.8rem; }
 .ap-compare-stat-label { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ap-muted); margin-bottom: 0.15rem; }
 .ap-compare-stat-value { font-size: 0.8rem; font-weight: 600; color: var(--dark-pine); }
 .ap-compare-desc { font-size: 0.8rem; color: var(--ap-muted); line-height: 1.55; margin-bottom: 0.9rem; }
-.ap-compare-cta { display: block; width: 100%; background: transparent; border: 1.5px solid var(--desert-green); color: #2a7a4a; padding: 0.7rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; text-align: center; cursor: pointer; }
+.ap-compare-cta { display: block; width: 100%; background: transparent; border: 1.5px solid var(--desert-green); color: #2a7a4a; padding: 0.7rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; text-align: center; cursor: pointer; margin-top: auto; }
 .ap-compare-cta:hover { background: rgba(122,189,145,0.1); }
 .ap-compare-cta:disabled { opacity: 0.6; cursor: wait; }
+/* Recommended card's CTA: solid, matching every other primary CTA in
+   the flow (Airey: "should be solid light green with white text just
+   like all other primary CTA buttons") -- Easier/More Challenging/
+   other badges keep the default outline style above. */
+.ap-compare-cta-primary { background: var(--desert-green); border-color: var(--desert-green); color: white; }
+.ap-compare-cta-primary:hover { background: #63a677; }
 
 .ap-reveal-photo { height: 170px; background: linear-gradient(135deg, #3a5a5a, #2A4747); border-radius: 12px 12px 0 0; display: flex; align-items: flex-end; padding: 1rem 1.2rem; margin-top: 0.2rem; max-width: 640px; }
 .ap-reveal-photo-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(248,241,233,0.5); }
