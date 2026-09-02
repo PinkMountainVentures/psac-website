@@ -388,6 +388,7 @@
       '<div class="ap-eyebrow">Confirm Your Details</div>' +
       '<div class="ap-q-title">Let’s make sure we can reach you.</div>' +
       '<div class="ap-q-help">We’ll keep you posted on this adventure, including trail updates, waivers you need to sign, and weather for your trail day.</div>' +
+      '<div class="ap-card">' +
       '<div class="ap-field-label">Your Email</div>' +
       '<input class="ap-field-input" type="email" id="sb-email" value="' + escapeHtml(state.email) + '">' +
       '<div class="ap-helper" style="margin-top:-0.6rem; display:block;">We’ll send waiver links and updates here. Change it if this isn’t the best one.</div>' +
@@ -404,6 +405,7 @@
       '<span class="ap-sms-fineprint">Optional, not required to continue. Unsubscribe anytime.</span>' +
       '</span></label>' +
       '<div id="sb-details-error" class="ap-error"></div>' +
+      '</div>' +
       '<button type="button" class="ap-cta-primary" id="sb-save-details">Save &amp; Continue</button>' +
       '</div></div>'
     );
