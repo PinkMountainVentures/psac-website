@@ -75,21 +75,24 @@
       now local-preview-only, built the same way the server derives
       eligibility, never sent.
 
-   FLAG FOR AIREY, still open, NOT solved here: the invite screen's copy
-   still says guardian assignment "isn't built yet" for a non-attending
-   external guardian. That's now stale — confirmRoster's
-   guardianAssignment (PRD Section 6 hybrid model) and
-   sendSignerLinksForBooking's guardian_only handling are both real and
-   live — but there is still no UI anywhere in this screen for the
-   booker to actually NAME a guardian for a minor (existing-adult or
-   external). Building that UI is a real, undecided product surface (what
-   it looks like, where it lives), not a mechanical fix, so it's flagged
-   again here rather than invented. Without it, minor waiver coverage
-   still only ever happens via the self-declare fallback (Model 1,
-   preserved) — an attending adult (this screen, renderSign, or
-   waiver-signer-form.js) checking "I'm the parent/guardian of ___" when
-   THEY sign, which works today and is what this rewrite fixes end to
-   end.
+   RESOLVED (guardian-assignment UI, 2026-09-02, per Airey's direct
+   request and mockup03confirmattendees.html's frames 3a/3b): this screen
+   now DOES let the booker proactively name a guardian for each minor —
+   renderRosterGuardians(), one screen per participating minor, inserted
+   between Contact Info and Send Invites (or right after the "are you
+   joining" question when Contact Info itself is skipped). Picks either
+   an attending adult already on the roster (including the owner) or
+   captures a non-attending guardian's name + email directly, and calls
+   confirmRoster() with the guardianAssignment shape that function has
+   supported all along. renderInvite() now also surfaces the minor
+   (dimmed, "child, no invite needed") and any non-attending guardian_only
+   row (highlighted, badged with which child they're signing for) instead
+   of silently omitting both. The self-declare fallback (Model 1,
+   preserved in renderSign()/waiver-signer-form.js — an attending adult
+   checking "I'm the parent/guardian of ___" at their own signing screen)
+   still exists alongside this and still works if a booker skips or gets
+   an assignment wrong; the two are independent and don't conflict, since
+   saveWaiverSignature's own certification write is idempotent per minor.
 
    Also flagged, not fixed here (pre-existing, separate from roster): the
    single-person "Send Reminder" button (renderWaiverDetail) posts to the
@@ -340,6 +343,30 @@
     });
   }
 
+  // NEW (guardian-assignment UI, 2026-09-02): re-fetches this booking's
+  // full context and re-hydrates working state from it, without
+  // resetting state.step -- used by the new guardian-assignment screen
+  // after each save, since confirmRoster() can create a brand new
+  // guardian_only booking_participants row (a non-attending external
+  // guardian, named for the first time) that this session's in-memory
+  // state.roster has no way to know about otherwise (saveConfirmRoster's
+  // own local mirror only ever updates existing array entries -- see its
+  // own comment -- it doesn't know the new row's server-generated
+  // participant_id/person_id). Without this, a guest who names an
+  // external guardian and moves straight to Send Invites would see a
+  // preview list missing that guardian entirely (the exact class of bug
+  // this feature exists to fix), even though the actual send -- which
+  // the server derives independently -- would still work correctly.
+  function reloadContext() {
+    return apiGet('/api/adventure-prep?token=' + encodeURIComponent(TOKEN)).then(function (res) {
+      if (res.ok) {
+        state.ctx = res.body;
+        hydrateWorkingStateFromCtx();
+      }
+      return res;
+    });
+  }
+
   function hydrateWorkingStateFromCtx() {
     var ap = state.ctx.adventurePrep || {};
 
@@ -363,10 +390,40 @@
         gearKit: r.gearKit,
         roleOnBooking: r.roleOnBooking,
         isParticipating: r.isParticipating,
+        personId: r.personId,
         guardianPersonId: r.guardianPersonId,
         guardianVerifiedAt: r.guardianVerifiedAt,
       };
     });
+
+    // NEW (guardian-assignment UI, 2026-09-02): rebuilds the frontend's
+    // own guardianAssignments map (minorParticipantId -> {mode, ...})
+    // from server truth every time context is (re)hydrated -- both on
+    // initial boot() and after the guardian-assignment screen's own
+    // reloadContext() call. Resolves each minor's guardianPersonId (an
+    // opaque person_id) back to either an attending adult already on
+    // this roster (mode 'participant') or a non-attending guardian_only
+    // row (mode 'external'), so a guest revisiting this screen, or
+    // reaching Send Invites right after assigning someone, sees the
+    // choice they already made instead of a blank/inconsistent screen.
+    var guardianCandidateAdults = state.roster.filter(function (p) {
+      return p.isParticipating !== false && !MINOR_BUCKETS[p.age] && p.roleOnBooking !== 'guardian_only';
+    });
+    var guardianOnlyRows = state.roster.filter(function (p) { return p.roleOnBooking === 'guardian_only'; });
+    state.guardianAssignments = {};
+    state.roster.forEach(function (m) {
+      if (!MINOR_BUCKETS[m.age] || !m.guardianPersonId) return;
+      var adultMatch = guardianCandidateAdults.filter(function (a) { return a.personId && a.personId === m.guardianPersonId; })[0];
+      if (adultMatch) {
+        state.guardianAssignments[m.participantId] = { mode: 'participant', participantId: adultMatch.participantId };
+        return;
+      }
+      var guardianMatch = guardianOnlyRows.filter(function (g) { return g.personId && g.personId === m.guardianPersonId; })[0];
+      if (guardianMatch) {
+        state.guardianAssignments[m.participantId] = { mode: 'external', name: guardianMatch.name, email: guardianMatch.email };
+      }
+    });
+    if (typeof state.guardianStepIndex !== 'number') state.guardianStepIndex = 0;
 
     // ap.isParticipating is a real Postgres boolean/null now (mapped
     // straight off adventure_prep.is_participating) — no more '"true"'/
@@ -422,6 +479,7 @@
       case 'hub': frag = renderHub(); break;
       case 'roster': frag = renderRoster(); break;
       case 'rosterParticipation': frag = renderRosterParticipation(); break;
+      case 'rosterGuardians': frag = renderRosterGuardians(); break;
       case 'rosterContact': frag = renderRosterContact(); break;
       case 'invite': frag = renderInvite(); break;
       case 'preferences': frag = renderPreferences(); break;
@@ -466,15 +524,25 @@
   // "Step X of N" label + thin .ap-mini-progress-track fill bar, so this
   // mirrors that exactly (2 steps here instead of 3), parameterized on the
   // back-link's id since renderRoster and renderInvite each wire their own.
-  function attendeesFlowTopHtml(stepIndex, backLinkId, backLabel) {
-    var meta = [
-      { pct: 25, label: 'Step 1 of 4' },
-      { pct: 50, label: 'Step 2 of 4' },
-      { pct: 75, label: 'Step 3 of 4' },
-      { pct: 100, label: 'Step 4 of 4' },
-    ][stepIndex];
-    return '<div class="ap-flow-top"><div class="ap-back-link" id="' + backLinkId + '" style="cursor:pointer; margin-bottom:0;">' + backLabel + '</div><div class="ap-progress-label">' + meta.label + '</div></div>' +
-      '<div class="ap-mini-progress-track"><div class="ap-mini-progress-fill" style="width:' + meta.pct + '%;"></div></div>';
+  // UPDATED (guardian-assignment UI, 2026-09-02): totalSteps is now a
+  // parameter instead of a hardcoded 4 -- a booking with a participating
+  // minor gets a 5th step (the new guardian-assignment screen, one pass
+  // per minor but counted as a single step in this progress bar, same as
+  // Trail Recommendation's own 3-screens-one-bar pattern), a booking with
+  // no minors keeps the original 4. See attendeesTotalSteps() below.
+  function attendeesFlowTopHtml(stepIndex, backLinkId, backLabel, totalSteps) {
+    var total = totalSteps || 4;
+    var pct = Math.round(((stepIndex + 1) / total) * 100);
+    var label = 'Step ' + (stepIndex + 1) + ' of ' + total;
+    return '<div class="ap-flow-top"><div class="ap-back-link" id="' + backLinkId + '" style="cursor:pointer; margin-bottom:0;">' + backLabel + '</div><div class="ap-progress-label">' + label + '</div></div>' +
+      '<div class="ap-mini-progress-track"><div class="ap-mini-progress-fill" style="width:' + pct + '%;"></div></div>';
+  }
+
+  // NEW (guardian-assignment UI, 2026-09-02): a participating minor on
+  // the roster adds one extra step to the Attendees flow's progress bar
+  // -- see attendeesFlowTopHtml above.
+  function attendeesTotalSteps() {
+    return minorsNeedingGuardian().length ? 5 : 4;
   }
 
   // Shared "who needs their own waiver-link email" filter (feedback
@@ -487,6 +555,29 @@
     return state.roster.filter(function (p) {
       return p.roleOnBooking !== 'owner'
         && (p.roleOnBooking === 'guardian_only' || (p.isParticipating !== false && !MINOR_BUCKETS[p.age]));
+    });
+  }
+
+  // NEW (guardian-assignment UI, 2026-09-02): every participating minor
+  // needs a booker-named signing guardian -- this drives both whether
+  // the new Attendees screen appears at all (renderRosterParticipation's
+  // and renderRosterContact's own Continue handlers) and, together with
+  // state.guardianStepIndex, which minor renderRosterGuardians() is
+  // currently asking about.
+  function minorsNeedingGuardian() {
+    return state.roster.filter(function (p) {
+      return MINOR_BUCKETS[p.age] && p.isParticipating !== false;
+    });
+  }
+
+  // The adults a booker can pick as a minor's signing guardian: every
+  // attending, non-minor roster member (including the owner -- labeled
+  // "(you)" on the guardian-assignment screen itself) except any
+  // guardian_only row (those are themselves the "not on this trip"
+  // answer for some other minor, never a candidate to pick from).
+  function eligibleGuardianAdults() {
+    return state.roster.filter(function (p) {
+      return p.isParticipating !== false && !MINOR_BUCKETS[p.age] && p.roleOnBooking !== 'guardian_only';
     });
   }
 
@@ -522,7 +613,23 @@
       roster: state.roster
         .filter(function (p) { return p.participantId !== state.ownerParticipantId; })
         .map(function (p) {
-          return { participantId: p.participantId, name: p.name, age: p.age, fitness: p.fitness, email: p.email, isParticipating: true };
+          var entry = { participantId: p.participantId, name: p.name, age: p.age, fitness: p.fitness, email: p.email, isParticipating: true };
+          // NEW (guardian-assignment UI, 2026-09-02): attaches the
+          // booker's guardian pick for this minor, if any, in exactly the
+          // shape lib/adventure-prep-service.js's confirmRoster() already
+          // expects (see that function's own header comment). Sending
+          // the assigned adult's own current email alongside their
+          // participantId is deliberate and harmless either way -- the
+          // server only consults it when that adult has no person_id on
+          // file yet, and ignores it otherwise.
+          var ga = state.guardianAssignments[p.participantId];
+          if (ga && ga.mode === 'participant') {
+            var assignedAdult = state.roster.filter(function (r) { return r.participantId === ga.participantId; })[0];
+            entry.guardianAssignment = { participantId: ga.participantId, email: (assignedAdult && assignedAdult.email) || undefined };
+          } else if (ga && ga.mode === 'external' && ga.name && ga.email) {
+            entry.guardianAssignment = { name: ga.name, email: ga.email };
+          }
+          return entry;
         }),
     };
     return apiPost('/api/adventure-prep', payload).then(function (res) {
@@ -969,7 +1076,7 @@
   function renderRoster() {
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(0, 'ap-flow-back', '&larr; Adventure Home') +
+      attendeesFlowTopHtml(0, 'ap-flow-back', '&larr; Adventure Home', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Confirm your group</h1>' +
       '<p class="ap-sub">Make sure everyone’s name, age, and fitness level are right before we reach out to your group.</p>' +
@@ -1045,7 +1152,7 @@
   function renderRosterParticipation() {
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(1, 'ap-flow-back', '&larr; Back') +
+      attendeesFlowTopHtml(1, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Will you be out on the trail with them?</h1>' +
       '<p class="ap-sub">We ask everyone this directly, booking for a group doesn’t always mean joining it.</p>' +
@@ -1132,8 +1239,22 @@
         // Skip straight to Send Invites when nobody needs a waiver-link
         // email (e.g. a solo booking where the booker is the only
         // participant) -- there's nothing for the Contact Info screen to
-        // collect in that case.
-        state.step = signers.length ? 'rosterContact' : 'invite';
+        // collect in that case. UPDATED (guardian-assignment UI,
+        // 2026-09-02): if that leaves nowhere for a minor's guardian to
+        // get assigned either (e.g. owner + one minor only, no other
+        // adults), route to the new guardian-assignment screen instead --
+        // see renderRosterContact's own Continue handler for why it,
+        // rather than this one, is the USUAL hand-off point into that
+        // screen (guardian assignment needs to run after adult emails are
+        // collected, not before).
+        if (signers.length) {
+          state.step = 'rosterContact';
+        } else if (minorsNeedingGuardian().length) {
+          state.guardianStepIndex = 0;
+          state.step = 'rosterGuardians';
+        } else {
+          state.step = 'invite';
+        }
         render();
       });
     });
@@ -1155,7 +1276,7 @@
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(2, 'ap-flow-back', '&larr; Back') +
+      attendeesFlowTopHtml(2, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Add an email for each person</h1>' +
       '<p class="ap-sub">Please enter a valid email address for each person so they can sign a participation waiver.</p>' +
@@ -1197,7 +1318,174 @@
       errEl.textContent = '';
       saveConfirmRoster().then(function (res) {
         if (!res.ok) { errEl.textContent = 'Something went wrong saving that, try again.'; return; }
-        state.step = 'invite';
+        // NEW (guardian-assignment UI, 2026-09-02): hands off to the new
+        // per-minor guardian screen from here rather than
+        // renderRosterParticipation, deliberately -- an attending adult
+        // named as a minor's guardian needs their own email already on
+        // file first (saveConfirmRoster() only sends it along as a
+        // fallback for confirmRoster's person_id backfill when that adult
+        // has none on file yet), and this is the screen that just
+        // collected it.
+        if (minorsNeedingGuardian().length) {
+          state.guardianStepIndex = 0;
+          state.step = 'rosterGuardians';
+        } else {
+          state.step = 'invite';
+        }
+        render();
+      });
+    });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Attendees micro-flow, guardian-assignment step (NEW, Sep 2026 --
+  // Airey's direct request: "we need to add some kind of identification
+  // of the minor's guardian... are they on the adventure? if so they need
+  // to be identified from the roster. if not, then an email address for
+  // the parent / guardian needs to be provided"). One screen per
+  // participating minor, shown between Contact Info and Send Invites (or
+  // right after the "are you joining" question when Contact Info itself
+  // is skipped -- see renderRosterParticipation's Continue handler).
+  // Pattern matches mockup03confirmattendees.html's frames 3a/3b, rebuilt
+  // with this codebase's own existing "which one of these is you" control
+  // (paf-options/.paf-option-btn, already used just above in
+  // renderRosterParticipation) instead of the mockup's own bespoke
+  // .ap-radio-list markup, per this whole build's "reuse before
+  // inventing" convention.
+  //
+  // Writes into state.guardianAssignments[minorParticipantId] as either
+  // {mode:'participant', participantId} (an attending adult already on
+  // the roster -- including the owner, labeled "(you)") or
+  // {mode:'external', name, email} (a non-attending guardian named
+  // directly, per Section 6's hybrid model). saveConfirmRoster() reads
+  // this map and turns it into the guardianAssignment payload shape
+  // lib/adventure-prep-service.js's confirmRoster() already expects.
+  // ---------------------------------------------------------------------
+  function renderRosterGuardians() {
+    var minors = minorsNeedingGuardian();
+    // Guards against a stale/out-of-range index (e.g. a minor was somehow
+    // removed between visits) rather than throwing on minors[idx] being
+    // undefined.
+    var idx = Math.max(0, Math.min(state.guardianStepIndex || 0, minors.length - 1));
+    var minor = minors[idx];
+    if (!minor) {
+      // Nothing left to ask -- shouldn't normally be reachable (every
+      // hand-off into this screen checks minorsNeedingGuardian().length
+      // first), but falls back to Send Invites rather than rendering a
+      // broken screen if it ever is.
+      state.step = 'invite';
+      render();
+      return document.createDocumentFragment();
+    }
+    var adults = eligibleGuardianAdults();
+    // Whether Contact Info actually ran before this -- decides where
+    // "Back" on the FIRST guardian screen returns to.
+    var cameFromContact = computeAttendeeSigners().length > 0;
+    var current = state.guardianAssignments[minor.participantId] || null;
+    var EXTERNAL_VAL = '__external__';
+    var selectedVal = current ? (current.mode === 'external' ? EXTERNAL_VAL : current.participantId) : null;
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      attendeesFlowTopHtml(3, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
+      '<div class="ap-eyebrow">Attendees</div>' +
+      '<h1 class="ap-q">Who can sign for ' + escapeHtml(minor.name || 'their') + '&rsquo;s waiver?</h1>' +
+      '<p class="ap-sub">' + escapeHtml(minor.name || 'This person') + '&rsquo;s waiver needs an adult guardian&rsquo;s signature. Pick who that is.</p>' +
+      '<div class="ap-card">' +
+      '<div class="paf-options" id="ap-guardian-opts">' +
+      adults.map(function (a) {
+        var label = escapeHtml(a.name || 'Unnamed') + (a.participantId === state.ownerParticipantId ? ' (you)' : '');
+        return '<button type="button" class="paf-option-btn' + (selectedVal === a.participantId ? ' is-selected' : '') + '" data-val="' + escapeHtml(a.participantId) + '">' + label + '</button>';
+      }).join('') +
+      '<button type="button" class="paf-option-btn' + (selectedVal === EXTERNAL_VAL ? ' is-selected' : '') + '" data-val="' + EXTERNAL_VAL + '">' + escapeHtml(minor.name || 'Their') + '&rsquo;s guardian isn&rsquo;t on this trip</button>' +
+      '</div>' +
+      '<div id="ap-guardian-external-wrap" style="display:' + (selectedVal === EXTERNAL_VAL ? '' : 'none') + '; margin-top:0.9rem;">' +
+      '<div class="paf-roster-sub">Guardian&rsquo;s name</div>' +
+      '<input id="ap-guardian-name" type="text" placeholder="Full name" value="' + escapeHtml((current && current.name) || '') + '" style="width:100%; box-sizing:border-box; margin-bottom:0.7rem; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
+      '<div class="paf-roster-sub">Guardian&rsquo;s email</div>' +
+      '<input id="ap-guardian-email" type="email" placeholder="Email address" value="' + escapeHtml((current && current.email) || '') + '" style="width:100%; box-sizing:border-box; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
+      '</div>' +
+      '<div id="ap-guardian-error" class="ap-error"></div>' +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="ap-next">Continue</button>' +
+      '<div class="ap-cta-secondary" id="ap-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>' +
+      '</div></div>'
+    );
+
+    function selectOpt(val) {
+      selectedVal = val;
+      Array.prototype.forEach.call(wrap.querySelectorAll('#ap-guardian-opts .paf-option-btn'), function (btn) {
+        btn.classList.toggle('is-selected', btn.getAttribute('data-val') === val);
+      });
+      wrap.querySelector('#ap-guardian-external-wrap').style.display = val === EXTERNAL_VAL ? '' : 'none';
+    }
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('#ap-guardian-opts .paf-option-btn'), function (btn) {
+      btn.addEventListener('click', function () { selectOpt(btn.getAttribute('data-val')); });
+    });
+
+    wrap.querySelector('#ap-flow-back').addEventListener('click', function () {
+      if (idx > 0) { state.guardianStepIndex = idx - 1; render(); return; }
+      state.step = cameFromContact ? 'rosterContact' : 'rosterParticipation';
+      render();
+    });
+
+    function currentSelection() {
+      if (!selectedVal) return null;
+      if (selectedVal === EXTERNAL_VAL) {
+        return {
+          mode: 'external',
+          name: wrap.querySelector('#ap-guardian-name').value.trim(),
+          email: wrap.querySelector('#ap-guardian-email').value.trim(),
+        };
+      }
+      return { mode: 'participant', participantId: selectedVal };
+    }
+
+    function saveAndAdvance(onSaved) {
+      var errEl = wrap.querySelector('#ap-guardian-error');
+      var sel = currentSelection();
+      if (!sel) {
+        errEl.textContent = 'Pick who signs for ' + (minor.name || 'this child') + ', or that their guardian isn’t on this trip.';
+        return;
+      }
+      if (sel.mode === 'external' && (!sel.name || !isValidEmail(sel.email))) {
+        errEl.textContent = 'Add the guardian’s name and a valid email before continuing.';
+        return;
+      }
+      errEl.textContent = '';
+      state.guardianAssignments[minor.participantId] = sel;
+      saveConfirmRoster().then(function (res) {
+        if (!res.ok) { errEl.textContent = 'Something went wrong saving that, try again.'; return; }
+        // See reloadContext()'s own comment: a newly-named external
+        // guardian only becomes a real, ID-bearing roster row on the
+        // server, and this refetch is what brings it into state.roster
+        // (and re-resolves state.guardianAssignments from server truth)
+        // before Send Invites' preview list would otherwise need it.
+        reloadContext().then(onSaved);
+      });
+    }
+
+    wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
+      var sel = currentSelection();
+      if (sel && !(sel.mode === 'external' && (!sel.name || !isValidEmail(sel.email)))) {
+        state.guardianAssignments[minor.participantId] = sel;
+      }
+      saveConfirmRosterIfDecided().then(function () {
+        return reloadContext();
+      }).then(function () { state.step = 'hub'; render(); });
+    });
+
+    wrap.querySelector('#ap-next').addEventListener('click', function () {
+      saveAndAdvance(function () {
+        var freshMinors = minorsNeedingGuardian();
+        if (idx + 1 < freshMinors.length) {
+          state.guardianStepIndex = idx + 1;
+        } else {
+          state.step = 'invite';
+        }
         render();
       });
     });
@@ -1214,15 +1502,14 @@
   // repeatedly from the hub (e.g. to send a link to someone added late),
   // not just once.
   //
-  // FLAGGED — guardian assignment (handoff Section 3, Section 9 item 1):
-  // "the booker picks which attending adult signs for a child, or names an
-  // external guardian (not on the trip) directly by name + email" is a new
-  // capability this build does not yet implement — there's no schema
-  // support today for attaching a non-attending adult as a signing
-  // guardian, so this screen still only sends invites to adults already ON
-  // the roster, exactly as the pre-redesign code did. Building that is
-  // real backend/data-model work (a new guardian-assignment table or
-  // column), called out here rather than bolted on as a workaround.
+  // RESOLVED — guardian assignment (handoff Section 3, Section 9 item
+  // 1), 2026-09-02: "the booker picks which attending adult signs for a
+  // child, or names an external guardian (not on the trip) directly by
+  // name + email" — see renderRosterGuardians() above, which now runs
+  // right before this screen. This screen's own displayRows below (a
+  // superset of `signers`) surfaces the result: minors show dimmed with
+  // no invite, and any non-attending guardian_only row shows highlighted
+  // with a badge naming which child(ren) they're signing for.
   // ---------------------------------------------------------------------
 
   // REWRITTEN (Task 15): `signers` here is now local-preview-only — it
@@ -1232,6 +1519,44 @@
   // link. It is NEVER sent to the server — the server derives its own
   // list from booking_participants now (see this file's header comment,
   // point 6).
+  // NEW (guardian-assignment UI, 2026-09-02): finds every minor this
+  // guardian_only row (`row`) was named for, per state.guardianAssignments
+  // (the frontend's own live record of what the booker just picked --
+  // reading guardianPersonId back off state.roster instead would require
+  // a fresh reloadContext() to have already run, which it always has by
+  // the time this renders, but this is simpler and doesn't depend on
+  // that). Matches by lowercased email since a brand-new guardian_only
+  // row's own participantId is only known after reloadContext() anyway.
+  function minorsSignedForByGuardianEmail(email) {
+    var emailNorm = String(email || '').trim().toLowerCase();
+    if (!emailNorm) return [];
+    var names = [];
+    Object.keys(state.guardianAssignments).forEach(function (minorId) {
+      var ga = state.guardianAssignments[minorId];
+      if (ga && ga.mode === 'external' && String(ga.email || '').trim().toLowerCase() === emailNorm) {
+        var m = state.roster.filter(function (r) { return r.participantId === minorId; })[0];
+        if (m) names.push(m.name || 'a child');
+      }
+    });
+    return names;
+  }
+
+  // Same idea for an attending adult who was picked (mode 'participant')
+  // as a minor's guardian -- surfaced as a small suffix on their own
+  // invite row so the booker can see that assignment took, without
+  // having to revisit the guardian-assignment screen itself.
+  function minorsSignedForByParticipantId(participantId) {
+    var names = [];
+    Object.keys(state.guardianAssignments).forEach(function (minorId) {
+      var ga = state.guardianAssignments[minorId];
+      if (ga && ga.mode === 'participant' && ga.participantId === participantId) {
+        var m = state.roster.filter(function (r) { return r.participantId === minorId; })[0];
+        if (m) names.push(m.name || 'a child');
+      }
+    });
+    return names;
+  }
+
   function renderInvite() {
     var ap = state.ctx.adventurePrep || {};
     var signers = computeAttendeeSigners();
@@ -1257,7 +1582,7 @@
     if (soloBookerOnly) {
       var soloWrap = h(
         '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-        attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home') +
+        attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home', attendeesTotalSteps()) +
         '<div class="ap-eyebrow">Attendees</div>' +
         '<h1 class="ap-q">Your roster is confirmed</h1>' +
         '<div class="ap-card">' +
@@ -1274,18 +1599,46 @@
       return soloWrap;
     }
 
+    var inviteStepIndex = minorsNeedingGuardian().length ? 4 : 3;
+
+    // NEW (guardian-assignment UI, 2026-09-02): everyone who belongs on
+    // this screen for display purposes -- a superset of `signers` (which
+    // stays exactly what it always was: who actually gets sent a link,
+    // and drives the missingEmail/Send-button logic below). Minors are
+    // shown dimmed with no email field ("no invite needed" -- they never
+    // get one), and a non-attending guardian_only row is shown with a
+    // small badge naming which child(ren) they're signing for, per
+    // Airey's direct request: "there is also no minor listed on the
+    // waiver links and invites screen... we need to add some kind of
+    // identification of the minor's guardian."
+    var displayRows = state.roster.filter(function (p) {
+      if (p.roleOnBooking === 'owner') return false;
+      if (p.roleOnBooking === 'guardian_only') return true;
+      return p.isParticipating !== false;
+    });
+
+    var rowsHtml = displayRows.map(function (p) {
+      if (MINOR_BUCKETS[p.age]) {
+        return '<div class="review-recipient" style="opacity:0.55;"><div><div class="review-recipient-name">' + escapeHtml(p.name || '') + ' <span style="font-weight:400; color:var(--ap-muted); font-size:0.68rem;">&middot; child, no invite needed</span></div></div></div>';
+      }
+      var isGuardianOnly = p.roleOnBooking === 'guardian_only';
+      var badgeKids = isGuardianOnly ? minorsSignedForByGuardianEmail(p.email) : minorsSignedForByParticipantId(p.participantId);
+      var badge = badgeKids.length
+        ? ' <span style="font-weight:400; color:var(--ap-muted); font-size:0.68rem;">&middot; ' + escapeHtml(badgeKids.join(' &amp; ')) + '&rsquo;s guardian' + (isGuardianOnly ? ', not attending' : '') + '</span>'
+        : '';
+      var rowStyle = isGuardianOnly ? ' style="border:1.5px solid var(--mountain-pink); background:rgba(245,130,113,0.06);"' : '';
+      return '<div class="review-recipient"' + rowStyle + '><div><div class="review-recipient-name">' + escapeHtml(p.name || '') + badge + '</div><div class="review-recipient-email">' + escapeHtml(p.email || 'no email on file yet') + '</div></div></div>';
+    }).join('');
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home') +
+      attendeesFlowTopHtml(inviteStepIndex, 'ap-back-to-hub', '&larr; Adventure Home', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Send waiver links and adventure invites to your group</h1>' +
       '<p class="ap-sub">Your group will receive an invite email from Palm Springs Adventure Club so they can confirm their participation and complete their waiver.</p>' +
       '<div class="ap-card">' +
-      (signers.length
-        ? signers.map(function (s) {
-          return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(s.email || 'no email on file yet') + '</div></div></div>';
-        }).join('')
-        : '<p class="ap-helper">No one else on this booking needs their own waiver link.</p>') +
+      (displayRows.length ? rowsHtml : '') +
+      (!signers.length ? '<p class="ap-helper">No one else on this booking needs their own waiver link.</p>' : '') +
       (missingEmail.length ? '<div class="ap-error" style="margin-bottom:1rem;">Add an email for ' + missingEmail.map(function (p) { return escapeHtml(p.name || 'this person'); }).join(', ') + ' before sending, they need it for their own link. <a href="#" id="ap-back-to-roster" style="color:var(--mountain-pink);">Go back and add it</a></div>' : '') +
       '<div id="ap-invite-error" class="ap-error"></div>' +
       (signers.length
