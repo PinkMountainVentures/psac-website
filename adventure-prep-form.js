@@ -1591,7 +1591,7 @@
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
         '<div class="ap-q-title" style="margin-bottom:0.5rem;">Tell us what you’re looking for.</div>' +
         '<div class="ap-q-help">Didn’t love the recommended trails? Tell us what you’re looking for and a team member will pick one personally.</div>' +
-        '<textarea class="ap-field-textarea" id="ap-ask-team-textarea" style="min-height:90px;" placeholder="What kind of trail do you want? Didn’t like the recommended trails -- tell us what you’re looking for."></textarea>' +
+        '<textarea class="ap-field-textarea" id="ap-ask-team-textarea" style="min-height:90px;" placeholder="What kind of trail do you want?"></textarea>' +
         '<div id="ap-ask-team-error" class="ap-error"></div>' +
         '<button type="button" class="ap-cta-primary" id="ap-ask-team-send">Send Request</button>' +
         '<div class="ap-cta-secondary" id="ap-ask-team-cancel" style="cursor:pointer;">Never mind, go back</div>';
