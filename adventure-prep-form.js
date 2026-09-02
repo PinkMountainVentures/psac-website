@@ -443,19 +443,19 @@
   }
 
   // Attendees micro-flow (roster -> invite) progress bar (feedback round,
-  // Sep 2026): "should there be a progress bar on this micro flow? ...
-  // something like: 'Participants ----- Adventure Invites'" — reuses the
-  // .ap-progress-bar/.ap-progress-labels/.ap-progress-section markup above
-  // rather than renderPreferences()'s "Step X of 3" mini-progress variant,
-  // since the ask was specifically for both step names to show together.
-  function attendeesProgressHtml(stepIndex) {
-    var sections = ['Participants', 'Adventure Invites'];
-    var pct = stepIndex === 0 ? 50 : 100;
-    var labels = sections.map(function (s, i) {
-      return '<span class="ap-progress-section' + (i === stepIndex ? ' is-active' : '') + '">' + s + '</span>';
-    }).join('');
-    return '<div class="ap-progress-bar"><div class="ap-progress-fill" style="width:' + pct + '%;"></div></div>' +
-      '<div class="ap-progress-labels">' + labels + '</div>';
+  // Sep 2026): follow-up ask was to match the same pattern used across
+  // every other micro-flow rather than invent a new one -- Trail
+  // Recommendation's renderPreferences() uses flowTop()'s back-link +
+  // "Step X of N" label + thin .ap-mini-progress-track fill bar, so this
+  // mirrors that exactly (2 steps here instead of 3), parameterized on the
+  // back-link's id since renderRoster and renderInvite each wire their own.
+  function attendeesFlowTopHtml(stepIndex, backLinkId, backLabel) {
+    var meta = [
+      { pct: 50, label: 'Step 1 of 2' },
+      { pct: 100, label: 'Step 2 of 2' },
+    ][stepIndex];
+    return '<div class="ap-flow-top"><div class="ap-back-link" id="' + backLinkId + '" style="cursor:pointer; margin-bottom:0;">' + backLabel + '</div><div class="ap-progress-label">' + meta.label + '</div></div>' +
+      '<div class="ap-mini-progress-track"><div class="ap-mini-progress-fill" style="width:' + meta.pct + '%;"></div></div>';
   }
 
   function renderMessage(title, body) {
@@ -825,8 +825,7 @@
     // every other screen in this file already uses.
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-flow-top"><div class="ap-back-link" id="ap-flow-back" style="cursor:pointer; margin-bottom:0;">&larr; Adventure Home</div><div></div></div>' +
-      attendeesProgressHtml(0) +
+      attendeesFlowTopHtml(0, 'ap-flow-back', '&larr; Adventure Home') +
       '<div class="ap-eyebrow">Your Adventure</div>' +
       '<h1 class="ap-q">Will you be out on the trail with them?</h1>' +
       '<p class="ap-sub">We ask everyone this directly, booking for a group doesn’t always mean joining it.</p>' +
@@ -1102,8 +1101,7 @@
     if (soloBookerOnly) {
       var soloWrap = h(
         '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-        '<div class="ap-back-link" id="ap-back-to-hub" style="cursor:pointer;">&larr; Adventure Home</div>' +
-        attendeesProgressHtml(1) +
+        attendeesFlowTopHtml(1, 'ap-back-to-hub', '&larr; Adventure Home') +
         '<div class="ap-eyebrow">Attendees</div>' +
         '<h1 class="ap-q">Your roster is confirmed</h1>' +
         '<p class="ap-sub">It’s just you on this booking, so there’s no one else to invite.</p>' +
@@ -1124,8 +1122,7 @@
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-back-link" id="ap-back-to-hub" style="cursor:pointer;">&larr; Adventure Home</div>' +
-      attendeesProgressHtml(1) +
+      attendeesFlowTopHtml(1, 'ap-back-to-hub', '&larr; Adventure Home') +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Send invites to your group</h1>' +
       '<p class="ap-sub">Confirm the roster below, then invites go out so the rest of your group can join the adventure and sign their own waivers.</p>' +
