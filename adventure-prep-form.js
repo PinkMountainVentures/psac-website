@@ -79,8 +79,8 @@
    request and mockup03confirmattendees.html's frames 3a/3b): this screen
    now DOES let the booker proactively name a guardian for each minor —
    renderRosterGuardians(), one screen per participating minor, inserted
-   between Contact Info and Send Invites (or right after the "are you
-   joining" question when Contact Info itself is skipped). Picks either
+   right after the "are you joining" question -- BEFORE Contact Info, not
+   after (see the 2026-09-02 update below for why this moved). Picks either
    an attending adult already on the roster (including the owner) or
    captures a non-attending guardian's name + email directly, and calls
    confirmRoster() with the guardianAssignment shape that function has
@@ -93,6 +93,31 @@
    still exists alongside this and still works if a booker skips or gets
    an assignment wrong; the two are independent and don't conflict, since
    saveWaiverSignature's own certification write is idempotent per minor.
+
+   UPDATED (flow-order + hidden guardian rows, live-test feedback,
+   2026-09-02): testing on a real "minor + non-attending external
+   guardian" booking surfaced three bugs in the above. (1) renderRoster()
+   and renderRosterContact() were both rendering the external guardian's
+   own guardian_only row as if it were a normal attendee (wrong age/
+   fitness placeholders, a bogus "needs an email" prompt) -- both now
+   filter guardian_only rows out; only renderInvite() still shows them
+   (deliberately, badged). (2) renderRosterContact()'s copy ("Add an
+   email for each person") read as if it covered the guardian too --
+   retitled to "Add an email for each adult participating in the
+   adventure". (3) The guardian-assignment screen(s) now run BEFORE
+   Contact Info, not after, per Airey's direct request -- collecting the
+   guardian's identity before nagging for email addresses reads better.
+   This reopens the exact ordering risk this file used to route around (a
+   same-booking adult named as guardian needs a person_id or an email on
+   file before confirmRoster() will accept the assignment, and Contact
+   Info -- the screen that used to guarantee that -- now runs later):
+   renderRosterGuardians() itself now detects an eligible adult with
+   neither and collects their email inline, right there on the guardian
+   screen, before letting the booker continue (see adultNeedsEmail()
+   inside that function). That email round-trips through confirmRoster()'s
+   existing person_id-backfill path (lib/adventure-prep-service.js), so
+   it's already on file -- and pre-filled -- by the time Contact Info
+   actually runs for that same adult.
 
    Also flagged, not fixed here (pre-existing, separate from roster): the
    single-person "Send Reminder" button (renderWaiverDetail) posts to the
@@ -558,6 +583,24 @@
     });
   }
 
+  // NEW (live-test feedback, 2026-09-02): renderRosterContact() ("add an
+  // email for each adult participating in the adventure") was reusing
+  // computeAttendeeSigners() above, which deliberately INCLUDES
+  // guardian_only rows (renderInvite() needs that) -- on a booking with a
+  // non-attending named guardian, that guardian showed up on the Contact
+  // Info screen as if they were a roster attendee needing an email, which
+  // is wrong (a guardian_only row's email is collected on the
+  // guardian-assignment screen itself, or was already on file). This is
+  // the narrower "adults actually on the adventure" filter Contact Info
+  // should have been using all along: same as computeAttendeeSigners()
+  // minus the guardian_only carve-out.
+  function computeParticipatingAdultSigners() {
+    return state.roster.filter(function (p) {
+      return p.roleOnBooking !== 'owner' && p.roleOnBooking !== 'guardian_only'
+        && p.isParticipating !== false && !MINOR_BUCKETS[p.age];
+    });
+  }
+
   // NEW (guardian-assignment UI, 2026-09-02): every participating minor
   // needs a booker-named signing guardian -- this drives both whether
   // the new Attendees screen appears at all (renderRosterParticipation's
@@ -625,7 +668,14 @@
           var ga = state.guardianAssignments[p.participantId];
           if (ga && ga.mode === 'participant') {
             var assignedAdult = state.roster.filter(function (r) { return r.participantId === ga.participantId; })[0];
-            entry.guardianAssignment = { participantId: ga.participantId, email: (assignedAdult && assignedAdult.email) || undefined };
+            // UPDATED (flow-order feedback, 2026-09-02): ga.email is now
+            // sometimes populated too -- renderRosterGuardians() collects
+            // it inline when the assigned adult has neither a person_id
+            // nor an email on file yet (guardian-assignment can now run
+            // before Contact Info, see this file's header comment).
+            // Prefer that freshly-collected value; fall back to whatever
+            // the roster row itself already has on file, same as before.
+            entry.guardianAssignment = { participantId: ga.participantId, email: ga.email || (assignedAdult && assignedAdult.email) || undefined };
           } else if (ga && ga.mode === 'external' && ga.name && ga.email) {
             entry.guardianAssignment = { name: ga.name, email: ga.email };
           }
@@ -1115,9 +1165,19 @@
     );
 
     function renderRosterRows() {
-      wrap.querySelector('#ap-roster-rows').innerHTML = state.roster.map(function (p, i) {
-        return rosterRowHtml(p, i);
-      }).join('');
+      // BUG FIX (live-test feedback, 2026-09-02): a non-attending named
+      // guardian (role_on_booking = 'guardian_only') isn't a roster
+      // attendee at all -- it used to render here as a 4th "person" with
+      // a bogus age/fitness picker. Filter it out, but keep mapping
+      // rosterRowHtml against each row's REAL index in state.roster (not
+      // the filtered array's index) -- data-idx on the name/age/fitness
+      // inputs above has to keep pointing at the right state.roster
+      // entry for edits to land correctly.
+      wrap.querySelector('#ap-roster-rows').innerHTML = state.roster
+        .map(function (p, i) { return { p: p, i: i }; })
+        .filter(function (x) { return x.p.roleOnBooking !== 'guardian_only'; })
+        .map(function (x) { return rosterRowHtml(x.p, x.i); })
+        .join('');
       // Name: plain text input, update state on 'input' only, no
       // re-render, so typing a correction doesn't lose cursor focus
       // mid-word.
@@ -1257,23 +1317,17 @@
       }
       saveConfirmRoster().then(function (res) {
         if (!res.ok) { wrap.querySelector('#ap-roster-error').textContent = 'Something went wrong saving that, try again.'; return; }
-        var signers = computeAttendeeSigners();
-        // Skip straight to Send Invites when nobody needs a waiver-link
-        // email (e.g. a solo booking where the booker is the only
-        // participant) -- there's nothing for the Contact Info screen to
-        // collect in that case. UPDATED (guardian-assignment UI,
-        // 2026-09-02): if that leaves nowhere for a minor's guardian to
-        // get assigned either (e.g. owner + one minor only, no other
-        // adults), route to the new guardian-assignment screen instead --
-        // see renderRosterContact's own Continue handler for why it,
-        // rather than this one, is the USUAL hand-off point into that
-        // screen (guardian assignment needs to run after adult emails are
-        // collected, not before).
-        if (signers.length) {
-          state.step = 'rosterContact';
-        } else if (minorsNeedingGuardian().length) {
+        // UPDATED (flow-order feedback, 2026-09-02): guardian assignment
+        // now runs BEFORE Contact Info (see this file's header comment) --
+        // any participating minor sends the booker there first. Only
+        // when there's nothing left needing a guardian pick do we fall
+        // through to Contact Info (skipped entirely on a solo booking,
+        // same as before) or straight to Send Invites.
+        if (minorsNeedingGuardian().length) {
           state.guardianStepIndex = 0;
           state.step = 'rosterGuardians';
+        } else if (computeParticipatingAdultSigners().length) {
+          state.step = 'rosterContact';
         } else {
           state.step = 'invite';
         }
@@ -1285,23 +1339,34 @@
   }
 
   // ---------------------------------------------------------------------
-  // Attendees micro-flow, step 3 of 4 ("Contact Info" -- collect a waiver
-  // email for everyone who needs one). New screen, feedback round Sep
-  // 2026: "we're asking this screen to do a lot" was the original single
-  // screen's problem; this is the piece that used to be an inline email
-  // field on each roster row. Skipped entirely (see
-  // renderRosterParticipation's Continue handler) when
-  // computeAttendeeSigners() comes back empty.
+  // Attendees micro-flow, "Contact Info" step (collect a waiver email for
+  // every adult actually on the adventure). New screen, feedback round
+  // Sep 2026: "we're asking this screen to do a lot" was the original
+  // single screen's problem; this is the piece that used to be an inline
+  // email field on each roster row. Skipped entirely (see
+  // renderRosterParticipation's and renderRosterGuardians' own Continue
+  // handlers) when computeParticipatingAdultSigners() comes back empty.
+  // UPDATED (flow-order feedback, 2026-09-02): now runs AFTER
+  // guardian-assignment, not before (see this file's header comment) --
+  // and uses computeParticipatingAdultSigners(), not
+  // computeAttendeeSigners(), so a non-attending named guardian
+  // (guardian_only) never shows up here needing an email of their own.
   // ---------------------------------------------------------------------
   function renderRosterContact() {
-    var signers = computeAttendeeSigners();
+    var signers = computeParticipatingAdultSigners();
+    // BUG FIX (flow-order feedback, 2026-09-02): Contact Info sits right
+    // after the guardian-assignment screen(s) when this booking has any
+    // participating minor (index 3 of 5), but right after Participation
+    // when it doesn't -- renderRosterGuardians() never renders at all in
+    // that case, so Contact Info is really the 3rd screen (index 2 of 4).
+    var contactStepIndex = minorsNeedingGuardian().length ? 3 : 2;
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(2, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
+      attendeesFlowTopHtml(contactStepIndex, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
-      '<h1 class="ap-q">Add an email for each person</h1>' +
-      '<p class="ap-sub">Please enter a valid email address for each person so they can sign a participation waiver.</p>' +
+      '<h1 class="ap-q">Add an email for each adult participating in the adventure</h1>' +
+      '<p class="ap-sub">Enter a valid email address for each adult so they can sign a waiver and receive an invite to the adventure.</p>' +
       '<div class="ap-card">' +
       '<div id="ap-contact-rows">' + signers.map(function (p) {
         var meta = [p.age, p.fitness].filter(Boolean).join(' · ');
@@ -1326,7 +1391,20 @@
       });
     });
 
-    wrap.querySelector('#ap-flow-back').addEventListener('click', function () { state.step = 'rosterParticipation'; render(); });
+    wrap.querySelector('#ap-flow-back').addEventListener('click', function () {
+      // UPDATED (flow-order feedback, 2026-09-02): Contact Info now
+      // always comes after guardian-assignment (when there is any) --
+      // Back returns to the last minor's guardian screen instead of
+      // straight to rosterParticipation.
+      var minors = minorsNeedingGuardian();
+      if (minors.length) {
+        state.guardianStepIndex = minors.length - 1;
+        state.step = 'rosterGuardians';
+      } else {
+        state.step = 'rosterParticipation';
+      }
+      render();
+    });
     wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
       saveConfirmRosterIfDecided().then(function () { state.step = 'hub'; render(); });
     });
@@ -1340,20 +1418,11 @@
       errEl.textContent = '';
       saveConfirmRoster().then(function (res) {
         if (!res.ok) { errEl.textContent = 'Something went wrong saving that, try again.'; return; }
-        // NEW (guardian-assignment UI, 2026-09-02): hands off to the new
-        // per-minor guardian screen from here rather than
-        // renderRosterParticipation, deliberately -- an attending adult
-        // named as a minor's guardian needs their own email already on
-        // file first (saveConfirmRoster() only sends it along as a
-        // fallback for confirmRoster's person_id backfill when that adult
-        // has none on file yet), and this is the screen that just
-        // collected it.
-        if (minorsNeedingGuardian().length) {
-          state.guardianStepIndex = 0;
-          state.step = 'rosterGuardians';
-        } else {
-          state.step = 'invite';
-        }
+        // UPDATED (flow-order feedback, 2026-09-02): guardian-assignment
+        // already ran before this screen (see renderRosterParticipation's
+        // and renderRosterGuardians' own Continue handlers) -- Contact
+        // Info is always the last stop before Send Invites now.
+        state.step = 'invite';
         render();
       });
     });
@@ -1367,9 +1436,13 @@
   // of the minor's guardian... are they on the adventure? if so they need
   // to be identified from the roster. if not, then an email address for
   // the parent / guardian needs to be provided"). One screen per
-  // participating minor, shown between Contact Info and Send Invites (or
-  // right after the "are you joining" question when Contact Info itself
-  // is skipped -- see renderRosterParticipation's Continue handler).
+  // participating minor, shown right after the "are you joining" question
+  // -- BEFORE Contact Info, per Airey's follow-up ask (live-test feedback,
+  // 2026-09-02): "it feels like the parent / legal guardian identification
+  // screen needs to be pulled forward ahead of the 'add an email for each
+  // person' screen." See renderRosterParticipation's Continue handler for
+  // the hand-off, and renderRosterContact's Back handler for the return
+  // trip.
   // Pattern matches mockup03confirmattendees.html's frames 3a/3b, rebuilt
   // with this codebase's own existing "which one of these is you" control
   // (paf-options/.paf-option-btn, already used just above in
@@ -1378,12 +1451,27 @@
   // inventing" convention.
   //
   // Writes into state.guardianAssignments[minorParticipantId] as either
-  // {mode:'participant', participantId} (an attending adult already on
-  // the roster -- including the owner, labeled "(you)") or
+  // {mode:'participant', participantId[, email]} (an attending adult
+  // already on the roster -- including the owner, labeled "(you)") or
   // {mode:'external', name, email} (a non-attending guardian named
   // directly, per Section 6's hybrid model). saveConfirmRoster() reads
   // this map and turns it into the guardianAssignment payload shape
   // lib/adventure-prep-service.js's confirmRoster() already expects.
+  //
+  // UPDATED (flow-order feedback, 2026-09-02): moving this screen ahead
+  // of Contact Info reopens a real gap -- confirmRoster() rejects
+  // {participantId} guardianAssignment for an existing participant who
+  // has neither a person_id nor an email on file yet (see that function's
+  // own header comment, "KNOWN ORDERING LIMITATION"), which Contact Info
+  // running first used to guarantee against. adultNeedsEmail() below
+  // detects exactly that case (true for almost any non-owner adult who
+  // hasn't been through Contact Info yet -- the owner always has a
+  // person_id, set the moment they're confirmed as the booker) and this
+  // screen collects that one adult's email inline, right where they're
+  // picked, instead of silently failing to save. That email round-trips
+  // through confirmRoster()'s own person_id-backfill path, so it's
+  // already on file (and pre-filled) by the time Contact Info runs later
+  // for that same adult.
   // ---------------------------------------------------------------------
   function renderRosterGuardians() {
     var minors = minorsNeedingGuardian();
@@ -1402,16 +1490,26 @@
       return document.createDocumentFragment();
     }
     var adults = eligibleGuardianAdults();
-    // Whether Contact Info actually ran before this -- decides where
-    // "Back" on the FIRST guardian screen returns to.
-    var cameFromContact = computeAttendeeSigners().length > 0;
     var current = state.guardianAssignments[minor.participantId] || null;
     var EXTERNAL_VAL = '__external__';
     var selectedVal = current ? (current.mode === 'external' ? EXTERNAL_VAL : current.participantId) : null;
 
+    // NEW (flow-order feedback, 2026-09-02): see this function's own
+    // header comment -- true when picking this adult as guardian would
+    // otherwise fail server-side (no person_id, no email on file yet).
+    function adultNeedsEmail(participantId) {
+      var a = adults.filter(function (x) { return x.participantId === participantId; })[0];
+      return !!a && !a.personId && !a.email;
+    }
+    function adultLabelById(participantId) {
+      var a = adults.filter(function (x) { return x.participantId === participantId; })[0];
+      return a ? (a.name || 'their') : 'their';
+    }
+    var selectedNeedsEmail = !!selectedVal && selectedVal !== EXTERNAL_VAL && adultNeedsEmail(selectedVal);
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(3, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
+      attendeesFlowTopHtml(2, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Who is ' + escapeHtml(minor.name || 'their') + '&rsquo;s legal parent or guardian?</h1>' +
       '<p class="ap-sub">' + escapeHtml(minor.name || 'This person') + ' will need a legal parent or guardian to sign their waiver in a following step.</p>' +
@@ -1422,6 +1520,11 @@
         return '<button type="button" class="paf-option-btn' + (selectedVal === a.participantId ? ' is-selected' : '') + '" data-val="' + escapeHtml(a.participantId) + '">' + label + '</button>';
       }).join('') +
       '<button type="button" class="paf-option-btn' + (selectedVal === EXTERNAL_VAL ? ' is-selected' : '') + '" data-val="' + EXTERNAL_VAL + '">' + escapeHtml(minor.name || 'Their') + '&rsquo;s guardian isn&rsquo;t on this trip</button>' +
+      '</div>' +
+      '<div id="ap-guardian-adult-email-wrap" style="display:' + (selectedNeedsEmail ? '' : 'none') + '; margin-top:0.9rem;">' +
+      '<div class="paf-roster-sub" id="ap-guardian-adult-email-label">' + escapeHtml(adultLabelById(selectedVal || '')) + '&rsquo;s email</div>' +
+      '<div class="ap-helper" style="margin:0 0 0.5rem;">We don&rsquo;t have an email on file for them yet -- add one so they can be reached about signing ' + escapeHtml(minor.name || 'this') + '&rsquo;s waiver.</div>' +
+      '<input id="ap-guardian-adult-email" type="email" placeholder="Email address" value="' + escapeHtml((current && current.mode === 'participant' && current.email) || '') + '" style="width:100%; box-sizing:border-box; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
       '</div>' +
       '<div id="ap-guardian-external-wrap" style="display:' + (selectedVal === EXTERNAL_VAL ? '' : 'none') + '; margin-top:0.9rem;">' +
       '<div class="paf-roster-sub">Legal parent / guardian&rsquo;s name</div>' +
@@ -1442,6 +1545,12 @@
         btn.classList.toggle('is-selected', btn.getAttribute('data-val') === val);
       });
       wrap.querySelector('#ap-guardian-external-wrap').style.display = val === EXTERNAL_VAL ? '' : 'none';
+      var needsEmail = val !== EXTERNAL_VAL && adultNeedsEmail(val);
+      var adultEmailWrap = wrap.querySelector('#ap-guardian-adult-email-wrap');
+      adultEmailWrap.style.display = needsEmail ? '' : 'none';
+      if (needsEmail) {
+        wrap.querySelector('#ap-guardian-adult-email-label').textContent = adultLabelById(val) + '’s email';
+      }
     }
 
     Array.prototype.forEach.call(wrap.querySelectorAll('#ap-guardian-opts .paf-option-btn'), function (btn) {
@@ -1450,7 +1559,10 @@
 
     wrap.querySelector('#ap-flow-back').addEventListener('click', function () {
       if (idx > 0) { state.guardianStepIndex = idx - 1; render(); return; }
-      state.step = cameFromContact ? 'rosterContact' : 'rosterParticipation';
+      // Guardian-assignment always runs right after the "are you joining"
+      // question now (see this file's header comment) -- Back on the
+      // first minor's screen never returns to Contact Info.
+      state.step = 'rosterParticipation';
       render();
     });
 
@@ -1463,7 +1575,11 @@
           email: wrap.querySelector('#ap-guardian-email').value.trim(),
         };
       }
-      return { mode: 'participant', participantId: selectedVal };
+      var sel = { mode: 'participant', participantId: selectedVal };
+      if (adultNeedsEmail(selectedVal)) {
+        sel.email = wrap.querySelector('#ap-guardian-adult-email').value.trim();
+      }
+      return sel;
     }
 
     function saveAndAdvance(onSaved) {
@@ -1475,6 +1591,10 @@
       }
       if (sel.mode === 'external' && (!sel.name || !isValidEmail(sel.email))) {
         errEl.textContent = 'Add the guardian’s name and a valid email before continuing.';
+        return;
+      }
+      if (sel.mode === 'participant' && adultNeedsEmail(sel.participantId) && !isValidEmail(sel.email)) {
+        errEl.textContent = 'Add a valid email for ' + adultLabelById(sel.participantId) + ' before continuing.';
         return;
       }
       errEl.textContent = '';
@@ -1492,7 +1612,11 @@
 
     wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
       var sel = currentSelection();
-      if (sel && !(sel.mode === 'external' && (!sel.name || !isValidEmail(sel.email)))) {
+      var incomplete = sel && (
+        (sel.mode === 'external' && (!sel.name || !isValidEmail(sel.email)))
+        || (sel.mode === 'participant' && adultNeedsEmail(sel.participantId) && !isValidEmail(sel.email))
+      );
+      if (sel && !incomplete) {
         state.guardianAssignments[minor.participantId] = sel;
       }
       saveConfirmRosterIfDecided().then(function () {
@@ -1505,6 +1629,10 @@
         var freshMinors = minorsNeedingGuardian();
         if (idx + 1 < freshMinors.length) {
           state.guardianStepIndex = idx + 1;
+        } else if (computeParticipatingAdultSigners().length) {
+          // UPDATED (flow-order feedback, 2026-09-02): Contact Info now
+          // runs after guardian-assignment, not before.
+          state.step = 'rosterContact';
         } else {
           state.step = 'invite';
         }
