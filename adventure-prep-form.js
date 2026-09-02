@@ -2287,7 +2287,7 @@
           '<textarea class="ap-field-textarea" id="ap-return-note" placeholder="Any other note or instructions about pickup">' + escapeHtml(state.returnNote) + '</textarea>' +
           '<div id="ap-pickup-error" class="ap-error"></div>' +
           '</div>' +
-          '<button type="button" class="ap-cta-primary" id="ap-next">Continue to Waivers</button>' +
+          '<button type="button" class="ap-cta-primary" id="ap-next">Finish Gear Kits &amp; Delivery/Pickup</button>' +
           '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
 
         contentEl.querySelector('#ap-flow-back').addEventListener('click', function () { state.gearStep = 1; render(); });
