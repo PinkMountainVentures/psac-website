@@ -299,6 +299,21 @@
     return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' }).format(d);
   }
 
+  // NEW (Airey's direct request, 2026-09-05): the Adventure Summary
+  // receipt's Gear delivery/pickup lines only ever showed a time window,
+  // with no day attached -- ambiguous on a card meant to be read at a
+  // glance (and possibly shared). Delivery happens the evening BEFORE the
+  // trail day; pickup happens the evening OF the trail day itself (see
+  // this file's own Gear Kits Pickup screen copy: "picked up the evening
+  // after your adventure"). dayOffset lets both reuse the same date math
+  // against experienceBooking.date instead of two copies.
+  function formatOffsetDate(dateStr, dayOffset) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + dayOffset));
+    return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' }).format(d);
+  }
+
   // ---------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------
@@ -2719,10 +2734,27 @@
 
     var headline = allSet ? 'Everything’s set.<br>The trail’s waiting.' : 'Almost there.<br>A few things left.';
     var kitStat = status.gearDone ? (status.kitCount + ' packed') : (status.kitCount + ' of ' + status.eligibleCount + ' selected');
-    var pickupLine = status.gearDone ? (ap.returnPreference || state.returnPreference) : 'Not set yet';
-    var waiverLine = status.signers.length
-      ? (status.signers.filter(function (s) { return s.isDone; }).length + ' of ' + status.signers.length + ' signed')
-      : 'Not started';
+
+    // FIX (Airey's direct request, 2026-09-05): Gear pickup used to show
+    // returnPreference -- a leftover field whose "We’ll drop it back off
+    // ourselves" copy describes the wrong direction entirely (that's not
+    // even an option this flow offers; PSAC picks gear up from the guest,
+    // the guest never drops anything off). Delivery and pickup now both
+    // show the actual day (derived from experienceBooking.date, since
+    // delivery is always the evening before and pickup the evening of)
+    // plus the guest's chosen time window -- and deliberately nothing
+    // else. This card is meant to be shareable, so no address of any
+    // kind belongs on it, on either line.
+    var deliveryWindow = ap.deliveryWindow || state.deliveryWindow;
+    var deliveryLine = status.gearDone
+      ? (formatOffsetDate(eb.date, -1) + (deliveryWindow ? ', ' + deliveryWindow : ''))
+      : 'Not set yet';
+    var returnWindow = ap.returnWindow || state.returnWindow;
+    var hotelPath = (ap.propertyType || state.propertyType) === 'Hotel / resort';
+    var pickupTimeLabel = returnWindow || (hotelPath ? 'Final sweep after 9:00pm' : 'Time TBD');
+    var pickupLine = status.gearDone
+      ? (formatOffsetDate(eb.date, 0) + ', ' + pickupTimeLabel)
+      : 'Not set yet';
 
     var actionHtml = allSet
       ? (status.trailSelected && isPastT3Cutoff()
@@ -2746,10 +2778,8 @@
       '<div><div class="ap-receipt-stat-label">Gear Kits</div><div class="ap-receipt-stat-value">' + kitStat + '</div></div>' +
       '</div>' +
       '<div class="ap-receipt-divider"></div>' +
-      '<div class="ap-receipt-line"><span>Gear delivery</span><b>' + escapeHtml(status.gearDone ? (ap.deliveryWindow || state.deliveryWindow) : 'Not set yet') + '</b></div>' +
+      '<div class="ap-receipt-line"><span>Gear delivery</span><b>' + escapeHtml(deliveryLine) + '</b></div>' +
       '<div class="ap-receipt-line"><span>Gear pickup</span><b>' + escapeHtml(pickupLine) + '</b></div>' +
-      '<div class="ap-receipt-line tappable" id="ap-open-waiver-detail"><span>Everyone’s waiver</span><b>' + escapeHtml(waiverLine) + '<span class="ap-receipt-line-arrow">&rsaquo;</span></b></div>' +
-      '<div class="ap-receipt-line"><span>Gear deposit</span><b>Placed the day before, refunded after</b></div>' +
       actionHtml +
       '<div class="ap-receipt-footer">palmspringsadventureclub.com</div>' +
       '</div></div>' +
@@ -2757,8 +2787,6 @@
     );
 
     wrap.querySelector('#ap-back-to-hub').addEventListener('click', function () { state.step = 'hub'; render(); });
-    var waiverLink = wrap.querySelector('#ap-open-waiver-detail');
-    if (waiverLink) waiverLink.addEventListener('click', function () { state.step = 'waiverDetail'; render(); });
     var guideBtn = wrap.querySelector('#ap-get-guide');
     if (guideBtn) guideBtn.addEventListener('click', function () {
       window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
