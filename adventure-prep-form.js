@@ -925,7 +925,6 @@
   // each entry's real participantId).
   function rosterRowHtml(person, index) {
     var age = person.age || person.ageRange || '';
-    var isMinor = !!MINOR_BUCKETS[age];
     // Unlike adventure-form.js's own age <select> (which prepends a
     // non-selectable "Age range" placeholder), every entry in AGE_BUCKETS
     // is itself a real, selectable value — no placeholder needed here.
@@ -941,7 +940,7 @@
     return '<div class="paf-roster-row">' +
       '<input class="paf-roster-input paf-roster-name" data-idx="' + index + '" value="' + escapeHtml(person.name || '') + '" placeholder="Name">' +
       '<select class="paf-roster-input paf-roster-age" data-idx="' + index + '">' + ageOptionsHtml + '</select>' +
-      (isMinor ? '<span class="paf-roster-tag">Minor</span>' : '<select class="paf-roster-input paf-roster-fit" data-idx="' + index + '">' + fitnessOptionsHtml + '</select>') +
+      '<select class="paf-roster-input paf-roster-fit" data-idx="' + index + '">' + fitnessOptionsHtml + '</select>' +
       '</div>';
   }
 
@@ -1000,9 +999,11 @@
         });
       });
       // Age: a <select>, no cursor position to lose, so a full
-      // re-render is safe here — needed because changing age can flip
-      // isMinor, which changes whether this row shows a fitness dropdown
-      // or a "Minor" tag.
+      // re-render is safe here. (Every row shows the same name/age/
+      // fitness fields regardless of age bucket, per Airey's request --
+      // this used to swap a minor's fitness dropdown for a plain "Minor"
+      // tag, but a full re-render on age change is still harmless/cheap
+      // to keep.)
       Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-age'), function (select) {
         select.addEventListener('change', function () {
           var idx = Number(select.getAttribute('data-idx'));
@@ -2729,7 +2730,6 @@
     var eb = state.ctx.experienceBooking;
     var ap = state.ctx.adventurePrep || {};
     var status = computeHubStatus();
-    var missingSignerCount = status.signers.filter(function (s) { return !s.isDone; }).length;
     var allSet = status.trailSelected && status.gearDone && status.waiversDone;
 
     var headline = allSet ? 'Everything’s set.<br>The trail’s waiting.' : 'Almost there.<br>A few things left.';
@@ -2756,13 +2756,9 @@
       ? (formatOffsetDate(eb.date, 0) + ', ' + pickupTimeLabel)
       : 'Not set yet';
 
-    var actionHtml = allSet
-      ? (status.trailSelected && isPastT3Cutoff()
-        ? '<div class="ap-receipt-guide-cta"><span>Your trail guide is ready to download.</span><button type="button" id="ap-get-guide">Get Guide</button></div>'
-        : '')
-      : (missingSignerCount
-        ? '<div class="ap-receipt-nudge-cta"><span>' + missingSignerCount + ' ' + (missingSignerCount === 1 ? 'person' : 'people') + ' in your group still ' + (missingSignerCount === 1 ? 'needs' : 'need') + ' to sign their waiver.</span><button type="button" id="ap-send-reminder-all">Send Reminder</button></div>'
-        : '');
+    var actionHtml = (allSet && status.trailSelected && isPastT3Cutoff())
+      ? '<div class="ap-receipt-guide-cta"><span>Your trail guide is ready to download.</span><button type="button" id="ap-get-guide">Get Guide</button></div>'
+      : '';
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
@@ -2791,12 +2787,6 @@
     if (guideBtn) guideBtn.addEventListener('click', function () {
       window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
     });
-    var remindAllBtn = wrap.querySelector('#ap-send-reminder-all');
-    if (remindAllBtn) remindAllBtn.addEventListener('click', function () {
-      state.step = 'waiverDetail';
-      render();
-    });
-
     return wrap;
   }
 
