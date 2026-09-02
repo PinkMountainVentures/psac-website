@@ -1918,7 +1918,7 @@
           '<div class="ap-kit-info-link" id="ap-kit-info-toggle">What’s inside a gear kit? ' + (infoOpen ? '&ndash;' : '+') + '</div>' +
           (infoOpen
             ? '<div class="ap-kit-info-panel">' +
-              '<div class="ap-kit-info-body"><b class="ap-kit-info-label">Rental gear:</b> a Gregory daypack, Leki trekking poles, two laser-engraved Hydro Flask 32oz bottles, and a first aid kit. Packed and delivered the evening before your trail day.</div>' +
+              '<div class="ap-kit-info-body"><b class="ap-kit-info-label">Rental gear:</b> a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Packed and delivered the evening before your trail day.</div>' +
               '<div class="ap-kit-info-body"><b class="ap-kit-info-label">Yours to keep:</b> LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.</div>' +
               '</div>'
             : '') +

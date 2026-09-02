@@ -119,7 +119,7 @@
   // went through the booking flow, so they've never seen this list the
   // way the booker has. Kept in sync manually since these are separate
   // client bundles, same caveat as this file's ported compareCardHtml.
-  var RENTAL_GEAR_ITEMS = ['Gregory daypack', 'Leki trekking poles', 'Two laser-engraved Hydro Flask 32oz bottles', 'First aid kit'];
+  var RENTAL_GEAR_ITEMS = ['Gregory daypack', 'Leki trekking poles', 'Two Hydro Flask 32oz bottles', 'First aid kit'];
   var KEEPSAKE_ITEMS = ['LMNT electrolytes', 'Rancho Meladuco Medjool dates', 'Blue Lizard mineral sunscreen'];
 
   function h(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
