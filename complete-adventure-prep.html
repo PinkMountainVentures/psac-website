@@ -49,18 +49,51 @@
     if (isOpen && textarea) textarea.focus();
   });
   if (sendBtn && textarea) {
-    // PROVISIONAL (coordinating chat, 2026-09-02): no dedicated
-    // send-a-message backend exists yet (checked -- nothing under api/
-    // handles a support/contact/help action today), so this hands off to
-    // a pre-filled mailto rather than silently doing nothing. Flagged to
-    // Airey as a real upgrade decision, not a permanent design.
+    // Sends via Resend (api/send-help-message.js) so the interaction lands
+    // as a real email in the reservations@ inbox, reply-to set to the
+    // guest's own address -- replaces the earlier mailto: placeholder.
+    var statusEl = null;
+    function setStatus(text, isError) {
+      if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.className = isError ? 'ap-error' : 'help-sent-note';
+        var row = sendBtn.closest('.help-row');
+        if (row && row.parentNode) row.parentNode.insertBefore(statusEl, row.nextSibling);
+      }
+      statusEl.className = isError ? 'ap-error' : 'help-sent-note';
+      statusEl.textContent = text;
+    }
     sendBtn.addEventListener('click', function () {
-      var body = textarea.value.trim();
-      if (!body) { textarea.focus(); return; }
-      var subject = 'Question from your Adventure Prep page';
-      window.location.href = 'mailto:hello@palmspringsadventureclub.com'
-        + '?subject=' + encodeURIComponent(subject)
-        + '&body=' + encodeURIComponent(body);
+      var message = textarea.value.trim();
+      if (!message) { textarea.focus(); return; }
+      var token = new URLSearchParams(window.location.search).get('token');
+      if (!token) {
+        setStatus('Something went wrong loading this page -- refresh and try again.', true);
+        return;
+      }
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending…';
+      fetch('/api/send-help-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token, message: message })
+      })
+        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+        .then(function (result) {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send';
+          if (result.ok && result.data && result.data.status === 'sent') {
+            textarea.value = '';
+            setStatus('Sent -- we’ll reply to your email soon.', false);
+          } else {
+            setStatus('Couldn’t send that -- try again, or email us directly at reservations@palmspringsadventureclub.com.', true);
+          }
+        })
+        .catch(function () {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send';
+          setStatus('Couldn’t send that -- try again, or email us directly at reservations@palmspringsadventureclub.com.', true);
+        });
     });
   }
 })();
