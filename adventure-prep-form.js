@@ -2477,12 +2477,16 @@
     function renderConfirmation() {
       var eb = state.ctx.experienceBooking;
       var depositAmount = eb.tier === 'p2p' ? 100 : 65;
+      var ecLine = state.ecName || state.ecPhone
+        ? escapeHtml([state.ecName, state.ecPhone].filter(Boolean).join(' \u00b7 '))
+        : 'Not provided';
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Waivers</div>' +
-        '<div class="ap-recap-icon">&#9997;&#65039;</div>' +
-        '<div class="ap-recap-title">Waiver signed.</div>' +
-        '<div class="ap-recap-body">You’re all set on this one.</div>' +
+        '<div class="ap-recap-title">Your waiver is complete.</div>' +
+        '<div class="ap-recap-body">This is confirmation of your waiver signature and emergency contact.</div>' +
+        '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
+        '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +
         '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-return-hub-2">Return to Adventure Home</button>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
