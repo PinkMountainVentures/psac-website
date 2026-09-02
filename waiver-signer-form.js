@@ -114,6 +114,14 @@
   // took with the intro banner before that round's copy landed.
   var KIT_OPTIN_LABEL = 'Yes, sign me up for occasional emails from Palm Springs Adventure Club about trail guides, gear tips, and future adventures.';
 
+  // Same rental/keepsake split as adventure-prep-form.js's own Gear Kits
+  // screen (renderKitScreen's kit-info panel) -- a non-owner signer never
+  // went through the booking flow, so they've never seen this list the
+  // way the booker has. Kept in sync manually since these are separate
+  // client bundles, same caveat as this file's ported compareCardHtml.
+  var RENTAL_GEAR_ITEMS = ['Gregory daypack', 'Leki trekking poles', 'Two laser-engraved Hydro Flask 32oz bottles', 'First aid kit'];
+  var KEEPSAKE_ITEMS = ['LMNT electrolytes', 'Rancho Meladuco Medjool dates', 'Blue Lizard mineral sunscreen'];
+
   function h(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -164,6 +172,7 @@
     switch (state.step) {
       case 'confirmDetails': frag = renderConfirmDetails(); break;
       case 'trail': frag = renderTrail(); break;
+      case 'gear': frag = renderGear(); break;
       case 'waiver': frag = renderWaiver(); break;
       case 'summary': frag = renderSummary(); break;
       default: frag = renderHub();
@@ -312,6 +321,10 @@
         status.trailAssigned ? status.trailName : 'Not yet assigned',
         null,
         { readonly: true, onClick: status.trailAssigned ? function () { state.step = 'trail'; render(); } : null }),
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8.3 8.2c0-2.4 1.7-4.3 3.7-4.3s3.7 1.9 3.7 4.3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><rect x="5.8" y="8.2" width="12.4" height="12" rx="3" stroke="#2A4747" stroke-width="1.4"/><path d="M9 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><path d="M15 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><rect x="9" y="13.4" width="6" height="4.4" rx="1.2" stroke="#F58271" stroke-width="1.2"/></svg>', 'Your Gear',
+        'See what\u2019s in your kit',
+        null,
+        { readonly: true, onClick: function () { state.step = 'gear'; render(); } }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.3 16.6c1.7-2.6 2.6 2.6 4.3 0s2.6 2.6 4.3 0 2.6 2.6 4.3 0" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6.3l4.3 4.3" stroke="#F58271" stroke-width="1.4" stroke-linecap="round"/><circle cx="18.7" cy="11" r="1.2" fill="#F58271"/></svg>', 'Your Waiver', waiverSub,
         status.waiverDone ? 'Done' : 'Not done',
         { onClick: function () { state.step = 'waiver'; render(); } }),
@@ -465,6 +478,33 @@
       (status.trailDescription ? '<div class="ap-q-help">' + escapeHtml(status.trailDescription) + '</div>' : '') +
       (status.trailDetail ? '<div style="margin:1.2rem 0;">' + compareCardHtml(status.trailDetail) + '</div>' : '') +
       '<div class="ap-helper" style="display:block;">Your trip organizer selected this trail for the group.</div>' +
+      '</div></div>'
+    );
+    wrap.querySelector('#sb-back').addEventListener('click', goHub);
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Your Gear (Sept 2026 follow-up): a Surface-B-only reference screen --
+  // a non-owner signer never went through the booking flow, so unlike the
+  // booker, they've never seen what's actually in a gear kit. Purely
+  // static content, same rental/keepsake split as adventure-prep-form.js's
+  // own Gear Kits screen. Read-only, like Your Trail above -- this signer
+  // never manages kit counts or delivery details, that stays owner-side.
+  // ---------------------------------------------------------------------
+  function renderGear() {
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="sb-back" style="cursor:pointer;">&larr; Back to Your Adventure</div>' +
+      '<div class="ap-eyebrow">Your Gear</div>' +
+      '<div class="ap-q-title">Your gear kit is ready.</div>' +
+      '<div class="ap-q-help">Your gear will be delivered the night before your adventure at the address provided by the adventure organizer.</div>' +
+      '<div class="ap-card">' +
+      '<div class="ap-section-label" style="margin-top:0;">Rental Gear</div>' +
+      RENTAL_GEAR_ITEMS.map(function (item) { return '<div class="sb-gear-item">' + escapeHtml(item) + '</div>'; }).join('') +
+      '<div class="ap-section-label">Yours to Keep</div>' +
+      KEEPSAKE_ITEMS.map(function (item) { return '<div class="sb-gear-item">' + escapeHtml(item) + '</div>'; }).join('') +
+      '</div>' +
       '</div></div>'
     );
     wrap.querySelector('#sb-back').addEventListener('click', goHub);
