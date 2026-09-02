@@ -104,9 +104,15 @@
   // SMS_CONSENT_TEXT. Only the subject of the message is adapted here,
   // per mockup-07's own note, since this is a separate consent event for
   // a different purpose than the original booker's own consent.
-  var SMS_CONSENT_LABEL = 'Yes, send me text messages from Palm Springs Adventure Club about this adventure — trail updates, waivers you need to sign, and weather for your trail day.';
+  var SMS_CONSENT_LABEL = 'Yes, send me text messages from Palm Springs Adventure Club about this adventure, including trail updates, waivers you need to sign, and weather for your trail day.';
   var SMS_CONSENT_FINEPRINT = 'Optional, not required to continue. Message frequency varies. Message and data rates may apply. Reply STOP to cancel, HELP for help.';
   var SMS_CONSENT_TEXT = SMS_CONSENT_LABEL + ' ' + SMS_CONSENT_FINEPRINT + ' See Terms of Service and Privacy Policy at palmspringsadventureclub.com.';
+  // PLACEHOLDER COPY, not final -- Airey asked for an email opt-in for
+  // the Kit list here (Confirm Your Details, Sept 2026 follow-up) but
+  // hadn't specified marketing copy yet, so this is a reasonable first
+  // draft pending the real copy review, same posture this file already
+  // took with the intro banner before that round's copy landed.
+  var KIT_OPTIN_LABEL = 'Yes, sign me up for occasional emails from Palm Springs Adventure Club about trail guides, gear tips, and future adventures.';
 
   function h(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
   function escapeHtml(s) {
@@ -368,7 +374,7 @@
       '<div class="ap-back-link" id="sb-back" style="cursor:pointer;">&larr; Back to Your Adventure</div>' +
       '<div class="ap-eyebrow">Confirm Your Details</div>' +
       '<div class="ap-q-title">Let’s make sure we can reach you.</div>' +
-      '<div class="ap-q-help">So we can keep you posted on this adventure — trail updates, any waivers you need to sign, and weather for your trail day.</div>' +
+      '<div class="ap-q-help">We’ll keep you posted on this adventure, including trail updates, waivers you need to sign, and weather for your trail day.</div>' +
       '<div class="ap-field-label">Your Email</div>' +
       '<input class="ap-field-input" type="email" id="sb-email" value="' + escapeHtml(state.email) + '">' +
       '<div class="ap-helper" style="margin-top:-0.6rem; display:block;">We’ll send waiver links and updates here. Change it if this isn’t the best one.</div>' +
@@ -378,6 +384,11 @@
       '<input type="checkbox" id="sb-sms"' + (state.smsConsent ? ' checked' : '') + '>' +
       '<span class="ap-sms-consent-label">' + escapeHtml(SMS_CONSENT_LABEL) +
       '<span class="ap-sms-fineprint">' + escapeHtml(SMS_CONSENT_FINEPRINT) + ' See Terms of Service and Privacy Policy at palmspringsadventureclub.com.</span>' +
+      '</span></label>' +
+      '<label class="ap-sms-consent">' +
+      '<input type="checkbox" id="sb-kit-optin">' +
+      '<span class="ap-sms-consent-label">' + escapeHtml(KIT_OPTIN_LABEL) +
+      '<span class="ap-sms-fineprint">Optional, not required to continue. Unsubscribe anytime.</span>' +
       '</span></label>' +
       '<div id="sb-details-error" class="ap-error"></div>' +
       '<button type="button" class="ap-cta-primary" id="sb-save-details">Save &amp; Continue</button>' +
@@ -390,6 +401,7 @@
       var email = wrap.querySelector('#sb-email').value.trim();
       var phone = wrap.querySelector('#sb-phone').value.trim();
       var smsConsent = wrap.querySelector('#sb-sms').checked;
+      var kitOptIn = wrap.querySelector('#sb-kit-optin').checked;
       if (!email) {
         wrap.querySelector('#sb-details-error').textContent = 'Enter an email so we can reach you.';
         return;
@@ -417,6 +429,18 @@
         state.ctx.signer.signerPhone = phone;
         state.ctx.signer.smsConsent = smsConsent;
         state.ctx.signer.detailsConfirmedAt = res.body.detailsConfirmedAt || new Date().toISOString();
+        // Kit is the system of record for list membership (see
+        // lib/kit-sync-service.js's own header comment) -- this never
+        // writes to Postgres directly, same as the homepage waitlist
+        // form's own call to this exact endpoint. Fire-and-forget: a
+        // failed subscribe shouldn't block confirming contact details,
+        // so errors are swallowed here rather than surfaced in
+        // sb-details-error. Not persisted locally, so a returning guest
+        // sees this box unchecked again even if already subscribed --
+        // re-subscribing is harmless (Kit dedupes by email).
+        if (kitOptIn) {
+          apiPost('/api/kit-subscribe', { email: email }).catch(function () {});
+        }
         goHub();
       });
     });
