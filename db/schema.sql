@@ -306,6 +306,14 @@ CREATE TABLE IF NOT EXISTS experience_bookings (
   refunded_at                TIMESTAMPTZ,
   refund_staff_notes         TEXT,
   deposit_hold_renewed_at    TIMESTAMPTZ,
+  -- NEW (Airey's direct request, 2026-09-02): dedup marker for
+  -- api/send-deposit-hold-heads-up.js -- set once the T-1 noon Pacific
+  -- "your gear deposit hold is coming" email has gone out for this
+  -- booking, same plain nullable-timestamp idempotency pattern as
+  -- t3_cutoff_processed_at/deposit_hold_renewed_at above. Independent of
+  -- deposit_status (that field tracks the actual Stripe hold's own
+  -- lifecycle; this one only tracks whether the heads-up EMAIL was sent).
+  deposit_heads_up_sent_at   TIMESTAMPTZ,
   gear_delivered_at          TIMESTAMPTZ,
   gear_delivered_by          TEXT,
   stalled_called_at          TIMESTAMPTZ,
