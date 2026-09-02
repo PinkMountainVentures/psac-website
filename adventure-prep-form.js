@@ -113,7 +113,7 @@
   var BEST_FOR_ATTRIBUTES_OPTIONS = [
     'Big views', 'Solitude and quiet', 'Physical challenge', 'Wildlife and nature',
     'Interesting geology', 'Water (streams, pools, falls)', 'Photography opportunities',
-    'Learning about the place', 'Moving fast', 'Moving slow and taking it all in',
+    'Learning about the place',
   ];
   var TECHNICAL_COMFORT_OPTIONS = [
     { value: 'wide_easy_underfoot', label: 'Wide, easy-underfoot trail' },
@@ -121,8 +121,8 @@
     { value: 'comfortable_scrambling_route_finding', label: 'Comfortable scrambling and route-finding' },
   ];
   var HEAT_COMFORT_OPTIONS = [
-    { value: 'prefers_shade_or_cooler_start', label: 'I’d rather have shade, or an early, cooler start' },
-    { value: 'heat_doesnt_slow_me_down', label: 'Heat doesn’t slow me down' },
+    { value: 'prefers_shade_or_cooler_start', label: 'We prefer shade' },
+    { value: 'heat_doesnt_slow_me_down', label: 'We love the sun' },
   ];
   // BUG FIX (Aug 2026, independent bug pass): these bucket strings used
   // ASCII hyphens ('14-17', '18-24', ...), but adventure-form.js's roster
@@ -1127,7 +1127,7 @@
 
     if (state.prefStep === 0) {
       var wrap = h(
-        '<div class="container"><div class="ap-shell">' +
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
         flowTop('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
         '<div class="ap-q-title">What does your group want to experience on the trail?</div>' +
@@ -1163,7 +1163,7 @@
 
     if (state.prefStep === 1) {
       var wrap = h(
-        '<div class="container"><div class="ap-shell">' +
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
         flowTop('&larr; Back') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
         '<div class="ap-q-title">How technical can the trail be for your group?</div>' +
@@ -1196,7 +1196,7 @@
 
     // prefStep === 2
     var wrap = h(
-      '<div class="container"><div class="ap-shell">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       flowTop('&larr; Back') +
       '<div class="ap-eyebrow">Trail Recommendation</div>' +
       '<div class="ap-q-title">How much sun is acceptable for your group?</div>' +
@@ -1274,8 +1274,35 @@
   // ".ap-compare-card" comparison layout (photo + badge, name, a
   // Distance/Elevation/Difficulty/Technical stat grid, a short description,
   // one CTA). `badge` is {text, cls} or null/undefined for no badge.
+  // Short-summary generator for trail cards (Sept 2026 walkthrough: full
+  // opening_description made the cards "far too compact"/overflowing).
+  // trails.what_makes_it_special exists in the schema as a possible short-
+  // copy source, but it's unpopulated/unused everywhere in the app today
+  // and there's no way to inspect real values from here -- so this derives
+  // a summary from the existing overviewCopy (opening_description) instead,
+  // which ships without any data/schema dependency. Cuts at the last full
+  // sentence that fits within maxLen, falling back to the last word
+  // boundary + an ellipsis. If Airey populates what_makes_it_special with
+  // real short-form copy later, swap the summarize() call below for that
+  // field directly.
+  function summarize(text, maxLen) {
+    if (!text) return '';
+    var trimmed = text.trim();
+    if (trimmed.length <= maxLen) return trimmed;
+    var slice = trimmed.slice(0, maxLen);
+    var lastSentenceEnd = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '));
+    if (lastSentenceEnd > maxLen * 0.4) {
+      return slice.slice(0, lastSentenceEnd + 1);
+    }
+    var lastSpace = slice.lastIndexOf(' ');
+    return slice.slice(0, lastSpace > 0 ? lastSpace : maxLen).replace(/[,;:\s]+$/, '') + '…';
+  }
+
+  // `ctaLabel` falsy (null/undefined) renders the card with no CTA button,
+  // so the confirmation screen (renderConfirmation) can reuse this exact
+  // component just for the consistent name/stats/summary presentation.
   function compareCardHtml(candidate, badge, ctaLabel, ctaDisabled) {
-    var desc = candidate.overviewCopy || ((candidate.matchedAttributes || []).length
+    var desc = summarize(candidate.overviewCopy, 250) || ((candidate.matchedAttributes || []).length
       ? 'Matches what you told us: ' + candidate.matchedAttributes.join(', ') + '.'
       : 'A safe, solid fit for your group.');
     return '<div class="ap-compare-card">' +
@@ -1291,13 +1318,13 @@
       '<div><div class="ap-compare-stat-label">Technical</div><div class="ap-compare-stat-value">' + technicalLabel(candidate.technicalRating) + '</div></div>' +
       '</div>' +
       '<div class="ap-compare-desc">' + escapeHtml(desc) + '</div>' +
-      '<button type="button" class="ap-compare-cta"' + (ctaDisabled ? ' disabled' : '') + ' data-trail-id="' + escapeHtml(candidate.trailId) + '">' + escapeHtml(ctaLabel) + '</button>' +
+      (ctaLabel ? '<button type="button" class="ap-compare-cta"' + (ctaDisabled ? ' disabled' : '') + ' data-trail-id="' + escapeHtml(candidate.trailId) + '">' + escapeHtml(ctaLabel) + '</button>' : '') +
       '</div></div>';
   }
 
   function renderTrail() {
     var ap = state.ctx.adventurePrep || {};
-    var wrap = h('<div class="container"><div class="ap-shell"><div id="ap-trail-content"></div></div></div>');
+    var wrap = h('<div class="container ap-wide"><div class="ap-shell" style="padding-top:0;"><div id="ap-trail-content"></div></div></div>');
     var contentEl = wrap.querySelector('#ap-trail-content');
 
     function flowTopHtml(backLabel) {
@@ -1311,12 +1338,7 @@
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
         '<div class="ap-q-title" style="margin-bottom:1rem;">' + escapeHtml(candidate.trailName || 'Your trail') + ' it is.</div>' +
-        '<div class="ap-reveal-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '>' + (candidate.photoUrl ? '' : '<div class="ap-reveal-photo-label">Trail photo</div>') + '</div>' +
-        '<div class="ap-reveal-card">' +
-        '<div class="ap-reveal-eyebrow">Your Trail</div>' +
-        '<div class="ap-reveal-name">' + escapeHtml(candidate.trailName || '') + '</div>' +
-        '<div class="ap-reveal-body">' + escapeHtml(candidate.overviewCopy || 'Matched to your group’s pace and the sun you’re comfortable with.') + '</div>' +
-        '</div>' +
+        '<div style="margin-bottom:1.2rem;">' + compareCardHtml(candidate, null, null, false) + '</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-continue-attendees">Continue to Attendees</button>' +
         '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Return to Adventure Home</div>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);

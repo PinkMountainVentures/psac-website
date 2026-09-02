@@ -93,6 +93,14 @@
    specifically. */
 .ap-shell .container { max-width: 640px; }
 
+/* Sept 2026 trail-recommendation walkthrough: Airey reacted to exactly the
+   tradeoff flagged above -- the trail-comparison grid and the post-
+   selection confirmation card were "far too compact" at the shared 640px
+   width. Scoped modifier (only renderTrail's wrap in adventure-prep-form.js
+   uses it) instead of raising the shared 640px, so the already-approved
+   narrower question screens are untouched. */
+.ap-shell .container.ap-wide { max-width: 960px; }
+
 .ap-progress-bar { height: 4px; background: rgba(42,71,71,0.12); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; max-width: 640px; }
 .ap-progress-fill { height: 100%; background: var(--mountain-pink); transition: width 0.3s ease; }
 .ap-progress-labels { display: flex; gap: 1.4rem; margin-bottom: 2.2rem; flex-wrap: wrap; }
@@ -357,7 +365,11 @@
 
 .ap-compare-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-bottom: 1rem; }
 .ap-compare-grid.is-thin { grid-template-columns: repeat(2, 1fr); max-width: 820px; }
-.ap-compare-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+.ap-compare-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); max-width: 420px; }
+/* max-width above only matters standalone (renderConfirmation, one card,
+   no grid) -- inside .ap-compare-grid the grid track (repeat(3,1fr) or
+   the .is-thin 2-col track) is already narrower than 420px, so grid
+   sizing is unaffected. */
 .ap-compare-photo { height: 130px; background: linear-gradient(135deg, #3a5a5a, #2A4747); position: relative; background-color: #6a7a6a; }
 .ap-compare-badge { position: absolute; top: 0.7rem; left: 0.8rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 10px; }
 .badge-recommended { background: var(--mountain-pink); color: white; }
