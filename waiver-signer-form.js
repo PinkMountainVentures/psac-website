@@ -370,7 +370,7 @@
   // ---------------------------------------------------------------------
   function renderConfirmDetails() {
     var wrap = h(
-      '<div class="container"><div class="ap-shell">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-back-link" id="sb-back" style="cursor:pointer;">&larr; Back to Your Adventure</div>' +
       '<div class="ap-eyebrow">Confirm Your Details</div>' +
       '<div class="ap-q-title">Let’s make sure we can reach you.</div>' +
@@ -479,7 +479,7 @@
   // top-of-file note) -> confirmation.
   // ---------------------------------------------------------------------
   function renderWaiver() {
-    var wrap = h('<div class="container"><div class="ap-shell"><div id="sb-waiver-content"></div></div></div>');
+    var wrap = h('<div class="container ap-wide"><div class="ap-shell" style="padding-top:0;"><div id="sb-waiver-content"></div></div></div>');
     var contentEl = wrap.querySelector('#sb-waiver-content');
 
     function flowTopHtml(backLabel) {
@@ -505,6 +505,7 @@
         '<div class="ap-eyebrow">Your Waiver</div>' +
         '<div class="ap-q-title">Sign your waiver.</div>' +
         '<div class="ap-q-help">Scroll through the full agreement below, then confirm at the bottom.</div>' +
+        '<div class="ap-card">' +
         '<div class="ap-waiver-scroll" id="sb-waiver-scroll">' +
         '<div class="doc-title"><div class="doc-name">PALM SPRINGS ADVENTURE CLUB</div>' +
         '<div class="doc-sub">Participant Agreement and Acknowledgment of Risk</div>' +
@@ -526,6 +527,7 @@
         '<div class="ap-field-label">Phone</div>' +
         '<input class="ap-field-input" type="tel" id="sb-ec-phone" placeholder="Phone number" value="' + escapeHtml(state.ecPhone) + '">' +
         '<div id="sb-waiver-error" class="ap-error"></div>' +
+        '</div>' +
         '<button type="button" class="ap-cta-primary" id="sb-sign-cta" disabled>Sign &amp; Continue</button>' +
         '<div class="ap-cta-secondary" id="sb-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
 
@@ -616,6 +618,7 @@
     // every box independently toggleable; nothing here auto-submits
     // without the signer's own affirmative action.
     function renderGuardianQuestion() {
+      wrap.classList.remove('ap-wide');
       var minors = state.ctx.minors || [];
       var isGuardian = null;
       // Pre-seed with any pre-assigned minors so the checklist starts
@@ -738,6 +741,7 @@
     }
 
     function renderConfirmation() {
+      wrap.classList.remove('ap-wide');
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Your Waiver</div>' +

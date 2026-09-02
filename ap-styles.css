@@ -496,7 +496,7 @@
 
 .ap-section-label { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ap-muted); margin: 1.1rem 0 0.6rem; }
 
-.ap-waiver-scroll { max-height: 280px; overflow-y: auto; border: 1.5px solid rgba(42,71,71,0.15); border-radius: 10px; padding: 1rem 1.1rem; background: white; font-size: 0.74rem; line-height: 1.65; color: var(--dark-pine); margin-bottom: 0.7rem; max-width: 640px; }
+.ap-waiver-scroll { max-height: 280px; overflow-y: auto; border: 1.5px solid rgba(42,71,71,0.15); border-radius: 10px; padding: 1rem 1.1rem; background: white; font-size: 0.74rem; line-height: 1.65; color: var(--dark-pine); margin-bottom: 0.7rem; }
 .ap-waiver-scroll .doc-title { text-align: center; margin-bottom: 0.8rem; }
 .ap-waiver-scroll .doc-name { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.05rem; }
 .ap-waiver-scroll .doc-sub { font-style: italic; font-size: 0.72rem; color: var(--ap-muted); margin-top: 0.2rem; }
