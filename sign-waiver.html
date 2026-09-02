@@ -19,9 +19,19 @@
 <header class="ap-header">
   <div class="container">
     <a href="/" class="ap-logo"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></a>
-    <div class="ap-header-right">Questions? <a href="mailto:hello@palmspringsadventureclub.com">Email us anytime</a></div>
+    <button type="button" id="ap-help-btn" class="ap-help-btn">Questions?</button>
   </div>
 </header>
+<div id="ap-help-panel" class="help-panel">
+  <div class="help-panel-inner">
+    <div class="help-panel-label">Questions? Ask us anything</div>
+    <textarea id="ap-help-textarea" class="help-textarea" placeholder="What do you need help with?"></textarea>
+    <div class="help-row">
+      <div class="help-note">We'll reply to the email on your booking.</div>
+      <button type="button" id="ap-help-send" class="help-send">Send</button>
+    </div>
+  </div>
+</div>
 
 <main id="sb-root" class="ap-shell">
   <div class="container">
@@ -32,6 +42,35 @@
   </div>
 </main>
 
+<script>
+(function () {
+  var btn = document.getElementById('ap-help-btn');
+  var panel = document.getElementById('ap-help-panel');
+  var sendBtn = document.getElementById('ap-help-send');
+  var textarea = document.getElementById('ap-help-textarea');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', function () {
+    var isOpen = panel.classList.toggle('is-open');
+    btn.textContent = isOpen ? 'Close \u2715' : 'Questions?';
+    if (isOpen && textarea) textarea.focus();
+  });
+  if (sendBtn && textarea) {
+    // PROVISIONAL (coordinating chat, 2026-09-02): no dedicated
+    // send-a-message backend exists yet (checked -- nothing under api/
+    // handles a support/contact/help action today), so this hands off to
+    // a pre-filled mailto rather than silently doing nothing. Flagged to
+    // Airey as a real upgrade decision, not a permanent design.
+    sendBtn.addEventListener('click', function () {
+      var body = textarea.value.trim();
+      if (!body) { textarea.focus(); return; }
+      var subject = 'Question from your Adventure Prep page';
+      window.location.href = 'mailto:hello@palmspringsadventureclub.com'
+        + '?subject=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+    });
+  }
+})();
+</script>
 <script src="/waiver-signer-form.js"></script>
 </body>
 </html>

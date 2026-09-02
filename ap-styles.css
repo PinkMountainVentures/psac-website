@@ -38,7 +38,61 @@
 .ap-header-right { font-size: 0.72rem; color: rgba(248,241,233,0.5); }
 .ap-header-right a { color: rgba(248,241,233,0.75); text-decoration: none; border-bottom: 1px solid rgba(248,241,233,0.3); }
 
+/* FIX (coordinating chat, 2026-09-02, Adventure Prep cleanup pass):
+   restores an interaction that was designed (mockup-01-adventure-home-v1.html,
+   "Questions?" pill button expanding an ask-a-question panel in place, no
+   navigation away) but dropped somewhere between v1 and the v2 mockup this
+   build actually shipped from -- the live header regressed to a plain
+   "Questions? <a mailto>" text link. Airey confirmed v1's interaction is
+   the target; rebuilding it here, verbatim off v1's own styles (same
+   values, just remapped onto this file's existing --dark-pine/
+   --mountain-pink/--sand-beige/--desert-green tokens instead of v1's
+   standalone mockup :root, and onto this project's real .ap-* class
+   names rather than duplicating a second header system). */
+.ap-help-btn { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(248,241,233,0.7); background: rgba(248,241,233,0.08); border: 1px solid rgba(248,241,233,0.2); border-radius: 20px; padding: 0.4rem 0.8rem; white-space: nowrap; cursor: pointer; }
+.ap-help-btn:hover { background: rgba(248,241,233,0.14); }
+.help-panel { display: none; background: #233c3c; padding: 1rem 0; }
+.help-panel.is-open { display: block; }
+.help-panel-inner { max-width: 640px; margin: 0 auto; padding: 0 28px; }
+.help-panel-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.6rem; }
+.help-textarea { width: 100%; background: rgba(248,241,233,0.06); border: 1px solid rgba(248,241,233,0.18); border-radius: 6px; color: var(--sand-beige); font-family: 'Montserrat', sans-serif; font-size: 0.78rem; padding: 0.7rem 0.8rem; min-height: 64px; resize: none; }
+.help-textarea::placeholder { color: rgba(248,241,233,0.35); }
+.help-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.help-note { font-size: 0.66rem; color: rgba(248,241,233,0.4); max-width: 320px; line-height: 1.5; }
+.help-send { background: var(--mountain-pink); color: white; border: none; padding: 0.55rem 1.1rem; border-radius: 20px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.help-send:hover { background: #e37360; }
+.help-send:disabled { opacity: 0.6; cursor: not-allowed; }
+.help-sent-note { font-size: 0.7rem; color: var(--desert-green); font-weight: 600; margin-top: 0.6rem; }
+
 .ap-shell { padding: 2.6rem 0 5rem; }
+
+/* FIX (coordinating chat, 2026-09-02, Adventure Prep cleanup pass): every
+   individual content block below (.ap-q, .ap-tiles, .ap-card, .ap-wv-row,
+   etc.) has always capped its OWN max-width (640px on the large majority,
+   720px on the hub's own elements, 820px on the comparison/reveal grids)
+   but never centered itself (no margin:auto anywhere except the three
+   terminal "done" states) -- so it rendered flush against the left edge
+   of the real .container's full 1160px width, which is centered but far
+   wider than any of this page's content. Reported live: "the content
+   needs to be centered" + "the content needs to be set to a standard
+   width across pages" -- both true, both caused by this one gap.
+   Fixed at the root instead of patching ~40 scattered declarations: this
+   overrides the shared .container's max-width (1160px, correct for the
+   marketing site, wrong here) down to 640px -- already the width nearly
+   every element below independently converged on -- for every Adventure
+   Prep screen at once. margin:0 auto is inherited from the base .container
+   rule already, so this centers the whole content column on the page.
+   Elements below still declaring their own 640px max-width are now
+   redundant (harmless, capped by this parent either way) rather than
+   load-bearing; the few at 720px (ap-q, ap-alert, ap-deposit-note,
+   ap-trail-section, ap-tiles, ap-receipt) and the comparison/reveal grids
+   at 820px are now clamped to this same 640px standard too, consistent
+   with "one standard width," at the cost of slightly tighter grid
+   columns on the trail-comparison screens -- flagged for Airey to react
+   to once seen live, not silently decided as a permanent width for those
+   specifically. */
+.ap-shell .container { max-width: 640px; }
+
 .ap-progress-bar { height: 4px; background: rgba(42,71,71,0.12); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; max-width: 640px; }
 .ap-progress-fill { height: 100%; background: var(--mountain-pink); transition: width 0.3s ease; }
 .ap-progress-labels { display: flex; gap: 1.4rem; margin-bottom: 2.2rem; flex-wrap: wrap; }
