@@ -660,13 +660,26 @@
     var depositAmount = eb.tier === 'p2p' ? 100 : 65;
 
     var pastT3 = status.trailSelected && isPastT3Cutoff();
+    // Sept 2026 walkthrough follow-up: the hub used to show just the
+    // trail name here (a separate, name-only ap-trail-* block) -- Airey
+    // asked for the same card styling used on the selection/confirmation
+    // screens (distance/elevation/brief description) to carry through
+    // once a trail is picked and the guest is back on the hub. Reuses
+    // compareCardHtml() with the full candidate object from
+    // ap.candidateTrails rather than just status.trailName.
+    var selectedTrailCandidate = null;
+    if (status.trailSelected) {
+      var hubCandidateTrails = ap.candidateTrails;
+      try { hubCandidateTrails = typeof hubCandidateTrails === 'string' ? JSON.parse(hubCandidateTrails || '[]') : (hubCandidateTrails || []); } catch (e) { hubCandidateTrails = []; }
+      selectedTrailCandidate = hubCandidateTrails.filter(function (c) { return c.trailId === ap.selectedTrailId; })[0] || { trailName: status.trailName };
+    }
     var trailSectionHtml = !status.trailSelected ? '' :
-      '<div class="ap-trail-section"><div class="ap-trail-photo"><div class="ap-trail-photo-label">Trail photo</div></div>' +
-      '<div class="ap-trail-body"><div class="ap-trail-eyebrow">Your Trail</div><div class="ap-trail-name">' + escapeHtml(status.trailName) + '</div>' +
+      '<div class="ap-trail-section-wide">' +
+      compareCardHtml(selectedTrailCandidate, null, null, false) +
       (pastT3
         ? '<div class="ap-trail-unlocked"><div class="ap-trail-unlocked-text">Your guide is ready: turn-by-turn navigation, waypoints, and everything else for the trail.</div><button type="button" class="ap-trail-download-btn" id="ap-get-guide">Get Guide</button></div>'
         : '<div class="ap-trail-locked-note"><span class="lock-icon">🔒</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
-      '</div></div>';
+      '</div>';
 
     // Icons: Style B ("Line, salmon accent") from the icon-options
     // comparison Airey picked from, 2026-09-02 -- inline SVG strings,
@@ -1488,11 +1501,7 @@
           flowTopHtml('&larr; Adventure Home') +
           '<div class="ap-eyebrow">Trail Recommendation</div>' +
           '<div class="ap-q-title" style="margin-bottom:1rem;">Want a different trail?</div>' +
-          '<div class="ap-reveal-photo" style="margin-top:0;' + (current.photoUrl ? ' background-image:url(\'' + current.photoUrl + '\'); background-size:cover; background-position:center;' : '') + '">' + (current.photoUrl ? '' : '<div class="ap-reveal-photo-label">Trail photo</div>') + '</div>' +
-          '<div class="ap-reveal-card" style="margin-bottom:1.4rem;">' +
-          '<div class="ap-reveal-eyebrow">Currently Set</div>' +
-          '<div class="ap-reveal-name">' + escapeHtml(current.trailName || 'Your trail') + '</div>' +
-          '</div>' +
+          '<div style="margin-bottom:1.4rem;">' + compareCardHtml(current, { text: 'Currently Set', cls: 'badge-current' }, null, false) + '</div>' +
           '<div class="ap-radio-list" id="ap-change-options">' +
           '<div class="ap-radio' + (choice === 'different' ? ' selected' : '') + '" data-val="different"><div class="ap-radio-dot"></div><div class="ap-radio-text">Choose a different trail<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Pick from the other trails that already fit your group</span></div></div>' +
           '<div class="ap-radio' + (choice === 'redo' ? ' selected' : '') + '" data-val="redo"><div class="ap-radio-dot"></div><div class="ap-radio-text">Answer the questions differently<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Redo the 3 preference questions and get a new match</span></div></div>' +
