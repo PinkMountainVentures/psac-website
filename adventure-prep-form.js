@@ -3218,10 +3218,14 @@
     // ---- Screen: confirmation ----
     function renderConfirmation() {
       var eb = state.ctx.experienceBooking;
-      var depositAmount = computeDepositAmount();
       var ecLine = state.ecName || state.ecPhone
         ? escapeHtml([state.ecName, state.ecPhone].filter(Boolean).join(' \u00b7 '))
         : 'Not provided';
+      // BUG FIX (live-test feedback, 2026-09-02): dropped the gear-deposit
+      // note that used to sit here -- not relevant to a waiver-signing
+      // confirmation, and already called out on the Gear Kits screen and
+      // the Adventure Home hub (see this file's own other two
+      // ap-deposit-note instances).
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Waivers</div>' +
@@ -3231,7 +3235,6 @@
         '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
         '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +
         '</div>' +
-        '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-return-hub-2">Return to Adventure Home</button>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
       contentEl.querySelector('#ap-return-hub-2').addEventListener('click', goHub);
