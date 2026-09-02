@@ -820,7 +820,7 @@
     return Math.max(n, 0);
   }
 
-  var BASE_GEAR_COPY = 'Gregory daypack, Leki trekking poles, two laser-engraved Hydro Flask bottles, LMNT electrolytes, Rancho Meladuco dates, Blue Lizard mineral sunscreen, and a first aid kit';
+  var BASE_GEAR_COPY = 'Gregory daypack, Leki trekking poles, two Hydro Flask bottles, LMNT electrolytes, Rancho Meladuco dates, Blue Lizard mineral sunscreen, and a first aid kit';
 
   function keepsakeCopy(tierKey) {
     return tierKey === 'trail'
