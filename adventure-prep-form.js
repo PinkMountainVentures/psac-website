@@ -1888,6 +1888,9 @@
       return (((parts[0] || '')[0] || '') + ((parts[1] || '')[0] || '')).toUpperCase();
     }
     function isHotelPath() { return state.propertyType === 'Hotel / resort'; }
+    // Shared with renderConfirmation()'s delivery recap, so both screens
+    // show the same human label for a given propertyType value.
+    var PROPERTY_LABELS = { 'Hotel / resort': 'Hotel / Resort', 'Vacation rental (Airbnb/VRBO)': 'Vacation rental', 'Private residence': 'Private residence' };
 
     // ---- Address autocomplete (Airey's direct request, 2026-09-02) ----
     // Shared by renderDeliveryScreen and renderPickupScreen's return-
@@ -2113,7 +2116,6 @@
     // ---- Screen 1: delivery ----
     function renderDeliveryScreen() {
       var PROPERTY_OPTS = ['Hotel / resort', 'Vacation rental (Airbnb/VRBO)', 'Private residence'];
-      var PROPERTY_LABELS = { 'Hotel / resort': 'Hotel / Resort', 'Vacation rental (Airbnb/VRBO)': 'Vacation rental', 'Private residence': 'Private residence' };
       var DELIVERY_WINDOWS = ['3:00pm – 5:00pm', '5:00pm – 7:00pm', '7:00pm – 9:00pm'];
       contentEl.innerHTML =
         flowTopHtml('&larr; Back') +
@@ -2362,27 +2364,71 @@
     }
 
     // ---- Confirmation recap ----
+    // REBUILT (Airey's direct request, 2026-09-02): the old version of
+    // this screen only recapped a kit count plus the delivery/pickup
+    // windows -- easy to miss on a first pass since the summary card was
+    // so sparse. Now recaps the full picture in one place: every roster
+    // member's kit + pack size decision, the full delivery confirmation,
+    // and the full pickup confirmation, so a guest leaves this screen
+    // actually knowing what was saved instead of just that "something"
+    // was saved.
     function renderConfirmation() {
       var eb = state.ctx.experienceBooking;
       var depositAmount = eb.tier === 'p2p' ? 100 : 65;
-      var kitCount = state.roster.filter(function (p) { return isGearEligible(p) && p.gearKit !== false; }).length;
       var hotel = isHotelPath();
-      var pickupLine = hotel
-        ? 'Front desk, final sweep after 9pm' + (state.returnWindow ? ' (requested ' + state.returnWindow + ')' : '')
-        : (state.returnLocation || 'Return location TBD') + (state.returnWindow ? ', ' + state.returnWindow : '');
+
+      var rosterRowsHtml = state.roster.map(function (p) {
+        var eligible = isGearEligible(p);
+        var status;
+        if (!eligible) {
+          status = 'Not included';
+        } else if (p.gearKit === false) {
+          status = 'No kit';
+        } else {
+          status = 'Kit &middot; ' + (p.packSizePreference === 'plus' ? 'Plus' : 'Standard');
+        }
+        return '<div class="ap-recap-line"><span>' + escapeHtml(p.name || '') + '</span><b>' + status + '</b></div>';
+      }).join('');
+
+      var deliveryAddressLine = [state.deliveryAddressLine1, state.deliveryCity, state.deliveryZip ? ('CA ' + state.deliveryZip) : 'CA']
+        .filter(Boolean).join(', ');
+      var deliveryRowsHtml =
+        '<div class="ap-recap-line"><span>Property</span><b>' + escapeHtml(PROPERTY_LABELS[state.propertyType] || state.propertyType || 'Not set') + '</b></div>' +
+        '<div class="ap-recap-line"><span>Address</span><b>' + escapeHtml(deliveryAddressLine || 'Not set') + '</b></div>' +
+        '<div class="ap-recap-line"><span>Delivery Window</span><b>' + escapeHtml(state.deliveryWindow || 'Not set') + '</b></div>' +
+        (state.deliveryNote ? '<div class="ap-recap-line"><span>Note</span><b>' + escapeHtml(state.deliveryNote) + '</b></div>' : '');
+
+      var pickupRowsHtml =
+        '<div class="ap-recap-line"><span>Return Address</span><b>' + (state.returnSameAsDelivery ? 'Same as delivery' : escapeHtml(state.returnAddressLine1 || 'Not set')) + '</b></div>' +
+        (hotel
+          ? '<div class="ap-recap-line"><span>Return Location</span><b>Front desk, final sweep after 9pm</b></div>'
+          : '<div class="ap-recap-line"><span>Return Location</span><b>' + escapeHtml(state.returnLocation || 'Not set') + '</b></div>') +
+        '<div class="ap-recap-line"><span>Return Time</span><b>' + escapeHtml(state.returnWindow || 'Not specified') + '</b></div>' +
+        (state.returnNote ? '<div class="ap-recap-line"><span>Note</span><b>' + escapeHtml(state.returnNote) + '</b></div>' : '');
+
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
         '<div class="ap-recap-icon">&#10003;</div>' +
-        '<div class="ap-recap-title">Your gear is all set.</div>' +
+        '<div class="ap-recap-title">Your gear is now ready to go.</div>' +
+        '<div class="ap-recap-body">You will be able to make changes to gear kits and delivery/pickup instructions until 10:00pm Pacific 3 days before your adventure day.</div>' +
         '<div class="ap-recap-card">' +
-        '<div class="ap-recap-line"><span>Gear Kits</span><b>' + kitCount + ' kit' + (kitCount === 1 ? '' : 's') + '</b></div>' +
-        '<div class="ap-recap-line"><span>Gear Delivery</span><b>' + escapeHtml(state.deliveryWindow || '') + '</b></div>' +
-        '<div class="ap-recap-line"><span>Gear Pickup</span><b>' + escapeHtml(pickupLine) + '</b></div>' +
+        '<div class="ap-recap-section">' +
+        '<div class="ap-field-label">Roster &amp; Gear Kits</div>' +
+        rosterRowsHtml +
+        '</div>' +
+        '<div class="ap-recap-section">' +
+        '<div class="ap-field-label">Delivery</div>' +
+        deliveryRowsHtml +
+        '</div>' +
+        '<div class="ap-recap-section">' +
+        '<div class="ap-field-label">Pickup</div>' +
+        pickupRowsHtml +
+        '</div>' +
         '</div>' +
         '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-continue-waivers">Continue to Waivers</button>' +
-        '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Return to Adventure Home</div>';
+        '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
       contentEl.querySelector('#ap-continue-waivers').addEventListener('click', function () { state.gearStep = 0; state.step = 'waiver'; render(); });
       contentEl.querySelector('#ap-return-hub').addEventListener('click', goHub);

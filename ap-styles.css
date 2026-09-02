@@ -498,6 +498,7 @@
 .ap-recap-line:last-child { border-bottom: none; }
 .ap-recap-line span { color: var(--ap-muted); }
 .ap-recap-line b { color: var(--dark-pine); font-weight: 600; text-align: right; }
+.ap-recap-section + .ap-recap-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--ap-rule); }
 .ap-recap-body { font-size: 0.85rem; color: var(--dark-pine); line-height: 1.65; margin-bottom: 1rem; max-width: 640px; }
 
 /* ---------------------------------------------------------------------
