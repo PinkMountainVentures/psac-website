@@ -939,14 +939,30 @@
   // return shape too — every caller now keys off `participantId`.
   // Also now excludes anyone the booker has marked not participating
   // (isParticipating === false) from the list entirely — a person who's
-  // not on the trip doesn't need a waiver, matching
-  // sendSignerLinksForBooking's own server-side eligibility filter — but
-  // keeps guardian_only rows (non-attending assigned guardians, who do
-  // still need to sign).
+  // not on the trip doesn't need a waiver.
+  // UPDATED (Airey's direct request, live-test feedback, 2026-09-02): used
+  // to also keep guardian_only rows (non-attending assigned guardians) in
+  // this list, on the theory that their own certification was "just as
+  // required as an attending signer's" (see lib/waiver-service.js's own
+  // header comment, point 4). Live-testing showed this reads wrong on
+  // Surface A -- a guardian who isn't coming on the trip shouldn't show
+  // up in "Your group's waivers" needing to sign one, and the hub tile's
+  // "X of Y signed" count shouldn't count them either. Reverted to a
+  // plain isParticipating check, same as any other non-attending person.
+  // FLAGGED, not fixed here: the backend still sends that guardian a real
+  // signer link and still needs their certification
+  // (booking_participants.guardian_verified_at) so this minor's gear kit
+  // doesn't get wrongly flagged as "uncovered" at the T-3 waiver cutoff
+  // (lib/t3-cutoff-service.js's listUncoveredKitParticipants) -- removing
+  // that requirement is a real backend/product decision (and Surface B's
+  // hub still has no distinct "certify guardianship" experience for a
+  // non-attending guardian at all, per waiver-signer-form.js's own header
+  // comment), not something to change silently as part of this display
+  // fix. Left for a follow-up.
   function waiverSigners() {
     var signatures = state.ctx.waiverSignatures || [];
     return state.roster
-      .filter(function (p) { return p.isParticipating !== false || p.roleOnBooking === 'guardian_only'; })
+      .filter(function (p) { return p.isParticipating !== false; })
       .map(function (p) {
         var isOwner = p.roleOnBooking === 'owner';
         var isMinor = !!MINOR_BUCKETS[p.age];
