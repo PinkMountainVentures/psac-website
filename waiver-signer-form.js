@@ -772,18 +772,30 @@
   // non-owner signer.
   // ---------------------------------------------------------------------
   function renderSummary() {
+    // Same .ap-receipt visual format as Surface A's own renderSummary
+    // (Sept 2026 follow-up: Airey asked for parity), just with Surface
+    // B's own narrower data set -- no gear/deposit/payment lines, none
+    // of which belong to a non-owner signer (this file's own longstanding
+    // header comment on this function).
     var status = computeStatus();
     var tripDate = formatTripDate(state.ctx.tripDate);
     var signer = state.ctx.signer || {};
     var wrap = h(
-      '<div class="container"><div class="ap-shell">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-back-link" id="sb-back" style="cursor:pointer;">&larr; Back to Your Adventure</div>' +
-      '<div class="ap-eyebrow">Adventure Summary</div>' +
-      '<div class="ap-q-title">You’re all set.</div>' +
-      '<div class="ap-recap-line"><span>Trail Day</span><b>' + escapeHtml(tripDate) + '</b></div>' +
-      (status.trailAssigned ? '<div class="ap-recap-line"><span>Trail</span><b>' + escapeHtml(status.trailName) + '</b></div>' : '') +
-      '<div class="ap-recap-line"><span>Your Waiver</span><b>Signed' + (signer.signedAt ? ' ' + formatTripDate(signer.signedAt) : '') + '</b></div>' +
-      (status.guardianForChildren.length ? '<div class="ap-recap-line"><span>Also covers</span><b>' + escapeHtml(status.guardianForChildren.join(', ')) + '</b></div>' : '') +
+      '<div class="ap-receipt"><div class="ap-receipt-inner">' +
+      '<div class="ap-receipt-mark"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></div>' +
+      '<div class="ap-receipt-eyebrow">Adventure Summary</div>' +
+      '<div class="ap-receipt-headline">You’re all set.</div>' +
+      '<div class="ap-receipt-grid">' +
+      '<div><div class="ap-receipt-stat-label">Trail Day</div><div class="ap-receipt-stat-value">' + escapeHtml(tripDate) + '</div></div>' +
+      '<div><div class="ap-receipt-stat-label">Trail</div><div class="ap-receipt-stat-value">' + escapeHtml(status.trailAssigned ? status.trailName : 'To be confirmed') + '</div></div>' +
+      '</div>' +
+      '<div class="ap-receipt-divider"></div>' +
+      '<div class="ap-receipt-line"><span>Your Waiver</span><b>Signed' + (signer.signedAt ? ' ' + formatTripDate(signer.signedAt) : '') + '</b></div>' +
+      (status.guardianForChildren.length ? '<div class="ap-receipt-line"><span>Also covers</span><b>' + escapeHtml(status.guardianForChildren.join(', ')) + '</b></div>' : '') +
+      '<div class="ap-receipt-footer">palmspringsadventureclub.com</div>' +
+      '</div></div>' +
       '</div></div>'
     );
     wrap.querySelector('#sb-back').addEventListener('click', goHub);
