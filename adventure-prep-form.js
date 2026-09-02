@@ -1413,8 +1413,8 @@
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       attendeesFlowTopHtml(3, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
-      '<h1 class="ap-q">Who can sign for ' + escapeHtml(minor.name || 'their') + '&rsquo;s waiver?</h1>' +
-      '<p class="ap-sub">' + escapeHtml(minor.name || 'This person') + '&rsquo;s waiver needs an adult guardian&rsquo;s signature. Pick who that is.</p>' +
+      '<h1 class="ap-q">Who is ' + escapeHtml(minor.name || 'their') + '&rsquo;s legal parent or guardian?</h1>' +
+      '<p class="ap-sub">' + escapeHtml(minor.name || 'This person') + ' will need a legal parent or guardian to sign their waiver in a following step.</p>' +
       '<div class="ap-card">' +
       '<div class="paf-options" id="ap-guardian-opts">' +
       adults.map(function (a) {
@@ -1424,9 +1424,9 @@
       '<button type="button" class="paf-option-btn' + (selectedVal === EXTERNAL_VAL ? ' is-selected' : '') + '" data-val="' + EXTERNAL_VAL + '">' + escapeHtml(minor.name || 'Their') + '&rsquo;s guardian isn&rsquo;t on this trip</button>' +
       '</div>' +
       '<div id="ap-guardian-external-wrap" style="display:' + (selectedVal === EXTERNAL_VAL ? '' : 'none') + '; margin-top:0.9rem;">' +
-      '<div class="paf-roster-sub">Guardian&rsquo;s name</div>' +
+      '<div class="paf-roster-sub">Legal parent / guardian&rsquo;s name</div>' +
       '<input id="ap-guardian-name" type="text" placeholder="Full name" value="' + escapeHtml((current && current.name) || '') + '" style="width:100%; box-sizing:border-box; margin-bottom:0.7rem; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
-      '<div class="paf-roster-sub">Guardian&rsquo;s email</div>' +
+      '<div class="paf-roster-sub">Legal parent / guardian&rsquo;s email</div>' +
       '<input id="ap-guardian-email" type="email" placeholder="Email address" value="' + escapeHtml((current && current.email) || '') + '" style="width:100%; box-sizing:border-box; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
       '</div>' +
       '<div id="ap-guardian-error" class="ap-error"></div>' +
