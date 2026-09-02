@@ -446,7 +446,7 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
   try {
     const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || '';
     if (depositStatus === 'released') {
-      await sendEmail({ to: ctx.contactEmail, subject: 'Your gear deposit has been released', html: renderDepositFullReleaseEmail({ logoUrl }) });
+      await sendEmail({ to: ctx.contactEmail, subject: 'Your gear deposit has been released', html: renderDepositFullReleaseEmail({ logoUrl, holdAmount: centsToDollarsStr(holdCents) }) });
     } else if (depositStatus === 'partial_capture') {
       const { itemsLabel, conditionNote } = summarizeItems(chargeableItems);
       await sendEmail({
@@ -456,6 +456,7 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
           logoUrl, item: itemsLabel, conditionNote,
           capturedAmount: centsToDollarsStr(reconciledAmountCents),
           releasedAmount: centsToDollarsStr(Math.max(0, holdCents - reconciledAmountCents)),
+          holdAmount: centsToDollarsStr(holdCents),
         }),
       });
     } else if (depositStatus === 'full_capture') {

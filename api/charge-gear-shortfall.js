@@ -322,6 +322,14 @@ module.exports = async function handler(req, res) {
             logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
             item: itemsLabel,
             additionalAmount: centsToDollarsStr(requestedAmountCents),
+            // ctx.reconciledAmountCents is the amount already captured from
+            // the deposit hold during the earlier reconciliation step --
+            // this scenario (a shortfall charge beyond the hold) only ever
+            // runs after that hold was captured in FULL, so this is exactly
+            // "the hold" the email body refers to (per-kit rate x kit
+            // count -- see api/create-deposit-hold.js's TIERS table; NOT
+            // always $65).
+            holdAmount: centsToDollarsStr(ctx.reconciledAmountCents || 0),
           }),
         });
       } catch (emailErr) {

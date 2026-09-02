@@ -856,6 +856,28 @@
       });
   }
 
+  // NEW (Airey's direct request, 2026-09-02): the refundable gear
+  // deposit hold is per-kit, not a flat fee -- $65/kit on the Trail Guide
+  // Experience, $100/kit on Peaks to Pools once that tier opens up
+  // (matches TIERS.gear in api/create-deposit-hold.js exactly, on
+  // purpose -- see that file's own TIERS table). Every "One more thing"
+  // deposit note in this file (Hub, Gear Kits confirmation, Waiver
+  // confirmation) was computing the correct per-tier RATE but never
+  // multiplying by how many kits the booking actually has, so a 2-kit
+  // Trail booking still showed "$65" instead of "$130". Kit count here
+  // is computeHubStatus().kitCount -- the same isGearEligible-gated,
+  // live gearKit-toggle count already shown on the hub tile and
+  // Adventure Summary -- so a guest never sees a different kit count on
+  // two different screens. Floors at 1 kit even if every roster member
+  // somehow opted out, matching api/create-deposit-hold.js's own "every
+  // booking requires at least 1 kit" floor.
+  function computeDepositAmount() {
+    var eb = state.ctx.experienceBooking;
+    var perKit = eb.tier === 'p2p' ? 100 : 65;
+    var kitCount = Math.max(computeHubStatus().kitCount, 1);
+    return perKit * kitCount;
+  }
+
   function computeHubStatus() {
     var ap = state.ctx.adventurePrep || {};
     var candidateTrails = ap.candidateTrails;
@@ -912,7 +934,7 @@
     var ap = state.ctx.adventurePrep || {};
     var status = computeHubStatus();
     var firstName = (eb.contactName || 'there').split(' ')[0];
-    var depositAmount = eb.tier === 'p2p' ? 100 : 65;
+    var depositAmount = computeDepositAmount();
 
     var pastT3 = status.trailSelected && isPastT3Cutoff();
     // Sept 2026 walkthrough follow-up: the hub used to show just the
@@ -2743,7 +2765,7 @@
     // was saved.
     function renderConfirmation() {
       var eb = state.ctx.experienceBooking;
-      var depositAmount = eb.tier === 'p2p' ? 100 : 65;
+      var depositAmount = computeDepositAmount();
       var hotel = isHotelPath();
 
       var rosterRowsHtml = state.roster.map(function (p) {
@@ -3047,7 +3069,7 @@
     // ---- Screen: confirmation ----
     function renderConfirmation() {
       var eb = state.ctx.experienceBooking;
-      var depositAmount = eb.tier === 'p2p' ? 100 : 65;
+      var depositAmount = computeDepositAmount();
       var ecLine = state.ecName || state.ecPhone
         ? escapeHtml([state.ecName, state.ecPhone].filter(Boolean).join(' \u00b7 '))
         : 'Not provided';
