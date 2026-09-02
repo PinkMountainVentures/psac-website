@@ -1889,6 +1889,105 @@
     }
     function isHotelPath() { return state.propertyType === 'Hotel / resort'; }
 
+    // ---- Address autocomplete (Airey's direct request, 2026-09-02) ----
+    // Shared by renderDeliveryScreen and renderPickupScreen's return-
+    // address field: wraps Google's Places API (New) -- `:autocomplete`
+    // for the live-typing suggestion list, Place Details for the
+    // standardized address once a guest picks one. Same Google Maps
+    // Platform project/key as the existing Address Validation call
+    // (process.env.GOOGLE_MAPS_API_KEY server-side; the key is never sent
+    // to the browser). One session token covers every keystroke's
+    // prediction call plus the eventual Details call for whichever
+    // suggestion gets picked, then a fresh token starts for the next
+    // address search, per Google's session-token billing guidance.
+    // Soft-fails to a quiet no-suggestions dropdown if the Places call
+    // errors or the key isn't configured -- never blocks a guest from
+    // just typing the address out by hand instead.
+    function newAddressSessionToken() {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    // @param addressInput the <input> element guests type into
+    // @param suggestionsEl the dropdown container rendered just below it
+    // @param onFilled(std) called with the standardized address (or null)
+    //   after a suggestion's Place Details call resolves, so each screen
+    //   can fill whatever fields it has beyond the address line itself.
+    function wireAddressAutocomplete(addressInput, suggestionsEl, onFilled) {
+      if (!addressInput || !suggestionsEl) return;
+      var sessionToken = newAddressSessionToken();
+      var debounceTimer = null;
+      var requestSeq = 0;
+      var suppressNextInput = false;
+
+      function closeSuggestions() {
+        suggestionsEl.innerHTML = '';
+        suggestionsEl.classList.remove('open');
+      }
+
+      function drawSuggestions(predictions) {
+        if (!predictions || !predictions.length) { closeSuggestions(); return; }
+        suggestionsEl.innerHTML = predictions.map(function (p, i) {
+          return '<div class="ap-address-suggestion" data-idx="' + i + '">' +
+            '<div class="ap-address-suggestion-main">' + escapeHtml(p.mainText || p.text || '') + '</div>' +
+            (p.secondaryText ? '<div class="ap-address-suggestion-sub">' + escapeHtml(p.secondaryText) + '</div>' : '') +
+            '</div>';
+        }).join('');
+        suggestionsEl.classList.add('open');
+        Array.prototype.forEach.call(suggestionsEl.querySelectorAll('.ap-address-suggestion'), function (el) {
+          // mousedown, not click: fires before the address input's own
+          // blur handler would otherwise close this dropdown out from
+          // under the click.
+          el.addEventListener('mousedown', function (ev) {
+            ev.preventDefault();
+            selectPrediction(predictions[Number(el.getAttribute('data-idx'))]);
+          });
+        });
+      }
+
+      function selectPrediction(prediction) {
+        suppressNextInput = true;
+        addressInput.value = prediction.mainText || prediction.text || addressInput.value;
+        closeSuggestions();
+        apiPost('/api/address-autocomplete', {
+          token: TOKEN,
+          mode: 'details',
+          placeId: prediction.placeId,
+          sessionToken: sessionToken,
+        }).then(function (res) {
+          var std = res.body && res.body.standardized;
+          if (std && std.line1) addressInput.value = std.line1;
+          if (onFilled) onFilled(std);
+          // A session token is spent once a Details call uses it -- start
+          // a fresh one for the next address this guest searches.
+          sessionToken = newAddressSessionToken();
+        });
+      }
+
+      addressInput.addEventListener('input', function () {
+        if (suppressNextInput) { suppressNextInput = false; return; }
+        var query = addressInput.value.trim();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        if (query.length < 4) { closeSuggestions(); return; }
+        debounceTimer = setTimeout(function () {
+          var seq = ++requestSeq;
+          apiPost('/api/address-autocomplete', { token: TOKEN, mode: 'predict', input: query, sessionToken: sessionToken })
+            .then(function (res) {
+              if (seq !== requestSeq) return; // a newer keystroke already superseded this request
+              drawSuggestions(res.body && res.body.predictions);
+            });
+        }, 300);
+      });
+      addressInput.addEventListener('blur', function () {
+        // Short delay so a suggestion's mousedown handler still gets to
+        // fire before the dropdown disappears.
+        setTimeout(closeSuggestions, 150);
+      });
+    }
+
     // NEW (Task 15, 2026-08-31): reconfirmedRosterJson no longer exists
     // (see this file's header comment, point 3) — saveFields silently
     // rejected it, so this screen's kit toggle never actually persisted
@@ -2061,101 +2160,15 @@
       drawPills();
       drawWindows();
 
-      // ---- Address autocomplete (Airey's direct request, 2026-09-02) ----
-      // Guests were typing the whole address by hand with no suggestions
-      // and no auto-fill of city/zip. Wraps Google's Places API (New) --
-      // same Google Maps Platform project/key as the existing Address
-      // Validation call below, just a different API on it (both keyed off
-      // process.env.GOOGLE_MAPS_API_KEY server-side; the key is never sent
-      // to the browser). One session token covers every keystroke's
-      // `:autocomplete` prediction call plus the eventual Place Details
-      // call for whichever suggestion gets picked, then a fresh token
-      // starts for the next address search, per Google's session-token
-      // billing guidance. Soft-fails to a quiet no-suggestions dropdown
-      // (same posture as validate-delivery-address below) if the Places
-      // call errors or the key isn't configured -- never blocks a guest
-      // from just typing the address out by hand instead.
-      var addressInput = contentEl.querySelector('#ap-address');
-      var suggestionsEl = contentEl.querySelector('#ap-address-suggestions');
-      var sessionToken = newSessionToken();
-      var debounceTimer = null;
-      var requestSeq = 0;
-      var suppressNextInput = false;
-
-      function newSessionToken() {
-        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-          var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
-      }
-
-      function closeSuggestions() {
-        suggestionsEl.innerHTML = '';
-        suggestionsEl.classList.remove('open');
-      }
-
-      function drawSuggestions(predictions) {
-        if (!predictions || !predictions.length) { closeSuggestions(); return; }
-        suggestionsEl.innerHTML = predictions.map(function (p, i) {
-          return '<div class="ap-address-suggestion" data-idx="' + i + '">' +
-            '<div class="ap-address-suggestion-main">' + escapeHtml(p.mainText || p.text || '') + '</div>' +
-            (p.secondaryText ? '<div class="ap-address-suggestion-sub">' + escapeHtml(p.secondaryText) + '</div>' : '') +
-            '</div>';
-        }).join('');
-        suggestionsEl.classList.add('open');
-        Array.prototype.forEach.call(suggestionsEl.querySelectorAll('.ap-address-suggestion'), function (el) {
-          // mousedown, not click: fires before the address input's own
-          // blur handler would otherwise close this dropdown out from
-          // under the click.
-          el.addEventListener('mousedown', function (ev) {
-            ev.preventDefault();
-            selectPrediction(predictions[Number(el.getAttribute('data-idx'))]);
-          });
-        });
-      }
-
-      function selectPrediction(prediction) {
-        suppressNextInput = true;
-        addressInput.value = prediction.mainText || prediction.text || addressInput.value;
-        closeSuggestions();
-        apiPost('/api/address-autocomplete', {
-          token: TOKEN,
-          mode: 'details',
-          placeId: prediction.placeId,
-          sessionToken: sessionToken,
-        }).then(function (res) {
-          var std = res.body && res.body.standardized;
-          if (std) {
-            if (std.line1) addressInput.value = std.line1;
-            if (std.city) contentEl.querySelector('#ap-city').value = std.city;
-            if (std.zip) contentEl.querySelector('#ap-zip').value = std.zip;
-          }
-          // A session token is spent once a Details call uses it -- start
-          // a fresh one for the next address this guest searches.
-          sessionToken = newSessionToken();
-        });
-      }
-
-      addressInput.addEventListener('input', function () {
-        if (suppressNextInput) { suppressNextInput = false; return; }
-        var query = addressInput.value.trim();
-        if (debounceTimer) clearTimeout(debounceTimer);
-        if (query.length < 4) { closeSuggestions(); return; }
-        debounceTimer = setTimeout(function () {
-          var seq = ++requestSeq;
-          apiPost('/api/address-autocomplete', { token: TOKEN, mode: 'predict', input: query, sessionToken: sessionToken })
-            .then(function (res) {
-              if (seq !== requestSeq) return; // a newer keystroke already superseded this request
-              drawSuggestions(res.body && res.body.predictions);
-            });
-        }, 300);
-      });
-      addressInput.addEventListener('blur', function () {
-        // Short delay so a suggestion's mousedown handler still gets to
-        // fire before the dropdown disappears.
-        setTimeout(closeSuggestions, 150);
-      });
+      wireAddressAutocomplete(
+        contentEl.querySelector('#ap-address'),
+        contentEl.querySelector('#ap-address-suggestions'),
+        function (std) {
+          if (!std) return;
+          if (std.city) contentEl.querySelector('#ap-city').value = std.city;
+          if (std.zip) contentEl.querySelector('#ap-zip').value = std.zip;
+        }
+      );
 
       function collectAndGoHub() {
         state.deliveryAddressLine1 = contentEl.querySelector('#ap-address').value.trim();
@@ -2251,11 +2264,15 @@
           flowTopHtml('&larr; Back') +
           '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
           '<div class="ap-q-title">Where should your gear get picked up?</div>' +
-          '<div class="ap-q-help">Your gear kit will be picked up the evening of your adventure from the location below.</div>' +
+          '<div class="ap-q-help">Your gear will be picked up the evening after your adventure from the location specified below.</div>' +
+          '<div class="ap-card">' +
           '<div class="ap-toggle-row" id="ap-same-toggle"><div class="ap-toggle-row-text">Same as delivery address</div><div class="ap-switch' + (state.returnSameAsDelivery ? ' on' : '') + '"></div></div>' +
           (state.returnSameAsDelivery ? '' :
             '<div class="ap-field-label">Return Address</div>' +
-            '<input class="ap-field-input" type="text" id="ap-return-address" placeholder="If different from your delivery address" value="' + escapeHtml(state.returnAddressLine1) + '">') +
+            '<div class="ap-address-field" id="ap-return-address-field">' +
+            '<input class="ap-field-input" type="text" id="ap-return-address" placeholder="If different from your delivery address" autocomplete="off" value="' + escapeHtml(state.returnAddressLine1) + '">' +
+            '<div class="ap-address-suggestions" id="ap-return-address-suggestions"></div>' +
+            '</div>') +
           (hotel ? '' :
             '<div class="ap-field-label">Return Location</div>' +
             '<div class="ap-choice-pills" id="ap-return-location"></div>') +
@@ -2267,8 +2284,9 @@
           '<div class="ap-field-label">Return Note (optional)</div>' +
           '<textarea class="ap-field-textarea" id="ap-return-note" placeholder="Any other note or instructions about pickup">' + escapeHtml(state.returnNote) + '</textarea>' +
           '<div id="ap-pickup-error" class="ap-error"></div>' +
+          '</div>' +
           '<button type="button" class="ap-cta-primary" id="ap-next">Continue to Waivers</button>' +
-          '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Return to Adventure Home</div>';
+          '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
 
         contentEl.querySelector('#ap-flow-back').addEventListener('click', function () { state.gearStep = 1; render(); });
         contentEl.querySelector('#ap-return-hub').addEventListener('click', collectAndGoHub);
@@ -2281,6 +2299,11 @@
           drawLocationPills();
         }
         drawWindows();
+        wireAddressAutocomplete(
+          contentEl.querySelector('#ap-return-address'),
+          contentEl.querySelector('#ap-return-address-suggestions'),
+          null
+        );
         contentEl.querySelector('#ap-next').addEventListener('click', onContinue);
       }
 
