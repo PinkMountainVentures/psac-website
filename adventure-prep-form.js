@@ -406,6 +406,8 @@
     switch (state.step) {
       case 'hub': frag = renderHub(); break;
       case 'roster': frag = renderRoster(); break;
+      case 'rosterParticipation': frag = renderRosterParticipation(); break;
+      case 'rosterContact': frag = renderRosterContact(); break;
       case 'invite': frag = renderInvite(); break;
       case 'preferences': frag = renderPreferences(); break;
       case 'trail': frag = renderTrail(); break;
@@ -451,11 +453,117 @@
   // back-link's id since renderRoster and renderInvite each wire their own.
   function attendeesFlowTopHtml(stepIndex, backLinkId, backLabel) {
     var meta = [
-      { pct: 50, label: 'Step 1 of 2' },
-      { pct: 100, label: 'Step 2 of 2' },
+      { pct: 25, label: 'Step 1 of 4' },
+      { pct: 50, label: 'Step 2 of 4' },
+      { pct: 75, label: 'Step 3 of 4' },
+      { pct: 100, label: 'Step 4 of 4' },
     ][stepIndex];
     return '<div class="ap-flow-top"><div class="ap-back-link" id="' + backLinkId + '" style="cursor:pointer; margin-bottom:0;">' + backLabel + '</div><div class="ap-progress-label">' + meta.label + '</div></div>' +
       '<div class="ap-mini-progress-track"><div class="ap-mini-progress-fill" style="width:' + meta.pct + '%;"></div></div>';
+  }
+
+  // Shared "who needs their own waiver-link email" filter (feedback
+  // round, Sep 2026 -- Contact Info split into its own screen): used by
+  // renderRoster()'s Continue handler (to decide whether Contact Info is
+  // needed at all), renderRosterContact() itself, and renderInvite().
+  // Mirrors lib/waiver-service.js's own eligibility filter (attending,
+  // non-owner, non-minor adults, plus any guardian_only rows).
+  function computeAttendeeSigners() {
+    return state.roster.filter(function (p) {
+      return p.roleOnBooking !== 'owner'
+        && (p.roleOnBooking === 'guardian_only' || (p.isParticipating !== false && !MINOR_BUCKETS[p.age]));
+    });
+  }
+
+  function isValidEmail(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
+  }
+
+  // REWRITTEN (Task 15): calls confirmRoster now, not saveFields (which
+  // actively rejects isParticipating/participatingRosterRef/
+  // reconfirmedRosterJson — see this file's header comment). The
+  // `roster` array sent here deliberately EXCLUDES whichever row is
+  // designated as the owner — that row is updated via ownerParticipantId
+  // instead (a separate write inside confirmRoster), and the two paths
+  // are mutually exclusive by design (see lib/adventure-prep-service.js's
+  // confirmRoster, step 4's `role_on_booking != 'owner'` guard). Every
+  // entry here always carries a real participantId (this screen has no
+  // "add a new person" capability — see this file's header comment,
+  // point 1) and is always sent isParticipating: true — this screen has
+  // no per-attendee opt-out control either, matching its existing
+  // "email us to add/remove someone" copy.
+  //
+  // Hoisted to top-level (feedback round, Sep 2026): used to live only
+  // inside renderRoster(), but renderRosterContact() (the new Contact
+  // Info step) needs to save the same combined roster/participation/
+  // email state too, via its own Continue and Save & Return actions.
+  function saveConfirmRoster() {
+    var participating = !!state.isParticipating;
+    var payload = {
+      action: 'confirmRoster',
+      token: TOKEN,
+      isParticipating: participating,
+      ownerParticipantId: participating ? (state.ownerParticipantId || null) : null,
+      roster: state.roster
+        .filter(function (p) { return p.participantId !== state.ownerParticipantId; })
+        .map(function (p) {
+          return { participantId: p.participantId, name: p.name, age: p.age, fitness: p.fitness, email: p.email, isParticipating: true };
+        }),
+    };
+    return apiPost('/api/adventure-prep', payload).then(function (res) {
+      // Mirror locally, same "don't wait for a reload to reflect a save"
+      // reasoning as saveFields()'s own state.ctx.adventurePrep mirroring
+      // above — computeHubStatus() reads state.ctx.adventurePrep.isParticipating,
+      // not state.isParticipating.
+      if (res.ok && state.ctx) {
+        state.ctx.adventurePrep = state.ctx.adventurePrep || {};
+        state.ctx.adventurePrep.isParticipating = !!state.isParticipating;
+      }
+      // BUG FIX (Task 17 jsdom smoke test, 2026-08-31): the above only
+      // ever mirrored adventurePrep.isParticipating — nothing mirrored the
+      // roster's own ownership designation into state.roster (as opposed
+      // to state.ctx.roster, which is never re-fetched until a reload).
+      // waiverSigners() and renderInvite() both read state.roster's
+      // per-entry roleOnBooking directly, so without this, a guest who
+      // just confirmed the roster for the first time couldn't tap their
+      // own row on the Waivers screen (nothing was recognized as
+      // roleOnBooking==='owner' yet) and the invite screen would still
+      // list them as someone to send a waiver link to — both wrong until
+      // a full page reload re-fetched context. Mirrors exactly what
+      // lib/adventure-prep-service.js's confirmRoster itself does
+      // server-side: reset any previous owner back to 'attendee', then
+      // (only when participating) mark the designated row 'owner'; every
+      // other roster entry actually sent keeps its existing
+      // roleOnBooking and just gets isParticipating: true, matching what
+      // was posted.
+      if (res.ok) {
+        var sentIds = {};
+        payload.roster.forEach(function (e) { sentIds[e.participantId] = true; });
+        state.roster.forEach(function (p) {
+          if (participating && p.participantId === state.ownerParticipantId) {
+            p.roleOnBooking = 'owner';
+            p.isParticipating = true;
+          } else if (p.roleOnBooking === 'owner') {
+            p.roleOnBooking = 'attendee';
+          }
+          if (sentIds[p.participantId]) p.isParticipating = true;
+        });
+      }
+      return res;
+    });
+  }
+
+  // Guards saveConfirmRoster() against writing a premature "not
+  // participating" for a guest who hasn't answered that question yet
+  // (feedback round, Sep 2026 -- confirmRoster's payload.isParticipating
+  // is server-side coerced with `!!`, so an undecided `null` would
+  // otherwise be sent, and read back, as a real "no"). Used by every
+  // Attendees screen's "Save & Return to Adventure Home" action; each
+  // screen's own Continue already validates isParticipating is answered
+  // before ever calling saveConfirmRoster() directly.
+  function saveConfirmRosterIfDecided() {
+    if (state.isParticipating === null) return Promise.resolve({ ok: true });
+    return saveConfirmRoster();
   }
 
   // Shared icon-set follow-up (Sept 2026 walkthrough): the alert "!" badge
@@ -800,12 +908,9 @@
   // doesn't reorder itself; it is NEVER sent to the server anymore (see
   // renderRoster's save handlers below, which build their payload from
   // each entry's real participantId).
-  function rosterRowHtml(person, index, isOwnerRow) {
+  function rosterRowHtml(person, index) {
     var age = person.age || person.ageRange || '';
     var isMinor = !!MINOR_BUCKETS[age];
-    var emailField = (!isMinor && !isOwnerRow)
-      ? '<input class="ap-roster-email" data-idx="' + index + '" type="email" placeholder="' + escapeHtml((person.name || 'Their') + '’s email, for their waiver link') + '" value="' + escapeHtml(person.email || '') + '" style="flex:2; min-width:180px; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">'
-      : '';
     // Unlike adventure-form.js's own age <select> (which prepends a
     // non-selectable "Age range" placeholder), every entry in AGE_BUCKETS
     // is itself a real, selectable value — no placeholder needed here.
@@ -815,27 +920,117 @@
     var fitnessOptionsHtml = '<option value="">Fitness level</option>' + FITNESS_OPTIONS.map(function (f) {
       return '<option value="' + escapeHtml(f) + '"' + ((person.fitness || '') === f ? ' selected' : '') + '>' + escapeHtml(f) + '</option>';
     }).join('');
+    // Email capture moved to its own screen (renderRosterContact, feedback
+    // round Sep 2026) -- this row is now just name/age/fitness, matching
+    // this screen's narrowed purpose ("confirm the participating roster").
     return '<div class="paf-roster-row">' +
       '<input class="paf-roster-input paf-roster-name" data-idx="' + index + '" value="' + escapeHtml(person.name || '') + '" placeholder="Name">' +
       '<select class="paf-roster-input paf-roster-age" data-idx="' + index + '">' + ageOptionsHtml + '</select>' +
       (isMinor ? '<span class="paf-roster-tag">Minor</span>' : '<select class="paf-roster-input paf-roster-fit" data-idx="' + index + '">' + fitnessOptionsHtml + '</select>') +
-      (isOwnerRow ? '' : emailField) +
       '</div>';
   }
 
+  // ---------------------------------------------------------------------
+  // Attendees micro-flow, step 1 of 4 ("confirm the participating
+  // roster"). Feedback round, Sep 2026: this used to be one screen doing
+  // three things at once -- roster edits, the "are you joining" question,
+  // and email capture. Split into four: this screen (roster basics only),
+  // renderRosterParticipation (step 2, the Yes/No + "which one is you"
+  // question), renderRosterContact (step 3, email addresses), and the
+  // existing renderInvite (step 4, confirm & send).
+  //
+  // Deliberately does NOT call saveConfirmRoster() on its own Continue --
+  // that action requires a decided isParticipating (server-side coerced
+  // with `!!`, see lib/adventure-prep-service.js's confirmRoster), and
+  // this screen runs before that question is ever asked. The real save
+  // happens once, on renderRosterParticipation's Continue, combining both
+  // screens' edits together exactly as the original single screen did.
+  // "Save & Return" here goes through saveConfirmRosterIfDecided() instead
+  // (a no-op network-wise until isParticipating is known) so a returning
+  // guest tweaking their roster mid-flow still saves correctly, without
+  // ever risking writing a premature "not participating" for a guest who
+  // hasn't answered that yet -- a real risk in the original screen's own
+  // "Save & Return", which called saveConfirmRoster() unconditionally.
+  // ---------------------------------------------------------------------
   function renderRoster() {
-    // BUG FIX (coordinating-session review, Aug 2026): this screen still had
-    // the pre-redesign fixed 3-section progressBar(0, 14) header and a
-    // Back/Continue bottom-nav pair, left over from the old linear wizard —
-    // every sibling screen in this file was already converted to the
-    // flow-top back-link + "Save & return to Adventure Home" pattern as
-    // part of this same rewrite, this one screen was just missed. Fixed to
-    // match, wired to the same state.step = 'hub' / saveFields() pattern
-    // every other screen in this file already uses.
     var wrap = h(
-      '<div class="container ap-roster-wide"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       attendeesFlowTopHtml(0, 'ap-flow-back', '&larr; Adventure Home') +
-      '<div class="ap-eyebrow">Your Adventure</div>' +
+      '<div class="ap-eyebrow">Attendees</div>' +
+      '<h1 class="ap-q">Confirm your group</h1>' +
+      '<p class="ap-sub">Make sure everyone’s name, age, and fitness level are right before we reach out to your group.</p>' +
+      '<div class="ap-card">' +
+      '<div class="paf-roster">' +
+      '<div class="paf-roster-sub">Your group</div>' +
+      '<div id="ap-roster-rows"></div>' +
+      '<div class="ap-helper" style="margin:0.4rem 0 0;">Need to add or remove someone? <a href="mailto:hello@palmspringsadventureclub.com" style="color:var(--mountain-pink);">Email us</a> and we’ll help you update it.</div>' +
+      '</div>' +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="ap-next">Continue</button>' +
+      '<div class="ap-cta-secondary" id="ap-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>' +
+      '</div></div>'
+    );
+
+    function renderRosterRows() {
+      wrap.querySelector('#ap-roster-rows').innerHTML = state.roster.map(function (p, i) {
+        return rosterRowHtml(p, i);
+      }).join('');
+      // Name: plain text input, update state on 'input' only, no
+      // re-render, so typing a correction doesn't lose cursor focus
+      // mid-word.
+      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-name'), function (input) {
+        input.addEventListener('input', function () {
+          var idx = Number(input.getAttribute('data-idx'));
+          state.roster[idx].name = input.value;
+        });
+      });
+      // Age: a <select>, no cursor position to lose, so a full
+      // re-render is safe here — needed because changing age can flip
+      // isMinor, which changes whether this row shows a fitness dropdown
+      // or a "Minor" tag.
+      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-age'), function (select) {
+        select.addEventListener('change', function () {
+          var idx = Number(select.getAttribute('data-idx'));
+          state.roster[idx].age = select.value;
+          renderRosterRows();
+        });
+      });
+      // Fitness: doesn't affect layout or minor status, just update state.
+      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-fit'), function (select) {
+        select.addEventListener('change', function () {
+          var idx = Number(select.getAttribute('data-idx'));
+          state.roster[idx].fitness = select.value;
+        });
+      });
+    }
+
+    renderRosterRows();
+
+    wrap.querySelector('#ap-flow-back').addEventListener('click', function () { state.step = 'hub'; render(); });
+    wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
+      saveConfirmRosterIfDecided().then(function () { state.step = 'hub'; render(); });
+    });
+    wrap.querySelector('#ap-next').addEventListener('click', function () {
+      state.step = 'rosterParticipation';
+      render();
+    });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Attendees micro-flow, step 2 of 4 ("verify if the booker is one of
+  // the participants"). Split out from the old combined roster screen --
+  // see renderRoster's own header comment above. This is where the real
+  // confirmRoster save happens: step 1's roster edits plus this screen's
+  // isParticipating/ownerParticipantId, all together in one call, exactly
+  // matching what the original single screen sent.
+  // ---------------------------------------------------------------------
+  function renderRosterParticipation() {
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      attendeesFlowTopHtml(1, 'ap-flow-back', '&larr; Back') +
+      '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Will you be out on the trail with them?</h1>' +
       '<p class="ap-sub">We ask everyone this directly, booking for a group doesn’t always mean joining it.</p>' +
       '<div class="ap-card">' +
@@ -846,11 +1041,6 @@
       '<div class="paf-roster" id="ap-whoisyou-wrap" style="display:none;">' +
       '<div class="paf-roster-sub">Which one of these is you?</div>' +
       '<div class="paf-options" id="ap-whoisyou-opts"></div>' +
-      '</div>' +
-      '<div class="paf-roster" style="margin-top:1.6rem;">' +
-      '<div class="paf-roster-sub">Your group</div>' +
-      '<div id="ap-roster-rows"></div>' +
-      '<div class="ap-helper" style="margin:0.4rem 0 1.2rem;">Need to add or remove someone? <a href="mailto:hello@palmspringsadventureclub.com" style="color:var(--mountain-pink);">Email us</a> and we’ll help you update it.</div>' +
       '</div>' +
       '<div id="ap-roster-error" class="ap-error"></div>' +
       '</div>' +
@@ -863,12 +1053,6 @@
     // positional array index (see this file's header comment, point 1).
     function renderWhoIsYou() {
       var el = wrap.querySelector('#ap-whoisyou-opts');
-      // BUG FIX (coordinating-session review, Aug 2026): this screen's
-      // "None of these are me" option was left in from the pre-redesign
-      // flow. The handoff doc (Section 3) locks this as removed — "'None
-      // of these are me' option removed from the 'which one is you'
-      // screen, per your future-state note" — but it was still rendered
-      // here. Removed to match the locked decision.
       el.innerHTML = state.roster.map(function (p) {
         var age = p.age || p.ageRange || '';
         var label = (p.name || 'Unnamed') + ' · ' + age + (p.fitness ? ' · ' + p.fitness : '');
@@ -878,48 +1062,6 @@
         btn.addEventListener('click', function () {
           state.ownerParticipantId = btn.getAttribute('data-participant-id');
           renderWhoIsYou();
-          renderRosterRows();
-        });
-      });
-    }
-
-    function renderRosterRows() {
-      wrap.querySelector('#ap-roster-rows').innerHTML = state.roster.map(function (p, i) {
-        return rosterRowHtml(p, i, p.participantId === state.ownerParticipantId);
-      }).join('');
-      // Name: plain text input, update state on 'input' only, no
-      // re-render — matches the existing email field's pattern below, so
-      // typing a correction doesn't lose cursor focus mid-word.
-      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-name'), function (input) {
-        input.addEventListener('input', function () {
-          var idx = Number(input.getAttribute('data-idx'));
-          state.roster[idx].name = input.value;
-        });
-      });
-      // Age: a <select>, no cursor position to lose, so a full
-      // re-render is safe here — needed because changing age can flip
-      // isMinor, which changes whether this row shows an email field, a
-      // fitness dropdown, or a "Minor" tag. Also refreshes the "which one
-      // is you" labels above, which embed age too.
-      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-age'), function (select) {
-        select.addEventListener('change', function () {
-          var idx = Number(select.getAttribute('data-idx'));
-          state.roster[idx].age = select.value;
-          renderRosterRows();
-          renderWhoIsYou();
-        });
-      });
-      // Fitness: doesn't affect layout or minor status, just update state.
-      Array.prototype.forEach.call(wrap.querySelectorAll('.paf-roster-fit'), function (select) {
-        select.addEventListener('change', function () {
-          var idx = Number(select.getAttribute('data-idx'));
-          state.roster[idx].fitness = select.value;
-        });
-      });
-      Array.prototype.forEach.call(wrap.querySelectorAll('.ap-roster-email'), function (input) {
-        input.addEventListener('change', function () {
-          var idx = Number(input.getAttribute('data-idx'));
-          state.roster[idx].email = input.value.trim();
         });
       });
     }
@@ -932,20 +1074,18 @@
       wrap.querySelector('#ap-whoisyou-wrap').style.display = state.isParticipating ? '' : 'none';
       // BUG FIX (Attendees walkthrough, Sep 2026): switching the answer to
       // "No" needs to clear any prior "which one of these is you" selection
-      // -- otherwise that roster row keeps its "You" tag (and its email
-      // field stays hidden) with no way left on this screen to un-mark it.
+      // -- otherwise that roster row would carry a stale owner designation
+      // with no way left on this screen to un-mark it.
       if (!state.isParticipating) {
         if (state.ownerParticipantId) {
           state.ownerParticipantId = '';
           renderWhoIsYou();
-          renderRosterRows();
         }
       } else if (state.roster.length === 1 && !state.ownerParticipantId) {
         // On a single-person booking there’s nothing to ask "which
         // one of these is you" -- it can only be them.
         state.ownerParticipantId = state.roster[0].participantId;
         renderWhoIsYou();
-        renderRosterRows();
       }
     }
 
@@ -956,80 +1096,10 @@
     if (state.isParticipating === true) setJoining('yes');
     else if (state.isParticipating === false) setJoining('no');
     renderWhoIsYou();
-    renderRosterRows();
 
-    // REWRITTEN (Task 15): calls confirmRoster now, not saveFields (which
-    // actively rejects isParticipating/participatingRosterRef/
-    // reconfirmedRosterJson — see this file's header comment). The
-    // `roster` array sent here deliberately EXCLUDES whichever row is
-    // designated as the owner — that row is updated via ownerParticipantId
-    // instead (a separate write inside confirmRoster), and the two paths
-    // are mutually exclusive by design (see lib/adventure-prep-service.js's
-    // confirmRoster, step 4's `role_on_booking != 'owner'` guard). Every
-    // entry here always carries a real participantId (this screen has no
-    // "add a new person" capability — see this file's header comment,
-    // point 1) and is always sent isParticipating: true — this screen has
-    // no per-attendee opt-out control either, matching its existing
-    // "email us to add/remove someone" copy.
-    function saveConfirmRoster() {
-      var participating = !!state.isParticipating;
-      var payload = {
-        action: 'confirmRoster',
-        token: TOKEN,
-        isParticipating: participating,
-        ownerParticipantId: participating ? (state.ownerParticipantId || null) : null,
-        roster: state.roster
-          .filter(function (p) { return p.participantId !== state.ownerParticipantId; })
-          .map(function (p) {
-            return { participantId: p.participantId, name: p.name, age: p.age, fitness: p.fitness, email: p.email, isParticipating: true };
-          }),
-      };
-      return apiPost('/api/adventure-prep', payload).then(function (res) {
-        // Mirror locally, same "don't wait for a reload to reflect a save"
-        // reasoning as saveFields()'s own state.ctx.adventurePrep mirroring
-        // above — computeHubStatus() reads state.ctx.adventurePrep.isParticipating,
-        // not state.isParticipating.
-        if (res.ok && state.ctx) {
-          state.ctx.adventurePrep = state.ctx.adventurePrep || {};
-          state.ctx.adventurePrep.isParticipating = !!state.isParticipating;
-        }
-        // BUG FIX (Task 17 jsdom smoke test, 2026-08-31): the above only
-        // ever mirrored adventurePrep.isParticipating — nothing mirrored the
-        // roster's own ownership designation into state.roster (as opposed
-        // to state.ctx.roster, which is never re-fetched until a reload).
-        // waiverSigners() and renderInvite() both read state.roster's
-        // per-entry roleOnBooking directly, so without this, a guest who
-        // just confirmed the roster for the first time couldn't tap their
-        // own row on the Waivers screen (nothing was recognized as
-        // roleOnBooking==='owner' yet) and the invite screen would still
-        // list them as someone to send a waiver link to — both wrong until
-        // a full page reload re-fetched context. Mirrors exactly what
-        // lib/adventure-prep-service.js's confirmRoster itself does
-        // server-side: reset any previous owner back to 'attendee', then
-        // (only when participating) mark the designated row 'owner'; every
-        // other roster entry actually sent keeps its existing
-        // roleOnBooking and just gets isParticipating: true, matching what
-        // was posted.
-        if (res.ok) {
-          var sentIds = {};
-          payload.roster.forEach(function (e) { sentIds[e.participantId] = true; });
-          state.roster.forEach(function (p) {
-            if (participating && p.participantId === state.ownerParticipantId) {
-              p.roleOnBooking = 'owner';
-              p.isParticipating = true;
-            } else if (p.roleOnBooking === 'owner') {
-              p.roleOnBooking = 'attendee';
-            }
-            if (sentIds[p.participantId]) p.isParticipating = true;
-          });
-        }
-        return res;
-      });
-    }
-
-    wrap.querySelector('#ap-flow-back').addEventListener('click', function () { state.step = 'hub'; render(); });
+    wrap.querySelector('#ap-flow-back').addEventListener('click', function () { state.step = 'roster'; render(); });
     wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
-      saveConfirmRoster().then(function () { state.step = 'hub'; render(); });
+      saveConfirmRosterIfDecided().then(function () { state.step = 'hub'; render(); });
     });
     wrap.querySelector('#ap-next').addEventListener('click', function () {
       if (state.isParticipating === null) {
@@ -1042,11 +1112,76 @@
       }
       saveConfirmRoster().then(function (res) {
         if (!res.ok) { wrap.querySelector('#ap-roster-error').textContent = 'Something went wrong saving that, try again.'; return; }
-        // Attendees is now roster + invite only (handoff Section 3) — the
-        // old linear flow's one-time end-of-flow "Confirm & Send" gate
-        // (renderReview) moved here, as this tile's own next screen,
-        // rather than staying a separate step at the very end of a fixed
-        // sequence that no longer exists.
+        var signers = computeAttendeeSigners();
+        // Skip straight to Send Invites when nobody needs a waiver-link
+        // email (e.g. a solo booking where the booker is the only
+        // participant) -- there's nothing for the Contact Info screen to
+        // collect in that case.
+        state.step = signers.length ? 'rosterContact' : 'invite';
+        render();
+      });
+    });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Attendees micro-flow, step 3 of 4 ("Contact Info" -- collect a waiver
+  // email for everyone who needs one). New screen, feedback round Sep
+  // 2026: "we're asking this screen to do a lot" was the original single
+  // screen's problem; this is the piece that used to be an inline email
+  // field on each roster row. Skipped entirely (see
+  // renderRosterParticipation's Continue handler) when
+  // computeAttendeeSigners() comes back empty.
+  // ---------------------------------------------------------------------
+  function renderRosterContact() {
+    var signers = computeAttendeeSigners();
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      attendeesFlowTopHtml(2, 'ap-flow-back', '&larr; Back') +
+      '<div class="ap-eyebrow">Attendees</div>' +
+      '<h1 class="ap-q">Add an email for each person</h1>' +
+      '<p class="ap-sub">Please enter a valid email address for each person so they can sign a participation waiver.</p>' +
+      '<div class="ap-card">' +
+      '<div id="ap-contact-rows">' + signers.map(function (p) {
+        var meta = [p.age, p.fitness].filter(Boolean).join(' · ');
+        return '<div class="paf-roster-row">' +
+          '<div style="flex:2; min-width:0;"><div style="font-weight:600; font-size:0.86rem; color:var(--dark-pine);">' + escapeHtml(p.name || '') + '</div><div style="font-size:0.74rem; color:var(--ap-muted);">' + escapeHtml(meta) + '</div></div>' +
+          '<input class="ap-contact-email" data-participant-id="' + escapeHtml(p.participantId) + '" type="email" placeholder="' + escapeHtml((p.name || 'Their') + '’s email') + '" value="' + escapeHtml(p.email || '') + '" style="flex:2; min-width:220px; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
+          '</div>';
+      }).join('') + '</div>' +
+      '<div class="ap-helper" style="margin:0.9rem 0 0;">Any minors on this booking need a guardian assigned before we can reach them, that’s not built yet, see the note in Waivers.</div>' +
+      '<div id="ap-contact-error" class="ap-error"></div>' +
+      '</div>' +
+      '<div class="ap-deposit-note">A waiver is required to be completed by each participant 3 days prior to the adventure day or gear will not be delivered for any participant with an unsigned waiver.</div>' +
+      '<button type="button" class="ap-cta-primary" id="ap-next">Continue</button>' +
+      '<div class="ap-cta-secondary" id="ap-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>' +
+      '</div></div>'
+    );
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('.ap-contact-email'), function (input) {
+      input.addEventListener('change', function () {
+        var pid = input.getAttribute('data-participant-id');
+        var person = state.roster.filter(function (r) { return r.participantId === pid; })[0];
+        if (person) person.email = input.value.trim();
+      });
+    });
+
+    wrap.querySelector('#ap-flow-back').addEventListener('click', function () { state.step = 'rosterParticipation'; render(); });
+    wrap.querySelector('#ap-save-and-return').addEventListener('click', function () {
+      saveConfirmRosterIfDecided().then(function () { state.step = 'hub'; render(); });
+    });
+    wrap.querySelector('#ap-next').addEventListener('click', function () {
+      var errEl = wrap.querySelector('#ap-contact-error');
+      var invalid = signers.filter(function (p) { return !isValidEmail(p.email); });
+      if (invalid.length) {
+        errEl.textContent = 'Add a valid email for ' + invalid.map(function (p) { return p.name || 'this person'; }).join(', ') + ' before continuing.';
+        return;
+      }
+      errEl.textContent = '';
+      saveConfirmRoster().then(function (res) {
+        if (!res.ok) { errEl.textContent = 'Something went wrong saving that, try again.'; return; }
         state.step = 'invite';
         render();
       });
@@ -1056,7 +1191,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Attendees tile, step 2: Send Invites (was renderReview — the old
+  // Attendees micro-flow, step 4 of 4: Send Invites (was renderReview — the old
   // one-time "Confirm and Send" end-of-flow gate). Handoff Section 6 FYI
   // note: this used to also serve as Adventure Summary's job; that recap
   // role now belongs entirely to renderSummary below, so this screen is
@@ -1084,11 +1219,8 @@
   // point 6).
   function renderInvite() {
     var ap = state.ctx.adventurePrep || {};
-    var signers = state.roster.filter(function (p) {
-      return p.roleOnBooking !== 'owner'
-        && (p.roleOnBooking === 'guardian_only' || (p.isParticipating !== false && !MINOR_BUCKETS[p.age]));
-    });
-    var missingEmail = signers.filter(function (p) { return !p.email; });
+    var signers = computeAttendeeSigners();
+    var missingEmail = signers.filter(function (p) { return !isValidEmail(p.email); });
     // ap.linksSentAt never existed in the new schema — this field was
     // never written by sendSignerLinksForBooking, which only ever touches
     // waiver_signatures, not adventure_prep. Approximate the same "have we
@@ -1110,16 +1242,14 @@
     if (soloBookerOnly) {
       var soloWrap = h(
         '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-        attendeesFlowTopHtml(1, 'ap-back-to-hub', '&larr; Adventure Home') +
+        attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home') +
         '<div class="ap-eyebrow">Attendees</div>' +
         '<h1 class="ap-q">Your roster is confirmed</h1>' +
-        '<p class="ap-sub">It’s just you on this booking, so there’s no one else to invite.</p>' +
         '<div class="ap-card">' +
         state.roster.map(function (s) {
           var meta = [s.age, s.fitness].filter(Boolean).join(' · ');
           return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(meta) + '</div></div><span class="review-recipient-tag">You</span></div>';
         }).join('') +
-        '<p class="ap-helper" style="margin:0.6rem 0 0;">No one else on this booking needs their own waiver link.</p>' +
         '</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-invite-done">Return to Adventure Home</button>' +
         '</div></div>'
@@ -1131,7 +1261,7 @@
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      attendeesFlowTopHtml(1, 'ap-back-to-hub', '&larr; Adventure Home') +
+      attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home') +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Send invites to your group</h1>' +
       '<p class="ap-sub">Confirm the roster below, then invites go out so the rest of your group can join the adventure and sign their own waivers.</p>' +
@@ -1153,7 +1283,7 @@
 
     wrap.querySelector('#ap-back-to-hub').addEventListener('click', function () { state.step = 'hub'; render(); });
     var backLink = wrap.querySelector('#ap-back-to-roster');
-    if (backLink) backLink.addEventListener('click', function (e) { e.preventDefault(); state.step = 'roster'; render(); });
+    if (backLink) backLink.addEventListener('click', function (e) { e.preventDefault(); state.step = 'rosterContact'; render(); });
 
     var sendBtn = wrap.querySelector('#ap-send-invites');
     if (sendBtn) sendBtn.addEventListener('click', function (e) {

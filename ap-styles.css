@@ -101,14 +101,12 @@
    narrower question screens are untouched. */
 .ap-shell .container.ap-wide { max-width: 960px; }
 
-/* Attendees walkthrough follow-up (Sept 2026): the roster screen's
-   4-column row (name/age/fitness/email, each with real min-widths) was
-   overflowing past the standard 640px card on desktop. A second, more
-   modest scoped modifier rather than reusing .ap-wide -- 960px would also
-   stretch the Yes/No option buttons above the roster (full-width flex
-   children of .ap-card) uncomfortably wide; this just gives the row
-   enough room. */
-.ap-shell .container.ap-roster-wide { max-width: 820px; }
+/* .ap-roster-wide (820px), previously here, is no longer used: the
+   Attendees micro-flow split its old 4-column roster+email row into two
+   screens (feedback round, Sep 2026 -- see adventure-prep-form.js's
+   renderRoster/renderRosterContact) -- email moved to its own screen, so
+   the roster row is back to 3 columns (name/age/fitness) and fits the
+   standard 640px card without help. */
 
 .ap-progress-bar { height: 4px; background: rgba(42,71,71,0.12); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; max-width: 640px; }
 .ap-progress-fill { height: 100%; background: var(--mountain-pink); transition: width 0.3s ease; }
