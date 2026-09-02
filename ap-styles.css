@@ -352,7 +352,7 @@
 --------------------------------------------------------------------- */
 .ap-flow-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .ap-progress-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ap-muted); }
-.ap-mini-progress-track { height: 4px; background: var(--ap-rule); border-radius: 2px; margin-bottom: 1.3rem; overflow: hidden; max-width: 640px; }
+.ap-mini-progress-track { height: 4px; background: var(--ap-rule); border-radius: 2px; margin-bottom: 1.3rem; overflow: hidden; }
 .ap-mini-progress-fill { height: 100%; background: var(--mountain-pink); border-radius: 2px; transition: width 0.3s ease; }
 
 .ap-q-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 600; line-height: 1.25; margin-bottom: 0.5rem; max-width: 640px; }
