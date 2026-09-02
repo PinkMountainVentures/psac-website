@@ -227,6 +227,11 @@
     var firstName = (signer.signerName || '').split(' ')[0] || 'there';
     var status = computeStatus();
 
+    // Icons: Style B ("Line, salmon accent"), matching
+    // adventure-prep-form.js's hub tiles for the 3 shared concepts
+    // (Your Trail / Your Waiver / Adventure Summary), 2026-09-02.
+    // Confirm Your Details keeps its emoji -- no reviewed Style B icon
+    // exists for it.
     function tile(icon, title, sub, statusLabel, opts) {
       opts = opts || {};
       return { icon: icon, title: title, sub: sub, statusLabel: statusLabel, locked: !!opts.locked, readonly: !!opts.readonly, onClick: opts.onClick };
@@ -241,14 +246,14 @@
         status.detailsDone ? 'Saved' : 'Your email & phone, so we can reach you',
         status.detailsDone ? 'Done' : 'Not done',
         { onClick: function () { state.step = 'confirmDetails'; render(); } }),
-      tile('🧭', 'Your Trail',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>', 'Your Trail',
         status.trailAssigned ? status.trailName : 'Not yet assigned',
         null,
         { readonly: true, onClick: status.trailAssigned ? function () { state.step = 'trail'; render(); } : null }),
-      tile('✍️', 'Your Waiver', waiverSub,
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.3 16.6c1.7-2.6 2.6 2.6 4.3 0s2.6 2.6 4.3 0 2.6 2.6 4.3 0" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6.3l4.3 4.3" stroke="#F58271" stroke-width="1.4" stroke-linecap="round"/><circle cx="18.7" cy="11" r="1.2" fill="#F58271"/></svg>', 'Your Waiver', waiverSub,
         status.waiverDone ? 'Done' : 'Not done',
         { onClick: function () { state.step = 'waiver'; render(); } }),
-      tile('📋', 'Adventure Summary',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="5.2" y="4.4" width="13.6" height="16.6" rx="2" stroke="#2A4747" stroke-width="1.3"/><rect x="9" y="2.7" width="6" height="3" rx="1" stroke="#2A4747" stroke-width="1.2"/><path d="M8.3 10h6.4M8.3 13.4h4.6" stroke="#2A4747" stroke-width="1.1" stroke-linecap="round"/><path d="M8.3 17l1.9 1.9 3.7-3.9" stroke="#F58271" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>', 'Adventure Summary',
         status.summaryUnlocked ? 'See your recap' : 'Unlocks once everything above is set',
         status.summaryUnlocked ? 'Done' : 'Locked',
         { locked: !status.summaryUnlocked, onClick: status.summaryUnlocked ? function () { state.step = 'summary'; render(); } : null }),

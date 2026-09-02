@@ -668,28 +668,32 @@
         : '<div class="ap-trail-locked-note"><span class="lock-icon">🔒</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
       '</div></div>';
 
+    // Icons: Style B ("Line, salmon accent") from the icon-options
+    // comparison Airey picked from, 2026-09-02 -- inline SVG strings,
+    // same 42px sand-beige .ap-tile-icon square as before, replacing the
+    // raw emoji this used to hold.
     function tile(icon, title, sub, status2, locked, onClick) {
       return { icon: icon, title: title, sub: sub, statusLabel: status2, locked: !!locked, onClick: onClick };
     }
 
     var tiles = [
-      tile('🧭', 'Trail Recommendation',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>', 'Trail Recommendation',
         status.trailSelected ? status.trailName : 'Tell us what you’re after and we’ll find your trail',
         status.hasUnreviewedManualPick ? 'In review' : (status.trailSelected ? 'Done' : 'Not done'),
         false, function () { state.step = status.trailSelected ? 'trail' : 'preferences'; render(); }),
-      tile('👥', 'Attendees',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.6" r="2.9" stroke="#F58271" stroke-width="1.3"/><path d="M4 19.3c0-3.7 2.2-6.1 5-6.1s5 2.4 5 6.1" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/><circle cx="15.3" cy="9.2" r="2.3" stroke="#2A4747" stroke-width="1.2"/><path d="M12.6 19.3c.2-3 1.9-4.9 3.9-4.9 2.3 0 4.1 2.4 4.1 5.4" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/></svg>', 'Attendees',
         status.rosterDone ? (state.roster.length + ' in your group') : 'Confirm who’s coming and invite your group',
         status.rosterDone ? 'Done' : 'Not done', false,
         function () { state.step = 'roster'; render(); }),
-      tile('🎒', 'Gear Kits &amp; Delivery/Pickup',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8.3 8.2c0-2.4 1.7-4.3 3.7-4.3s3.7 1.9 3.7 4.3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><rect x="5.8" y="8.2" width="12.4" height="12" rx="3" stroke="#2A4747" stroke-width="1.4"/><path d="M9 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><path d="M15 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><rect x="9" y="13.4" width="6" height="4.4" rx="1.2" stroke="#F58271" stroke-width="1.2"/></svg>', 'Gear Kits &amp; Delivery/Pickup',
         status.gearDone ? (status.kitCount + ' kits · Gear delivery ' + (ap.deliveryWindow || state.deliveryWindow)) : 'Choose your kits and delivery details',
         status.gearDone ? 'Done' : 'Not done', false,
         function () { state.step = 'planning'; render(); }),
-      tile('✍️', 'Waivers',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.3 16.6c1.7-2.6 2.6 2.6 4.3 0s2.6 2.6 4.3 0 2.6 2.6 4.3 0" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6.3l4.3 4.3" stroke="#F58271" stroke-width="1.4" stroke-linecap="round"/><circle cx="18.7" cy="11" r="1.2" fill="#F58271"/></svg>', 'Waivers',
         status.signers.length ? (status.signers.filter(function (s) { return s.isDone; }).length + ' of ' + status.signers.length + ' signed') : 'Sign your waiver',
         status.waiversDone ? 'Done' : 'Not done', false,
         function () { state.step = 'waiver'; render(); }),
-      tile('📋', 'Adventure Summary',
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="5.2" y="4.4" width="13.6" height="16.6" rx="2" stroke="#2A4747" stroke-width="1.3"/><rect x="9" y="2.7" width="6" height="3" rx="1" stroke="#2A4747" stroke-width="1.2"/><path d="M8.3 10h6.4M8.3 13.4h4.6" stroke="#2A4747" stroke-width="1.1" stroke-linecap="round"/><path d="M8.3 17l1.9 1.9 3.7-3.9" stroke="#F58271" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>', 'Adventure Summary',
         status.summaryUnlocked ? 'See your full recap' : 'Unlocks once everything above is set',
         status.summaryUnlocked ? 'Done' : 'Locked', !status.summaryUnlocked,
         function () { if (status.summaryUnlocked) { state.step = 'summary'; render(); } }),
