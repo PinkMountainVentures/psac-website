@@ -184,7 +184,7 @@
 .ap-tile-mid { flex: 1; min-width: 0; }
 .ap-tile-title { font-size: 0.88rem; font-weight: 600; color: var(--dark-pine); margin-bottom: 0.18rem; }
 .ap-tile-sub { font-size: 0.74rem; color: var(--ap-muted); line-height: 1.4; }
-.ap-tile-status { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.28rem 0.6rem; border-radius: 12px; white-space: nowrap; flex-shrink: 0; }
+.ap-tile-status, .ap-wv-status { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.28rem 0.6rem; border-radius: 12px; white-space: nowrap; flex-shrink: 0; }
 .status-done { background: rgba(122,189,145,0.18); color: #2a7a4a; }
 .status-review { background: rgba(245,130,113,0.14); color: #c04a2a; }
 .status-notdone { background: rgba(42,71,71,0.06); color: var(--ap-muted); }

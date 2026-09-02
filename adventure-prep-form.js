@@ -2501,7 +2501,7 @@
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Waivers</div>' +
         '<div class="ap-q-title">Your group’s waivers.</div>' +
-        '<div class="ap-q-help">Sign yours, and see where everyone else stands.</div>' +
+        '<div class="ap-q-help">Current status of your group’s waivers.</div>' +
         alertHtml +
         rowsHtml +
         '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer; margin-top:0.6rem;">Return to Adventure Home</div>';
