@@ -1523,7 +1523,7 @@
         contentEl.querySelector('#ap-change-continue').addEventListener('click', function () {
           if (choice === 'different') { renderChangeGrid(candidates, current); }
           else if (choice === 'redo') { state.prefStep = 0; state.forceTrailRefresh = true; state.step = 'preferences'; render(); }
-          else { renderAskTeamConfirm(); }
+          else { renderAskTeamForm(); }
         });
       }
       draw();
@@ -1576,20 +1576,54 @@
       });
     }
 
-    // ---- "Ask our team" — no dedicated backend field/action exists for a
-    // guest-initiated "please review my trail" flag (unlike manual_override,
-    // which is staff-initiated from Ops). Reuses this file's existing
-    // guest-to-team mailto pattern (see the reveal footnote's "Tell us
-    // what's not working" link) rather than inventing a new Sheet column and
-    // Apps Script action for a single button — flagged for Airey; a real
-    // trackable "request review" field would be a clean follow-up if this
-    // needs to show up in Ops.
+    // ---- "Ask our team": a guest-typed note, sent the same way the
+    // header's "Questions?" panel sends (Resend, to reservations@, guest
+    // email as reply-to -- api/send-help-message.js), plus a real
+    // trail_swap_requests row via that endpoint's requestType: 'trail_swap'
+    // handling, so this now surfaces in Ops' Trail Swap Requests alert
+    // like a staff-logged one does. Replaces the previous mailto: fallback
+    // this file used to flag as a known gap ("no dedicated backend field/
+    // action exists for a guest-initiated 'please review my trail' flag").
+    function renderAskTeamForm() {
+      wrap.classList.remove('ap-wide');
+      contentEl.innerHTML =
+        flowTopHtml('&larr; Adventure Home') +
+        '<div class="ap-eyebrow">Trail Recommendation</div>' +
+        '<div class="ap-q-title" style="margin-bottom:0.5rem;">Tell us what you’re looking for.</div>' +
+        '<div class="ap-q-help">Didn’t love the recommended trails? Tell us what you’re looking for and a team member will pick one personally.</div>' +
+        '<textarea class="ap-field-textarea" id="ap-ask-team-textarea" style="min-height:90px;" placeholder="What kind of trail do you want? Didn’t like the recommended trails -- tell us what you’re looking for."></textarea>' +
+        '<div id="ap-ask-team-error" class="ap-error"></div>' +
+        '<button type="button" class="ap-cta-primary" id="ap-ask-team-send">Send Request</button>' +
+        '<div class="ap-cta-secondary" id="ap-ask-team-cancel" style="cursor:pointer;">Never mind, go back</div>';
+      contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
+      contentEl.querySelector('#ap-ask-team-cancel').addEventListener('click', renderChangeEntry);
+      var sendBtn = contentEl.querySelector('#ap-ask-team-send');
+      var errEl = contentEl.querySelector('#ap-ask-team-error');
+      var textarea = contentEl.querySelector('#ap-ask-team-textarea');
+      sendBtn.addEventListener('click', function () {
+        var message = textarea.value.trim();
+        errEl.textContent = '';
+        if (!message) { errEl.textContent = 'Let us know what you’re looking for.'; textarea.focus(); return; }
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending…';
+        apiPost('/api/send-help-message', { token: TOKEN, message: message, requestType: 'trail_swap' }).then(function (res) {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send Request';
+          if (res.ok && res.body && res.body.status === 'sent') {
+            renderAskTeamConfirm();
+          } else {
+            errEl.textContent = (res.body && res.body.message) || 'Something went wrong sending that -- try again, or email us directly at reservations@palmspringsadventureclub.com.';
+          }
+        }).catch(function () {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send Request';
+          errEl.textContent = 'Something went wrong sending that -- try again, or email us directly at reservations@palmspringsadventureclub.com.';
+        });
+      });
+    }
+
     function renderAskTeamConfirm() {
       wrap.classList.remove('ap-wide');
-      var bookingId = (state.ctx.experienceBooking && state.ctx.experienceBooking.bookingId) || '';
-      var mailto = 'mailto:hello@palmspringsadventureclub.com?subject=' + encodeURIComponent('Please pick our trail personally') +
-        '&body=' + encodeURIComponent('Hi team,\n\nCould someone take a personal look at our trail pick?\n\nBooking: ' + bookingId + '\n\nThanks!');
-      window.location.href = mailto;
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
@@ -1603,8 +1637,15 @@
 
     // ---- Entry point: a trail is already set and we're not mid-"just
     // chose it" transition -> show the Change Your Trail re-entry screen
-    // instead of re-running assignment or re-showing the choose grid. ----
-    if (ap.selectedTrailId && state.trailAssignmentPhase !== 'justChosen') {
+    // instead of re-running assignment or re-showing the choose grid.
+    // BUG FIX (Sept 2026): state.forceTrailRefresh also has to bypass this
+    // -- "Answer the questions differently" sets it and routes back here
+    // via state.step = 'trail' with trailAssignmentPhase left 'idle' (not
+    // 'justChosen'), so without this check the gate below always matched
+    // ap.selectedTrailId still being set and sent the guest right back to
+    // the "Want a different trail?" screen instead of actually
+    // re-running the assignment and showing new candidates. ----
+    if (ap.selectedTrailId && state.trailAssignmentPhase !== 'justChosen' && !state.forceTrailRefresh) {
       renderChangeEntry();
     } else {
       state.trailAssignmentPhase = 'idle';

@@ -32,7 +32,19 @@
  * non-attending guardian, PRD Section 6) — reply-to should reach the
  * actual person who typed the message.
  *
- * Request shape: POST /api/send-help-message { token, message }
+ * Request shape: POST /api/send-help-message { token, message,
+ * requestType }. requestType is optional; omitted (or 'question')
+ * keeps the original "Questions?" panel behavior. requestType:
+ * 'trail_swap' (added Sept 2026 for the Trail Recommendation flow's
+ * "Ask our team to pick for you" step -- see adventure-prep-form.js's
+ * renderAskTeamForm) sends distinct email copy (so staff can tell it
+ * apart from a generic question at a glance) and additionally opens a
+ * real trail_swap_requests row via lib/trail-swap-service.js's
+ * logIntake, so the guest's ask surfaces in Ops' Trail Swap Requests
+ * alert the same way a staff-logged one does -- closes the gap that
+ * function's own header comment ("Staff-initiated intake only")
+ * flagged: there was previously no way for a guest's own request to
+ * reach Ops at all, only the mailto: fallback this replaces.
  *
  * RATE LIMITING (added per Airey's question, 2026-09-02): a valid token is
  * the only gate on this endpoint (same posture as every other Adventure
@@ -54,6 +66,7 @@ const { sql } = require('../lib/db');
 const { sendEmail } = require('../lib/send-email');
 const { renderAdventurePrepQuestionEmail } = require('../lib/email-templates/adventure-prep-question-email');
 const { genId } = require('../lib/ids');
+const trailSwapService = require('../lib/trail-swap-service');
 
 const STAFF_INBOX = 'reservations@palmspringsadventureclub.com';
 const MAX_MESSAGE_LENGTH = 4000;
@@ -200,6 +213,7 @@ module.exports = async function handler(req, res) {
     const body = parseBody(req);
     const token = body.token;
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const isTrailSwap = body.requestType === 'trail_swap';
 
     if (!token) {
       res.status(400).json({ error: 'missing_token' });
@@ -226,6 +240,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const guestNameSafe = ctx.guestName || 'A guest';
     const html = renderAdventurePrepQuestionEmail({
       logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
       guestName: ctx.guestName,
@@ -234,12 +249,15 @@ module.exports = async function handler(req, res) {
       tripDateDisplay: formatTripDate(ctx.tripDate),
       sourcePage: ctx.sourcePage,
       message: message,
+      eyebrow: isTrailSwap ? 'TRAIL SWAP REQUEST' : undefined,
+      headline: isTrailSwap ? (guestNameSafe + ' <em>wants a different trail.</em>') : undefined,
+      preheader: isTrailSwap ? (guestNameSafe + ' would like a different trail for their trip.') : undefined,
     });
 
     const sendResult = await sendEmail({
       to: STAFF_INBOX,
       replyTo: ctx.guestEmail || undefined,
-      subject: 'Question from ' + (ctx.guestName || 'a guest') + ' — ' + ctx.bookingId,
+      subject: (isTrailSwap ? 'Trail swap request from ' : 'Question from ') + guestNameSafe + ' — ' + ctx.bookingId,
       html: html,
     });
 
@@ -249,6 +267,20 @@ module.exports = async function handler(req, res) {
     }
 
     await logHelpMessageSent(ctx.bookingId, ctx.sourcePage);
+
+    // Also flag this in Ops' Trail Swap Requests alert (lib/trail-swap-
+    // service.js's logIntake, previously staff-only -- see this file's
+    // header comment). Best-effort: the email already sent successfully
+    // at this point, so a failure here logs server-side rather than
+    // turning into a scary error for a guest whose message did go through.
+    if (isTrailSwap) {
+      try {
+        await trailSwapService.logIntake({ bookingId: ctx.bookingId, guestConcernSummary: message });
+      } catch (swapErr) {
+        // eslint-disable-next-line no-console
+        console.error('send-help-message: trail swap logIntake failed after successful email send', swapErr);
+      }
+    }
 
     res.status(200).json({ status: 'sent' });
   } catch (err) {
