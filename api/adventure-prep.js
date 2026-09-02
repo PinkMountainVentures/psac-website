@@ -78,11 +78,29 @@ const { renderSignerWaiverInviteEmail } = require('../lib/email-templates/signer
 const SITE_URL = getSiteUrl();
 const MAX_KIT_COUNT = 20; // matches lib/finalize-kit-change.js's own clamp
 
-function formatTripDate(dateStr) {
-  if (!dateStr) return 'your upcoming trip';
-  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return String(dateStr);
-  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+// BUG FIX (2026-09-02, same root cause caught and fixed in
+// api/send-help-message.js's own formatTripDate): experience_bookings.date
+// comes back from @neondatabase/serverless as a native JS Date object, not
+// a "YYYY-MM-DD" string, so this function's regex-only match silently fell
+// through to the Date's own toString() -- e.g. "Sat Sep 05 2026 00:00:00
+// GMT+0000 (Coordinated Universal Time)" -- anywhere a signer invite email
+// used tripDateDisplay. Handles both shapes now, always reading UTC
+// calendar fields so it can't drift a day either direction.
+function formatTripDate(dateInput) {
+  if (!dateInput) return 'your upcoming trip';
+  var year, month, day;
+  if (dateInput instanceof Date) {
+    year = dateInput.getUTCFullYear();
+    month = dateInput.getUTCMonth();
+    day = dateInput.getUTCDate();
+  } else {
+    const m = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(dateInput);
+    year = Number(m[1]);
+    month = Number(m[2]) - 1;
+    day = Number(m[3]);
+  }
+  const d = new Date(Date.UTC(year, month, day));
   return d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' });
 }
 
