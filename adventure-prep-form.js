@@ -2021,10 +2021,14 @@
         '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
         '<div class="ap-q-title">Where should your gear get delivered?</div>' +
         '<div class="ap-q-help">Your gear kit will be delivered the evening before your trail day.</div>' +
+        '<div class="ap-card">' +
         '<div class="ap-field-label">Where are you staying?</div>' +
         '<div class="ap-choice-pills" id="ap-property"></div>' +
         '<div class="ap-field-label">Delivery Address</div>' +
-        '<input class="ap-field-input" type="text" id="ap-address" placeholder="Property name or street address" value="' + escapeHtml(state.deliveryAddressLine1) + '">' +
+        '<div class="ap-address-field" id="ap-address-field">' +
+        '<input class="ap-field-input" type="text" id="ap-address" placeholder="Start typing your address…" autocomplete="off" value="' + escapeHtml(state.deliveryAddressLine1) + '">' +
+        '<div class="ap-address-suggestions" id="ap-address-suggestions"></div>' +
+        '</div>' +
         '<div class="ap-field-row2">' +
         '<div><div class="ap-field-label">City</div><input class="ap-field-input" type="text" id="ap-city" value="' + escapeHtml(state.deliveryCity) + '" placeholder="Palm Springs"></div>' +
         '<div><div class="ap-field-label">Zip</div><input class="ap-field-input" type="text" id="ap-zip" value="' + escapeHtml(state.deliveryZip) + '" placeholder="92264"></div>' +
@@ -2034,6 +2038,7 @@
         '<div class="ap-field-label">Delivery Note (optional)</div>' +
         '<textarea class="ap-field-textarea" id="ap-delivery-note" placeholder="Any other note or instructions about delivery">' + escapeHtml(state.deliveryNote) + '</textarea>' +
         '<div id="ap-delivery-error" class="ap-error"></div>' +
+        '</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-next">Continue</button>' +
         '<div class="ap-cta-secondary" id="ap-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
 
@@ -2055,6 +2060,102 @@
       }
       drawPills();
       drawWindows();
+
+      // ---- Address autocomplete (Airey's direct request, 2026-09-02) ----
+      // Guests were typing the whole address by hand with no suggestions
+      // and no auto-fill of city/zip. Wraps Google's Places API (New) --
+      // same Google Maps Platform project/key as the existing Address
+      // Validation call below, just a different API on it (both keyed off
+      // process.env.GOOGLE_MAPS_API_KEY server-side; the key is never sent
+      // to the browser). One session token covers every keystroke's
+      // `:autocomplete` prediction call plus the eventual Place Details
+      // call for whichever suggestion gets picked, then a fresh token
+      // starts for the next address search, per Google's session-token
+      // billing guidance. Soft-fails to a quiet no-suggestions dropdown
+      // (same posture as validate-delivery-address below) if the Places
+      // call errors or the key isn't configured -- never blocks a guest
+      // from just typing the address out by hand instead.
+      var addressInput = contentEl.querySelector('#ap-address');
+      var suggestionsEl = contentEl.querySelector('#ap-address-suggestions');
+      var sessionToken = newSessionToken();
+      var debounceTimer = null;
+      var requestSeq = 0;
+      var suppressNextInput = false;
+
+      function newSessionToken() {
+        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      }
+
+      function closeSuggestions() {
+        suggestionsEl.innerHTML = '';
+        suggestionsEl.classList.remove('open');
+      }
+
+      function drawSuggestions(predictions) {
+        if (!predictions || !predictions.length) { closeSuggestions(); return; }
+        suggestionsEl.innerHTML = predictions.map(function (p, i) {
+          return '<div class="ap-address-suggestion" data-idx="' + i + '">' +
+            '<div class="ap-address-suggestion-main">' + escapeHtml(p.mainText || p.text || '') + '</div>' +
+            (p.secondaryText ? '<div class="ap-address-suggestion-sub">' + escapeHtml(p.secondaryText) + '</div>' : '') +
+            '</div>';
+        }).join('');
+        suggestionsEl.classList.add('open');
+        Array.prototype.forEach.call(suggestionsEl.querySelectorAll('.ap-address-suggestion'), function (el) {
+          // mousedown, not click: fires before the address input's own
+          // blur handler would otherwise close this dropdown out from
+          // under the click.
+          el.addEventListener('mousedown', function (ev) {
+            ev.preventDefault();
+            selectPrediction(predictions[Number(el.getAttribute('data-idx'))]);
+          });
+        });
+      }
+
+      function selectPrediction(prediction) {
+        suppressNextInput = true;
+        addressInput.value = prediction.mainText || prediction.text || addressInput.value;
+        closeSuggestions();
+        apiPost('/api/address-autocomplete', {
+          token: TOKEN,
+          mode: 'details',
+          placeId: prediction.placeId,
+          sessionToken: sessionToken,
+        }).then(function (res) {
+          var std = res.body && res.body.standardized;
+          if (std) {
+            if (std.line1) addressInput.value = std.line1;
+            if (std.city) contentEl.querySelector('#ap-city').value = std.city;
+            if (std.zip) contentEl.querySelector('#ap-zip').value = std.zip;
+          }
+          // A session token is spent once a Details call uses it -- start
+          // a fresh one for the next address this guest searches.
+          sessionToken = newSessionToken();
+        });
+      }
+
+      addressInput.addEventListener('input', function () {
+        if (suppressNextInput) { suppressNextInput = false; return; }
+        var query = addressInput.value.trim();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        if (query.length < 4) { closeSuggestions(); return; }
+        debounceTimer = setTimeout(function () {
+          var seq = ++requestSeq;
+          apiPost('/api/address-autocomplete', { token: TOKEN, mode: 'predict', input: query, sessionToken: sessionToken })
+            .then(function (res) {
+              if (seq !== requestSeq) return; // a newer keystroke already superseded this request
+              drawSuggestions(res.body && res.body.predictions);
+            });
+        }, 300);
+      });
+      addressInput.addEventListener('blur', function () {
+        // Short delay so a suggestion's mousedown handler still gets to
+        // fire before the dropdown disappears.
+        setTimeout(closeSuggestions, 150);
+      });
 
       function collectAndGoHub() {
         state.deliveryAddressLine1 = contentEl.querySelector('#ap-address').value.trim();
