@@ -142,7 +142,7 @@
 .ap-back-link { font-size: 0.76rem; font-weight: 600; color: var(--dark-pine); opacity: 0.7; margin-bottom: 1.2rem; }
 
 .ap-alert { display: flex; gap: 0.7rem; align-items: flex-start; background: rgba(231,111,81,0.08); border: 1px solid rgba(231,111,81,0.25); border-radius: 8px; padding: 0.9rem 1.1rem; margin-bottom: 1.4rem; max-width: 720px; }
-.ap-alert-icon { width: 20px; height: 20px; border-radius: 50%; background: var(--sunset-red); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.72rem; font-weight: 700; margin-top: 0.05rem; }
+.ap-alert-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--sand-beige); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .ap-alert-text { font-size: 0.82rem; line-height: 1.6; color: var(--dark-pine); }
 .ap-alert-text b { font-weight: 600; }
 .ap-deposit-note { font-size: 0.8rem; color: var(--dark-pine); background: rgba(42,71,71,0.05); border-radius: 8px; padding: 0.85rem 1rem; line-height: 1.7; margin-top: 1.6rem; max-width: 720px; }
@@ -162,7 +162,7 @@
 .ap-trail-eyebrow { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.4rem; }
 .ap-trail-name { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; margin-bottom: 0.6rem; }
 .ap-trail-locked-note { font-size: 0.78rem; color: var(--ap-muted); line-height: 1.6; display: flex; gap: 0.5rem; align-items: center; margin-top: 0.9rem; }
-.ap-trail-locked-note .lock-icon { font-size: 0.9rem; }
+.ap-trail-locked-note .lock-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
 .ap-trail-unlocked { display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; padding-top: 0.3rem; flex-wrap: wrap; margin-top: 0.9rem; }
 .ap-trail-unlocked-text { font-size: 0.78rem; color: var(--dark-pine); line-height: 1.55; }
 .ap-trail-download-btn { background: var(--desert-green); color: white; border: none; padding: 0.65rem 1.2rem; border-radius: 20px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }

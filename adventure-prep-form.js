@@ -458,6 +458,15 @@
       '<div class="ap-mini-progress-track"><div class="ap-mini-progress-fill" style="width:' + meta.pct + '%;"></div></div>';
   }
 
+  // Shared icon-set follow-up (Sept 2026 walkthrough): the alert "!" badge
+  // and the trail-guide lock note were still the pre-icon-set treatment
+  // (a solid sunset-red circle with a literal "!" character, and a raw
+  // 🔒 emoji) -- rebuilt in the same "Style B" line/salmon-accent language
+  // as the .ap-tile-icon SVGs above (dark-pine #2A4747 strokes, #F58271
+  // salmon accents) so every icon on the hub reads as one consistent set.
+  var ALERT_ICON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#2A4747" stroke-width="1.4"/><path d="M12 7.6v6" stroke="#F58271" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1.15" fill="#F58271"/></svg>';
+  var LOCK_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="5.5" y="10.3" width="13" height="10.2" rx="2" stroke="#2A4747" stroke-width="1.4"/><path d="M8.2 10.3V7.7a3.8 3.8 0 0 1 7.6 0v2.6" stroke="#2A4747" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="15.1" r="1.2" fill="#F58271"/><path d="M12 16.3v1.5" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/></svg>';
+
   function renderMessage(title, body) {
     root.innerHTML = '';
     root.appendChild(h(
@@ -694,7 +703,7 @@
       compareCardHtml(selectedTrailCandidate, null, null, false) +
       (pastT3
         ? '<div class="ap-trail-unlocked"><div class="ap-trail-unlocked-text">Your guide is ready: turn-by-turn navigation, waypoints, and everything else for the trail.</div><button type="button" class="ap-trail-download-btn" id="ap-get-guide">Get Guide</button></div>'
-        : '<div class="ap-trail-locked-note"><span class="lock-icon">🔒</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
+        : '<div class="ap-trail-locked-note"><span class="lock-icon">' + LOCK_ICON_SVG + '</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
       '</div>';
 
     // Icons: Style B ("Line, salmon accent") from the icon-options
@@ -740,7 +749,7 @@
     var alertHtml = '';
     if (status.rosterDone && !status.waiversDone && status.signers.length) {
       var missingCount = status.signers.filter(function (s) { return !s.isDone; }).length;
-      alertHtml = '<div class="ap-alert"><div class="ap-alert-icon">!</div><div class="ap-alert-text"><b>Waivers lock at ' + formatCutoffLabel() + '.</b> ' + missingCount + ' ' + (missingCount === 1 ? 'person on your list hasn’t' : 'people on your list haven’t') + ' signed yet.</div></div>';
+      alertHtml = '<div class="ap-alert"><div class="ap-alert-icon">' + ALERT_ICON_SVG + '</div><div class="ap-alert-text"><b>Waivers lock at ' + formatCutoffLabel() + '.</b><br>' + missingCount + ' ' + (missingCount === 1 ? 'person on your list hasn’t' : 'people on your list haven’t') + ' signed yet.</div></div>';
     }
 
     var wrap = h(
@@ -2137,7 +2146,7 @@
       var signers = waiverSigners();
       var missingCount = signers.filter(function (s) { return !s.isDone; }).length;
       var alertHtml = missingCount
-        ? '<div class="ap-alert"><div class="ap-alert-icon">!</div><div class="ap-alert-text"><b>Waivers lock at ' + formatCutoffLabel() + '.</b> Gear rental will be cancelled for anyone who hasn’t finished theirs.</div></div>'
+        ? '<div class="ap-alert"><div class="ap-alert-icon">' + ALERT_ICON_SVG + '</div><div class="ap-alert-text"><b>Waivers lock at ' + formatCutoffLabel() + '.</b> Gear rental will be cancelled for anyone who hasn’t finished theirs.</div></div>'
         : '';
       var rowsHtml = signers.map(function (s) {
         var statusCls = s.isDone ? 'status-done' : 'status-notdone';
