@@ -20,7 +20,7 @@
     },
     {
       "path": "/api/send-deposit-hold-heads-up",
-      "schedule": "*/15 18,19,20,21 * * *"
+      "schedule": "*/15 14,15,16,17 * * *"
     },
     {
       "path": "/api/process-pending-kit-changes",

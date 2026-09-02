@@ -3,7 +3,7 @@
  *
  * NEW (Airey's direct request, 2026-09-02): wires up the previously
  * unwired lib/email-templates/deposit-hold-heads-up-email.js. Vercel
- * Cron, noon Pacific, T-1 dispatch day (gear delivers that same evening)
+ * Cron, 8am Pacific, T-1 dispatch day (gear delivers that same evening)
  * — for every active booking whose trip date is tomorrow AND has met all
  * T-3 requirements, sends the guest a heads-up that their refundable gear
  * deposit hold is coming, with the real per-kit dollar amount (see
@@ -26,11 +26,16 @@
  * Dedup: experience_bookings.deposit_heads_up_sent_at (new column, see
  * db/schema.sql) — same plain-nullable-timestamp idempotency pattern as
  * t3_cutoff_processed_at/deposit_hold_renewed_at. This cron fires on a
- * repeating every-15-minutes window (matching api/check-hold-clearance-
- * deadline.js's own noon-Pacific window exactly, same vercel.json entry
- * shape) rather than a single fixed instant, so without this dedup a
- * slow first tick or an all-day-lingering booking would get re-emailed
- * on every subsequent tick.
+ * repeating every-15-minutes window (same "actual instant +/- 1 hour UTC"
+ * vercel.json shape as api/trigger-deposit-holds.js's own 9am-Pacific
+ * window, one hour earlier) rather than a single fixed instant, so
+ * without this dedup a slow first tick or an all-day-lingering booking
+ * would get re-emailed on every subsequent tick.
+ *
+ * UPDATED (Airey's direct request, 2026-09-02): moved from noon Pacific
+ * to 8am Pacific — one hour ahead of api/trigger-deposit-holds.js's own
+ * 9am-Pacific hold-placement cron, so the heads-up email always lands in
+ * the guest's inbox before the actual hold gets placed, not after.
  *
  * Skips (no email, no alert — not an error, just not applicable):
  *   - tier not in TIERS (Custom Experience and anything else) — no
@@ -45,7 +50,8 @@
  * Stripe hold's own lifecycle (scheduled_t1 -> held/failed/...), which
  * this endpoint never touches. t3_cutoff_processed_at and
  * deposit_heads_up_sent_at are this endpoint's own, independent gate/dedup
- * pair, unrelated to whether the 9am hold-placement cron has run yet.
+ * pair — timed an hour ahead of the 9am hold-placement cron by clock
+ * time alone, not by checking whether that cron has actually run yet.
  */
 
 'use strict';
@@ -122,13 +128,15 @@ module.exports = async function handler(req, res) {
     }
 
     // Same "don't act on the cron window's first tick, gate to the
-    // actual locked instant" pattern as api/check-hold-clearance-
-    // deadline.js's own noon gate (lib/cadence.js's pacificClockTimeReached
-    // header explains why — the window's first tick lands up to two hours
-    // early during PDT/PST).
+    // actual locked instant" pattern as api/trigger-deposit-holds.js's own
+    // 9am gate (lib/cadence.js's pacificClockTimeReached header explains
+    // why — the window's first tick lands up to two hours early during
+    // PDT/PST). UPDATED (Airey's direct request, 2026-09-02): 8am, not
+    // noon — one hour ahead of the 9am hold-placement cron, so this email
+    // always lands before the hold, never after.
     const now = new Date();
-    if (!pacificClockTimeReached(12, 0, now)) {
-      res.status(200).json({ ok: true, skipped: 'before_noon_pacific' });
+    if (!pacificClockTimeReached(8, 0, now)) {
+      res.status(200).json({ ok: true, skipped: 'before_8am_pacific' });
       return;
     }
 
