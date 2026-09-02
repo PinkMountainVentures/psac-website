@@ -2991,7 +2991,12 @@
   // views would be a clean, explicitly-flagged follow-up, not silently
   // done or silently skipped.
   function renderWaiver() {
-    var wrap = h('<div class="container"><div class="ap-shell"><div id="ap-waiver-content"></div></div></div>');
+    // UPDATED (live-test feedback, 2026-09-02): matches
+    // waiver-signer-form.js's own renderWaiver() wrap exactly -- ap-wide
+    // (960px, was the standard 640px) and padding-top:0 (removes the
+    // default 2.6rem .ap-shell gap under the header bar, same fix already
+    // applied to nearly every other Adventure Prep screen).
+    var wrap = h('<div class="container ap-wide"><div class="ap-shell" style="padding-top:0;"><div id="ap-waiver-content"></div></div></div>');
     var contentEl = wrap.querySelector('#ap-waiver-content');
 
     function flowTopHtml(backLabel) {
@@ -3064,6 +3069,7 @@
         '<div class="ap-eyebrow">Waivers</div>' +
         '<div class="ap-q-title">Sign your waiver.</div>' +
         '<div class="ap-q-help">Scroll through the full agreement below, then confirm at the bottom.</div>' +
+        '<div class="ap-card">' +
         '<div class="ap-waiver-scroll" id="ap-waiver-scroll">' +
         '<div class="doc-title"><div class="doc-name">PALM SPRINGS ADVENTURE CLUB</div>' +
         '<div class="doc-sub">Participant Agreement and Acknowledgment of Risk</div>' +
@@ -3091,6 +3097,7 @@
         '<div class="ap-field-label">Phone</div>' +
         '<input class="ap-field-input" type="tel" id="ap-ec-phone" placeholder="Phone number" value="' + escapeHtml(state.ecPhone) + '">' +
         '<div id="ap-waiver-error" class="ap-error"></div>' +
+        '</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-sign-cta" disabled>Sign &amp; Continue</button>' +
         '<div class="ap-cta-secondary" id="ap-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
 
