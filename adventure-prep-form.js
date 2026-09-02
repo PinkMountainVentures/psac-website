@@ -601,6 +601,20 @@
     });
   }
 
+  // BUG FIX (live-test feedback, 2026-09-02): the hub's "Attendees" tile
+  // and Adventure Summary's "Group" stat both used to just read
+  // state.roster.length directly -- on a booking with a non-attending
+  // named guardian (role_on_booking = 'guardian_only'), that inflated the
+  // headcount by however many external guardians were named, none of whom
+  // are actually coming on the adventure. Every OTHER roster row (owner,
+  // every attendee, every participating minor) still always counts here,
+  // same as state.roster.length used to -- this screen has no per-
+  // attendee opt-out control (see this file's header comment), so the
+  // only category that was ever wrongly included is guardian_only.
+  function attendingRosterCount() {
+    return state.roster.filter(function (p) { return p.roleOnBooking !== 'guardian_only'; }).length;
+  }
+
   // NEW (guardian-assignment UI, 2026-09-02): every participating minor
   // needs a booker-named signing guardian -- this drives both whether
   // the new Attendees screen appears at all (renderRosterParticipation's
@@ -1022,7 +1036,7 @@
         status.hasUnreviewedManualPick ? 'In review' : (status.trailSelected ? 'Done' : 'Not done'),
         false, function () { state.step = status.trailSelected ? 'trail' : 'preferences'; render(); }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.6" r="2.9" stroke="#F58271" stroke-width="1.3"/><path d="M4 19.3c0-3.7 2.2-6.1 5-6.1s5 2.4 5 6.1" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/><circle cx="15.3" cy="9.2" r="2.3" stroke="#2A4747" stroke-width="1.2"/><path d="M12.6 19.3c.2-3 1.9-4.9 3.9-4.9 2.3 0 4.1 2.4 4.1 5.4" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/></svg>', 'Attendees',
-        status.rosterDone ? (state.roster.length + ' in your group') : 'Confirm who’s coming and invite your group',
+        status.rosterDone ? (attendingRosterCount() + ' in your group') : 'Confirm who’s coming and invite your group',
         status.rosterDone ? 'Done' : 'Not done', false,
         function () { state.step = 'roster'; render(); }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8.3 8.2c0-2.4 1.7-4.3 3.7-4.3s3.7 1.9 3.7 4.3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><rect x="5.8" y="8.2" width="12.4" height="12" rx="3" stroke="#2A4747" stroke-width="1.4"/><path d="M9 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><path d="M15 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><rect x="9" y="13.4" width="6" height="4.4" rx="1.2" stroke="#F58271" stroke-width="1.2"/></svg>', 'Gear Kits &amp; Delivery/Pickup',
@@ -3273,7 +3287,7 @@
       '<div class="ap-receipt-grid">' +
       '<div><div class="ap-receipt-stat-label">Trail Day</div><div class="ap-receipt-stat-value">' + formatTripDate(eb.date) + '</div></div>' +
       '<div><div class="ap-receipt-stat-label">Trail</div><div class="ap-receipt-stat-value">' + escapeHtml(status.trailSelected ? status.trailName : 'To be confirmed') + '</div></div>' +
-      '<div><div class="ap-receipt-stat-label">Group</div><div class="ap-receipt-stat-value">' + state.roster.length + ' adventurers</div></div>' +
+      '<div><div class="ap-receipt-stat-label">Group</div><div class="ap-receipt-stat-value">' + attendingRosterCount() + ' adventurers</div></div>' +
       '<div><div class="ap-receipt-stat-label">Gear Kits</div><div class="ap-receipt-stat-value">' + kitStat + '</div></div>' +
       '</div>' +
       '<div class="ap-receipt-divider"></div>' +
