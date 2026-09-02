@@ -954,6 +954,29 @@
     // db/schema.sql) and is only ever set (true or false) by a real
     // confirmRoster call.
     var rosterDone = ap.isParticipating !== null && ap.isParticipating !== undefined;
+    // NEW (live-test feedback, 2026-09-02): rosterDone above only means
+    // "the are-you-joining question has been answered" -- it used to
+    // drive the hub tile's own "Done" pill directly, which meant tapping
+    // Continue on renderRosterParticipation and then backing all the way
+    // out to Adventure Home (skipping guardian assignment and/or Contact
+    // Info entirely) still showed "Done." A micro-flow should only read
+    // Done once every screen it actually requires has been satisfied --
+    // on the LAST screen (Send Invites / the solo "roster confirmed"
+    // variant), "satisfied" just means reachable/viewed, not that
+    // invites were actually sent, which is exactly what "every
+    // participating minor has a resolved guardian and every adult who
+    // needs a waiver email has a valid one on file" already guarantees
+    // (the flow's Continue handlers are the only way to get there, and
+    // do so on their own -- see renderRosterParticipation's and
+    // renderRosterGuardians' own routing). Kept separate from rosterDone
+    // itself, which still (deliberately, see summaryUnlocked below)
+    // unlocks Adventure Summary on minimal engagement alone.
+    var minorsAllGuardianed = state.roster
+      .filter(function (p) { return MINOR_BUCKETS[p.age] && p.isParticipating !== false; })
+      .every(function (m) { return !!m.guardianPersonId; });
+    var participatingAdultsAllEmailed = computeParticipatingAdultSigners()
+      .every(function (p) { return isValidEmail(p.email); });
+    var attendeesDone = rosterDone && minorsAllGuardianed && participatingAdultsAllEmailed;
     var gearDone = !!ap.propertyType && !!ap.deliveryAddressLine1;
     var signers = state.roster.length ? waiverSigners() : [];
     var waiversDone = signers.length > 0 && signers.every(function (s) { return s.isDone; });
@@ -973,6 +996,7 @@
       trailName: (candidateTrails.filter(function (c) { return c.trailId === ap.selectedTrailId; })[0] || {}).trailName || '',
       hasUnreviewedManualPick: hasUnreviewedManualPick,
       rosterDone: rosterDone,
+      attendeesDone: attendeesDone,
       gearDone: gearDone,
       kitCount: kitCount,
       eligibleCount: eligibleCount,
@@ -1037,7 +1061,7 @@
         false, function () { state.step = status.trailSelected ? 'trail' : 'preferences'; render(); }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.6" r="2.9" stroke="#F58271" stroke-width="1.3"/><path d="M4 19.3c0-3.7 2.2-6.1 5-6.1s5 2.4 5 6.1" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/><circle cx="15.3" cy="9.2" r="2.3" stroke="#2A4747" stroke-width="1.2"/><path d="M12.6 19.3c.2-3 1.9-4.9 3.9-4.9 2.3 0 4.1 2.4 4.1 5.4" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/></svg>', 'Attendees',
         status.rosterDone ? (attendingRosterCount() + ' in your group') : 'Confirm who’s coming and invite your group',
-        status.rosterDone ? 'Done' : 'Not done', false,
+        status.attendeesDone ? 'Done' : 'Not done', false,
         function () { state.step = 'roster'; render(); }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8.3 8.2c0-2.4 1.7-4.3 3.7-4.3s3.7 1.9 3.7 4.3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><rect x="5.8" y="8.2" width="12.4" height="12" rx="3" stroke="#2A4747" stroke-width="1.4"/><path d="M9 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><path d="M15 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><rect x="9" y="13.4" width="6" height="4.4" rx="1.2" stroke="#F58271" stroke-width="1.2"/></svg>', 'Gear Kits &amp; Delivery/Pickup',
         status.gearDone ? (status.kitCount + ' kits · Gear delivery ' + (ap.deliveryWindow || state.deliveryWindow)) : 'Choose your kits and delivery details',
