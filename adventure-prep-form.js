@@ -129,6 +129,41 @@
    button still works (mechanically the same call this build already
    makes for group-level sends), its copy is just updated below to stop
    promising a single-recipient send it can no longer make.
+
+   UPDATED (hub-tile audit + waivers width + guardian self-sign, live-test
+   feedback, 2026-09-02): three more follow-ups from the same round. (1)
+   Audited every other hub tile for the same "answered part of the
+   micro-flow, tile still says Done" gap the Attendees tile had --
+   Trail Recommendation's `trailSelected` is fine as-is (selecting a
+   trail commits and shows its own terminal confirmation screen in the
+   same synchronous step, nothing required comes after), but Gear Kits'
+   `gearDone` had the identical bug: propertyType/deliveryAddressLine1
+   are saved at the end of the Delivery screen (gearStep 1), but that
+   screen's own "Save & return to Adventure Home" exit skips the Pickup
+   screen (gearStep 2) entirely, leaving return_preference (and every
+   other pickup field) NULL. `gearDone` now also requires
+   `ap.returnPreference`, which only ever gets written once the Pickup
+   screen itself has been saved. (2) `.ap-alert` and `.ap-wv-row`
+   (ap-styles.css) each carried their own hardcoded max-width (720px/
+   640px) smaller than the Waivers list screen's new 960px `ap-wide`
+   container and with no margin:auto of their own -- inside that wider,
+   correctly-centered container they shrank to their own caps and sat
+   flush-left. Both caps removed; they now fill their parent exactly
+   like .ap-card already did. (3) A booker who's already declared
+   themself their minor's legal guardian (renderRosterGuardians(),
+   Attendees flow) had no way to actually sign that child's waiver here
+   -- the child's row was always readonly, and even the booker's own
+   tappable row's guardian toggle (renderSign(), Waivers flow) started
+   unchecked every time. Fixed both ends: hydrateWorkingStateFromCtx()
+   now pre-populates state.guardianForChildrenParticipantIds with any
+   minor whose guardian_person_id already resolves to the booker's own
+   person_id and isn't guardian_verified_at yet, and renderList() now
+   makes that child's row tappable too (routing into the same
+   renderSign() the booker's own row uses). Scoped deliberately to the
+   booker-is-the-attending-guardian case, per Airey's own stated
+   boundary -- a minor whose assigned guardian isn't attending this trip
+   still has to be signed for on Surface B (waiver-signer-form.js) by
+   that guardian directly.
    ============================================================================ */
 
 (function () {
@@ -461,6 +496,26 @@
     // participatingRosterRef entirely.
     var ownerRow = state.roster.filter(function (r) { return r.roleOnBooking === 'owner'; })[0];
     state.ownerParticipantId = ownerRow ? ownerRow.participantId : '';
+
+    // NEW (guardian-signing gap, live-test feedback, 2026-09-02): the
+    // Waivers Sign screen's per-minor "I am the parent/guardian ... and
+    // I'm signing on their behalf" toggle (state.guardianForChildrenParticipantIds)
+    // used to always start empty, even for a minor the booker had already
+    // declared themself the legal guardian of back in the Attendees flow's
+    // guardian-assignment screen -- so re-signing there meant remembering
+    // to manually flip a toggle for a fact the guest had already told us.
+    // Pre-populate it here (runs on every boot() and reloadContext(), same
+    // as guardianAssignments above) with every minor whose guardian_person_id
+    // already resolves to the booker's own person_id and isn't confirmed
+    // yet -- safe to recompute from server truth every hydrate since
+    // nothing calls reloadContext() again once a guest reaches renderSign().
+    var ownerPersonId = ownerRow ? ownerRow.personId : null;
+    state.guardianForChildrenParticipantIds = state.roster
+      .filter(function (m) {
+        return MINOR_BUCKETS[m.age] && m.isParticipating !== false &&
+          !m.guardianVerifiedAt && ownerPersonId && m.guardianPersonId === ownerPersonId;
+      })
+      .map(function (m) { return m.participantId; });
 
     // bestForAttributes now comes back as a real TEXT[] (mapAdventurePrepRow),
     // not a comma-joined string cell — the old String(...).split(',') only
@@ -977,7 +1032,15 @@
     var participatingAdultsAllEmailed = computeParticipatingAdultSigners()
       .every(function (p) { return isValidEmail(p.email); });
     var attendeesDone = rosterDone && minorsAllGuardianed && participatingAdultsAllEmailed;
-    var gearDone = !!ap.propertyType && !!ap.deliveryAddressLine1;
+    // NEW (live-test feedback follow-up audit, 2026-09-02): also
+    // requires the Pickup screen (gearStep 2) to have been saved at
+    // least once -- propertyType/deliveryAddressLine1 alone only prove
+    // the earlier Delivery screen (gearStep 1) was saved, and that
+    // screen's own "Save & return to Adventure Home" exit skips Pickup
+    // entirely, leaving return_preference (and every other pickup field)
+    // NULL in the database -- same "answered part of the flow, tile
+    // still says Done" gap Attendees had.
+    var gearDone = !!ap.propertyType && !!ap.deliveryAddressLine1 && !!ap.returnPreference;
     var signers = state.roster.length ? waiverSigners() : [];
     var waiversDone = signers.length > 0 && signers.every(function (s) { return s.isDone; });
     // BUG FIX (coordinating-session review, Aug 2026): this was the only one
@@ -3084,6 +3147,22 @@
       var alertHtml = missingCount
         ? '<div class="ap-alert"><div class="ap-alert-icon">' + ALERT_ICON_SVG + '</div><div class="ap-alert-text"><b>Waivers lock at ' + formatCutoffLabel() + '.</b> Gear rental will be cancelled for anyone who hasn’t finished theirs.</div></div>'
         : '';
+      // NEW (Airey's direct request, 2026-09-02): a minor whose legal
+      // guardian is the booker themself -- declared back in the
+      // Attendees flow's guardian-assignment screen -- can be signed for
+      // right here, instead of only ever showing as a readonly "Guardian
+      // invited, not yet confirmed" row with nothing to tap. Scoped
+      // specifically to the booker-is-the-guardian case: a minor whose
+      // assigned guardian is someone else (not attending this trip)
+      // still has to be signed for on Surface B (waiver-signer-form.js)
+      // by that guardian directly -- out of scope here, matching Airey's
+      // own stated boundary.
+      var ownerPersonId = (state.roster.filter(function (r) { return r.participantId === state.ownerParticipantId; })[0] || {}).personId;
+      function minorGuardianedByOwner(s) {
+        if (!s.isMinor || !ownerPersonId) return false;
+        var rosterRow = state.roster.filter(function (r) { return r.participantId === s.participantId; })[0];
+        return !!rosterRow && rosterRow.guardianPersonId === ownerPersonId;
+      }
       var rowsHtml = signers.map(function (s) {
         var statusCls = s.isDone ? 'status-done' : 'status-notdone';
         var statusLabel = s.isDone ? 'Done' : 'Not done';
@@ -3091,6 +3170,15 @@
           return '<div class="ap-wv-row tappable" id="ap-wv-self">' +
             '<div class="ap-wv-avatar">' + escapeHtml(initialsOf(s.name)) + '</div>' +
             '<div class="ap-wv-mid"><div class="ap-wv-name">' + escapeHtml(s.name) + ' <span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">(you)</span></div></div>' +
+            '<div class="ap-wv-status ' + statusCls + '">' + statusLabel + '</div>' +
+            '<div class="ap-wv-chevron">&rsaquo;</div>' +
+            '</div>';
+        }
+        if (minorGuardianedByOwner(s) && !s.isDone) {
+          return '<div class="ap-wv-row tappable" data-wv-minor-id="' + escapeHtml(s.participantId) + '">' +
+            '<div class="ap-wv-avatar">' + escapeHtml(initialsOf(s.name)) + '</div>' +
+            '<div class="ap-wv-mid"><div class="ap-wv-name">' + escapeHtml(s.name) + '</div>' +
+            '<div class="ap-wv-sub">Tap to sign as their parent/guardian</div></div>' +
             '<div class="ap-wv-status ' + statusCls + '">' + statusLabel + '</div>' +
             '<div class="ap-wv-chevron">&rsaquo;</div>' +
             '</div>';
@@ -3116,6 +3204,9 @@
       contentEl.querySelector('#ap-return-hub').addEventListener('click', goHub);
       var selfRow = contentEl.querySelector('#ap-wv-self');
       if (selfRow) selfRow.addEventListener('click', renderSign);
+      Array.prototype.forEach.call(contentEl.querySelectorAll('[data-wv-minor-id]'), function (row) {
+        row.addEventListener('click', renderSign);
+      });
     }
 
     // ---- Screen: sign (scroll-gated) ----

@@ -148,7 +148,7 @@
 
 .ap-back-link { font-size: 0.76rem; font-weight: 600; color: var(--dark-pine); opacity: 0.7; margin-bottom: 1.2rem; }
 
-.ap-alert { display: flex; gap: 0.7rem; align-items: flex-start; background: rgba(231,111,81,0.08); border: 1px solid rgba(231,111,81,0.25); border-radius: 8px; padding: 0.9rem 1.1rem; margin-bottom: 1.4rem; max-width: 720px; }
+.ap-alert { display: flex; gap: 0.7rem; align-items: flex-start; background: rgba(231,111,81,0.08); border: 1px solid rgba(231,111,81,0.25); border-radius: 8px; padding: 0.9rem 1.1rem; margin-bottom: 1.4rem; }
 .ap-alert-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--sand-beige); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .ap-alert-text { font-size: 0.82rem; line-height: 1.6; color: var(--dark-pine); }
 .ap-alert-text b { font-weight: 600; }
@@ -505,7 +505,7 @@
    Waivers redesign (Round 2, mockup-05) — the group waiver-status list,
    the scroll-gated ("scrollwrap") sign screen, and its confirmation.
 --------------------------------------------------------------------- */
-.ap-wv-row { display: flex; align-items: center; gap: 0.75rem; background: white; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0.6rem; box-shadow: 0 1px 3px rgba(42,71,71,0.06); max-width: 640px; }
+.ap-wv-row { display: flex; align-items: center; gap: 0.75rem; background: white; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0.6rem; box-shadow: 0 1px 3px rgba(42,71,71,0.06); }
 .ap-wv-row.tappable { cursor: pointer; }
 .ap-wv-row.readonly { opacity: 0.8; }
 .ap-wv-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--sand-beige); color: var(--dark-pine); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; }
