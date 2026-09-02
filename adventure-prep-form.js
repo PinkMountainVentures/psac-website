@@ -1331,21 +1331,36 @@
       }
       saveConfirmRoster().then(function (res) {
         if (!res.ok) { wrap.querySelector('#ap-roster-error').textContent = 'Something went wrong saving that, try again.'; return; }
+        // BUG FIX (live-test feedback, 2026-09-02): refetch context right
+        // here, before ever deciding where to go next. This save is very
+        // often the FIRST time the booker's own roster row gets a
+        // person_id (confirmRoster() sets it the moment ownerParticipantId
+        // is confirmed, right above) -- without a refetch, state.roster's
+        // local copy still shows whatever personId it had on page load
+        // (usually none), so renderRosterGuardians()'s adultNeedsEmail()
+        // check would wrongly think the booker's own email still needs
+        // collecting when they pick themselves as a minor's guardian,
+        // even though the server already has it on file. Mirrors the same
+        // reloadContext() call renderRosterGuardians() already makes
+        // after each of its own saves, one screen later in the flow.
+        //
         // UPDATED (flow-order feedback, 2026-09-02): guardian assignment
         // now runs BEFORE Contact Info (see this file's header comment) --
         // any participating minor sends the booker there first. Only
         // when there's nothing left needing a guardian pick do we fall
         // through to Contact Info (skipped entirely on a solo booking,
         // same as before) or straight to Send Invites.
-        if (minorsNeedingGuardian().length) {
-          state.guardianStepIndex = 0;
-          state.step = 'rosterGuardians';
-        } else if (computeParticipatingAdultSigners().length) {
-          state.step = 'rosterContact';
-        } else {
-          state.step = 'invite';
-        }
-        render();
+        reloadContext().then(function () {
+          if (minorsNeedingGuardian().length) {
+            state.guardianStepIndex = 0;
+            state.step = 'rosterGuardians';
+          } else if (computeParticipatingAdultSigners().length) {
+            state.step = 'rosterContact';
+          } else {
+            state.step = 'invite';
+          }
+          render();
+        });
       });
     });
 
