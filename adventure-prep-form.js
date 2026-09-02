@@ -1770,28 +1770,59 @@
     // sent before" signal locally instead of a field that doesn't exist.
     var hasSentBefore = (state.ctx.waiverSignatures || []).some(function (w) { return w.role === 'non_owner'; });
 
-    // BUG FIX (Attendees walkthrough, Sep 2026): "this screen is useless on
-    // a solo booking" — when the booker is the only person on the roster
-    // and they said "Yes, I'm joining", `signers` is always empty by
-    // construction (the owner is filtered out and there's no one else).
-    // The old copy ("Let's reach the rest of your group") plus an enabled
-    // "Send Invites" button that sent to zero people was confusing on
-    // exactly this booking shape. Split into two variants: a pure
-    // roster-confirmation screen here, and the existing send-links screen
-    // for every other booking shape (booker not participating, or more
-    // than one person on the roster).
-    var soloBookerOnly = state.roster.length === 1 && state.isParticipating === true;
+    // BUG FIX (Attendees walkthrough, Sep 2026, generalized live-test
+    // feedback 2026-09-02): "this screen is useless when there's no one
+    // to invite" — signers is empty whenever the only people on this
+    // roster are the participating owner and/or their own minor
+    // children (the owner is filtered out of `signers` by construction,
+    // and a minor never needs their own waiver link — see
+    // computeAttendeeSigners()'s own header comment). This used to only
+    // catch the true solo-booker case (roster.length === 1); a booker
+    // travelling with their own minor child, naming themselves as
+    // guardian, hit the exact same "nothing to send" problem (Airey:
+    // "there is nobody to send invites to so the content on the final
+    // screen about sending invites isn't relevant... we should instead
+    // confirm the participants with a summary screen of who is
+    // attending") but didn't trigger the old, narrower check. Broadened
+    // to noOneToInvite = !signers.length, and the roster recap below now
+    // handles minors (guardian noted, no "You" tag) alongside the
+    // booker, not just a single owner row.
+    var noOneToInvite = !signers.length;
+    var inviteStepIndex = minorsNeedingGuardian().length ? 4 : 3;
 
-    if (soloBookerOnly) {
+    if (noOneToInvite) {
+      // Resolves a minor's already-assigned guardian (renderRosterGuardians())
+      // back to a display label for this recap -- "You" when it's the
+      // booker themselves (the only case reachable here, see this
+      // branch's own header comment: signers.length === 0 rules out any
+      // OTHER participating adult or non-attending named guardian), with
+      // a defensive fallback to another adult's name or an external
+      // guardian's name/email in case that invariant ever changes.
+      function guardianLabelForMinor(m) {
+        var ga = state.guardianAssignments[m.participantId];
+        if (!ga) return '';
+        if (ga.mode === 'participant') {
+          if (ga.participantId === state.ownerParticipantId) return 'Guardian: You';
+          var adult = state.roster.filter(function (r) { return r.participantId === ga.participantId; })[0];
+          return adult ? 'Guardian: ' + (adult.name || '') : '';
+        }
+        if (ga.mode === 'external') return 'Guardian: ' + (ga.name || ga.email || '');
+        return '';
+      }
+      var summaryRows = state.roster.filter(function (p) { return p.roleOnBooking !== 'guardian_only'; });
       var soloWrap = h(
         '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-        attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home', attendeesTotalSteps()) +
+        attendeesFlowTopHtml(inviteStepIndex, 'ap-back-to-hub', '&larr; Adventure Home', attendeesTotalSteps()) +
         '<div class="ap-eyebrow">Attendees</div>' +
         '<h1 class="ap-q">Your roster is confirmed</h1>' +
+        '<p class="ap-sub">Here\u2019s who\u2019s coming on your adventure.</p>' +
         '<div class="ap-card">' +
-        state.roster.map(function (s) {
-          var meta = [s.age, s.fitness].filter(Boolean).join(' · ');
-          return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(meta) + '</div></div><span class="review-recipient-tag">You</span></div>';
+        summaryRows.map(function (s) {
+          var isOwner = s.participantId === state.ownerParticipantId;
+          var isMinor = !!MINOR_BUCKETS[s.age];
+          var meta = [s.age, isMinor ? guardianLabelForMinor(s) : s.fitness].filter(Boolean).join(' \u00b7 ');
+          var tag = isOwner ? '<span class="review-recipient-tag">You</span>' : (isMinor ? '<span class="review-recipient-tag">Minor</span>' : '');
+          return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(meta) + '</div></div>' + tag + '</div>';
         }).join('') +
         '</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-invite-done">Return to Adventure Home</button>' +
@@ -1801,8 +1832,6 @@
       soloWrap.querySelector('#ap-invite-done').addEventListener('click', function () { state.step = 'hub'; render(); });
       return soloWrap;
     }
-
-    var inviteStepIndex = minorsNeedingGuardian().length ? 4 : 3;
 
     // NEW (guardian-assignment UI, 2026-09-02): everyone who belongs on
     // this screen for display purposes -- a superset of `signers` (which
