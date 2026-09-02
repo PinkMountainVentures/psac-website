@@ -819,7 +819,7 @@
       '<input class="paf-roster-input paf-roster-name" data-idx="' + index + '" value="' + escapeHtml(person.name || '') + '" placeholder="Name">' +
       '<select class="paf-roster-input paf-roster-age" data-idx="' + index + '">' + ageOptionsHtml + '</select>' +
       (isMinor ? '<span class="paf-roster-tag">Minor</span>' : '<select class="paf-roster-input paf-roster-fit" data-idx="' + index + '">' + fitnessOptionsHtml + '</select>') +
-      (isOwnerRow ? '<span class="paf-roster-tag is-you">You</span>' : emailField) +
+      (isOwnerRow ? '' : emailField) +
       '</div>';
   }
 
@@ -833,7 +833,7 @@
     // match, wired to the same state.step = 'hub' / saveFields() pattern
     // every other screen in this file already uses.
     var wrap = h(
-      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container ap-roster-wide"><div class="ap-shell" style="padding-top:0;">' +
       attendeesFlowTopHtml(0, 'ap-flow-back', '&larr; Adventure Home') +
       '<div class="ap-eyebrow">Your Adventure</div>' +
       '<h1 class="ap-q">Will you be out on the trail with them?</h1>' +
