@@ -373,11 +373,16 @@
 
 .ap-compare-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-bottom: 1rem; }
 .ap-compare-grid.is-thin { grid-template-columns: repeat(2, 1fr); max-width: 820px; }
-.ap-compare-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); max-width: 420px; display: flex; flex-direction: column; }
-/* max-width above only matters standalone (renderConfirmation, one card,
-   no grid) -- inside .ap-compare-grid the grid track (repeat(3,1fr) or
-   the .is-thin 2-col track) is already narrower than 420px, so grid
-   sizing is unaffected. */
+.ap-compare-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.07); max-width: 640px; display: flex; flex-direction: column; }
+/* max-width above only matters standalone (renderConfirmation, the
+   Change Your Trail "Currently Set" card -- both narrowed back to the
+   standard 640px container, see wrap.classList.remove('ap-wide') calls
+   in adventure-prep-form.js) -- inside .ap-compare-grid the grid track
+   (repeat(3,1fr) or the .is-thin 2-col track) is already narrower than
+   640px, so grid sizing is unaffected. Matches .ap-cta-primary's own
+   640px cap so a standalone card and the button below it share the
+   same edges (Airey: "the card width should be the same as the CTA
+   button width"). */
 .ap-compare-photo { height: 130px; flex-shrink: 0; background: linear-gradient(135deg, #3a5a5a, #2A4747); position: relative; background-color: #6a7a6a; }
 .ap-compare-badge { position: absolute; top: 0.7rem; left: 0.8rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 10px; }
 .badge-recommended { background: var(--mountain-pink); color: white; }

@@ -1345,12 +1345,13 @@
     }
     function goHub() { state.trailAssignmentPhase = 'idle'; state.step = 'hub'; render(); }
 
-    // ---- "[Trail] it is." confirmation, right after choosing ----
+    // ---- "[Trail] is a great choice!" confirmation, right after choosing ----
     function renderConfirmation(candidate) {
+      wrap.classList.remove('ap-wide');
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
-        '<div class="ap-q-title" style="margin-bottom:1rem;">' + escapeHtml(candidate.trailName || 'Your trail') + ' it is.</div>' +
+        '<div class="ap-q-title" style="margin-bottom:1rem;">' + escapeHtml(candidate.trailName || 'Your trail') + ' is a great choice!</div>' +
         '<div style="margin-bottom:1.2rem;">' + compareCardHtml(candidate, null, null, false) + '</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-continue-attendees">Continue to Attendees</button>' +
         '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Return to Adventure Home</div>';
@@ -1361,6 +1362,7 @@
 
     // ---- In review: 0 qualifying candidates, nothing manual yet ----
     function renderInReview() {
+      wrap.classList.remove('ap-wide');
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
@@ -1377,6 +1379,7 @@
 
     // ---- Choose Your Trail grid (first-time assignment or a refresh) ----
     function renderChooseGrid(candidates) {
+      wrap.classList.add('ap-wide');
       var algo = candidates.filter(function (c) { return c.source !== 'manual_override'; });
       var manual = candidates.filter(function (c) { return c.source === 'manual_override'; });
       var badgesMap = difficultyBadges(candidates);
@@ -1455,6 +1458,7 @@
     }
 
     function renderPacing() {
+      wrap.classList.remove('ap-wide');
       contentEl.innerHTML = '<div class="transition-wrap"><div class="transition-spinner"></div>' +
         '<div class="transition-line">Looking for trails that fit your group&hellip;</div></div>';
     }
@@ -1497,6 +1501,7 @@
       var choice = 'different';
 
       function draw() {
+        wrap.classList.remove('ap-wide');
         contentEl.innerHTML =
           flowTopHtml('&larr; Adventure Home') +
           '<div class="ap-eyebrow">Trail Recommendation</div>' +
@@ -1529,6 +1534,7 @@
     // grid rather than a shortened list, with the current pick badged
     // "Currently Set" instead of "Recommended".
     function renderChangeGrid(candidates, current) {
+      wrap.classList.add('ap-wide');
       var badgesMap = difficultyBadges(candidates);
       var algoOnly = candidates.filter(function (c) { return c.source !== 'manual_override'; });
       function badgeFor(c) {
@@ -1579,6 +1585,7 @@
     // trackable "request review" field would be a clean follow-up if this
     // needs to show up in Ops.
     function renderAskTeamConfirm() {
+      wrap.classList.remove('ap-wide');
       var bookingId = (state.ctx.experienceBooking && state.ctx.experienceBooking.bookingId) || '';
       var mailto = 'mailto:hello@palmspringsadventureclub.com?subject=' + encodeURIComponent('Please pick our trail personally') +
         '&body=' + encodeURIComponent('Hi team,\n\nCould someone take a personal look at our trail pick?\n\nBooking: ' + bookingId + '\n\nThanks!');
