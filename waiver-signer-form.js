@@ -169,18 +169,21 @@
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
   }
 
-  function parseCandidateTrails() {
-    var candidateTrails = state.ctx.candidateTrails;
-    try { return typeof candidateTrails === 'string' ? JSON.parse(candidateTrails || '[]') : (candidateTrails || []); } catch (e) { return []; }
-  }
-
   function computeStatus() {
     var signer = state.ctx.signer || {};
     var detailsDone = !!signer.detailsConfirmedAt;
     var waiverDone = signer.status === 'signed';
-    var candidateTrails = parseCandidateTrails();
+    // BUG FIX (Sept 2026, Attendees walkthrough follow-up): this used to
+    // look up the selected trail by filtering state.ctx.candidateTrails --
+    // a key getSignerContext never actually sent (it returns
+    // selectedTrail, a single object, not a candidates array), so
+    // trailMatch was always undefined and the "Your Trail" tile silently
+    // rendered a blank second line even once a trail had been picked.
+    // getSignerContext now returns the selected trail's full stats
+    // (distance/elevation/ratings included) directly on state.ctx, so
+    // read it straight from there instead of re-deriving it.
     var selectedTrailId = state.ctx.selectedTrailId;
-    var trailMatch = candidateTrails.filter(function (c) { return c.trailId === selectedTrailId; })[0];
+    var trailMatch = state.ctx.selectedTrail || null;
     // NEW (Task 16): guardianForChildrenParticipantIds is a real JSONB
     // column (guardian_for_children_json) that lib/waiver-service.js's
     // getSignerContext already returns pre-parsed as a JS array — NOT a
@@ -204,7 +207,8 @@
       guardianForChildren: guardianForChildrenNames,
       trailAssigned: !!selectedTrailId,
       trailName: trailMatch ? trailMatch.trailName : '',
-      trailDescription: trailMatch ? (trailMatch.description || (trailMatch.matchedAttributes || []).join(', ')) : '',
+      trailDescription: trailMatch ? (trailMatch.overviewCopy || (trailMatch.matchedAttributes || []).join(', ')) : '',
+      trailDetail: trailMatch,
       // Same judgment call as adventure-prep-form.js's own hub status
       // comment: no mockup exists for Surface B's Adventure Summary
       // content, so this unlocks on the two things Surface B itself
@@ -213,6 +217,57 @@
       // signer's hands entirely.
       summaryUnlocked: detailsDone && waiverDone,
     };
+  }
+
+  // ---------------------------------------------------------------------
+  // Trail card (mirrors adventure-prep-form.js's own compareCardHtml /
+  // summarize / difficultyLabel / technicalLabel) -- read-only version
+  // for Surface B's hub, Sept 2026: no badge, no CTA button, since this
+  // signer never controls trail selection, just needs to see it. Kept as
+  // a small local port rather than a shared require because the two
+  // files are separate client bundles for separate pages, not modules
+  // that can import from one another.
+  // ---------------------------------------------------------------------
+  function summarize(text, maxLen) {
+    if (!text) return '';
+    var trimmed = text.trim();
+    if (trimmed.length <= maxLen) return trimmed;
+    var slice = trimmed.slice(0, maxLen);
+    var lastSentenceEnd = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '));
+    if (lastSentenceEnd > maxLen * 0.4) {
+      return slice.slice(0, lastSentenceEnd + 1);
+    }
+    var lastSpace = slice.lastIndexOf(' ');
+    return slice.slice(0, lastSpace > 0 ? lastSpace : maxLen).replace(/[,;:\s]+$/, '') + '…';
+  }
+  function difficultyLabel(n) {
+    if (n == null) return '—';
+    if (n <= 2) return 'Easy';
+    if (n === 3) return 'Moderate';
+    return 'Hard';
+  }
+  function technicalLabel(n) {
+    if (n == null) return '—';
+    if (n <= 2) return 'Low';
+    if (n === 3) return 'Moderate';
+    return 'High';
+  }
+  function compareCardHtml(candidate) {
+    var desc = summarize(candidate.overviewCopy, 250) || ((candidate.matchedAttributes || []).length
+      ? 'Matches what you told us: ' + candidate.matchedAttributes.join(', ') + '.'
+      : 'A safe, solid fit for your group.');
+    return '<div class="ap-compare-card">' +
+      '<div class="ap-compare-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '></div>' +
+      '<div class="ap-compare-body">' +
+      '<div class="ap-compare-name">' + escapeHtml(candidate.trailName || '') + '</div>' +
+      '<div class="ap-compare-stats">' +
+      '<div><div class="ap-compare-stat-label">Distance</div><div class="ap-compare-stat-value">' + (candidate.distance != null ? candidate.distance + ' mi' : '—') + '</div></div>' +
+      '<div><div class="ap-compare-stat-label">Elevation</div><div class="ap-compare-stat-value">' + (candidate.elevation != null ? candidate.elevation + ' ft' : '—') + '</div></div>' +
+      '<div><div class="ap-compare-stat-label">Difficulty</div><div class="ap-compare-stat-value">' + difficultyLabel(candidate.difficultyRating) + '</div></div>' +
+      '<div><div class="ap-compare-stat-label">Technical</div><div class="ap-compare-stat-value">' + technicalLabel(candidate.technicalRating) + '</div></div>' +
+      '</div>' +
+      '<div class="ap-compare-desc">' + escapeHtml(desc) + '</div>' +
+      '</div></div>';
   }
 
   function goHub() { state.step = 'hub'; render(); }
@@ -273,17 +328,21 @@
 
     var allSet = status.detailsDone && status.waiverDone;
 
+    // Trail card (Sept 2026 follow-up, matches Surface A's own hub
+    // pattern): only shown once the booker has actually picked a trail --
+    // status.trailDetail is the full candidate_trails/trails row
+    // (distance/elevation/ratings/photo) getSignerContext now resolves,
+    // not just a name (see this file's computeStatus() bug-fix comment).
+    var trailSectionHtml = !status.trailAssigned || !status.trailDetail ? '' :
+      '<div class="ap-trail-section-wide">' + compareCardHtml(status.trailDetail) + '</div>';
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-eyebrow">You’re Invited</div>' +
       '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + ', you’ve been added to an adventure.</div>' +
-      '<div class="ap-subline">' + escapeHtml(tripDate) + ' &middot; ' + (allSet ? 'you’re all set' : 'one thing needs you first') + '.</div>' +
-      // PLACEHOLDER COPY, not final — adapted from the same illustrative
-      // Borrowed Trust copy already used for this exact banner before
-      // this redesign (this file's own pre-Round-2 version), per
-      // mockup-07's own flag that this is a placeholder pending the real
-      // copy review landing, not a design decision to sign off on.
-      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + escapeHtml(ownerName) + '’s heading out with Palm Springs Adventure Club on ' + escapeHtml(tripDate) + ' and added you to the day. We place people on the trail that actually fits them, not a generic route. Before you’re all set, we just need a few things from you.</div></div>' +
+      '<div class="ap-subline">Complete the following steps to officially join the adventure.</div>' +
+      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + escapeHtml(ownerName) + '’s heading out with Palm Springs Adventure Club on ' + escapeHtml(tripDate) + ' and added you to the adventure. Palm Springs Adventure Club is a personalized trail experience and gear rental service that unlocks experiences on the trails, canyons, and ridgelines surrounding Palm Springs. We need a few things from you before your adventure.</div></div>' +
+      trailSectionHtml +
       '<div class="ap-tiles-label">Get ready</div>' +
       '<div class="ap-tiles" id="sb-hub-tiles">' + tilesHtml + '</div>' +
       '</div></div>'

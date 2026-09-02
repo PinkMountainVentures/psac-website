@@ -524,7 +524,7 @@
    .ap-cta-primary/secondary, status-done/notdone/locked) already exists
    above and is reused as-is. Only genuinely new pieces follow.
    --------------------------------------------------------------------- */
-.ap-intro-banner { background: rgba(245,130,113,0.08); border: 1px solid rgba(245,130,113,0.25); border-radius: 10px; padding: 0.95rem 1.1rem; margin-bottom: 1.3rem; max-width: 640px; }
+.ap-intro-banner { background: rgba(122,189,145,0.1); border: 1px solid rgba(122,189,145,0.3); border-radius: 10px; padding: 0.95rem 1.1rem; margin-bottom: 1.3rem; max-width: 640px; }
 .ap-intro-banner-text { font-size: 0.82rem; line-height: 1.6; color: var(--dark-pine); }
 
 .ap-sms-consent { display: flex; gap: 0.7rem; align-items: flex-start; background: white; border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 1.3rem; box-shadow: 0 1px 3px rgba(42,71,71,0.06); cursor: pointer; max-width: 640px; }
