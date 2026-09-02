@@ -960,7 +960,7 @@
       '<h1 class="ap-q">Confirm your group</h1>' +
       '<p class="ap-sub">Make sure everyone’s name, age, and fitness level are right before we reach out to your group.</p>' +
       '<div class="ap-card">' +
-      '<div class="paf-roster">' +
+      '<div class="paf-roster" style="border-top:none; padding-top:0; margin-top:0;">' +
       '<div class="paf-roster-sub">Your group</div>' +
       '<div id="ap-roster-rows"></div>' +
       '<div class="ap-helper" style="margin:0.4rem 0 0;">Need to add or remove someone? <a href="mailto:hello@palmspringsadventureclub.com" style="color:var(--mountain-pink);">Email us</a> and we’ll help you update it.</div>' +
@@ -1151,10 +1151,9 @@
           '<input class="ap-contact-email" data-participant-id="' + escapeHtml(p.participantId) + '" type="email" placeholder="' + escapeHtml((p.name || 'Their') + '’s email') + '" value="' + escapeHtml(p.email || '') + '" style="flex:2; min-width:220px; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
           '</div>';
       }).join('') + '</div>' +
-      '<div class="ap-helper" style="margin:0.9rem 0 0;">Any minors on this booking need a guardian assigned before we can reach them, that’s not built yet, see the note in Waivers.</div>' +
       '<div id="ap-contact-error" class="ap-error"></div>' +
       '</div>' +
-      '<div class="ap-deposit-note">A waiver is required to be completed by each participant 3 days prior to the adventure day or gear will not be delivered for any participant with an unsigned waiver.</div>' +
+      '<div class="ap-deposit-note" style="margin-bottom:1.2rem;">A waiver is required to be completed by each participant 3 days prior to the adventure day or gear will not be delivered for any participant with an unsigned waiver.</div>' +
       '<button type="button" class="ap-cta-primary" id="ap-next">Continue</button>' +
       '<div class="ap-cta-secondary" id="ap-save-and-return" style="cursor:pointer;">Save &amp; return to Adventure Home</div>' +
       '</div></div>'
@@ -1263,15 +1262,14 @@
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       attendeesFlowTopHtml(3, 'ap-back-to-hub', '&larr; Adventure Home') +
       '<div class="ap-eyebrow">Attendees</div>' +
-      '<h1 class="ap-q">Send invites to your group</h1>' +
-      '<p class="ap-sub">Confirm the roster below, then invites go out so the rest of your group can join the adventure and sign their own waivers.</p>' +
+      '<h1 class="ap-q">Send waiver links and adventure invites to your group</h1>' +
+      '<p class="ap-sub">Your group will receive an invite email from Palm Springs Adventure Club so they can confirm their participation and complete their waiver.</p>' +
       '<div class="ap-card">' +
       (signers.length
         ? signers.map(function (s) {
-          return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(s.email || 'no email on file yet') + '</div></div><span class="review-recipient-tag">Waiver link</span></div>';
+          return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(s.email || 'no email on file yet') + '</div></div></div>';
         }).join('')
         : '<p class="ap-helper">No one else on this booking needs their own waiver link.</p>') +
-      '<div class="ap-helper" style="margin:0.6rem 0 1.2rem;">Any minors on this booking need a guardian assigned before we can reach them, that’s not built yet, see the note in Waivers.</div>' +
       (missingEmail.length ? '<div class="ap-error" style="margin-bottom:1rem;">Add an email for ' + missingEmail.map(function (p) { return escapeHtml(p.name || 'this person'); }).join(', ') + ' before sending, they need it for their own link. <a href="#" id="ap-back-to-roster" style="color:var(--mountain-pink);">Go back and add it</a></div>' : '') +
       '<div id="ap-invite-error" class="ap-error"></div>' +
       (signers.length
