@@ -93,7 +93,9 @@
           sendBtn.textContent = 'Send';
           if (result.ok && result.data && result.data.status === 'sent') {
             textarea.value = '';
-            setStatus('Sent -- we’ll reply to your email soon.', false);
+            setStatus('Sent. We’ll reply to your email soon.', false);
+          } else if (result.data && result.data.message) {
+            setStatus(result.data.message, true);
           } else {
             setStatus('Couldn’t send that -- try again, or email us directly at reservations@palmspringsadventureclub.com.', true);
           }

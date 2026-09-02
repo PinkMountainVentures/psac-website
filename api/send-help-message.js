@@ -33,6 +33,19 @@
  * actual person who typed the message.
  *
  * Request shape: POST /api/send-help-message { token, message }
+ *
+ * RATE LIMITING (added per Airey's question, 2026-09-02): a valid token is
+ * the only gate on this endpoint (same posture as every other Adventure
+ * Prep action), so without a cap, a single known token -- a guest's own
+ * link, forwarded, screenshotted, or scripted -- could be used to spam the
+ * reservations@ inbox indefinitely. Enforced per booking_id using the
+ * existing audit_log table (no schema change): a short cooldown between
+ * sends, plus a daily cap, both checked against 'help_message_sent' rows
+ * logged right after each real send. This does NOT protect against someone
+ * guessing/brute-forcing an unknown token in the first place -- that's a
+ * different problem (see resolveContext's own note below) and needs
+ * request-level throttling in front of the endpoint (e.g. Vercel Firewall
+ * rate-limit rules), not a per-booking counter.
  */
 
 'use strict';
@@ -40,9 +53,12 @@
 const { sql } = require('../lib/db');
 const { sendEmail } = require('../lib/send-email');
 const { renderAdventurePrepQuestionEmail } = require('../lib/email-templates/adventure-prep-question-email');
+const { genId } = require('../lib/ids');
 
 const STAFF_INBOX = 'reservations@palmspringsadventureclub.com';
 const MAX_MESSAGE_LENGTH = 4000;
+const RATE_LIMIT_COOLDOWN_SECONDS = 30;
+const RATE_LIMIT_DAILY_CAP = 8;
 
 function parseBody(req) {
   var body = req.body;
@@ -68,6 +84,12 @@ function formatTripDate(dateStr) {
 // most "Send" clicks will come from the booking owner on Surface A), then
 // falls back to a waiver signer token (Surface B, a non-owner signer who
 // may not be the booking's contact_email at all).
+//
+// NOTE on token strength: adventure_prep_token is a full crypto.randomUUID()
+// (lib/booking-service.js) -- not practically guessable. signer_token is
+// genId() (lib/ids.js), only 8 hex chars / 32 bits -- weaker, and this
+// endpoint doesn't add any extra check beyond "does a row exist." An
+// invalid guess just 404s below, which nothing currently throttles.
 async function resolveContext(token) {
   const apRows = await sql`
     SELECT booking_id, contact_name, contact_email, date
@@ -105,6 +127,47 @@ async function resolveContext(token) {
   return null;
 }
 
+// Per-booking cap: a short cooldown (blocks rapid-fire clicking or a tight
+// retry loop) plus a rolling 24h cap (blocks slower sustained abuse of one
+// known-valid token). Both read off the same audit_log rows this function's
+// caller writes on every real send -- see logHelpMessageSent below.
+async function checkRateLimit(bookingId) {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS send_count, MAX("timestamp") AS last_sent_at
+    FROM audit_log
+    WHERE booking_id = ${bookingId}
+      AND change_type = 'help_message_sent'
+      AND "timestamp" > now() - interval '24 hours'
+  `;
+  const row = rows[0] || { send_count: 0, last_sent_at: null };
+
+  if (row.send_count >= RATE_LIMIT_DAILY_CAP) {
+    return {
+      limited: true,
+      message: "You've reached today's limit for messages on this booking. Email us directly at reservations@palmspringsadventureclub.com and we'll get right back to you.",
+    };
+  }
+
+  if (row.last_sent_at) {
+    const secondsSinceLast = (Date.now() - new Date(row.last_sent_at).getTime()) / 1000;
+    if (secondsSinceLast < RATE_LIMIT_COOLDOWN_SECONDS) {
+      return { limited: true, message: 'That message is on its way. Give it a few seconds before sending another.' };
+    }
+  }
+
+  return { limited: false };
+}
+
+// Reuses the existing audit trail (every other write in this codebase
+// already logs here -- see lib/manual-adjustment-service.js's own header
+// comment) rather than adding a new table just for this counter.
+async function logHelpMessageSent(bookingId, sourcePage) {
+  await sql`
+    INSERT INTO audit_log (audit_id, booking_id, change_type, new_value_json)
+    VALUES (${genId('AUDIT')}, ${bookingId}, 'help_message_sent', ${JSON.stringify({ sourcePage: sourcePage })})
+  `;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'method_not_allowed' });
@@ -135,6 +198,12 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const rateLimit = await checkRateLimit(ctx.bookingId);
+    if (rateLimit.limited) {
+      res.status(429).json({ error: 'rate_limited', message: rateLimit.message });
+      return;
+    }
+
     const html = renderAdventurePrepQuestionEmail({
       logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
       guestName: ctx.guestName,
@@ -156,6 +225,8 @@ module.exports = async function handler(req, res) {
       res.status(502).json({ error: 'send_failed', detail: sendResult.error || sendResult.reason });
       return;
     }
+
+    await logHelpMessageSent(ctx.bookingId, ctx.sourcePage);
 
     res.status(200).json({ status: 'sent' });
   } catch (err) {
