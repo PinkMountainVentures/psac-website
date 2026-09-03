@@ -840,7 +840,7 @@
     var reasonPhrase = 'the adventure details we need';
     if (reasons.indexOf('zero_waivers') !== -1) reasonPhrase = 'your waiver signed';
     else if (reasons.indexOf('no_address') !== -1) reasonPhrase = 'a delivery address on file';
-    else if (reasons.indexOf('hold_never_cleared') !== -1) reasonPhrase = 'your gear hold cleared in time';
+    else if (reasons.indexOf('hold_never_cleared') !== -1) reasonPhrase = 'your gear hold cleared';
     else if (reasons.indexOf('no_1.2a') !== -1) reasonPhrase = 'the adventure details we need';
 
     // UPDATED (buggy-items follow-up, 2026-09-03): this used to remove
@@ -859,7 +859,7 @@
       '<div class="cancel-shell"><div class="container"><div class="cancel-card">' +
       '<div class="cancel-badge"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 7" stroke="#4a9d68" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
       '<h1 class="cancel-headline">This reservation has been cancelled</h1>' +
-      '<p class="cancel-body">We weren’t able to get <strong>' + escapeHtml(reasonPhrase) + '</strong> in time to plan your trail day, so this reservation was cancelled. A refund has already been issued to the card on file, there’s nothing further owed on either side.</p>' +
+      '<p class="cancel-body">We weren’t able to get <strong>' + escapeHtml(reasonPhrase) + '</strong> in time to plan your trail day, so this reservation was cancelled. We’ve already sent your refund to the card on file, and there’s nothing further owed on either side.</p>' +
       '<div class="cancel-detail">' +
       '<div class="cancel-detail-row"><span>Refund issued</span><span>' + escapeHtml(refundAmount) + '</span></div>' +
       (cancelledAt ? '<div class="cancel-detail-row"><span>Date</span><span>' + escapeHtml(cancelledAt) + '</span></div>' : '') +
@@ -870,7 +870,7 @@
       // "Questions?" pill already covers this, so a second contact path
       // here was redundant.
       '<div class="cancel-ctas"><a href="#" class="btn start-adventure-btn">Book Again</a></div>' +
-      '<p class="cancel-footnote">Nothing further is needed from you. This reservation is fully closed out.</p>' +
+      '<p class="cancel-footnote">There’s nothing left for you to do here. Whenever you’re ready to give the trail another try, we’ll be here.</p>' +
       '</div></div></div>'
     ));
 
