@@ -118,6 +118,11 @@
   // client bundles, same caveat as this file's ported compareCardHtml.
   var RENTAL_GEAR_ITEMS = ['Gregory daypack', 'Leki trekking poles', 'Two Hydro Flask 32oz bottles', 'First aid kit'];
   var KEEPSAKE_ITEMS = ['LMNT electrolytes', 'Rancho Meladuco Medjool dates', 'Blue Lizard mineral sunscreen'];
+  // Same icon adventure-prep-form.js's own hub uses for its pre-T3
+  // trail-locked note -- ported here since this is a separate client
+  // bundle (see this file's header comment), needed now that Surface B's
+  // own trail section gets the same locked/unlocked treatment.
+  var LOCK_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="5.5" y="10.3" width="13" height="10.2" rx="2" stroke="#2A4747" stroke-width="1.4"/><path d="M8.2 10.3V7.7a3.8 3.8 0 0 1 7.6 0v2.6" stroke="#2A4747" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="15.1" r="1.2" fill="#F58271"/><path d="M12 16.3v1.5" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/></svg>';
 
   function h(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
   function escapeHtml(s) {
@@ -137,6 +142,60 @@
     if (!m) return 'an upcoming trip';
     var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
     return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' }).format(d);
+  }
+
+  // -----------------------------------------------------------------
+  // Date math for the Phase 1/2 escalating hub arc (hub-lifecycle-
+  // alerts-proposal.md, 2026-09-03) -- this file never needed T-3/
+  // delivery-day/today's-own-date logic before now, so none of these
+  // existed here; same techniques adventure-prep-form.js's own copies
+  // already use (this file is a separate client bundle, no shared
+  // import path between the two -- see this file's header comment).
+  // -----------------------------------------------------------------
+  function pacificOffsetMinutes(utcInstant) {
+    var dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles', hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    var parts = dtf.formatToParts(utcInstant).reduce(function (acc, p) { acc[p.type] = p.value; return acc; }, {});
+    var asIfUtc = Date.UTC(
+      Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour) === 24 ? 0 : Number(parts.hour), Number(parts.minute), Number(parts.second)
+    );
+    return (asIfUtc - utcInstant.getTime()) / 60000;
+  }
+  function computeT3CutoffDate(tripDateStr) {
+    var m = String(tripDateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    var y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    var threeBack = new Date(Date.UTC(y, mo - 1, d) - 3 * 86400000);
+    var cy = threeBack.getUTCFullYear(), cm = threeBack.getUTCMonth(), cd = threeBack.getUTCDate();
+    var guess = new Date(Date.UTC(cy, cm, cd, 22, 0, 0) + 8 * 3600000);
+    var offset = pacificOffsetMinutes(guess);
+    return new Date(Date.UTC(cy, cm, cd, 22, 0, 0) - offset * 60000);
+  }
+  function isPastT3Cutoff(tripDateStr) {
+    var cutoff = computeT3CutoffDate(tripDateStr);
+    return !!cutoff && new Date() >= cutoff;
+  }
+  function pacificDateString(date) {
+    var dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    var parts = dtf.formatToParts(date).reduce(function (acc, p) { acc[p.type] = p.value; return acc; }, {});
+    return parts.year + '-' + parts.month + '-' + parts.day;
+  }
+  function isoOffsetDateStr(dateStr, dayOffset) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + dayOffset));
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+  function joinWithAnd(items) {
+    if (items.length === 0) return '';
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return items[0] + ' and ' + items[1];
+    return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
   }
 
   function boot() {
@@ -243,6 +302,10 @@
       // requiring the trail to be assigned, which is out of this
       // signer's hands entirely.
       summaryUnlocked: detailsDone && waiverDone,
+      // NEW (Phase 1/2 escalating hub arc, 2026-09-03): same value as
+      // summaryUnlocked above, named to match Surface A's own allSet
+      // field so the two hubs' top-card logic reads the same way.
+      allSet: detailsDone && waiverDone,
     };
   }
 
@@ -364,8 +427,13 @@
     // status.trailDetail is the full candidate_trails/trails row
     // (distance/elevation/ratings/photo) getSignerContext now resolves,
     // not just a name (see this file's computeStatus() bug-fix comment).
+    var pastT3 = status.trailAssigned && isPastT3Cutoff(state.ctx.tripDate);
     var trailSectionHtml = !status.trailAssigned || !status.trailDetail ? '' :
-      '<div class="ap-trail-section-wide">' + compareCardHtml(status.trailDetail) + '</div>';
+      '<div class="ap-trail-section-wide">' + compareCardHtml(status.trailDetail) +
+      (pastT3
+        ? '<div class="ap-trail-unlocked"><div class="ap-trail-unlocked-text">Your guide is ready: turn-by-turn navigation, waypoints, and everything else for the trail.</div><button type="button" class="ap-trail-download-btn" id="sb-get-guide">Get Guide</button></div>'
+        : '<div class="ap-trail-locked-note"><span class="lock-icon">' + LOCK_ICON_SVG + '</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
+      '</div>';
 
     var hubGuardianMinors = (state.ctx.minors || []).filter(function (m) { return m.preAssignedToThisSigner; });
     var hubIsGuardian = hubGuardianMinors.length > 0;
@@ -379,11 +447,59 @@
       : 'A few things need your attention before the trail day arrives, and most of them take a minute.';
     var hubIntroText = (hubIsGuardian ? 'You both get placed' : 'You get placed') +
       ' on a trail that fits the group, not a generic route, with gear at your door the night before you go. ' + escapeHtml(ownerName) + ' picked Palm Springs Adventure Club because it’s the easiest way to have a great adventure on the trails around Palm Springs.';
+    // -----------------------------------------------------------------
+    // Phase 1/2 escalating top card (hub-lifecycle-alerts-proposal.md,
+    // 2026-09-03). Same "pure function of current state" rule and the
+    // same climax/2A merge Surface A's own renderHub() follows -- see
+    // that file's own comment for the reasoning.
+    // -----------------------------------------------------------------
+    var topGreetingHtml = hubGreeting;
+    var topSublineHtml = hubSubline;
+    var doneCount = [status.detailsDone, status.waiverDone].filter(Boolean).length;
+
+    if (status.allSet) {
+      var statLine = (status.trailAssigned ? escapeHtml(status.trailName) + ' \u00b7 ' : '') + formatTripDate(state.ctx.tripDate);
+      var todayStr = pacificDateString(new Date());
+      var tripDateMatch = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
+      var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
+      var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
+
+      if (todayStr === tripDateStr) {
+        var tripTip = (status.trailDetail && status.trailDetail.oneTripTip) ||
+          'Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.';
+        topGreetingHtml = 'It\u2019s adventure day! ' + escapeHtml(status.trailAssigned ? status.trailName : 'Your trail') + ' is waiting.';
+        topSublineHtml = escapeHtml(tripTip);
+      } else if (todayStr === deliveryDateStr) {
+        // Framed around what's arriving for THIS signer, per the doc's
+        // own direction -- same "to the address [owner] provided," never
+        // a full address, framing renderGear() already established.
+        var deliveryWin = state.ctx.deliveryWindow;
+        topGreetingHtml = 'Your gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', to the address ' + escapeHtml(ownerName) + ' provided.';
+        topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
+      } else if (pastT3) {
+        topGreetingHtml = 'Your guide\u2019s ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(status.trailName) + ' is yours now.';
+        topSublineHtml = statLine;
+      } else {
+        // Climax through 2A Countdown, merged (same call as Surface A).
+        topGreetingHtml = hubIsGuardian
+          ? hubChildLabel + '\u2019s ready, and so are you. The trail is ready and the adventure will be fun!'
+          : 'You\u2019re in. ' + escapeHtml(ownerName) + '\u2019s adventure is set. The trail is ready for you.';
+        topSublineHtml = statLine;
+      }
+    } else if (doneCount === 1) {
+      topGreetingHtml = status.detailsDone
+        ? 'One thing left: your waiver, then you\u2019re fully in.'
+        : 'One thing left: confirm your details, then you\u2019re fully in.';
+      topSublineHtml = '';
+    }
+    // else doneCount === 0: topGreetingHtml/topSublineHtml stay the
+    // Borrowed Trust opener already built above.
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-eyebrow">You’re In</div>' +
-      '<div class="ap-greeting">' + hubGreeting + '</div>' +
-      '<div class="ap-subline">' + hubSubline + '</div>' +
+      '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+      '<div class="ap-subline">' + topSublineHtml + '</div>' +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>' +
       trailSectionHtml +
       '<div class="ap-tiles-label">Get ready</div>' +
@@ -396,6 +512,10 @@
         var t = tiles[Number(el.getAttribute('data-tile'))];
         if (t && t.onClick) t.onClick();
       });
+    });
+    var guideBtn = wrap.querySelector('#sb-get-guide');
+    if (guideBtn) guideBtn.addEventListener('click', function () {
+      window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
     });
 
     return wrap;
@@ -501,11 +621,52 @@
         '</div>';
     }).join('');
 
+    // -----------------------------------------------------------------
+    // Phase 1/2 escalating top card, non-attending guardian branch
+    // (hub-lifecycle-alerts-proposal.md, 2026-09-03). Only two Phase 1
+    // states for this persona (not certified / certified) -- one real
+    // task only, no roster/gear/trail of their own to track -- then the
+    // same Phase 2 arc the other two hubs get, framed around [child]'s
+    // day throughout per Airey's own correction (low task count here
+    // doesn't mean low informational need).
+    // -----------------------------------------------------------------
+    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '\u2019s guardian for their adventure day.';
+    var topSublineHtml = '';
+    var pastT3 = isPastT3Cutoff(state.ctx.tripDate);
+    var guideBtnHtml = '';
+
+    if (allCertified) {
+      var todayStr = pacificDateString(new Date());
+      var tripDateMatch = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
+      var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
+      var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
+
+      if (todayStr === tripDateStr) {
+        topGreetingHtml = 'It\u2019s adventure day for ' + childLabel + '! ' + escapeHtml(trailDetail ? trailDetail.trailName : 'The trail') + ' is waiting.';
+        topSublineHtml = theDaySub;
+      } else if (todayStr === deliveryDateStr) {
+        var deliveryWin = state.ctx.deliveryWindow;
+        topGreetingHtml = childLabel + '\u2019s gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', packed and ready for tomorrow.';
+        topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
+      } else if (pastT3) {
+        topGreetingHtml = childLabel + '\u2019s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
+        topSublineHtml = '';
+        guideBtnHtml = '<div class="ap-trail-unlocked" style="margin-top:0.6rem;"><div class="ap-trail-unlocked-text"></div><button type="button" class="ap-trail-download-btn" id="sb-guardian-get-guide">Get Guide</button></div>';
+      } else {
+        // Climax through 2A Countdown, merged into one state (same call
+        // as the other two hubs' own identical reasoning -- no "seen it
+        // before" tracking exists to tell a first visit from a later one).
+        topGreetingHtml = childLabel + ' is going to have a great adventure!';
+        topSublineHtml = 'This confirms your authorization and emergency contact are on file.';
+      }
+    }
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-eyebrow">You\u2019re In</div>' +
-      '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '\u2019s guardian for their adventure day.</div>' +
-      '<div class="ap-subline"></div>' +
+      '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+      '<div class="ap-subline">' + topSublineHtml + '</div>' +
+      guideBtnHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '\u2019s day itself is self-guided, without one of our own people along, so here\u2019s everything about it: who\u2019s going, where, when, and what to do if you need to reach us.</div></div>' +
       '<div class="ap-tiles-label">The day</div>' +
       '<div class="ap-tiles" id="sb-guardian-hub-tiles">' + tilesHtml + '</div>' +
@@ -517,6 +678,10 @@
         var t = tiles[Number(el.getAttribute('data-tile'))];
         if (t && t.onClick) t.onClick();
       });
+    });
+    var guardianGuideBtn = wrap.querySelector('#sb-guardian-get-guide');
+    if (guardianGuideBtn) guardianGuideBtn.addEventListener('click', function () {
+      window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
     });
 
     return wrap;

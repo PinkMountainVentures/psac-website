@@ -378,6 +378,42 @@
     return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' }).format(d);
   }
 
+  // NEW (Phase 1/2 escalating hub arc, 2026-09-03): the countdown/
+  // delivery-day/trail-day states in renderHub() below need to know
+  // TODAY's own Pacific calendar date, not the UTC one -- same
+  // technique lib/cadence.js's own pacificDateString already uses
+  // server-side, ported here since this file has no shared import path
+  // with lib/ (separate client bundle, see this file's header comment).
+  function pacificDateString(date) {
+    var dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    var parts = dtf.formatToParts(date).reduce(function (acc, p) { acc[p.type] = p.value; return acc; }, {});
+    return parts.year + '-' + parts.month + '-' + parts.day;
+  }
+
+  // ISO ('YYYY-MM-DD') sibling of formatOffsetDate above -- that one
+  // returns a display string ("Tuesday, September 8"), this returns the
+  // plain date so it can be compared against pacificDateString(new
+  // Date()) to detect "today is delivery day."
+  function isoOffsetDateStr(dateStr, dayOffset) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + dayOffset));
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+
+  // Small Oxford-style joiner for the "Building momentum" state's "just
+  // [X], [Y] and [Z] left" copy below -- no equivalent existed anywhere
+  // in this file since nothing previously needed to name a variable-
+  // length list of remaining items in one sentence.
+  function joinWithAnd(items) {
+    if (items.length === 0) return '';
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return items[0] + ' and ' + items[1];
+    return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
+  }
+
   // ---------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------
@@ -1130,6 +1166,18 @@
       eligibleCount: eligibleCount,
       signers: signers,
       waiversDone: waiversDone,
+      // NEW (Phase 1/2 escalating hub arc, 2026-09-03): bookerWaiverDone
+      // is one of the four "first thing done" signals the top-card state
+      // machine below needs (trailSelected/attendeesDone/gearDone are
+      // already here; the booker's own signature wasn't previously
+      // surfaced as its own flag, only bundled into waiversDone/signers).
+      // allSet is renderSummary()'s own gate, hoisted here per the
+      // lifecycle-alerts proposal's explicit note that it's "already
+      // computed in renderSummary(), just needs hoisting" -- renderSummary
+      // itself is updated below to read status.allSet instead of
+      // recomputing it.
+      bookerWaiverDone: signers.some(function (s) { return s.isOwner && s.isDone; }),
+      allSet: !!ap.selectedTrailId && gearDone && waiversDone,
       // FLAGGED, judgment call: the mockups don't fully reconcile the hub
       // tile's "Locked — unlocks once everything above is set" copy with
       // Adventure Summary's own "still finishing up" state (handoff
@@ -1220,11 +1268,97 @@
       alertHtml = '<div class="ap-alert"><div class="ap-alert-icon">' + ALERT_ICON_SVG + '</div><div class="ap-alert-text"><b>Waivers lock at ' + formatCutoffLabel() + '.</b><br>' + missingCount + ' ' + (missingCount === 1 ? 'person on your list hasn’t' : 'people on your list haven’t') + ' signed yet.</div></div>';
     }
 
+    // -----------------------------------------------------------------
+    // Phase 1/2 escalating top card (hub-lifecycle-alerts-proposal.md,
+    // 2026-09-03). Pure function of computeHubStatus() plus today's own
+    // date, same "no new tracking" principle as the rest of this hub --
+    // a guest who steps away for a week and comes back sees the state
+    // that matches where they actually are.
+    //
+    // Climax vs Phase 2A Countdown, resolved per Airey's direct call:
+    // since nothing here tracks "have they already seen the climax
+    // moment," the richer climax copy (with the trail/date/adventurers/
+    // gear stat line) fills the ENTIRE pre-T3 window rather than handing
+    // off to a plainer day-count line after one visit -- simpler, more
+    // information-rich, and consistent with this hub's own "pure
+    // function of current state" rule.
+    // -----------------------------------------------------------------
+    var bookerWaiverDone = status.bookerWaiverDone;
+    var doneFlags = [status.trailSelected, status.attendeesDone, status.gearDone, bookerWaiverDone];
+    var doneCount = doneFlags.filter(Boolean).length;
+    var groupPendingState = status.trailSelected && status.gearDone && bookerWaiverDone && !status.waiversDone;
+
+    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + '. You could have spent ' + formatTripDate(eb.date) + ' by the pool. You picked the trail instead. Here’s everything left before you’re on it.';
+    var topSublineHtml = '';
+
+    if (status.allSet) {
+      var statLine = escapeHtml(status.trailName) + ' \u00b7 ' + formatTripDate(eb.date) + ' \u00b7 ' + attendingRosterCount() + ' adventurers \u00b7 ' + status.kitCount + ' gear kits packed';
+      var todayStr = pacificDateString(new Date());
+      var tripDateMatch = String(eb.date || '').match(/^\d{4}-\d{2}-\d{2}/);
+      var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
+      var deliveryDateStr = isoOffsetDateStr(eb.date, -1);
+
+      if (todayStr === tripDateStr) {
+        // 2D: Trail-day. oneTripTip (Trail Database column AU) is
+        // wired through already but empty for every trail today -- see
+        // this doc's own flagged content gap -- so this falls back to
+        // the audit's own confirmed-good sun-exposure line until a
+        // trail actually has one written.
+        var tripTip = (selectedTrailCandidate && selectedTrailCandidate.oneTripTip) ||
+          'Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.';
+        topGreetingHtml = 'It\u2019s adventure day! ' + escapeHtml(status.trailName) + ' is waiting.';
+        topSublineHtml = escapeHtml(tripTip);
+      } else if (todayStr === deliveryDateStr) {
+        // 2C: Delivery-day reminder. Property type, never the full
+        // address, on a card meant to be shareable -- same reasoning
+        // renderSummary()'s own delivery line already follows.
+        var deliveryWin = ap.deliveryWindow || state.deliveryWindow;
+        var propertyLabels = { 'Hotel / resort': 'Hotel / Resort', 'Vacation rental (Airbnb/VRBO)': 'Vacation rental', 'Private residence': 'Private residence' };
+        var propertyRaw = ap.propertyType || state.propertyType;
+        var propertyLabel = propertyLabels[propertyRaw] || 'your place';
+        topGreetingHtml = 'Your gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', at your ' + escapeHtml(propertyLabel) + '.';
+        topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
+      } else if (pastT3) {
+        // 2B: Guide unlocked. The trail section below already carries
+        // its own Get Guide button once pastT3, so this doesn't repeat
+        // one -- just names the moment.
+        topGreetingHtml = 'Your guide\u2019s ready. Turn-by-turn navigation, waypoints, and everything for ' + escapeHtml(status.trailName) + ' is yours now.';
+        topSublineHtml = statLine;
+      } else {
+        // Climax through 2A Countdown, merged per the call above.
+        topGreetingHtml = 'That\u2019s everything. The trail is ready for you.';
+        topSublineHtml = statLine;
+      }
+    } else if (groupPendingState) {
+      var missingSignerCount = status.signers.filter(function (s) { return !s.isDone; }).length;
+      topGreetingHtml = 'Your part\u2019s done. ' + missingSignerCount + ' more signature' + (missingSignerCount === 1 ? '' : 's') + ' from your group and you\u2019re fully clear for gear.';
+    } else if (doneCount === 1) {
+      if (status.trailSelected) {
+        topGreetingHtml = escapeHtml(status.trailName) + '\u2019s locked in. A few more things and you\u2019re fully set for the day.';
+      } else if (status.attendeesDone) {
+        topGreetingHtml = 'Your group\u2019s confirmed. A few more things and you\u2019re fully set for the day.';
+      } else if (status.gearDone) {
+        topGreetingHtml = 'Your gear\u2019s sorted. A few more things and you\u2019re fully set for the day.';
+      } else if (bookerWaiverDone) {
+        topGreetingHtml = 'Your waiver\u2019s signed. A few more things and you\u2019re fully set for the day.';
+      }
+    } else if (doneCount >= 2) {
+      var remaining = [];
+      if (!status.trailSelected) remaining.push('your trail');
+      if (!status.attendeesDone) remaining.push('your group');
+      if (!status.gearDone) remaining.push('gear');
+      if (!bookerWaiverDone) remaining.push('your waiver');
+      topGreetingHtml = 'Almost there, just ' + joinWithAnd(remaining) + ' left before you\u2019re all set.';
+    }
+    // else doneCount === 0 (or a guest who hasn't reconfirmed their
+    // roster yet): topGreetingHtml/topSublineHtml stay the Part 2.1
+    // continuity-beat opener set above.
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-eyebrow">Your Adventure</div>' +
-      '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + '. You could have spent ' + formatTripDate(eb.date) + ' by the pool. You picked the trail instead. Here’s everything left before you’re on it.</div>' +
-      '<div class="ap-subline"></div>' +
+      '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+      '<div class="ap-subline">' + topSublineHtml + '</div>' +
       alertHtml +
       trailSectionHtml +
       '<div class="ap-tiles-label">Get ready</div>' +
@@ -3642,7 +3776,7 @@
     var eb = state.ctx.experienceBooking;
     var ap = state.ctx.adventurePrep || {};
     var status = computeHubStatus();
-    var allSet = status.trailSelected && status.gearDone && status.waiversDone;
+    var allSet = status.allSet;
 
     var headline = allSet ? 'Everything’s set.<br>The trail’s waiting.' : 'Almost there.<br>A few things left.';
     var kitStat = status.gearDone ? (status.kitCount + ' packed') : (status.kitCount + ' of ' + status.eligibleCount + ' selected');
