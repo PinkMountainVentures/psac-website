@@ -1516,9 +1516,20 @@
       '<div class="ap-card">' +
       '<div id="ap-contact-rows">' + signers.map(function (p) {
         var meta = [p.age, p.fitness].filter(Boolean).join(' · ');
-        return '<div class="paf-roster-row">' +
-          '<div style="flex:2; min-width:0;"><div style="font-weight:600; font-size:0.86rem; color:var(--dark-pine);">' + escapeHtml(p.name || '') + '</div><div style="font-size:0.74rem; color:var(--ap-muted);">' + escapeHtml(meta) + '</div></div>' +
-          '<input class="ap-contact-email" data-participant-id="' + escapeHtml(p.participantId) + '" type="email" placeholder="' + escapeHtml((p.name || 'Their') + '’s email') + '" value="' + escapeHtml(p.email || '') + '" style="flex:2; min-width:220px; border:1px solid rgba(42,71,71,0.18); border-radius:6px; padding:0.6rem 0.7rem; background:var(--sand-beige); color:var(--dark-pine); font-family:inherit; font-size:0.82rem;">' +
+        // BUG FIX (Airey's live-test report, 2026-09-03): this row's
+        // sizing used to be entirely inline (flex:2 on both pieces, the
+        // input pinned to a 220px minimum) with no narrow-screen stacking
+        // rule of its own -- on a phone-width viewport that squeezed the
+        // name/meta column down to almost nothing while the input held
+        // its floor, and vertical centering then landed the input right
+        // in the middle of the compressed, multi-line-wrapped name/meta
+        // text, reading as the two overlapping. Moved to real classes
+        // (styles.css) with a 600px breakpoint that now stacks both onto
+        // their own full-width row instead, matching the equivalent
+        // roster-row treatment elsewhere in this same file.
+        return '<div class="paf-contact-row">' +
+          '<div class="paf-contact-name"><div class="paf-contact-name-text">' + escapeHtml(p.name || '') + '</div><div class="paf-contact-meta">' + escapeHtml(meta) + '</div></div>' +
+          '<input class="ap-contact-email" data-participant-id="' + escapeHtml(p.participantId) + '" type="email" placeholder="' + escapeHtml((p.name || 'Their') + '’s email') + '" value="' + escapeHtml(p.email || '') + '">' +
           '</div>';
       }).join('') + '</div>' +
       '<div id="ap-contact-error" class="ap-error"></div>' +
@@ -3162,7 +3173,6 @@
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
-        '<div class="ap-recap-icon">&#10003;</div>' +
         '<div class="ap-recap-title">Your gear is now ready to go.</div>' +
         '<div class="ap-recap-body">You will be able to make changes to gear kits and delivery/pickup instructions until 10:00pm Pacific 3 days before your adventure day.</div>' +
         '<div class="ap-recap-card">' +

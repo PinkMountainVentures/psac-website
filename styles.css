@@ -980,6 +980,25 @@ footer { background: var(--dark-pine); color: white; padding: 4rem 0 2rem; }
 .paf-roster-name { flex: 2; }
 .paf-roster-age { width: 110px; flex-shrink: 0; }
 .paf-roster-fit { flex: 2; }
+/* Attendees > "Add an email for each adult" row (adventure-prep-form.js's
+   renderRosterContact() -- BUG FIX, Airey's live-test report, 2026-09-03).
+   This row used to be built entirely with inline styles (flex:2 on both
+   the name block and the email input, the input additionally pinned to
+   min-width:220px) and never got the same narrow-screen stacking
+   treatment .paf-roster-row's own siblings get below -- on an actual
+   phone-width viewport, a 220px-min-width input left too little room for
+   the name/age/fitness column, which itself has no minimum, so it kept
+   compressing (and its meta text kept wrapping across several lines)
+   rather than the row ever breaking onto two lines, and vertical
+   centering then landed the short input right in the middle of that much
+   taller compressed column -- reading as the two visually overlapping.
+   Moved into real classes so the same 600px breakpoint below can force
+   both pieces to their own full-width row instead. */
+.paf-contact-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+.paf-contact-name { flex: 2; min-width: 0; }
+.paf-contact-name-text { font-weight: 600; font-size: 0.86rem; color: var(--dark-pine); }
+.paf-contact-meta { font-size: 0.74rem; color: var(--ap-muted); }
+.ap-contact-email { flex: 2; min-width: 220px; border: 1px solid rgba(42,71,71,0.18); border-radius: 6px; padding: 0.6rem 0.7rem; background: var(--sand-beige); color: var(--dark-pine); font-family: inherit; font-size: 0.82rem; }
 select.paf-roster-input {
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -1075,6 +1094,9 @@ select.paf-roster-input {
     .paf-roster-name { flex: 1 1 100%; }
     .paf-roster-age { flex: 1 1 32%; width: auto; }
     .paf-roster-fit { flex: 1 1 48%; }
+    .paf-contact-row { flex-wrap: wrap; }
+    .paf-contact-name { flex: 1 1 100%; }
+    .ap-contact-email { flex: 1 1 100%; min-width: 0; }
 }
 
 /* ── LEGAL / POLICY PAGES ── */
