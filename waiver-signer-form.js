@@ -33,26 +33,22 @@
    than always starting unchecked, while still requiring the affirmative
    click to actually submit (never auto-certifying).
 
-   WHAT THIS BUILD STILL COULD NOT DO (flagged, not silently worked
-   around, and now more precisely scoped than before this rewrite):
-   mockup-07 also shows a second scenario — "Taylor," an adult who is
-   named as a guardian for a minor but is NOT herself attending or on the
-   roster. PRD Section 6's guardian hybrid model (built earlier this
-   migration — see lib/waiver-service.js's own header comment) DOES now
-   support this at the data/backend level: confirmRoster's
-   guardianAssignment can name a non-attending external guardian
-   ({name, email}), which creates a real booking_participants row
-   (role_on_booking = 'guardian_only') and sendSignerLinksForBooking does
-   send that person a real signerToken. What's still missing is UI: there
-   is no screen anywhere in this codebase for the booker to actually NAME
-   that external guardian (see adventure-prep-form.js's own header comment
-   for the same flag from the booker's side), so no real "Taylor" token
-   has ever been issued in practice — every real signerToken today still
-   belongs to an attending adult (the "Jordan" shape), and that's the only
-   shape this file builds. If/when that assignment UI is built, this
-   file's hub would need a second branch for a non-attending guardian (no
-   Your Trail tile, "[Child]'s Waiver" instead of "Your Waiver") — flagged
-   here rather than guessed at now.
+   RESOLVED (Part 5 branch, 2026-09-03): mockup-07 also shows a second
+   scenario -- "Taylor," an adult who is named as a guardian for a minor
+   but is NOT herself attending or on the roster. This paragraph used to
+   flag two real gaps here; both are closed now. First, the booker-side
+   assignment UI (renderRosterGuardians(), adventure-prep-form.js) was
+   built 2026-09-02, per that file's own header -- a real "Taylor" token
+   is issued today, this was stale by the time this paragraph was next
+   read. Second, this file's own hub now has that second branch:
+   getSignerContext returns isGuardianOnly (role_on_booking ===
+   'guardian_only'), and render() routes straight to
+   renderGuardianOnlyHub()/renderGuardianOnlyCertify() for that case,
+   entirely separate from renderHub() above -- no Your Trail/Gear/
+   Adventure Summary tiles, "[Child]'s Trail"/"Who's Going"/"The Day"/
+   "[Child]'s Waiver" instead, per
+   claude/psac-adventure-prep-full-copy-pass-rewrite-proposal-2026-09-03.md
+   Part 5's approved copy. See that branch's own comments for the design.
 
    Two screens have no mockup frame to build against (Your Trail's detail
    view, and Adventure Summary's unlocked content) — both are deliberately
@@ -69,7 +65,8 @@
 
   var state = {
     ctx: null,
-    step: 'hub', // 'hub' | 'confirmDetails' | 'trail' | 'waiver' | 'summary'
+    step: 'hub', // attending signer: 'hub' | 'confirmDetails' | 'trail' | 'gear' | 'waiver' | 'summary'
+            // guardian_only signer (Part 5): 'hub' | 'guardianCertify' -- routed independently, see render()
     // Confirm Your Details
     email: '',
     phone: '',
@@ -169,6 +166,21 @@
   function render() {
     root.innerHTML = '';
     var frag;
+    // Part 5 branch (non-attending guardian, 2026-09-03): a guardian_only
+    // signer -- named as a minor's guardian but not attending themselves,
+    // distinct from 3.3's attending-guardian case above -- gets an
+    // entirely separate hub, never the ordinary 5-step tile set. Checked
+    // first and unconditionally, since nothing below applies to this
+    // persona (no gear, no personal waiver, no Adventure Summary).
+    if (state.ctx && state.ctx.isGuardianOnly) {
+      switch (state.step) {
+        case 'guardianCertify': frag = renderGuardianOnlyCertify(); break;
+        default: frag = renderGuardianOnlyHub();
+      }
+      root.appendChild(frag);
+      if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+      return;
+    }
     switch (state.step) {
       case 'confirmDetails': frag = renderConfirmDetails(); break;
       case 'trail': frag = renderTrail(); break;
@@ -385,6 +397,200 @@
         if (t && t.onClick) t.onClick();
       });
     });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Part 5: non-attending guardian's own hub (guardian_only, 2026-09-03).
+  // Entirely separate from renderHub() above -- this person has no trail
+  // day of their own, so this doesn't reuse renderHub()'s tile set at
+  // all, it's a smaller, fully informational 3-tile read-only set plus
+  // one real action (certifying as guardian). Per
+  // claude/psac-adventure-prep-full-copy-pass-rewrite-proposal-2026-09-03.md
+  // Part 5's own approved copy.
+  // ---------------------------------------------------------------------
+
+  // Rough starting hour from the booking's own time_preference bucket
+  // (adventure-form.js's q3 -- the only pre-trip start-time signal that
+  // exists anywhere in this schema). Deliberately approximate: this is a
+  // stated preference, not a confirmed start time, same reasoning as the
+  // return check-in design in the companion lifecycle-alerts proposal --
+  // so the estimate below is framed as one throughout, never a promise.
+  function guardianDayStartHour(timePreference) {
+    var t = (timePreference || '').toLowerCase();
+    if (t.indexOf('before 8am') !== -1) return 7;
+    if (t.indexOf('8am') !== -1) return 9;
+    if (t.indexOf('after 10am') !== -1) return 11;
+    return null; // "Flexible," missing, or unrecognized -- no estimate offered
+  }
+  function formatHourOfDay(hourFloat) {
+    var totalMinutes = Math.round((hourFloat * 60) / 30) * 30;
+    var h = Math.floor(totalMinutes / 60) % 24;
+    var m = totalMinutes % 60;
+    var period = h >= 12 ? 'PM' : 'AM';
+    var displayHour = h % 12 === 0 ? 12 : h % 12;
+    return displayHour + (m === 0 ? ':00' : ':' + m) + ' ' + period;
+  }
+
+  function renderGuardianOnlyHub() {
+    var signer = state.ctx.signer || {};
+    var ownerName = state.ctx.ownerName || 'Your trip organizer';
+    var firstName = (signer.signerName || '').split(' ')[0] || 'there';
+    var myMinors = (state.ctx.minors || []).filter(function (m) { return m.preAssignedToThisSigner; });
+    var childNames = myMinors.map(function (m) { return m.name; }).filter(Boolean);
+    // Two forms deliberately: childLabel is pre-escaped, for use directly
+    // in HTML strings below (never re-escaped downstream). childLabelRaw
+    // is unescaped, for the two places (tile titles) that go through
+    // tilesHtml's own escapeHtml(t.title) call below -- passing the
+    // pre-escaped form there would double-escape any child name with an
+    // apostrophe or similar (e.g. "O'Brien" rendering as "O&#39;Brien").
+    var childLabel = childNames.length ? escapeHtml(childNames.join(' and ')) : 'them';
+    var childLabelRaw = childNames.length ? childNames.join(' and ') : 'them';
+    var allCertified = myMinors.length > 0 && myMinors.every(function (m) { return m.alreadyVerified; });
+
+    function tile(icon, title, sub, statusLabel, opts) {
+      opts = opts || {};
+      return { icon: icon, title: title, sub: sub, statusLabel: statusLabel, locked: !!opts.locked, readonly: !!opts.readonly, onClick: opts.onClick };
+    }
+
+    var trailDetail = state.ctx.selectedTrail || null;
+    var trailSub = trailDetail
+      ? 'Placed for ' + childLabel + '\u2019s age and the group\u2019s own experience, the same trail-matching every recommendation in this system runs on, not a generic route.' +
+        (trailDetail.distance ? ' ' + trailDetail.distance + ' miles.' : '')
+      : 'Not yet assigned';
+
+    var adultNames = (state.ctx.attendingAdults || []).map(function (a) { return a.name; }).filter(Boolean);
+    var whosGoingSub = 'The adults ' + childLabel + ' is headed out with today.' +
+      (adultNames.length ? ' ' + escapeHtml(adultNames.join(', ')) + '.' : '');
+
+    var dayStartText = state.ctx.timePreference || '';
+    var dayLine = formatTripDate(state.ctx.tripDate) + (dayStartText ? ', ' + escapeHtml(dayStartText) + '.' : '.');
+    var startHour = guardianDayStartHour(state.ctx.timePreference);
+    var durationHours = trailDetail && trailDetail.estTimeEasyPaceHours;
+    var backLine = (startHour != null && durationHours)
+      ? ' Expected back by around ' + formatHourOfDay(startHour + durationHours) + '.'
+      : '';
+    var trailheadLine = trailDetail && trailDetail.trailheadLocation ? ' Meeting at ' + escapeHtml(trailDetail.trailheadLocation) + '.' : '';
+    var theDaySub = dayLine + backLine + trailheadLine + ' If anything comes up out there, you\u2019re our first call.';
+
+    var tiles = [
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>',
+        (trailDetail ? trailDetail.trailName : childLabelRaw + '\u2019s Trail'), trailSub, null,
+        { readonly: true }),
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.2" r="2.6" stroke="#2A4747" stroke-width="1.3"/><path d="M4.2 18.4c0-3 2.1-5.1 4.8-5.1s4.8 2.1 4.8 5.1" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><circle cx="16.6" cy="9" r="2" stroke="#F58271" stroke-width="1.2"/><path d="M14.3 18.4c0-2.4 1-4.3 3.4-4.7" stroke="#F58271" stroke-width="1.2" stroke-linecap="round"/></svg>',
+        'Who\u2019s Going', whosGoingSub, null,
+        { readonly: true }),
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4.3" y="5.4" width="15.4" height="14" rx="2" stroke="#2A4747" stroke-width="1.3"/><path d="M4.3 9.6h15.4" stroke="#2A4747" stroke-width="1.3"/><path d="M8 3.8v3M16 3.8v3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><circle cx="9.4" cy="13.4" r="1.1" fill="#F58271"/></svg>',
+        'The Day', theDaySub, null,
+        { readonly: true }),
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.3 16.6c1.7-2.6 2.6 2.6 4.3 0s2.6 2.6 4.3 0 2.6 2.6 4.3 0" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6.3l4.3 4.3" stroke="#F58271" stroke-width="1.4" stroke-linecap="round"/><circle cx="18.7" cy="11" r="1.2" fill="#F58271"/></svg>',
+        childLabelRaw + '\u2019s Waiver', allCertified ? 'Confirmed' : 'Confirm you\u2019re their guardian',
+        allCertified ? 'Done' : 'Not done',
+        { onClick: function () { state.step = 'guardianCertify'; render(); } }),
+    ];
+
+    var tilesHtml = tiles.map(function (t, i) {
+      var rightHtml = t.readonly
+        ? '<div class="ap-tile-readonly-tag">View only</div>'
+        : '<div class="ap-tile-status ' + (t.statusLabel === 'Done' ? 'status-done' : t.statusLabel === 'Locked' ? 'status-locked' : 'status-notdone') + '">' + t.statusLabel + '</div>';
+      return '<div class="ap-tile' + (t.locked ? ' locked' : '') + '" data-tile="' + i + '">' +
+        '<div class="ap-tile-icon">' + t.icon + '</div>' +
+        '<div class="ap-tile-mid"><div class="ap-tile-title">' + escapeHtml(t.title) + '</div><div class="ap-tile-sub">' + t.sub + '</div></div>' +
+        rightHtml +
+        '</div>';
+    }).join('');
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-eyebrow">You\u2019re In</div>' +
+      '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '\u2019s guardian for their adventure day.</div>' +
+      '<div class="ap-subline"></div>' +
+      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '\u2019s day itself is self-guided, without one of our own people along, so here\u2019s everything about it: who\u2019s going, where, when, and what to do if you need to reach us.</div></div>' +
+      '<div class="ap-tiles-label">The day</div>' +
+      '<div class="ap-tiles" id="sb-guardian-hub-tiles">' + tilesHtml + '</div>' +
+      '</div></div>'
+    );
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('.ap-tile:not(.locked)'), function (el) {
+      el.addEventListener('click', function () {
+        var t = tiles[Number(el.getAttribute('data-tile'))];
+        if (t && t.onClick) t.onClick();
+      });
+    });
+
+    return wrap;
+  }
+
+  // Certify screen (Part 5) -- replaces a personal liability waiver
+  // entirely for this persona, per the approved copy doc: no scroll-
+  // gated agreement (there's no liability to accept, this person isn't
+  // attending), no emergency contact (not relevant to someone who isn't
+  // on the trail). Just the one real certification action, reusing
+  // saveWaiverSignature exactly as the attending-guardian self-declare
+  // path does (isGuardian + guardianForChildrenParticipantIds), since the
+  // backend already treats that as a complete, valid certification on
+  // its own -- no waiver-specific fields are required server-side.
+  function renderGuardianOnlyCertify() {
+    var myMinors = (state.ctx.minors || []).filter(function (m) { return m.preAssignedToThisSigner; });
+    var childNames = myMinors.map(function (m) { return m.name; }).filter(Boolean);
+    var childLabel = childNames.length ? escapeHtml(childNames.join(' and ')) : 'them';
+    var ownerName = state.ctx.ownerName || 'Your trip organizer';
+    var alreadyCertified = myMinors.length > 0 && myMinors.every(function (m) { return m.alreadyVerified; });
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="sb-guardian-back" style="cursor:pointer;">&larr; Back to Adventure Home</div>' +
+      '<div class="ap-eyebrow">' + childLabel + '\u2019s Waiver</div>' +
+      '<div class="ap-q-title">Confirm you\u2019re ' + childLabel + '\u2019s parent or guardian.</div>' +
+      '<div class="ap-q-help">' + escapeHtml(ownerName) + ' named you as the person responsible for ' + childLabel + ' on this adventure. This confirms it on our end, so ' + childLabel + '\u2019s on record with a real adult accountable for them, not just a name on someone else\u2019s roster.</div>' +
+      '<div class="ap-card">' +
+      '<div class="ap-field-label">Type your full legal name to confirm</div>' +
+      '<input class="ap-field-input" type="text" id="sb-guardian-name" placeholder="Full legal name" value="' + escapeHtml(state.waiverName) + '">' +
+      '<div id="sb-guardian-certify-error" class="ap-error"></div>' +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="sb-guardian-certify-cta"' + (alreadyCertified ? ' disabled' : '') + '>' + (alreadyCertified ? 'Confirmed' : 'Confirm') + '</button>' +
+      '<div class="ap-cta-secondary" id="sb-guardian-save-return" style="cursor:pointer;">Back to Adventure Home</div>' +
+      '</div></div>'
+    );
+
+    wrap.querySelector('#sb-guardian-back').addEventListener('click', goHub);
+    wrap.querySelector('#sb-guardian-save-return').addEventListener('click', goHub);
+
+    var nameInput = wrap.querySelector('#sb-guardian-name');
+    var cta = wrap.querySelector('#sb-guardian-certify-cta');
+    if (!alreadyCertified) {
+      cta.addEventListener('click', function () {
+        var name = (nameInput.value || '').trim();
+        if (!name) {
+          wrap.querySelector('#sb-guardian-certify-error').textContent = 'Enter your full legal name to confirm.';
+          return;
+        }
+        state.waiverName = name;
+        cta.disabled = true;
+        var minorIds = myMinors.map(function (m) { return m.participantId; });
+        var participantsCovered = [name].concat(childNames);
+        apiPost('/api/waiver', {
+          action: 'saveWaiverSignature',
+          signerToken: SIGNER_TOKEN,
+          signerName: name,
+          isGuardian: true,
+          guardianForChildrenParticipantIds: minorIds,
+          participantsCovered: participantsCovered,
+        }).then(function (res) {
+          if (!res.ok) {
+            cta.disabled = false;
+            wrap.querySelector('#sb-guardian-certify-error').textContent = 'Something went wrong saving your confirmation, try again.';
+            return;
+          }
+          state.ctx.minors = (state.ctx.minors || []).map(function (m) {
+            return minorIds.indexOf(m.participantId) !== -1 ? Object.assign({}, m, { alreadyVerified: true }) : m;
+          });
+          state.ctx.signer = Object.assign({}, state.ctx.signer, { status: 'signed', guardianForChildrenParticipantIds: minorIds });
+          goHub();
+        });
+      });
+    }
 
     return wrap;
   }
