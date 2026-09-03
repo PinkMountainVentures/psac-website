@@ -3543,6 +3543,17 @@
 
     // ---- Screen: confirmation ----
     function renderConfirmation() {
+      // BUG FIX (Airey's direct request, 2026-09-03): renderWaiver()'s
+      // outer wrap is ap-wide (960px, for the list/sign screens' wider
+      // layouts) and this screen never shrank it back down the way every
+      // other single-column recap/confirmation screen in this file does
+      // (renderTrail's own renderConfirmation, Gear Kits' confirmation,
+      // etc. -- see this function's neighbors for the same one-liner).
+      // The recap card/title/body all cap themselves at max-width:640px
+      // (ap-styles.css) but with no auto-margin centering of their own,
+      // so inside a 960px-wide container they just hugged the left edge
+      // instead of sitting centered on the page.
+      wrap.classList.remove('ap-wide');
       var eb = state.ctx.experienceBooking;
       var ecLine = state.ecName || state.ecPhone
         ? escapeHtml([state.ecName, state.ecPhone].filter(Boolean).join(' \u00b7 '))
