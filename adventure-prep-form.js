@@ -843,18 +843,15 @@
     else if (reasons.indexOf('hold_never_cleared') !== -1) reasonPhrase = 'your gear hold cleared in time';
     else if (reasons.indexOf('no_1.2a') !== -1) reasonPhrase = 'the adventure details we need';
 
-    document.querySelector('header.ap-header') && document.querySelector('header.ap-header').remove();
-
+    // UPDATED (buggy-items follow-up, 2026-09-03): this used to remove
+    // the shared .ap-header (logo + "Questions?" pill, the same header
+    // every other Adventure Prep screen uses) and replace it with a
+    // one-off marketing site-header/nav that doesn't exist anywhere else
+    // in this flow -- wrong header entirely, flagged by Airey. The real
+    // .ap-header from complete-adventure-prep.html's static shell is left
+    // in place untouched; nothing to remove or insert here anymore.
     var refundAmount = eb.refundAmount != null ? '$' + Number(eb.refundAmount).toFixed(2) : 'in full';
     var cancelledAt = eb.cancelledAt ? new Date(eb.cancelledAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
-
-    document.body.insertAdjacentHTML('afterbegin',
-      '<header class="site-header"><div class="container"><nav>' +
-      '<a href="/" class="logo">Palm Springs Adventure Club</a>' +
-      '<ul class="nav-links"><li><a href="/peaks-to-pools">Peaks to Pools</a></li><li><a href="/membership">The Club</a></li>' +
-      '<li><a href="/how-it-works">How It Works</a></li><li><a href="#" class="nav-cta start-adventure-btn">Start My Adventure</a></li></ul>' +
-      '</nav></div></header>'
-    );
 
     root.className = '';
     root.innerHTML = '';
@@ -868,7 +865,11 @@
       (cancelledAt ? '<div class="cancel-detail-row"><span>Date</span><span>' + escapeHtml(cancelledAt) + '</span></div>' : '') +
       '<div class="cancel-detail-row"><span>Back in your account</span><span>5–10 business days</span></div>' +
       '</div>' +
-      '<div class="cancel-ctas"><a href="#" class="btn start-adventure-btn">Book Again</a><a href="mailto:hello@palmspringsadventureclub.com" class="btn-outline">Contact Us</a></div>' +
+      // UPDATED (buggy-items follow-up, 2026-09-03): "Contact Us" removed --
+      // the shared .ap-header now stays on this screen (see above), and its
+      // "Questions?" pill already covers this, so a second contact path
+      // here was redundant.
+      '<div class="cancel-ctas"><a href="#" class="btn start-adventure-btn">Book Again</a></div>' +
       '<p class="cancel-footnote">Nothing further is needed from you. This reservation is fully closed out.</p>' +
       '</div></div></div>'
     ));
