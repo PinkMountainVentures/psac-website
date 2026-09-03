@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parks | PSAC Ops</title>
+<!--
+  ops-parks.html
+
+  New, 2026-09-03 (Ops App Redesign — "Build a Parks section in the
+  internal Ops UX", raised 2026-09-02): real staff-facing CRUD for the
+  `park_access` table — the season/day-type/hours/fee schedule rows
+  lib/trail-selection-engine.js's checkParkDateAvailability() reads for
+  both trail assignment's Tier A safety check and the guest-facing
+  open-days date picker (lib/booking-open-days-service.js). A park can
+  have more than one row (a summer-restricted schedule and a winter one,
+  same park, two rows) — this page manages that table directly, one row
+  at a time, not a "one park = one row" abstraction the schema doesn't
+  have.
+
+  Wired to /api/ops-proxy -> api/manage-trails-parks.js
+  (TRAILS_PARKS_SHARED_SECRET). Adopts the shared OpsShell, same as every
+  other Ops App Redesign page.
+
+  Park-name mismatch banner: surfaces any bookable trail whose `park`
+  value has zero matching park_access rows here — exactly the
+  TRAIL-051/052 bug class found and fixed this same session (a
+  free-typed trails.park that never matched any real park_access.park,
+  so that trail could never pass the Tier A safety check on any date).
+  There's no foreign key between the two tables (park_access has no
+  natural key trails could reference), so this is a live proactive check,
+  not a schema-enforced guarantee.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-select, .ops-input, .ops-textarea { width:100%; padding:0.65rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; color:var(--ops-text); background:white; margin-bottom:0.9rem; font-family:inherit; }
+  .ops-textarea { resize:vertical; min-height:4.5rem; }
+  .ops-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
+  .ops-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 1rem; }
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-top:0.4rem; margin-bottom:1.4rem; }
+  .ops-panel-title { font-size:0.95rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
+  .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.5rem; }
+  .ops-btn-small { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; margin-right:0.3rem; }
+  .ops-btn-small:hover { border-color:var(--mountain-pink); }
+  .ops-btn-danger { background:white; border:1px solid rgba(231,111,81,0.5); color:#a8341c; border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; }
+  .ops-btn-danger:hover { background:rgba(231,111,81,0.08); }
+
+  .day-checks { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.9rem; }
+  .day-check { display:flex; align-items:center; gap:0.3rem; border:1px solid var(--ops-border); border-radius:5px; padding:0.35rem 0.6rem; font-size:0.78rem; cursor:pointer; user-select:none; }
+  .day-check input { margin:0; }
+  .day-check.is-checked { border-color:var(--desert-green); background:rgba(122,189,145,0.12); }
+
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.55rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:top; }
+  .park-name-cell { font-weight:600; color:var(--dark-pine); }
+  .days-pill { display:inline-block; font-size:0.68rem; font-weight:600; background:var(--ops-bg); border:1px solid var(--ops-border); border-radius:4px; padding:0.1rem 0.4rem; margin:0 0.15rem 0.15rem 0; }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .mismatch-banner { background:rgba(245,130,113,0.14); color:#a8341c; border:1px solid rgba(245,130,113,0.4); border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:1.2rem; font-size:0.82rem; }
+  .mismatch-banner ul { margin:0.5rem 0 0; padding-left:1.2rem; }
+
+  @media (max-width: 760px) {
+    .ops-form-grid { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div id="ops-search-container"></div>
+
+      <div id="banner-container"></div>
+      <div id="mismatch-container"></div>
+
+      <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+        <div class="ops-form-row" style="max-width:320px; margin-bottom:0;">
+          <label>Filter by park name</label>
+          <input class="ops-input" id="filter-park" placeholder="Search park name…" style="margin-bottom:0;">
+        </div>
+        <button class="ops-btn" id="add-park-btn">+ Add Park Access Row</button>
+      </div>
+
+      <div class="ops-panel hidden" id="park-form-panel">
+        <div class="ops-panel-title" id="park-form-title">Add Park Access Row</div>
+        <div class="ops-form-grid">
+          <div class="ops-form-row"><label>Park name</label><input class="ops-input" id="f-park" placeholder="Indian Canyons"></div>
+          <div class="ops-form-row"><label>Season (free text)</label><input class="ops-input" id="f-season" placeholder="Jul 6-Oct 1"></div>
+        </div>
+        <div class="ops-form-row">
+          <label>Applicable days (leave all unchecked = open every day this season)</label>
+          <div class="day-checks" id="f-days"></div>
+        </div>
+        <div class="ops-form-grid">
+          <div class="ops-form-row"><label>Opening time</label><input class="ops-input" id="f-opening" placeholder="7:00 AM"></div>
+          <div class="ops-form-row"><label>Closing time</label><input class="ops-input" id="f-closing" placeholder="5:00 PM"></div>
+        </div>
+        <div class="ops-form-grid">
+          <div class="ops-form-row"><label>Adult fee</label><input class="ops-input" id="f-adult-fee" placeholder="$12"></div>
+          <div class="ops-form-row"><label>Child fee</label><input class="ops-input" id="f-child-fee" placeholder="$6"></div>
+        </div>
+        <div class="ops-form-row"><label>Payment method</label><input class="ops-input" id="f-payment-method" placeholder="Drive-up tollbooth or online"></div>
+        <div class="ops-form-row"><label>Discount eligibility notes</label><textarea class="ops-textarea" id="f-discount-notes" placeholder="Free admission, donations accepted; no dogs..."></textarea></div>
+        <div class="ops-panel-footer">
+          <button class="ops-btn-secondary" id="park-form-cancel">Cancel</button>
+          <button class="ops-btn" id="park-form-submit">Save</button>
+        </div>
+      </div>
+
+      <div id="parks-list"><div class="ops-empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
+
+  var editingId = null; // null = Add mode; a parkAccessId string = Edit mode
+
+  function showBanner(kind, message) {
+    var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
+  }
+
+  function renderDayChecks(selected) {
+    var sel = selected || [];
+    var html = '';
+    DAYS.forEach(function (d) {
+      var checked = sel.indexOf(d) !== -1;
+      html += '<label class="day-check' + (checked ? ' is-checked' : '') + '" data-day="' + d + '">'
+        + '<input type="checkbox" value="' + d + '"' + (checked ? ' checked' : '') + '>' + d + '</label>';
+    });
+    document.getElementById('f-days').innerHTML = html;
+    document.getElementById('f-days').querySelectorAll('.day-check').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        // Let the native checkbox toggle happen, then sync the visual state.
+        setTimeout(function () { el.classList.toggle('is-checked', el.querySelector('input').checked); }, 0);
+      });
+    });
+  }
+
+  function collectDayChecks() {
+    var out = [];
+    document.getElementById('f-days').querySelectorAll('input:checked').forEach(function (cb) { out.push(cb.value); });
+    return out;
+  }
+
+  function renderMismatches(mismatches) {
+    var container = document.getElementById('mismatch-container');
+    if (!mismatches.length) { container.innerHTML = ''; return; }
+    var html = '<div class="mismatch-banner"><strong>' + mismatches.length + ' bookable trail(s) reference a park name with no matching Park Access row below</strong> — '
+      + 'these trails can never pass the open-day/park-hours check on any date, so they can never actually be assigned and their real hours never show on the guest date picker. '
+      + 'Fix by editing the trail’s Park field (Trails page) to match a park name here exactly, or add a Park Access row using that exact name.<ul>';
+    mismatches.forEach(function (m) {
+      html += '<li>' + escapeHtml(m.trailId) + ' — ' + escapeHtml(m.trailName) + ' (park: "' + escapeHtml(m.park) + '")</li>';
+    });
+    html += '</ul></div>';
+    container.innerHTML = html;
+  }
+
+  function loadMismatches() {
+    opsCall('parksNameMismatches', {}).then(function (result) {
+      if (result.ok) renderMismatches(result.data.mismatches || []);
+    });
+  }
+
+  function renderParks(parks) {
+    var container = document.getElementById('parks-list');
+    if (!parks.length) { container.innerHTML = '<div class="ops-empty">No Park Access rows match this filter.</div>'; return; }
+
+    var html = '<table class="ops-table"><thead><tr><th>Park</th><th>Season</th><th>Days</th><th>Hours</th><th>Fees</th><th>Payment</th><th>Actions</th></tr></thead><tbody>';
+    parks.forEach(function (p) {
+      var days = (p.applicableDays || []);
+      var daysHtml = days.length ? days.map(function (d) { return '<span class="days-pill">' + escapeHtml(d) + '</span>'; }).join('') : '<span class="days-pill">Every day</span>';
+      html += '<tr>'
+        + '<td class="park-name-cell">' + escapeHtml(p.park) + '</td>'
+        + '<td>' + escapeHtml(p.season || '—') + '</td>'
+        + '<td>' + daysHtml + '</td>'
+        + '<td>' + escapeHtml(p.openingTime || '—') + ' – ' + escapeHtml(p.closingTime || '—') + '</td>'
+        + '<td>' + escapeHtml(p.adultFee || '—') + ' adult / ' + escapeHtml(p.childFee || '—') + ' child</td>'
+        + '<td>' + escapeHtml(p.paymentMethod || '—') + '</td>'
+        + '<td><button class="ops-btn-small" data-action="edit" data-id="' + escapeHtml(p.parkAccessId) + '">Edit</button>'
+        + '<button class="ops-btn-danger" data-action="delete" data-id="' + escapeHtml(p.parkAccessId) + '">Delete</button></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('button[data-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-id');
+        if (btn.getAttribute('data-action') === 'edit') openEditForm(id);
+        else handleDelete(id);
+      });
+    });
+  }
+
+  function loadParks() {
+    var q = document.getElementById('filter-park').value.trim();
+    document.getElementById('parks-list').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('parksList', { q: q }).then(function (result) {
+      if (!result.ok) { document.getElementById('parks-list').innerHTML = '<div class="ops-empty">Could not load Parks.</div>'; return; }
+      renderParks(result.data.parks || []);
+    });
+  }
+
+  function clearForm() {
+    ['f-park', 'f-season', 'f-opening', 'f-closing', 'f-adult-fee', 'f-child-fee', 'f-payment-method', 'f-discount-notes'].forEach(function (id) {
+      document.getElementById(id).value = '';
+    });
+    renderDayChecks([]);
+  }
+
+  function openAddForm() {
+    editingId = null;
+    clearForm();
+    document.getElementById('park-form-title').textContent = 'Add Park Access Row';
+    document.getElementById('park-form-panel').classList.remove('hidden');
+    document.getElementById('park-form-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function openEditForm(parkAccessId) {
+    opsCall('parksGet', { parkAccessId: parkAccessId }).then(function (result) {
+      if (!result.ok) { showBanner('error', 'Could not load that row.'); return; }
+      var p = result.data.park;
+      editingId = parkAccessId;
+      document.getElementById('f-park').value = p.park || '';
+      document.getElementById('f-season').value = p.season || '';
+      document.getElementById('f-opening').value = p.openingTime || '';
+      document.getElementById('f-closing').value = p.closingTime || '';
+      document.getElementById('f-adult-fee').value = p.adultFee || '';
+      document.getElementById('f-child-fee').value = p.childFee || '';
+      document.getElementById('f-payment-method').value = p.paymentMethod || '';
+      document.getElementById('f-discount-notes').value = p.discountEligibilityNotes || '';
+      renderDayChecks(p.applicableDays || []);
+      document.getElementById('park-form-title').textContent = 'Edit Park Access Row — ' + p.park;
+      document.getElementById('park-form-panel').classList.remove('hidden');
+      document.getElementById('park-form-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  function collectFields() {
+    return {
+      park: document.getElementById('f-park').value.trim(),
+      season: document.getElementById('f-season').value.trim(),
+      applicableDays: collectDayChecks(),
+      openingTime: document.getElementById('f-opening').value.trim(),
+      closingTime: document.getElementById('f-closing').value.trim(),
+      adultFee: document.getElementById('f-adult-fee').value.trim(),
+      childFee: document.getElementById('f-child-fee').value.trim(),
+      paymentMethod: document.getElementById('f-payment-method').value.trim(),
+      discountEligibilityNotes: document.getElementById('f-discount-notes').value.trim(),
+    };
+  }
+
+  function submitForm() {
+    var fields = collectFields();
+    if (!fields.park) { showBanner('error', 'Park name is required.'); return; }
+    document.getElementById('park-form-submit').disabled = true;
+    var action = editingId ? 'parksUpdate' : 'parksCreate';
+    var payload = editingId ? { parkAccessId: editingId, fields: fields } : { fields: fields };
+    opsCall(action, payload).then(function (result) {
+      document.getElementById('park-form-submit').disabled = false;
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not save this row.'); return; }
+      showBanner('success', (editingId ? 'Updated ' : 'Added ') + fields.park + '.');
+      document.getElementById('park-form-panel').classList.add('hidden');
+      loadParks();
+      loadMismatches();
+    });
+  }
+
+  function handleDelete(parkAccessId) {
+    if (!window.confirm('Delete this Park Access row? This cannot be undone.')) return;
+    opsCall('parksDelete', { parkAccessId: parkAccessId }).then(function (result) {
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not delete this row.'); return; }
+      showBanner('success', 'Row deleted.');
+      loadParks();
+      loadMismatches();
+    });
+  }
+
+  function onReady() {
+    document.getElementById('add-park-btn').addEventListener('click', openAddForm);
+    document.getElementById('park-form-cancel').addEventListener('click', function () { document.getElementById('park-form-panel').classList.add('hidden'); });
+    document.getElementById('park-form-submit').addEventListener('click', submitForm);
+    document.getElementById('filter-park').addEventListener('input', debounce(loadParks, 300));
+    loadParks();
+    loadMismatches();
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+  }
+
+  OpsShell.boot({
+    activeHref: 'ops-parks.html',
+    title: 'Parks',
+    subtitle: 'Season, day-of-week, hours, and fee schedules for each park — the source Trail Selection and the guest date picker both read for open-day rules.',
+    onReady: onReady,
+  });
+})();
+</script>
+</body>
+</html>

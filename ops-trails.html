@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trails | PSAC Ops</title>
+<!--
+  ops-trails.html
+
+  New, 2026-09-03 (Ops App Redesign — "Build a Trails section in the
+  internal Ops UX", raised 2026-09-02): real staff-facing CRUD for the
+  `trails` table. 19 bookable trails now exist in the database and
+  several still need content filled in (descriptions, hazards, photos,
+  links) — this is where that content gets added, without a direct SQL
+  session or another build-chat round trip.
+
+  Wired to /api/ops-proxy -> api/manage-trails-parks.js
+  (TRAILS_PARKS_SHARED_SECRET). Adopts the shared OpsShell.
+
+  Park field is a DROPDOWN sourced from real park_access.park values
+  (parksListNames), not free text — this is deliberate: the exact bug
+  fixed earlier this same session (TRAIL-051/052 seeded with a `park`
+  value that matched no real Park Access row, so those trails could never
+  pass the Tier A safety check on any date) was caused by trails.park
+  being hand-typed with no connection to the real park_access table.
+  Picking from a real list prevents that class of typo/mismatch outright;
+  "Other (type a new park name)" stays available for a genuinely new park
+  that doesn't have Park Access rows yet (add those on the Parks page).
+
+  Season fields (Optimal/Viable/Avoid) and Best For Attributes are
+  checkbox sets against the SAME fixed vocabularies the rest of the app
+  already relies on (3-letter month abbreviations; the same
+  BEST_FOR_ATTRIBUTES_OPTIONS list adventure-prep-form.js uses for the
+  guest's own preference picker) rather than free text — this is the
+  same fix already applied once this session to a DIFFERENT bug
+  (adventure-prep-form.js's "2 of 3 selected" bug, caused by a stored
+  value that didn't exactly match the canonical option strings). Typing a
+  best-for-attribute here that doesn't match the guest-facing list
+  verbatim would silently make a trail unmatchable by that preference —
+  checkboxes make that impossible.
+
+  Trail ID is editable only when adding a new trail (trailsSuggestNextId
+  pre-fills the next TRAIL-0XX, staff can override) — never editable once
+  a trail exists, since trail_id is what booking_participants/
+  candidate_trails/trail_swap_requests reference.
+
+  Deleting a trail with real booking history is refused server-side (a
+  foreign-key violation, caught and turned into a plain-language message)
+  — set Bookable to No instead to take it out of rotation.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-select, .ops-input, .ops-textarea { width:100%; padding:0.6rem 0.75rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.83rem; color:var(--ops-text); background:white; margin-bottom:0.85rem; font-family:inherit; }
+  .ops-textarea { resize:vertical; min-height:4rem; }
+  .ops-form-row label { display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.3rem; }
+  .ops-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 1rem; }
+  .ops-form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 1rem; }
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-top:0.4rem; margin-bottom:1.4rem; }
+  .ops-panel-title { font-size:1rem; font-weight:700; margin-bottom:1rem; color:var(--dark-pine); }
+  .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.8rem; position:sticky; bottom:0; background:white; padding-top:0.6rem; }
+  .ops-btn-small { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; margin-right:0.3rem; }
+  .ops-btn-small:hover { border-color:var(--mountain-pink); }
+  .ops-btn-danger { background:white; border:1px solid rgba(231,111,81,0.5); color:#a8341c; border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; }
+  .ops-btn-danger:hover { background:rgba(231,111,81,0.08); }
+
+  .form-section { border-top:1px solid var(--ops-border); padding-top:1rem; margin-top:1rem; }
+  .form-section:first-child { border-top:none; padding-top:0; margin-top:0; }
+  .form-section-title { font-size:0.82rem; font-weight:700; color:var(--dark-pine); margin-bottom:0.7rem; }
+  .check-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.83rem; }
+  .check-row input { margin:0; }
+
+  .chip-set { display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.9rem; }
+  .chip { display:flex; align-items:center; gap:0.3rem; border:1px solid var(--ops-border); border-radius:5px; padding:0.3rem 0.55rem; font-size:0.76rem; cursor:pointer; user-select:none; }
+  .chip input { margin:0; }
+  .chip.is-checked { border-color:var(--desert-green); background:rgba(122,189,145,0.12); }
+
+  .photo-preview { max-width:180px; max-height:120px; border-radius:6px; border:1px solid var(--ops-border); display:block; margin-bottom:0.6rem; }
+  .photo-row { display:flex; align-items:flex-start; gap:1rem; flex-wrap:wrap; }
+
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.55rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+  .trail-id-cell { font-weight:600; color:var(--dark-pine); white-space:nowrap; }
+  .status-tag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; }
+  .st-bookable { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .st-not-bookable { background:#E7ECEE; color:#6B7378; }
+  .content-gap-tag { background:rgba(245,130,113,0.18); color:#a8341c; }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+
+  @media (max-width: 900px) {
+    .ops-form-grid, .ops-form-grid-3 { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div id="ops-search-container"></div>
+
+      <div id="banner-container"></div>
+
+      <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem;">
+        <div class="ops-form-row" style="max-width:320px; margin-bottom:0;">
+          <label>Filter by ID, name, or park</label>
+          <input class="ops-input" id="filter-trail" placeholder="Search trails…" style="margin-bottom:0;">
+        </div>
+        <button class="ops-btn" id="add-trail-btn">+ Add Trail</button>
+      </div>
+
+      <div class="ops-panel hidden" id="trail-form-panel">
+        <div class="ops-panel-title" id="trail-form-title">Add Trail</div>
+
+        <div class="form-section">
+          <div class="form-section-title">Identity & status</div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Trail ID</label><input class="ops-input" id="f-trailId" placeholder="TRAIL-020"></div>
+            <div class="ops-form-row"><label>Trail name</label><input class="ops-input" id="f-trailName" placeholder="McCallum Pond Loop"></div>
+          </div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Alternate names</label><input class="ops-input" id="f-alternateNames"></div>
+            <div class="ops-form-row"><label>Area</label><input class="ops-input" id="f-area" placeholder="Thousand Palms"></div>
+          </div>
+          <div class="ops-form-row">
+            <label>Park</label>
+            <select class="ops-select" id="f-park-select" style="margin-bottom:0.4rem;"></select>
+            <input class="ops-input" id="f-park-other" placeholder="Type the new park name exactly" style="display:none;">
+          </div>
+          <div class="check-row"><input type="checkbox" id="f-bookable"><label style="margin:0; text-transform:none; font-weight:600;" for="f-bookable">Bookable (shows up for real guests — leave off until content is ready)</label></div>
+          <div class="check-row"><input type="checkbox" id="f-desertRidersTrail"><label style="margin:0; text-transform:none; font-weight:600;" for="f-desertRidersTrail">Desert Riders trail</label></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Location & access</div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Trailhead name</label><input class="ops-input" id="f-trailheadName"></div>
+            <div class="ops-form-row"><label>Trailhead GPS</label><input class="ops-input" id="f-trailheadGps" placeholder="33.8303, -116.5453"></div>
+          </div>
+          <div class="ops-form-row"><label>Parking notes</label><textarea class="ops-textarea" id="f-parkingNotes"></textarea></div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Nearest neighborhood</label><input class="ops-input" id="f-nearestNeighborhood"></div>
+            <div class="ops-form-row"><label>Drive time from downtown PS</label><input class="ops-input" id="f-driveTimeFromDowntownPs" placeholder="15 min"></div>
+          </div>
+          <div class="check-row"><input type="checkbox" id="f-entryFeeRequired"><label style="margin:0; text-transform:none; font-weight:600;" for="f-entryFeeRequired">Entry fee required</label></div>
+          <div class="check-row"><input type="checkbox" id="f-guidedEligible"><label style="margin:0; text-transform:none; font-weight:600;" for="f-guidedEligible">Guided eligible</label></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Difficulty & route</div>
+          <div class="ops-form-grid-3">
+            <div class="ops-form-row"><label>Distance (mi)</label><input class="ops-input" id="f-distanceMi" type="number" step="0.1" min="0"></div>
+            <div class="ops-form-row"><label>Elevation gain (ft)</label><input class="ops-input" id="f-elevationGainFt" type="number" min="0"></div>
+            <div class="ops-form-row"><label>Highest point (ft)</label><input class="ops-input" id="f-highestPointFt" type="number" min="0"></div>
+          </div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Est. time, easy pace</label><input class="ops-input" id="f-estTimeEasyPace" placeholder="1.5 - 2 hrs"></div>
+            <div class="ops-form-row"><label>Est. time, strong pace</label><input class="ops-input" id="f-estTimeStrongPace" placeholder=".75 - 1 hr"></div>
+          </div>
+          <div class="ops-form-grid-3">
+            <div class="ops-form-row"><label>Difficulty (1-5)</label><select class="ops-select" id="f-difficulty"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+            <div class="ops-form-row"><label>Technical rating (1-5)</label><select class="ops-select" id="f-technicalRating"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+            <div class="ops-form-row"><label>Route type</label><input class="ops-input" id="f-routeType" placeholder="Loop / Out & Back"></div>
+          </div>
+          <div class="ops-form-row"><label>Activity type</label><input class="ops-input" id="f-activityType" placeholder="Hiking"></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Season & content tags</div>
+          <div class="ops-form-row"><label>Optimal season</label><div class="chip-set" id="f-optimalSeason"></div></div>
+          <div class="ops-form-row"><label>Viable season</label><div class="chip-set" id="f-viableSeason"></div></div>
+          <div class="ops-form-row"><label>Avoid season</label><div class="chip-set" id="f-avoidSeason"></div></div>
+          <div class="ops-form-row"><label>Best for (matches guests' own trail preference picker — must match exactly)</label><div class="chip-set" id="f-bestForAttributes"></div></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Suitability</div>
+          <div class="check-row"><input type="checkbox" id="f-kidFriendly"><label style="margin:0; text-transform:none; font-weight:600;" for="f-kidFriendly">Kid friendly</label></div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Minimum age recommendation</label><input class="ops-input" id="f-minAgeRec" placeholder="4+"></div>
+            <div class="ops-form-row"><label>Dog friendly</label><input class="ops-input" id="f-dogFriendly" placeholder="No / Yes, leashed"></div>
+          </div>
+          <div class="check-row"><input type="checkbox" id="f-goodForBeginners"><label style="margin:0; text-transform:none; font-weight:600;" for="f-goodForBeginners">Good for beginners</label></div>
+          <div class="check-row"><input type="checkbox" id="f-goodForAthletes"><label style="margin:0; text-transform:none; font-weight:600;" for="f-goodForAthletes">Good for athletes</label></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Descriptions & tips</div>
+          <div class="ops-form-row"><label>Opening description (guest-facing)</label><textarea class="ops-textarea" id="f-openingDescription"></textarea></div>
+          <div class="ops-form-row"><label>What makes it special</label><textarea class="ops-textarea" id="f-whatMakesItSpecial"></textarea></div>
+          <div class="ops-form-row"><label>Trail-day tip</label><textarea class="ops-textarea" id="f-trailDayTip"></textarea></div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Safety</div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Heat considerations</label><input class="ops-input" id="f-heatConsiderations"></div>
+            <div class="ops-form-row"><label>Water sources on trail</label><input class="ops-input" id="f-waterSourcesOnTrail"></div>
+          </div>
+          <div class="ops-form-row"><label>Known hazards</label><textarea class="ops-textarea" id="f-knownHazards"></textarea></div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Cell coverage</label><input class="ops-input" id="f-cellCoverage" placeholder="3 - Fair"></div>
+            <div class="ops-form-row"><label>Emergency egress notes</label><input class="ops-input" id="f-emergencyEgressNotes"></div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Links & photo</div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>RideWithGPS link</label><input class="ops-input" id="f-ridewithgpsLink"></div>
+            <div class="ops-form-row"><label>Strava link</label><input class="ops-input" id="f-stravaLink"></div>
+          </div>
+          <div class="ops-form-grid">
+            <div class="ops-form-row"><label>Garmin Connect link</label><input class="ops-input" id="f-garminConnectLink"></div>
+            <div class="ops-form-row"><label>GPX file location</label><input class="ops-input" id="f-gpxFileLocation"></div>
+          </div>
+          <div class="ops-form-row">
+            <label>Photo</label>
+            <div class="photo-row">
+              <div>
+                <img class="photo-preview hidden" id="photo-preview-img">
+                <input type="file" accept="image/*" id="photo-file-input">
+                <div id="photo-upload-status" style="font-size:0.75rem; color:var(--ops-text-mid); margin-top:0.3rem;"></div>
+              </div>
+            </div>
+            <input class="ops-input" id="f-photoReferences" placeholder="Photo URL(s), newline or comma separated" style="margin-top:0.6rem;">
+          </div>
+        </div>
+
+        <div class="ops-panel-footer">
+          <button class="ops-btn-secondary" id="trail-form-cancel">Cancel</button>
+          <button class="ops-btn" id="trail-form-submit">Save Trail</button>
+        </div>
+      </div>
+
+      <div id="trails-list"><div class="ops-empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var BEST_FOR_ATTRIBUTES_OPTIONS = [
+    'Big views', 'Solitude and quiet', 'Physical challenge', 'Wildlife and nature',
+    'Interesting geology', 'Water (streams, pools, falls)', 'Photography opportunities',
+    'Learning about the place',
+  ];
+  var BOOL_FIELDS = ['bookable', 'desertRidersTrail', 'entryFeeRequired', 'guidedEligible', 'kidFriendly', 'goodForBeginners', 'goodForAthletes'];
+  var ARRAY_CHIP_FIELDS = { optimalSeason: MONTHS, viableSeason: MONTHS, avoidSeason: MONTHS, bestForAttributes: BEST_FOR_ATTRIBUTES_OPTIONS };
+  var TEXT_FIELDS = [
+    'trailName', 'alternateNames', 'area', 'trailheadName', 'trailheadGps', 'parkingNotes', 'nearestNeighborhood',
+    'driveTimeFromDowntownPs', 'distanceMi', 'elevationGainFt', 'highestPointFt', 'estTimeEasyPace', 'estTimeStrongPace',
+    'difficulty', 'technicalRating', 'routeType', 'activityType', 'minAgeRec', 'dogFriendly', 'openingDescription',
+    'whatMakesItSpecial', 'trailDayTip', 'heatConsiderations', 'waterSourcesOnTrail', 'knownHazards', 'cellCoverage',
+    'emergencyEgressNotes', 'ridewithgpsLink', 'stravaLink', 'garminConnectLink', 'gpxFileLocation', 'photoReferences',
+  ];
+
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
+  var editingTrailId = null; // null = Add mode
+  var parkNames = [];
+
+  function showBanner(kind, message) {
+    var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + escapeHtml(message) + '</div>';
+  }
+
+  function renderChipSet(containerId, options, selected) {
+    var sel = selected || [];
+    var html = '';
+    options.forEach(function (opt) {
+      var checked = sel.indexOf(opt) !== -1;
+      html += '<label class="chip' + (checked ? ' is-checked' : '') + '"><input type="checkbox" value="' + escapeHtml(opt) + '"' + (checked ? ' checked' : '') + '>' + escapeHtml(opt) + '</label>';
+    });
+    var el = document.getElementById(containerId);
+    el.innerHTML = html;
+    el.querySelectorAll('.chip').forEach(function (chip) {
+      chip.addEventListener('click', function () { setTimeout(function () { chip.classList.toggle('is-checked', chip.querySelector('input').checked); }, 0); });
+    });
+  }
+
+  function collectChipSet(containerId) {
+    var out = [];
+    document.getElementById(containerId).querySelectorAll('input:checked').forEach(function (cb) { out.push(cb.value); });
+    return out;
+  }
+
+  function populateParkSelect(currentValue) {
+    var select = document.getElementById('f-park-select');
+    var options = parkNames.slice();
+    if (currentValue && options.indexOf(currentValue) === -1) options.unshift(currentValue);
+    var html = '<option value="">— none —</option>';
+    options.forEach(function (p) { html += '<option value="' + escapeHtml(p) + '"' + (p === currentValue ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; });
+    html += '<option value="__other__">Other (type a new park name)…</option>';
+    select.innerHTML = html;
+    document.getElementById('f-park-other').style.display = 'none';
+    document.getElementById('f-park-other').value = '';
+  }
+
+  function loadParkNames() {
+    return opsCall('parksListNames', {}).then(function (result) {
+      if (result.ok) parkNames = result.data.parkNames || [];
+    });
+  }
+
+  function renderTrails(trails) {
+    var container = document.getElementById('trails-list');
+    if (!trails.length) { container.innerHTML = '<div class="ops-empty">No trails match this filter.</div>'; return; }
+    var html = '<table class="ops-table"><thead><tr><th>Trail</th><th>Park</th><th>Status</th><th>Difficulty</th><th>Distance</th><th>Actions</th></tr></thead><tbody>';
+    trails.forEach(function (t) {
+      var contentGap = !t.openingDescription || !t.photoReferences;
+      html += '<tr>'
+        + '<td class="trail-id-cell">' + escapeHtml(t.trailId) + '<br><span style="font-weight:400; color:var(--ops-text-mid);">' + escapeHtml(t.trailName || '') + '</span></td>'
+        + '<td>' + escapeHtml(t.park || '—') + '</td>'
+        + '<td><span class="status-tag ' + (t.bookable ? 'st-bookable' : 'st-not-bookable') + '">' + (t.bookable ? 'Bookable' : 'Not bookable') + '</span>'
+        + (contentGap ? ' <span class="status-tag content-gap-tag">Content gap</span>' : '') + '</td>'
+        + '<td>' + (t.difficulty != null ? t.difficulty + '/5' : '—') + '</td>'
+        + '<td>' + (t.distanceMi != null ? t.distanceMi + ' mi' : '—') + '</td>'
+        + '<td><button class="ops-btn-small" data-action="edit" data-id="' + escapeHtml(t.trailId) + '">Edit</button>'
+        + '<button class="ops-btn-danger" data-action="delete" data-id="' + escapeHtml(t.trailId) + '">Delete</button></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    container.querySelectorAll('button[data-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-id');
+        if (btn.getAttribute('data-action') === 'edit') openEditForm(id);
+        else handleDelete(id);
+      });
+    });
+  }
+
+  function loadTrails() {
+    var q = document.getElementById('filter-trail').value.trim();
+    document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('trailsList', { q: q }).then(function (result) {
+      if (!result.ok) { document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Could not load Trails.</div>'; return; }
+      renderTrails(result.data.trails || []);
+    });
+  }
+
+  function clearForm() {
+    TEXT_FIELDS.forEach(function (key) { var el = document.getElementById('f-' + key); if (el) el.value = ''; });
+    BOOL_FIELDS.forEach(function (key) { document.getElementById('f-' + key).checked = false; });
+    Object.keys(ARRAY_CHIP_FIELDS).forEach(function (key) { renderChipSet('f-' + key, ARRAY_CHIP_FIELDS[key], []); });
+    populateParkSelect('');
+    document.getElementById('photo-preview-img').classList.add('hidden');
+    document.getElementById('photo-file-input').value = '';
+    document.getElementById('photo-upload-status').textContent = '';
+  }
+
+  function fillForm(t) {
+    TEXT_FIELDS.forEach(function (key) { var el = document.getElementById('f-' + key); if (el) el.value = (t[key] != null ? t[key] : ''); });
+    BOOL_FIELDS.forEach(function (key) { document.getElementById('f-' + key).checked = !!t[key]; });
+    Object.keys(ARRAY_CHIP_FIELDS).forEach(function (key) { renderChipSet('f-' + key, ARRAY_CHIP_FIELDS[key], t[key] || []); });
+    populateParkSelect(t.park || '');
+    var photoUrl = t.photoReferences ? String(t.photoReferences).split(/[\n,;]/)[0].trim() : '';
+    if (photoUrl) { document.getElementById('photo-preview-img').src = photoUrl; document.getElementById('photo-preview-img').classList.remove('hidden'); }
+    else { document.getElementById('photo-preview-img').classList.add('hidden'); }
+  }
+
+  function openAddForm() {
+    editingTrailId = null;
+    clearForm();
+    document.getElementById('f-trailId').disabled = false;
+    document.getElementById('trail-form-title').textContent = 'Add Trail';
+    document.getElementById('trail-form-panel').classList.remove('hidden');
+    document.getElementById('trail-form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    opsCall('trailsSuggestNextId', {}).then(function (result) {
+      if (result.ok) document.getElementById('f-trailId').value = result.data.nextTrailId;
+    });
+  }
+
+  function openEditForm(trailId) {
+    Promise.all([loadParkNames(), opsCall('trailsGet', { trailId: trailId })]).then(function (results) {
+      var result = results[1];
+      if (!result.ok) { showBanner('error', 'Could not load that trail.'); return; }
+      editingTrailId = trailId;
+      clearForm();
+      fillForm(result.data.trail);
+      document.getElementById('f-trailId').value = trailId;
+      document.getElementById('f-trailId').disabled = true;
+      document.getElementById('trail-form-title').textContent = 'Edit Trail — ' + trailId;
+      document.getElementById('trail-form-panel').classList.remove('hidden');
+      document.getElementById('trail-form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  function collectFields() {
+    var fields = {};
+    TEXT_FIELDS.forEach(function (key) { fields[key] = document.getElementById('f-' + key).value.trim(); });
+    BOOL_FIELDS.forEach(function (key) { fields[key] = document.getElementById('f-' + key).checked; });
+    Object.keys(ARRAY_CHIP_FIELDS).forEach(function (key) { fields[key] = collectChipSet('f-' + key); });
+
+    var parkSelectVal = document.getElementById('f-park-select').value;
+    fields.park = parkSelectVal === '__other__' ? document.getElementById('f-park-other').value.trim() : parkSelectVal;
+
+    return fields;
+  }
+
+  function submitForm() {
+    var trailId = document.getElementById('f-trailId').value.trim();
+    var fields = collectFields();
+    if (!trailId) { showBanner('error', 'Trail ID is required.'); return; }
+    if (!fields.trailName) { showBanner('error', 'Trail name is required.'); return; }
+
+    document.getElementById('trail-form-submit').disabled = true;
+    var action = editingTrailId ? 'trailsUpdate' : 'trailsCreate';
+    var payload = editingTrailId ? { trailId: editingTrailId, fields: fields } : { trailId: trailId, fields: fields };
+    opsCall(action, payload).then(function (result) {
+      document.getElementById('trail-form-submit').disabled = false;
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not save this trail.'); return; }
+      showBanner('success', (editingTrailId ? 'Updated ' : 'Added ') + trailId + '.');
+      document.getElementById('trail-form-panel').classList.add('hidden');
+      loadTrails();
+    });
+  }
+
+  function handleDelete(trailId) {
+    if (!window.confirm('Delete ' + trailId + '? This cannot be undone.')) return;
+    opsCall('trailsDelete', { trailId: trailId }).then(function (result) {
+      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not delete this trail.'); return; }
+      showBanner('success', trailId + ' deleted.');
+      loadTrails();
+    });
+  }
+
+  function wirePhotoUpload() {
+    document.getElementById('f-park-select').addEventListener('change', function (e) {
+      document.getElementById('f-park-other').style.display = e.target.value === '__other__' ? 'block' : 'none';
+    });
+
+    document.getElementById('photo-file-input').addEventListener('change', function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      if (!editingTrailId && !document.getElementById('f-trailId').value.trim()) {
+        showBanner('error', 'Set a Trail ID before uploading a photo.');
+        return;
+      }
+      var trailIdForUpload = editingTrailId || document.getElementById('f-trailId').value.trim();
+      var status = document.getElementById('photo-upload-status');
+      status.textContent = 'Uploading…';
+      var reader = new FileReader();
+      reader.onload = function () {
+        opsCall('trailsUploadPhoto', { trailId: trailIdForUpload, dataUrl: reader.result }).then(function (result) {
+          if (!result.ok) { status.textContent = ''; showBanner('error', (result.data && result.data.error) || 'Upload failed.'); return; }
+          var url = result.data.photoUrl;
+          document.getElementById('f-photoReferences').value = url;
+          document.getElementById('photo-preview-img').src = url;
+          document.getElementById('photo-preview-img').classList.remove('hidden');
+          status.textContent = 'Uploaded.';
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function onReady() {
+    document.getElementById('add-trail-btn').addEventListener('click', function () {
+      loadParkNames().then(openAddForm);
+    });
+    document.getElementById('trail-form-cancel').addEventListener('click', function () { document.getElementById('trail-form-panel').classList.add('hidden'); });
+    document.getElementById('trail-form-submit').addEventListener('click', submitForm);
+    document.getElementById('filter-trail').addEventListener('input', debounce(loadTrails, 300));
+    wirePhotoUpload();
+    loadTrails();
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+  }
+
+  OpsShell.boot({
+    activeHref: 'ops-trails.html',
+    title: 'Trails',
+    subtitle: '19 bookable trails and counting — add new trails, fill in missing content, and manage every field the guest-facing site and trail assignment engine read.',
+    onReady: onReady,
+  });
+})();
+</script>
+</body>
+</html>

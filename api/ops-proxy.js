@@ -62,6 +62,9 @@ const reconcileGearDepositHandler = require('./reconcile-gear-deposit');
 const chargeGearShortfallHandler = require('./charge-gear-shortfall');
 const refundGearChargeHandler = require('./refund-gear-charge');
 const checkGearAvailabilityHandler = require('./check-gear-availability');
+// Trails & Parks dashboard (Ops App Redesign, 2026-09-03) — same in-process
+// reuse pattern, own real TRAILS_PARKS_SHARED_SECRET, injected below.
+const manageTrailsParksHandler = require('./manage-trails-parks');
 
 function captureResponse() {
   const result = { statusCode: 200, body: null };
@@ -110,6 +113,11 @@ const MANUAL_ADJUSTMENT_TYPES = [
 // with GEAR_OPS_SHARED_SECRET injected — these handlers already do their
 // own action-specific validation (see each file's own header), this proxy
 // only adds the staff-session gate and the real secret.
+const TRAILS_PARKS_ACTIONS = [
+  'trailsList', 'trailsGet', 'trailsSuggestNextId', 'trailsCreate', 'trailsUpdate', 'trailsDelete', 'trailsUploadPhoto',
+  'parksList', 'parksGet', 'parksListNames', 'parksNameMismatches', 'parksCreate', 'parksUpdate', 'parksDelete',
+];
+
 const GEAR_OPS_PROXY_ACTIONS = {
   // api/manage-gear-units.js
   gearUnits_list: manageGearUnitsHandler,
@@ -294,6 +302,24 @@ module.exports = async function handler(req, res) {
           // simply ignores it; any handler that records "who did this" now
           // gets a real, server-verified identity instead of whatever the
           // browser happened to send, for free.
+          staffEmail: session.email,
+        }),
+      }, innerRes);
+      res.status(result.statusCode).json(result.body);
+      return;
+    }
+
+    // Trails & Parks dashboard actions all forward straight through with
+    // no inner-action remapping needed -- api/manage-trails-parks.js reads
+    // body.action directly and its action names already match these one
+    // for one (unlike the gear-ops family above, which predates that
+    // simplification).
+    if (TRAILS_PARKS_ACTIONS.indexOf(action) !== -1) {
+      const { res: innerRes, result } = captureResponse();
+      await manageTrailsParksHandler({
+        method: 'POST',
+        body: Object.assign({}, body, {
+          secret: process.env.TRAILS_PARKS_SHARED_SECRET,
           staffEmail: session.email,
         }),
       }, innerRes);

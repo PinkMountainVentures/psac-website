@@ -31,6 +31,8 @@ var OpsShell = (function () {
     { href: 'ops-manual-adjustment.html', label: 'Manual Adjustment' },
     { href: 'ops-gear-checkout.html', label: 'Gear Assembly & Checkout' },
     { href: 'ops-gear-units.html', label: 'Gear Units' },
+    { href: 'ops-trails.html', label: 'Trails' },
+    { href: 'ops-parks.html', label: 'Parks' },
     { href: 'ops-gear-checkin.html', label: 'Return Check-In' },
     { href: 'ops-reconciliation-review.html', label: 'Reconciliation Review' },
   ];
