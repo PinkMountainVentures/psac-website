@@ -394,7 +394,7 @@
    640px cap so a standalone card and the button below it share the
    same edges (Airey: "the card width should be the same as the CTA
    button width"). */
-.ap-compare-photo { height: 130px; flex-shrink: 0; background: linear-gradient(135deg, #3a5a5a, #2A4747); position: relative; background-color: #6a7a6a; }
+.ap-compare-photo { height: 195px; flex-shrink: 0; background: linear-gradient(135deg, #3a5a5a, #2A4747); position: relative; background-color: #6a7a6a; }
 .ap-compare-badge { position: absolute; top: 0.7rem; left: 0.8rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 10px; }
 .badge-recommended { background: var(--mountain-pink); color: white; }
 .badge-easier { background: rgba(122,189,145,0.92); color: white; }
@@ -424,7 +424,7 @@
    the hub reaches its own "everything set" state
    (hub-top-card-visual-options.html, 2026-09-03). */
 .ap-hero-card { margin-top: 0.4rem; margin-bottom: 1.4rem; border-radius: 18px; overflow: hidden; position: relative; min-height: clamp(560px, 54vw, 700px); display: flex; align-items: flex-end; box-shadow: 0 14px 34px rgba(42,71,71,0.32); background-size: cover; background-position: center; max-width: 960px; }
-.ap-hero-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,35,35,0.15) 0%, rgba(20,35,35,0.55) 55%, rgba(15,26,26,0.86) 100%); }
+.ap-hero-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,35,35,0.06) 0%, rgba(20,35,35,0.30) 55%, rgba(15,26,26,0.55) 100%); }
 .ap-hero-card.no-photo { background: linear-gradient(155deg, #2A4747 0%, #223b3b 55%, #1c3232 100%); }
 .ap-hero-card.no-photo::before { background: radial-gradient(circle at 85% 8%, rgba(245,130,113,0.26) 0%, transparent 48%), radial-gradient(circle at 10% 95%, rgba(122,189,145,0.18) 0%, transparent 52%); }
 .ap-hero-card-inner { position: relative; z-index: 1; padding: 2.1rem 1.9rem 1.9rem; width: 100%; }
