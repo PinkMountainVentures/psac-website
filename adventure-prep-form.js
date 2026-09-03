@@ -1138,7 +1138,7 @@
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>', 'Trail Recommendation',
         status.trailSelected ? status.trailName : 'Tell us what you’re after and we’ll find your trail',
         status.hasUnreviewedManualPick ? 'In review' : (status.trailSelected ? 'Done' : 'Not done'),
-        false, function () { state.step = status.trailSelected ? 'trail' : 'preferences'; render(); }),
+        false, function () { state.step = (status.trailSelected || ap.assignedAt) ? 'trail' : 'preferences'; render(); }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.6" r="2.9" stroke="#F58271" stroke-width="1.3"/><path d="M4 19.3c0-3.7 2.2-6.1 5-6.1s5 2.4 5 6.1" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/><circle cx="15.3" cy="9.2" r="2.3" stroke="#2A4747" stroke-width="1.2"/><path d="M12.6 19.3c.2-3 1.9-4.9 3.9-4.9 2.3 0 4.1 2.4 4.1 5.4" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/></svg>', 'Attendees',
         status.rosterDone ? (attendingRosterCount() + ' in your group') : 'Confirm who’s coming and invite your group',
         status.attendeesDone ? 'Done' : 'Not done', false,
@@ -2254,15 +2254,47 @@
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
-        '<div class="ap-review-icon">&#128269;</div>' +
         '<div class="ap-review-title">We’re building your trail recommendation personally.</div>' +
         '<div class="ap-review-body">Your group’s preferences and trail day are a genuinely specific combination, so we’ve flagged this for a closer look by our team. You’ll hear from us with a trail recommendation before your trail day.</div>' +
         '<div class="ap-review-body">Continue to make sure your attendees, gear delivery details, and waivers are all set in the meantime.</div>' +
         '<button type="button" class="ap-cta-primary" id="ap-continue-attendees">Continue to Confirm Attendees</button>' +
+        '<div class="ap-cta-secondary" id="ap-modify" style="cursor:pointer;">Want to change something?</div>' +
         '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Return to Adventure Home</div>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
       contentEl.querySelector('#ap-continue-attendees').addEventListener('click', function () { state.step = 'roster'; render(); });
+      contentEl.querySelector('#ap-modify').addEventListener('click', renderInReviewModify);
       contentEl.querySelector('#ap-return-hub').addEventListener('click', goHub);
+    }
+
+    // ---- In review, guest wants to change something: the redo-questions
+    // / ask-team-for-more-detail options from renderChangeEntry's 3-option
+    // list, minus "pick from existing results" (nothing exists yet to
+    // pick from in this state).
+    function renderInReviewModify() {
+      var choice = 'redo';
+      function draw() {
+        wrap.classList.remove('ap-wide');
+        contentEl.innerHTML =
+          flowTopHtml('&larr; Adventure Home') +
+          '<div class="ap-eyebrow">Trail Recommendation</div>' +
+          '<div class="ap-q-title" style="margin-bottom:1rem;">Want to change something?</div>' +
+          '<div class="ap-radio-list" id="ap-review-modify-options">' +
+          '<div class="ap-radio' + (choice === 'redo' ? ' selected' : '') + '" data-val="redo"><div class="ap-radio-dot"></div><div class="ap-radio-text">Answer the questions differently<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Redo the 3 preference questions and get a new match</span></div></div>' +
+          '<div class="ap-radio' + (choice === 'ask_team' ? ' selected' : '') + '" data-val="ask_team"><div class="ap-radio-dot"></div><div class="ap-radio-text">Tell us more about what you’re looking for<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Give our team a few more details to work with</span></div></div>' +
+          '</div>' +
+          '<button type="button" class="ap-cta-primary" id="ap-review-modify-continue">Continue</button>' +
+          '<div class="ap-cta-secondary" id="ap-review-modify-cancel" style="cursor:pointer;">Never mind, go back</div>';
+        contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
+        contentEl.querySelector('#ap-review-modify-cancel').addEventListener('click', renderInReview);
+        Array.prototype.forEach.call(contentEl.querySelectorAll('#ap-review-modify-options .ap-radio'), function (el) {
+          el.addEventListener('click', function () { choice = el.getAttribute('data-val'); draw(); });
+        });
+        contentEl.querySelector('#ap-review-modify-continue').addEventListener('click', function () {
+          if (choice === 'redo') { state.prefStep = 0; state.forceTrailRefresh = true; state.step = 'preferences'; render(); }
+          else { renderAskTeamForm(renderInReviewModify); }
+        });
+      }
+      draw();
     }
 
     // ---- Choose Your Trail grid (first-time assignment or a refresh) ----
@@ -2363,8 +2395,9 @@
       try { existing = typeof existing === 'string' ? JSON.parse(existing || '[]') : (existing || []); } catch (e) { existing = []; }
       var forceRefresh = state.forceTrailRefresh;
       state.forceTrailRefresh = false;
-      if (!forceRefresh && existing.length && ap.assignedAt) {
-        routeReveal(existing);
+      if (!forceRefresh && ap.assignedAt) {
+        if (existing.length) { routeReveal(existing); return; }
+        renderInReview();
         return;
       }
       renderPacing();
@@ -2472,7 +2505,8 @@
     // like a staff-logged one does. Replaces the previous mailto: fallback
     // this file used to flag as a known gap ("no dedicated backend field/
     // action exists for a guest-initiated 'please review my trail' flag").
-    function renderAskTeamForm() {
+    function renderAskTeamForm(backFn) {
+      var goBack = backFn || renderChangeEntry;
       wrap.classList.remove('ap-wide');
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
@@ -2484,7 +2518,7 @@
         '<button type="button" class="ap-cta-primary" id="ap-ask-team-send">Send Request</button>' +
         '<div class="ap-cta-secondary" id="ap-ask-team-cancel" style="cursor:pointer;">Never mind, go back</div>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
-      contentEl.querySelector('#ap-ask-team-cancel').addEventListener('click', renderChangeEntry);
+      contentEl.querySelector('#ap-ask-team-cancel').addEventListener('click', goBack);
       var sendBtn = contentEl.querySelector('#ap-ask-team-send');
       var errEl = contentEl.querySelector('#ap-ask-team-error');
       var textarea = contentEl.querySelector('#ap-ask-team-textarea');
