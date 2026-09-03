@@ -1019,6 +1019,17 @@
     var candidateTrails = ap.candidateTrails;
     try { candidateTrails = typeof candidateTrails === 'string' ? JSON.parse(candidateTrails || '[]') : (candidateTrails || []); } catch (e) { candidateTrails = []; }
     var hasUnreviewedManualPick = candidateTrails.some(function (c) { return c.source === 'manual_override' && c.trailId !== ap.selectedTrailId; });
+    // NEW (hub tile copy pass, 2026-09-03): distinct from
+    // hasUnreviewedManualPick above (which means "something's ready for
+    // you to look at") -- this is the opposite: preferences were
+    // submitted, assignment ran, and it came back with zero automated
+    // matches (renderInReview()'s "we're building it personally" screen).
+    // The hub tile used to have no way to tell this apart from "hasn't
+    // started yet," showing the same "Not done" / "Tell us what you're
+    // after" copy for both -- flagged by Airey as actively misleading
+    // once a guest has already answered everything and is just waiting
+    // on the team.
+    var awaitingTeamTrail = !!ap.assignedAt && !ap.selectedTrailId && candidateTrails.length === 0;
     // BUG FIX (Task 15): ap.reconfirmedRosterJson no longer exists (see
     // this file's header comment) — "has the roster reconfirmation step
     // run at least once" is now the same signal confirmRoster itself
@@ -1075,6 +1086,7 @@
       trailSelected: !!ap.selectedTrailId,
       trailName: (candidateTrails.filter(function (c) { return c.trailId === ap.selectedTrailId; })[0] || {}).trailName || '',
       hasUnreviewedManualPick: hasUnreviewedManualPick,
+      awaitingTeamTrail: awaitingTeamTrail,
       rosterDone: rosterDone,
       attendeesDone: attendeesDone,
       gearDone: gearDone,
@@ -1136,8 +1148,8 @@
 
     var tiles = [
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>', 'Trail Recommendation',
-        status.trailSelected ? status.trailName : 'Tell us what you’re after and we’ll find your trail',
-        status.hasUnreviewedManualPick ? 'In review' : (status.trailSelected ? 'Done' : 'Not done'),
+        status.trailSelected ? status.trailName : (status.awaitingTeamTrail ? 'We’re placing your group personally, no action needed.' : 'Tell us what you’re after and we’ll find your trail'),
+        status.hasUnreviewedManualPick ? 'In review' : (status.trailSelected ? 'Done' : (status.awaitingTeamTrail ? 'With Our Team' : 'Not done')),
         false, function () { state.step = (status.trailSelected || ap.assignedAt) ? 'trail' : 'preferences'; render(); }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.6" r="2.9" stroke="#F58271" stroke-width="1.3"/><path d="M4 19.3c0-3.7 2.2-6.1 5-6.1s5 2.4 5 6.1" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/><circle cx="15.3" cy="9.2" r="2.3" stroke="#2A4747" stroke-width="1.2"/><path d="M12.6 19.3c.2-3 1.9-4.9 3.9-4.9 2.3 0 4.1 2.4 4.1 5.4" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/></svg>', 'Attendees',
         status.rosterDone ? (attendingRosterCount() + ' in your group') : 'Confirm who’s coming and invite your group',
@@ -1158,7 +1170,7 @@
     ];
 
     var tilesHtml = tiles.map(function (t, i) {
-      var statusClass = t.statusLabel === 'Done' ? 'status-done' : t.statusLabel === 'In review' ? 'status-review' : t.statusLabel === 'Locked' ? 'status-locked' : 'status-notdone';
+      var statusClass = t.statusLabel === 'Done' ? 'status-done' : (t.statusLabel === 'In review' || t.statusLabel === 'With Our Team') ? 'status-review' : t.statusLabel === 'Locked' ? 'status-locked' : 'status-notdone';
       return '<div class="ap-tile' + (t.locked ? ' locked' : '') + '" data-tile="' + i + '">' +
         '<div class="ap-tile-icon">' + t.icon + '</div>' +
         '<div class="ap-tile-mid"><div class="ap-tile-title">' + t.title + '</div><div class="ap-tile-sub">' + escapeHtml(t.sub) + '</div></div>' +
