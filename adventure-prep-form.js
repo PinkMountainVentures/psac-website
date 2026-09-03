@@ -239,6 +239,7 @@
     waiverName: '',
     waiverAgreed: false,
     guardianForChildrenParticipantIds: [], // NEW (Task 15): array of participant_ids, replaces the old name-keyed guardianForChildren — matches lib/waiver-service.js's real saveWaiverSignature contract
+    guardianChildLegalNames: {}, // NEW (child-waiver capture, 2026-09-03): participantId -> the full legal name the guardian types at signing, keyed separately from the roster's own display name so a nickname/shorthand entered at roster time doesn't silently become the name on the signed record
     ecName: '',
     ecPhone: '',
     prefStep: 0, // 0 | 1 | 2 — which of the 3 Trail Recommendation question screens (Round 2, handoff Section 2: "Each question screen gets a step progress bar...")
@@ -3308,9 +3309,15 @@
         '<div class="ap-field-label">Type your full legal name to sign</div>' +
         '<input class="ap-field-input" type="text" id="ap-waiver-name" placeholder="Full legal name" value="' + escapeHtml(state.waiverName) + '">' +
         (minors.length ? minors.map(function (m) {
+          var isGuardianOn = state.guardianForChildrenParticipantIds.indexOf(m.participantId) !== -1;
+          var childLegalName = state.guardianChildLegalNames[m.participantId] != null ? state.guardianChildLegalNames[m.participantId] : (m.name || '');
           return '<div class="ap-toggle-row" data-guardian-participant-id="' + escapeHtml(m.participantId || '') + '" style="cursor:pointer;">' +
-            '<div class="ap-toggle-row-text" style="font-weight:500; font-size:0.78rem;">I am the parent/guardian of ' + escapeHtml(m.name || 'this child') + ' (' + escapeHtml(m.age || m.ageRange || '') + ') and I’m signing on their behalf</div>' +
-            '<div class="ap-switch' + (state.guardianForChildrenParticipantIds.indexOf(m.participantId) !== -1 ? ' on' : '') + '"></div>' +
+            '<div class="ap-toggle-row-text" style="font-weight:500; font-size:0.78rem;">I am the parent / legal guardian of ' + escapeHtml(m.name || 'this child') + ' (' + escapeHtml(m.age || m.ageRange || '') + ') and I’m signing on their behalf</div>' +
+            '<div class="ap-switch' + (isGuardianOn ? ' on' : '') + '"></div>' +
+            '</div>' +
+            '<div class="ap-toggle-legalname-wrap" data-legalname-for="' + escapeHtml(m.participantId || '') + '" style="margin:-0.4rem 0 0.9rem;' + (isGuardianOn ? '' : ' display:none;') + '">' +
+            '<div class="ap-field-label">' + escapeHtml(m.name || 'Child') + '’s full legal name</div>' +
+            '<input class="ap-field-input" type="text" data-child-legalname-input="' + escapeHtml(m.participantId || '') + '" placeholder="Full legal name" value="' + escapeHtml(childLegalName) + '">' +
             '</div>';
         }).join('') : '') +
         '<div class="ap-section-label">Emergency Contact (optional)</div>' +
@@ -3363,8 +3370,23 @@
         row.addEventListener('click', function () {
           var participantId = row.getAttribute('data-guardian-participant-id');
           var idx = state.guardianForChildrenParticipantIds.indexOf(participantId);
-          if (idx === -1) state.guardianForChildrenParticipantIds.push(participantId); else state.guardianForChildrenParticipantIds.splice(idx, 1);
+          var turningOn = idx === -1;
+          if (turningOn) state.guardianForChildrenParticipantIds.push(participantId); else state.guardianForChildrenParticipantIds.splice(idx, 1);
           row.querySelector('.ap-switch').classList.toggle('on', state.guardianForChildrenParticipantIds.indexOf(participantId) !== -1);
+          // NEW (child-waiver capture, 2026-09-03): the legal-name field
+          // lives in a sibling wrap immediately after this toggle row
+          // (see renderSign()'s minors.map() above) -- reveal it the
+          // moment the guardian toggle flips on, so the name is captured
+          // as part of the same certifying action, and hide it again if
+          // they flip it back off.
+          var wrap = row.nextElementSibling;
+          if (wrap && wrap.getAttribute('data-legalname-for') === participantId) {
+            wrap.style.display = turningOn ? '' : 'none';
+            if (turningOn) {
+              var nameInput = wrap.querySelector('[data-child-legalname-input]');
+              if (nameInput) nameInput.focus();
+            }
+          }
         });
       });
 
@@ -3372,6 +3394,9 @@
         state.waiverName = contentEl.querySelector('#ap-waiver-name').value.trim();
         state.ecName = contentEl.querySelector('#ap-ec-name').value.trim();
         state.ecPhone = contentEl.querySelector('#ap-ec-phone').value.trim();
+        Array.prototype.forEach.call(contentEl.querySelectorAll('[data-child-legalname-input]'), function (input) {
+          state.guardianChildLegalNames[input.getAttribute('data-child-legalname-input')] = input.value.trim();
+        });
       }
 
       contentEl.querySelector('#ap-flow-back').addEventListener('click', renderList);
@@ -3385,6 +3410,19 @@
           contentEl.querySelector('#ap-waiver-error').textContent = 'Type your full legal name to sign.';
           return;
         }
+        // NEW (child-waiver capture, 2026-09-03): require the guardian to
+        // have actually typed each toggled-on minor's full legal name,
+        // same as their own signature above -- an untouched toggle
+        // shouldn't be able to fall through to whatever the roster's
+        // display name happened to be.
+        var missingChildName = state.roster.filter(function (p) {
+          return state.guardianForChildrenParticipantIds.indexOf(p.participantId) !== -1 &&
+            !(state.guardianChildLegalNames[p.participantId] || '').trim();
+        })[0];
+        if (missingChildName) {
+          contentEl.querySelector('#ap-waiver-error').textContent = 'Enter ' + missingChildName.name + '’s full legal name.';
+          return;
+        }
         signCta.disabled = true;
         // BUG FIX (Task 15): this used to send `guardianForChildren`
         // (an array of names). lib/waiver-service.js's saveWaiverSignature
@@ -3396,8 +3434,13 @@
         // source of truth for guardian coverage — waiverSigners() now
         // reads booking_participants.guardian_verified_at instead (see
         // that function's own header comment).
+        // UPDATED (child-waiver capture, 2026-09-03): a covered minor now
+        // uses the full legal name the guardian typed at signing (see
+        // above) rather than the roster's own display name, so the
+        // record reflects what was actually certified.
         var participantsCovered = [state.waiverName].concat(
-          state.roster.filter(function (p) { return state.guardianForChildrenParticipantIds.indexOf(p.participantId) !== -1; }).map(function (p) { return p.name; })
+          state.roster.filter(function (p) { return state.guardianForChildrenParticipantIds.indexOf(p.participantId) !== -1; })
+            .map(function (p) { return state.guardianChildLegalNames[p.participantId] || p.name; })
         );
         apiPost('/api/waiver', {
           action: 'saveWaiverSignature',
