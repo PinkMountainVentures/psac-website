@@ -1918,11 +1918,21 @@
           return '<div class="review-recipient"><div><div class="review-recipient-name">' + escapeHtml(s.name || '') + '</div><div class="review-recipient-email">' + escapeHtml(meta) + '</div></div>' + tag + '</div>';
         }).join('') +
         '</div>' +
-        '<button type="button" class="ap-cta-primary" id="ap-invite-done">Return to Adventure Home</button>' +
+        '<button type="button" class="ap-cta-primary" id="ap-invite-done">Continue to Gear</button>' +
+        '<div class="ap-cta-secondary" id="ap-invite-save" style="cursor:pointer;">Save &amp; return to Adventure Home</div>' +
         '</div></div>'
       );
       soloWrap.querySelector('#ap-back-to-hub').addEventListener('click', function () { state.step = 'hub'; render(); });
-      soloWrap.querySelector('#ap-invite-done').addEventListener('click', function () { state.step = 'hub'; render(); });
+      // UPDATED (Airey's direct request, 2026-09-03): this screen's only
+      // action used to be "Return to Adventure Home", which just dropped
+      // the guest back at the hub to find and tap into Gear Kits
+      // themselves -- an extra step when the natural next thing to do,
+      // right after confirming the roster, is start on gear. Primary CTA
+      // now moves straight into Gear Kits; "Save & return to Adventure
+      // Home" (same wording/pattern as the other flows' secondary link)
+      // is still there for anyone who wants to stop here instead.
+      soloWrap.querySelector('#ap-invite-done').addEventListener('click', function () { state.step = 'planning'; render(); });
+      soloWrap.querySelector('#ap-invite-save').addEventListener('click', function () { state.step = 'hub'; render(); });
       return soloWrap;
     }
 
