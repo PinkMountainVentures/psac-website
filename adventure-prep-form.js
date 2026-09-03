@@ -2433,6 +2433,21 @@
         ap.candidateTrails = res.body.candidateTrails;
         ap.assignedAt = res.body.assignedAt;
         ap.assignmentMethod = res.body.assignmentMethod;
+        // BUG FIX (Airey's live-test report, 2026-09-03): a refresh can
+        // clear ap.selectedTrailId server-side (api/adventure-prep.js's
+        // runTrailAssignment action, see its own comment) when whatever
+        // was previously selected -- almost always a staff manual_override
+        // -- doesn't survive into the fresh candidateTrails. This client
+        // copy of ap used to never hear about that: it kept pointing at a
+        // trailId no candidate row matched anymore, which is exactly what
+        // made the hub's trail card (and this tile's own subtitle, both of
+        // which resolve "the selected trail" by filtering candidateTrails
+        // for this id) render blank -- dashes for every stat, the generic
+        // "A safe, solid fit for your group." fallback description, no
+        // name. Syncing it here means a cleared selection is reflected
+        // the moment this response comes back, routing the guest into
+        // renderInReview()'s "awaiting team trail" state below instead.
+        ap.selectedTrailId = res.body.selectedTrailId;
         routeReveal(res.body.candidateTrails);
       });
     }

@@ -231,6 +231,14 @@ async function runTrailAssignment(body, res) {
     assignmentMethod: result.assignmentMethod,
     qualifyingCandidateCount: result.qualifyingCandidateCount,
     swapRequestOpened: result.swapRequestOpened,
+    // NEW (Airey's live-test report, 2026-09-03): see
+    // lib/run-trail-assignment.js's own comment on selectedTrailIdOrphaned
+    // -- a refresh can clear adventure_prep.selected_trail_id server-side
+    // when the previously-picked trail didn't survive into the fresh
+    // candidateTrails; the frontend's own in-memory ap.selectedTrailId
+    // needs to be told about that (it doesn't automatically know), which
+    // is what this field is for.
+    selectedTrailId: result.selectedTrailId,
   });
 }
 
