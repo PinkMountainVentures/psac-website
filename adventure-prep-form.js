@@ -1373,7 +1373,7 @@
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
     var wrap = h(
-      '<div class="container' + (status.allSet ? ' ap-hero-wide' : '') + '"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container ap-hero-wide"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
       alertHtml +
       trailSectionHtml +
@@ -2428,7 +2428,6 @@
     return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + '"' +
       (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
       '<div class="ap-hero-card-inner">' +
-      '<div class="ap-hero-mark"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></div>' +
       '<div class="ap-hero-eyebrow">' + escapeHtml(eyebrowText) + '</div>' +
       '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
       '<div class="ap-hero-subline">' + sublineHtml + '</div>' +
