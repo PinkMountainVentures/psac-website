@@ -449,6 +449,46 @@
     var TIMES = ['Early start (before 8am)', 'Morning (8am – 10am)', 'Mid-Morning (after 10am)', 'Flexible'];
     var outsideClickHandler = null;
 
+    // Open-days-only restriction (build checklist P0: "Date picker:
+    // restrict to open days only ... an open day is defined generically
+    // by whichever trail's hours/days apply, not hardcoded to Agua
+    // Caliente"). Cached per "YYYY-M" key so navigating back to a month
+    // already viewed this session doesn't re-fetch. Persists across
+    // re-renders of this same card instance, same lifetime as
+    // outsideClickHandler above.
+    var openDaysCache = {}; // monthKey -> Set of ISO date strings that are open
+    var openDaysFailed = {}; // monthKey -> true if the fetch errored (fail OPEN: no extra restriction applied for that month rather than blocking every date)
+    var openDaysInFlight = {}; // monthKey -> true while a fetch is in progress, so a rapid prev/next doesn't double-fetch the same month
+
+    function monthKey(year, monthIndex0) { return year + '-' + (monthIndex0 + 1); }
+
+    // monthIndex0 is 0-11 (JS Date convention); the API takes 1-12.
+    function ensureOpenDaysForMonth(year, monthIndex0, onSettled) {
+      var key = monthKey(year, monthIndex0);
+      if (openDaysCache[key] || openDaysFailed[key] || openDaysInFlight[key]) return;
+      openDaysInFlight[key] = true;
+      fetch('/api/booking-open-days?year=' + year + '&month=' + (monthIndex0 + 1))
+        .then(function (r) {
+          if (!r.ok) throw new Error('booking-open-days responded ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          openDaysCache[key] = new Set(Array.isArray(data.openDates) ? data.openDates : []);
+          delete openDaysInFlight[key];
+          onSettled();
+        })
+        .catch(function (err) {
+          // Fail OPEN, not closed: an availability-check outage shouldn't
+          // strand every date in the month as unselectable. Logged so a
+          // real outage is still visible, matching this project's
+          // standing "never silently swallow a failure" posture.
+          console.error('booking-open-days fetch failed for', key, err);
+          openDaysFailed[key] = true;
+          delete openDaysInFlight[key];
+          onSettled();
+        });
+    }
+
     function pad2(n) { return n < 10 ? '0' + n : String(n); }
     function toISO(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
     function fromISO(iso) {
@@ -500,19 +540,40 @@
         h += '</div>';
         h += '<div class="paf-cal-days">';
         for (var i = 0; i < startWeekday; i++) h += '<span class="paf-cal-day is-empty"></span>';
+        var monthOpenDays = openDaysCache[monthKey(year, month)]; // undefined until the fetch resolves -- treated as "no extra restriction yet" below
         for (var day = 1; day <= daysInMonth; day++) {
           var thisDate = new Date(year, month, day);
           var iso = toISO(thisDate);
           // Disabled if it's in the past OR inside the gear-delivery lead
           // time (today through today + MIN_BOOKING_LEAD_DAYS - 1), not just
-          // strictly before today. See MIN_BOOKING_LEAD_DAYS above.
-          var isDisabled = thisDate < minDate;
+          // strictly before today. See MIN_BOOKING_LEAD_DAYS above. ALSO
+          // disabled if this specific date isn't an open day for any
+          // currently-bookable trail (monthOpenDays undefined = the fetch
+          // hasn't resolved yet for this month, so no extra restriction is
+          // applied yet -- renderCalendar() re-runs once it does, see
+          // ensureOpenDaysForMonth's callback below).
+          var isClosedDay = monthOpenDays ? !monthOpenDays.has(iso) : false;
+          var isDisabled = thisDate < minDate || isClosedDay;
           var isSelected = state.answers.q3_date === iso;
           var cls = 'paf-cal-day' + (isDisabled ? ' is-disabled' : '') + (isSelected ? ' is-selected' : '');
-          h += '<button type="button" class="' + cls + '" data-date="' + iso + '"' + (isDisabled ? ' disabled' : '') + '>' + day + '</button>';
+          var title = (isClosedDay && thisDate >= minDate) ? ' title="Not an available day for our launch trails right now"' : '';
+          h += '<button type="button" class="' + cls + '" data-date="' + iso + '"' + (isDisabled ? ' disabled' : '') + title + '>' + day + '</button>';
         }
         h += '</div>';
         calendarEl.innerHTML = h;
+
+        // Kick off (or piggyback on) the fetch for the visible month. If it
+        // isn't cached yet, this month renders once now with no open-day
+        // restriction applied (only the lead-time rule), then
+        // ensureOpenDaysForMonth's callback re-invokes renderCalendar() to
+        // redraw with the real restriction once the data arrives -- guarded
+        // so a redraw after the user has already navigated to a different
+        // month doesn't stomp on what's currently showing.
+        ensureOpenDaysForMonth(year, month, function () {
+          if (viewDate.getFullYear() === year && viewDate.getMonth() === month) {
+            renderCalendar();
+          }
+        });
 
         calendarEl.querySelector('[data-nav="prev"]').addEventListener('click', function (e) {
           e.stopPropagation();
