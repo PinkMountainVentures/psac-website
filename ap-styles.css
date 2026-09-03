@@ -416,6 +416,31 @@
 .ap-compare-cta-primary { background: var(--desert-green); border-color: var(--desert-green); color: white; }
 .ap-compare-cta-primary:hover { background: #63a677; }
 
+/* -- Hub top card, Climax onward -- hero-photo treatment (Option C) with
+   a dark-card fallback (Option A) when a trail has no photo yet. Phase 1
+   states keep the plain .ap-eyebrow/.ap-greeting/.ap-subline treatment
+   above this block, untouched -- this only replaces the top card once
+   the hub reaches its own "everything set" state
+   (hub-top-card-visual-options.html, 2026-09-03). */
+.ap-hero-card { margin-top: 0.4rem; margin-bottom: 1.4rem; border-radius: 16px; overflow: hidden; position: relative; min-height: 340px; display: flex; align-items: flex-end; box-shadow: 0 10px 28px rgba(42,71,71,0.28); background-size: cover; background-position: center; max-width: 720px; }
+.ap-hero-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,35,35,0.15) 0%, rgba(20,35,35,0.55) 55%, rgba(15,26,26,0.86) 100%); }
+.ap-hero-card.no-photo { min-height: 0; background: linear-gradient(155deg, #2A4747 0%, #223b3b 55%, #1c3232 100%); }
+.ap-hero-card.no-photo::before { background: radial-gradient(circle at 85% 8%, rgba(245,130,113,0.22) 0%, transparent 45%), radial-gradient(circle at 10% 95%, rgba(122,189,145,0.14) 0%, transparent 50%); }
+.ap-hero-card-inner { position: relative; z-index: 1; padding: 1.7rem 1.6rem 1.6rem; width: 100%; }
+.ap-hero-mark { margin-bottom: 1.1rem; }
+.ap-hero-mark img { height: 22px; width: auto; display: block; }
+.ap-hero-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.5rem; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.ap-hero-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.7rem; font-weight: 500; color: var(--sand-beige); line-height: 1.28; margin-bottom: 0.6rem; text-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+.ap-hero-subline { font-size: 0.8rem; color: rgba(248,241,233,0.85); text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.ap-hero-subline:empty { display: none; }
+
+/* lean trail-detail card -- used once the hero card above already
+   carries the photo, so the trail card below drops its own photo bar
+   for a thin top accent instead
+   (hub-trail-card-placement-options.html, 2026-09-03). */
+.ap-compare-card.lean { border-top: 3px solid var(--desert-green); }
+.ap-compare-card.lean .ap-compare-body { padding-top: 1.1rem; }
+
 .ap-reveal-photo { height: 170px; background: linear-gradient(135deg, #3a5a5a, #2A4747); border-radius: 12px 12px 0 0; display: flex; align-items: flex-end; padding: 1rem 1.2rem; margin-top: 0.2rem; max-width: 640px; }
 .ap-reveal-photo-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(248,241,233,0.5); }
 .ap-reveal-card { background: white; border-radius: 0 0 12px 12px; padding: 1.3rem 1.3rem 1.5rem; margin-bottom: 1.3rem; box-shadow: 0 1px 3px rgba(42,71,71,0.08); max-width: 640px; }

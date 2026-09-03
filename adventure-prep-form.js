@@ -1228,7 +1228,7 @@
     }
     var trailSectionHtml = !status.trailSelected ? '' :
       '<div class="ap-trail-section-wide">' +
-      compareCardHtml(selectedTrailCandidate, null, null, false) +
+      compareCardHtml(selectedTrailCandidate, null, null, false, status.allSet) +
       (pastT3
         ? '<div class="ap-trail-unlocked"><div class="ap-trail-unlocked-text">Your guide is ready: turn-by-turn navigation, waypoints, and everything else for the trail.</div><button type="button" class="ap-trail-download-btn" id="ap-get-guide">Get Guide</button></div>'
         : '<div class="ap-trail-locked-note"><span class="lock-icon">' + LOCK_ICON_SVG + '</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
@@ -1366,11 +1366,15 @@
     // roster yet): topGreetingHtml/topSublineHtml stay the Part 2.1
     // continuity-beat opener set above.
 
+    var topCardHtml = status.allSet
+      ? heroCardHtml('Your Adventure', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl)
+      : '<div class="ap-eyebrow">Your Adventure</div>' +
+        '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+        '<div class="ap-subline">' + topSublineHtml + '</div>';
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-eyebrow">Your Adventure</div>' +
-      '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
-      '<div class="ap-subline">' + topSublineHtml + '</div>' +
+      topCardHtml +
       alertHtml +
       trailSectionHtml +
       '<div class="ap-tiles-label">Get ready</div>' +
@@ -2414,17 +2418,38 @@
     return slice.slice(0, lastSpace > 0 ? lastSpace : maxLen).replace(/[,;:\s]+$/, '') + '…';
   }
 
+  // Hub top card, Climax onward -- hero-photo treatment with a dark-card
+  // fallback when a trail has no photo yet
+  // (hub-top-card-visual-options.html, 2026-09-03). headlineHtml/
+  // sublineHtml are passed through as already-safe HTML, matching how
+  // topGreetingHtml/topSublineHtml are built and inserted everywhere else
+  // in this file.
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl) {
+    return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + '"' +
+      (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
+      '<div class="ap-hero-card-inner">' +
+      '<div class="ap-hero-mark"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></div>' +
+      '<div class="ap-hero-eyebrow">' + escapeHtml(eyebrowText) + '</div>' +
+      '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
+      '<div class="ap-hero-subline">' + sublineHtml + '</div>' +
+      '</div></div>';
+  }
+
   // `ctaLabel` falsy (null/undefined) renders the card with no CTA button,
   // so the confirmation screen (renderConfirmation) can reuse this exact
   // component just for the consistent name/stats/summary presentation.
-  function compareCardHtml(candidate, badge, ctaLabel, ctaDisabled) {
+  // `lean` (new, hub-trail-card-placement-options.html) renders without
+  // the photo bar -- used once the hero card above already carries the
+  // photo, so the page isn't showing the same photo twice.
+  function compareCardHtml(candidate, badge, ctaLabel, ctaDisabled, lean) {
     var desc = summarize(candidate.overviewCopy, 250) || ((candidate.matchedAttributes || []).length
       ? 'What you told us you wanted: ' + candidate.matchedAttributes.join(', ') + '.'
       : 'A safe, solid fit for your group.');
-    return '<div class="ap-compare-card">' +
+    return '<div class="ap-compare-card' + (lean ? ' lean' : '') + '">' +
+      (lean ? '' :
       '<div class="ap-compare-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '>' +
       (badge ? '<div class="ap-compare-badge ' + badge.cls + '">' + escapeHtml(badge.text) + '</div>' : '') +
-      '</div>' +
+      '</div>') +
       '<div class="ap-compare-body">' +
       '<div class="ap-compare-name">' + escapeHtml(candidate.trailName || '') + '</div>' +
       '<div class="ap-compare-stats">' +

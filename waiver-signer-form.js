@@ -342,12 +342,32 @@
     if (n === 3) return 'Moderate';
     return 'High';
   }
-  function compareCardHtml(candidate) {
+  // Hub top card, Climax onward -- hero-photo treatment with a dark-card
+  // fallback when a trail has no photo yet
+  // (hub-top-card-visual-options.html, 2026-09-03). headlineHtml/
+  // sublineHtml are passed through as already-safe HTML, matching how
+  // topGreetingHtml/topSublineHtml are built and inserted everywhere else
+  // in this file.
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl) {
+    return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + '"' +
+      (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
+      '<div class="ap-hero-card-inner">' +
+      '<div class="ap-hero-mark"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></div>' +
+      '<div class="ap-hero-eyebrow">' + escapeHtml(eyebrowText) + '</div>' +
+      '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
+      '<div class="ap-hero-subline">' + sublineHtml + '</div>' +
+      '</div></div>';
+  }
+
+  // `lean` (new, hub-trail-card-placement-options.html) renders without
+  // the photo bar -- used once the hero card above already carries the
+  // photo, so the page isn't showing the same photo twice.
+  function compareCardHtml(candidate, lean) {
     var desc = summarize(candidate.overviewCopy, 250) || ((candidate.matchedAttributes || []).length
       ? 'What you told us you wanted: ' + candidate.matchedAttributes.join(', ') + '.'
       : 'A safe, solid fit for your group.');
-    return '<div class="ap-compare-card">' +
-      '<div class="ap-compare-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '></div>' +
+    return '<div class="ap-compare-card' + (lean ? ' lean' : '') + '">' +
+      (lean ? '' : '<div class="ap-compare-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '></div>') +
       '<div class="ap-compare-body">' +
       '<div class="ap-compare-name">' + escapeHtml(candidate.trailName || '') + '</div>' +
       '<div class="ap-compare-stats">' +
@@ -429,7 +449,7 @@
     // not just a name (see this file's computeStatus() bug-fix comment).
     var pastT3 = status.trailAssigned && isPastT3Cutoff(state.ctx.tripDate);
     var trailSectionHtml = !status.trailAssigned || !status.trailDetail ? '' :
-      '<div class="ap-trail-section-wide">' + compareCardHtml(status.trailDetail) +
+      '<div class="ap-trail-section-wide">' + compareCardHtml(status.trailDetail, status.allSet) +
       (pastT3
         ? '<div class="ap-trail-unlocked"><div class="ap-trail-unlocked-text">Your guide is ready: turn-by-turn navigation, waypoints, and everything else for the trail.</div><button type="button" class="ap-trail-download-btn" id="sb-get-guide">Get Guide</button></div>'
         : '<div class="ap-trail-locked-note"><span class="lock-icon">' + LOCK_ICON_SVG + '</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
@@ -495,11 +515,15 @@
     // else doneCount === 0: topGreetingHtml/topSublineHtml stay the
     // Borrowed Trust opener already built above.
 
+    var topCardHtml = status.allSet
+      ? heroCardHtml('You’re In', topGreetingHtml, topSublineHtml, status.trailDetail && status.trailDetail.photoUrl)
+      : '<div class="ap-eyebrow">You’re In</div>' +
+        '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+        '<div class="ap-subline">' + topSublineHtml + '</div>';
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-eyebrow">You’re In</div>' +
-      '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
-      '<div class="ap-subline">' + topSublineHtml + '</div>' +
+      topCardHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>' +
       trailSectionHtml +
       '<div class="ap-tiles-label">Get ready</div>' +
@@ -661,11 +685,15 @@
       }
     }
 
+    var topCardHtml = allCertified
+      ? heroCardHtml('You\u2019re In', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl)
+      : '<div class="ap-eyebrow">You\u2019re In</div>' +
+        '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+        '<div class="ap-subline">' + topSublineHtml + '</div>';
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-eyebrow">You\u2019re In</div>' +
-      '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
-      '<div class="ap-subline">' + topSublineHtml + '</div>' +
+      topCardHtml +
       guideBtnHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '\u2019s day itself is self-guided, without one of our own people along, so here\u2019s everything about it: who\u2019s going, where, when, and what to do if you need to reach us.</div></div>' +
       '<div class="ap-tiles-label">The day</div>' +
