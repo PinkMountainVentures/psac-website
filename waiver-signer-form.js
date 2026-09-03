@@ -521,7 +521,7 @@
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
     var wrap = h(
-      '<div class="container ap-hero-wide"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>' +
       trailSectionHtml +
@@ -691,7 +691,7 @@
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
     var wrap = h(
-      '<div class="container ap-hero-wide"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
       guideBtnHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '\u2019s day itself is self-guided, without one of our own people along, so here\u2019s everything about it: who\u2019s going, where, when, and what to do if you need to reach us.</div></div>' +
@@ -931,7 +931,7 @@
   // top-of-file note) -> confirmation.
   // ---------------------------------------------------------------------
   function renderWaiver() {
-    var wrap = h('<div class="container ap-wide"><div class="ap-shell" style="padding-top:0;"><div id="sb-waiver-content"></div></div></div>');
+    var wrap = h('<div class="container"><div class="ap-shell" style="padding-top:0;"><div id="sb-waiver-content"></div></div></div>');
     var contentEl = wrap.querySelector('#sb-waiver-content');
 
     function flowTopHtml(backLabel) {

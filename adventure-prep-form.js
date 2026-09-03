@@ -1373,7 +1373,7 @@
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
     var wrap = h(
-      '<div class="container ap-hero-wide"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
       alertHtml +
       trailSectionHtml +
@@ -3431,7 +3431,7 @@
     // (960px, was the standard 640px) and padding-top:0 (removes the
     // default 2.6rem .ap-shell gap under the header bar, same fix already
     // applied to nearly every other Adventure Prep screen).
-    var wrap = h('<div class="container ap-wide"><div class="ap-shell" style="padding-top:0;"><div id="ap-waiver-content"></div></div></div>');
+    var wrap = h('<div class="container"><div class="ap-shell" style="padding-top:0;"><div id="ap-waiver-content"></div></div></div>');
     var contentEl = wrap.querySelector('#ap-waiver-content');
 
     function flowTopHtml(backLabel) {
