@@ -59,7 +59,7 @@
  *   POST /api/adventure-prep { action: 'confirmRoster', token, isParticipating, ownerParticipantId?, ownerNewEntry?, roster? }
  *   POST /api/adventure-prep { action: 'runTrailAssignment', token, operation }
  *   POST /api/adventure-prep { action: 'selectTrail', token, trailId }
- *   POST /api/adventure-prep { action: 'sendSignerLinks', token }  -- shape simplified this update, no `signers` array needed anymore
+ *   POST /api/adventure-prep { action: 'sendSignerLinks', token, participantId? }  -- shape simplified this update, no `signers` array needed anymore; optional participantId (NEW, per-row "Resend waiver invite," 2026-09-03) narrows which signer(s) actually get emailed to just that one, without changing the full-booking DB bookkeeping sendSignerLinksForBooking always does
  *   POST /api/adventure-prep { action: 'adjustGearKitCount', token, requestedKitCount }
  *   POST /api/adventure-prep { action: 'setRosterGearKits', token, updates: [{participantId, gearKit}] }  -- NEW (Task 15): backs the Gear Kits screen's per-person kit toggle; see lib/adventure-prep-service.js's own header comment on why this is deliberately separate from confirmRoster
  */
@@ -296,8 +296,25 @@ async function sendSignerLinks(body, res) {
   const tripDateDisplay = formatTripDate(result.tripDate);
   const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || '';
 
+  // NEW (per-row "Resend waiver invite," 2026-09-03): sendSignerLinksForBooking
+  // above always upserts/refreshes a waiver_signatures row (and a live
+  // signerToken) for EVERY eligible signer on the booking -- that part is
+  // deliberately unconditional (see this file's header comment, point 3
+  // in that function's own doc, on why it's safely idempotent). What used
+  // to be unconditional too was the actual EMAIL SEND below, which meant
+  // any "reminder" button anywhere in this app was really a "resend to
+  // the whole group" button wearing one person's name. An optional
+  // participantId narrows the email step to just that one signer without
+  // touching the bookkeeping above; omitting it keeps the original
+  // whole-booking behavior (still used by the initial "Send Invites" step,
+  // where there's no single person to target yet).
+  const targetParticipantId = body.participantId || null;
+  const signersToEmail = targetParticipantId
+    ? (result.signers || []).filter((s) => s.participantId === targetParticipantId)
+    : (result.signers || []);
+
   const emailed = await Promise.all(
-    (result.signers || []).map(async (signer) => {
+    signersToEmail.map(async (signer) => {
       if (!signer.email) {
         return { ...signer, emailStatus: 'skipped_no_email' };
       }

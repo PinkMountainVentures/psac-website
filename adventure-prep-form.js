@@ -3257,10 +3257,24 @@
             '<div class="ap-wv-chevron">&rsaquo;</div>' +
             '</div>';
         }
+        // NEW (Airey's direct request, 2026-09-03): a readonly row for
+        // someone who hasn't signed yet -- any non-owner adult, or a
+        // non-attending assigned guardian -- gets its own "Resend waiver
+        // invite" action (s.canRemind is already exactly this: not done,
+        // not the owner, already has a live invite on file, has an
+        // email to send it to -- see waiverSigners()'s own header
+        // comment). A minor's row never gets one: either it's guardianed
+        // by the booker themself (tappable above, signed in-app, no
+        // email involved) or it's guardianed by someone else, in which
+        // case the GUARDIAN's own row -- not the child's -- is what
+        // shows the resend action.
         return '<div class="ap-wv-row readonly">' +
           '<div class="ap-wv-avatar">' + escapeHtml(initialsOf(s.name)) + '</div>' +
           '<div class="ap-wv-mid"><div class="ap-wv-name">' + escapeHtml(s.name) + '</div>' +
-          (s.subLabel ? '<div class="ap-wv-sub">' + escapeHtml(s.subLabel) + '</div>' : '') + '</div>' +
+          (s.subLabel ? '<div class="ap-wv-sub">' + escapeHtml(s.subLabel) + '</div>' : '') +
+          (s.canRemind ? '<button type="button" class="ap-waiver-remind-btn" data-resend-participant-id="' + escapeHtml(s.participantId) + '">Resend waiver invite</button>' +
+            '<div class="ap-helper" data-resend-status-for="' + escapeHtml(s.participantId) + '" style="margin-top:0.15rem;"></div>' : '') +
+          '</div>' +
           '<div class="ap-wv-status ' + statusCls + '">' + statusLabel + '</div>' +
           '</div>';
       }).join('');
@@ -3280,6 +3294,28 @@
       if (selfRow) selfRow.addEventListener('click', renderSign);
       Array.prototype.forEach.call(contentEl.querySelectorAll('[data-wv-minor-id]'), function (row) {
         row.addEventListener('click', renderSign);
+      });
+      // NEW (per-row "Resend waiver invite," 2026-09-03): fires a
+      // single-recipient resend (api/adventure-prep.js's sendSignerLinks
+      // now takes an optional participantId, see that file's own comment)
+      // rather than the whole-booking resend the same action used to
+      // always do -- so clicking this on one person's row only emails
+      // that person, not everyone still missing a signature.
+      Array.prototype.forEach.call(contentEl.querySelectorAll('[data-resend-participant-id]'), function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var participantId = btn.getAttribute('data-resend-participant-id');
+          var statusEl = contentEl.querySelector('[data-resend-status-for="' + participantId + '"]');
+          btn.disabled = true;
+          apiPost('/api/adventure-prep', {
+            action: 'sendSignerLinks',
+            token: TOKEN,
+            participantId: participantId,
+          }).then(function (res) {
+            if (statusEl) statusEl.textContent = res.ok ? 'Invite resent.' : 'Something went wrong, try again.';
+            btn.disabled = false;
+          });
+        });
       });
     }
 
@@ -3602,6 +3638,13 @@
   // email template this codebase has; a dedicated "reminder" template
   // (different subject/copy from the first invite) is a reasonable
   // follow-up but not required for the reminder to actually function.
+  //
+  // UPDATED (per-row "Resend waiver invite" on the Waivers screen itself,
+  // 2026-09-03): this button used to be a "resend to everyone" action
+  // wearing one person's name (sendSignerLinks re-emailed the whole
+  // group every time, with copy here honestly saying so) -- it now
+  // passes this person's participantId and only reaches them, matching
+  // the equivalent action added to renderWaiver()'s own list screen.
   // ---------------------------------------------------------------------
 
   function renderWaiverDetail() {
@@ -3638,15 +3681,14 @@
     wrap.querySelector('#ap-back-to-summary').addEventListener('click', goBack);
     wrap.querySelector('#ap-back-to-summary-2').addEventListener('click', goBack);
 
-    // BUG FIX (Task 15): sendSignerLinks no longer accepts a `signers`
-    // subset (lib/waiver-service.js's sendSignerLinksForBooking derives
-    // and re-sends to EVERY eligible signer every time it's called — see
-    // this file's header comment for the flagged behavior change from the
-    // old single-recipient resend). This button still triggers the same
-    // real call this build already makes elsewhere (renderInvite's own
-    // "Send/Resend Invites"), just with honest copy about what it
-    // actually does now, rather than a `signers` payload the server
-    // ignores.
+    // UPDATED (per-row "Resend waiver invite," 2026-09-03):
+    // api/adventure-prep.js's sendSignerLinks now takes an optional
+    // participantId that narrows the actual email send to just that one
+    // signer (the DB bookkeeping in sendSignerLinksForBooking still runs
+    // for the whole booking either way -- that part was always meant to
+    // be unconditional, see that function's own header comment). Passing
+    // it here means this button really does just remind the one person
+    // named on it, instead of quietly re-emailing everyone else too.
     Array.prototype.forEach.call(wrap.querySelectorAll('.ap-waiver-remind-btn'), function (btn) {
       btn.addEventListener('click', function () {
         var participantId = btn.getAttribute('data-participant-id');
@@ -3655,9 +3697,10 @@
         apiPost('/api/adventure-prep', {
           action: 'sendSignerLinks',
           token: TOKEN,
+          participantId: participantId,
         }).then(function (res) {
           wrap.querySelector('#ap-remind-status').textContent = res.ok
-            ? 'Reminder emails resent to everyone who hasn\'t signed yet (including ' + (person ? person.name : 'this person') + ').'
+            ? 'Reminder sent to ' + (person ? person.name : 'this person') + '.'
             : 'Something went wrong sending that reminder, try again.';
           btn.disabled = false;
         });
