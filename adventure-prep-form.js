@@ -594,9 +594,21 @@
     // ever worked on an array by accident (Array.prototype.toString()
     // happens to comma-join). Handled explicitly here instead of relying
     // on that coincidence.
-    state.bestForAttributes = Array.isArray(ap.bestForAttributes)
+    var rawBestForAttributes = Array.isArray(ap.bestForAttributes)
       ? ap.bestForAttributes
       : (ap.bestForAttributes ? String(ap.bestForAttributes).split(',').map(function (s) { return s.trim(); }).filter(Boolean) : []);
+    // BUG FIX (Sept 2026): a stored value that no longer matches one of
+    // BEST_FOR_ATTRIBUTES_OPTIONS exactly (stale copy, manual DB edit,
+    // whatever) used to pass straight through into state.bestForAttributes.
+    // It never rendered as a checked chip (the render loop matches against
+    // the live options list), but it still counted toward "X of 3 selected"
+    // and toward the length<3 gate in the click handler -- so the guest saw
+    // only 2 chips checked yet was blocked from picking a 3rd. Filtering to
+    // known options here keeps the displayed count and the actual
+    // selectable slots in sync.
+    state.bestForAttributes = rawBestForAttributes.filter(function (v) {
+      return BEST_FOR_ATTRIBUTES_OPTIONS.indexOf(v) !== -1;
+    });
     state.technicalComfort = ap.technicalComfort || null;
     state.heatComfort = ap.heatComfort || null;
     state.propertyType = ap.propertyType || null;
