@@ -319,7 +319,7 @@ module.exports = async function handler(req, res) {
           to: ctx.contactEmail,
           subject: 'An update on your gear deposit',
           html: renderDepositCaptureExceedingHoldEmail({
-            logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+            logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
             item: itemsLabel,
             additionalAmount: centsToDollarsStr(requestedAmountCents),
             // ctx.reconciledAmountCents is the amount already captured from
@@ -399,7 +399,7 @@ module.exports = async function handler(req, res) {
             to: ctxInner.contactEmail,
             subject: "We couldn't process your gear deposit charge",
             html: renderGearShortfallChargeFailedEmail({
-              logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+              logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
               item: fItemsLabel, conditionNote: fConditionNote,
               holdAmount: centsToDollarsStr(ctxInner.reconciledAmountCents || 0),
               amount: centsToDollarsStr(amountCents),

@@ -444,7 +444,7 @@ async function writeBackAndNotify({ ctx, depositStatus, reconciledAmountCents, h
   }
 
   try {
-    const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || '';
+    const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png';
     if (depositStatus === 'released') {
       await sendEmail({ to: ctx.contactEmail, subject: 'Your gear deposit has been released', html: renderDepositFullReleaseEmail({ logoUrl, holdAmount: centsToDollarsStr(holdCents) }) });
     } else if (depositStatus === 'partial_capture') {

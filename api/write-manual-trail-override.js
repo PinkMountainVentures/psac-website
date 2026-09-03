@@ -129,7 +129,7 @@ module.exports = async function handler(req, res) {
     if (!body.skipGuestEmail && applyResult.contactEmail) {
       const tripT3DateStr = body.tripDate ? addDaysToDateString(body.tripDate, -3) : null;
       const html = renderTrailSwapResolutionEmail({
-        logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+        logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
         guestName: applyResult.contactName,
         newTrailName: body.newTrailName || newTrailId,
         overviewBlurb: body.overviewBlurb || '',

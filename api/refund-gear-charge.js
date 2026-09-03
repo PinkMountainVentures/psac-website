@@ -224,7 +224,7 @@ module.exports = async function handler(req, res) {
           to: ctx.contactEmail,
           subject: 'A refund related to your gear deposit',
           html: renderGearRefundConfirmationEmail({
-            logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+            logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
             guestName: ctx.contactName || '',
             amount: centsToDollarsStr(refundAmountCents),
           }),

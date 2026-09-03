@@ -176,7 +176,7 @@ module.exports = async function handler(req, res) {
 
       try {
         const html = renderDepositHoldHeadsUpEmail({
-          logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+          logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
           depositAmount,
           kitCount,
         });

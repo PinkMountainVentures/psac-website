@@ -302,7 +302,7 @@ async function sendSignerLinks(body, res) {
   }
 
   const tripDateDisplay = formatTripDate(result.tripDate);
-  const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || '';
+  const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png';
 
   // NEW (per-row "Resend waiver invite," 2026-09-03): sendSignerLinksForBooking
   // above always upserts/refreshes a waiver_signatures row (and a live

@@ -396,7 +396,7 @@ module.exports = async function handler(req, res) {
           to: ctx.contactEmail,
           subject: 'Your Palm Springs Adventure Club reservation has been cancelled',
           html: renderCancellationEmail({
-            logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+            logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
             guestName: ctx.contactName || '',
             reasons,
             refundAmount,

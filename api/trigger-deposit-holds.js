@@ -141,7 +141,7 @@ async function processOneBooking(booking, now) {
     // adventurePrepToken (same low-stakes guest-auth pattern as Surface A)
     // rather than minting a new token type.
     const html = renderDepositHoldFailedEmail({
-      logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+      logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
       guestName: booking.contactName,
       tripDateFormatted: formatTripDate(booking.tripDate),
       deadlineTimeFormatted: formatDeadlineTime(now),

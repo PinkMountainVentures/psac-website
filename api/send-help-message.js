@@ -242,7 +242,7 @@ module.exports = async function handler(req, res) {
 
     const guestNameSafe = ctx.guestName || 'A guest';
     const html = renderAdventurePrepQuestionEmail({
-      logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || '',
+      logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
       guestName: ctx.guestName,
       guestEmail: ctx.guestEmail,
       bookingId: ctx.bookingId,

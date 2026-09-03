@@ -130,7 +130,7 @@ async function processOneBooking(bookingSummary, now) {
 
   const tripDateFormatted = formatTripDate(ctx.tripDate);
   const adventurePrepLink = adventurePrepLinkFor(ctx.adventurePrepToken);
-  const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || '';
+  const logoUrl = process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png';
 
   // BUG FIX (independent bug pass, Aug 2026): every stage block used to call
   // sendEmail(...) and only THEN record the stage sent. This cron is
