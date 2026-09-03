@@ -382,6 +382,40 @@
   // Boot
   // ---------------------------------------------------------------------
 
+  // NEW (Airey's nav-experience discussion, 2026-09-03): Adventure Prep
+  // has no per-screen URL routing at all -- state.step just swaps
+  // in-memory and re-renders against one single URL -- so the browser
+  // back button (and iOS's edge-swipe-back gesture) never had anything
+  // of ours to step back through. The very first back press just left
+  // the app entirely, to whatever page preceded this one (usually an
+  // email link), silently discarding whatever screen the guest was on.
+  // Real step-by-step routing (a URL/history entry per screen) would fix
+  // this completely but is a much bigger, riskier lift across the many
+  // `state.step = '...'; render();` call sites in this file. This is the
+  // agreed middle ground instead: one extra history entry pushed on top
+  // of the page's real one, so a back press always lands on THIS
+  // document first rather than skipping straight past it. From there, a
+  // back press while on any screen other than the hub re-arms the guard
+  // and returns to the hub instead of leaving -- one press never dumps
+  // you out mid-task. A back press from the hub itself is let through
+  // untouched (nothing re-armed), so leaving is still one deliberate
+  // press away, not permanently blocked.
+  //
+  // Deliberately armed only after a successful boot into an active
+  // booking, from inside boot()'s own success path below -- the "link
+  // isn't quite right" and cancelled-booking screens are dead ends on
+  // purpose, so back should behave completely normally there.
+  function armBackButtonGuard() {
+    history.pushState({ apGuard: true }, '', location.href);
+    window.addEventListener('popstate', function () {
+      if (state.step !== 'hub') {
+        history.pushState({ apGuard: true }, '', location.href);
+        state.step = 'hub';
+        render();
+      }
+    });
+  }
+
   function boot() {
     if (!TOKEN) {
       renderMessage('This link isn’t quite right', 'We couldn’t find an adventure to set up here. If you followed a link from your confirmation email, try copying and pasting the full address, or reply to that email and we’ll send you a fresh one.');
@@ -401,6 +435,7 @@
       hydrateWorkingStateFromCtx();
       state.step = 'hub';
       render();
+      armBackButtonGuard();
     });
   }
 

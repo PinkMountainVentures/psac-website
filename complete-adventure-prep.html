@@ -10,9 +10,19 @@
 </head>
 <body>
 
+<!-- BUG FIX (Airey's nav-experience discussion, 2026-09-03): the logo used
+     to be a plain <a href="/"> straight out of this in-progress flow --
+     a single mis-tap did a full page navigation to the marketing
+     homepage and silently threw away everything in the in-memory
+     Adventure Prep state (this app has no URL-per-screen routing, see
+     adventure-prep-form.js's own new history.js comment below). Adventure
+     Prep is a focused, one-purpose task, not a browsing session, so the
+     logo is now a static, non-navigating mark here rather than an exit --
+     same visual treatment (.ap-logo's own CSS doesn't rely on being an
+     <a>), just nothing to accidentally tap. -->
 <header class="ap-header">
   <div class="container">
-    <a href="/" class="ap-logo"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></a>
+    <div class="ap-logo"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></div>
     <button type="button" id="ap-help-btn" class="ap-help-btn">Questions?</button>
   </div>
 </header>
