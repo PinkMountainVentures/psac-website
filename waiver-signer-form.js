@@ -269,7 +269,7 @@
   }
   function compareCardHtml(candidate) {
     var desc = summarize(candidate.overviewCopy, 250) || ((candidate.matchedAttributes || []).length
-      ? 'Matches what you told us: ' + candidate.matchedAttributes.join(', ') + '.'
+      ? 'What you told us you wanted: ' + candidate.matchedAttributes.join(', ') + '.'
       : 'A safe, solid fit for your group.');
     return '<div class="ap-compare-card">' +
       '<div class="ap-compare-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '></div>' +
@@ -309,7 +309,7 @@
     }
 
     var waiverSub = status.waiverDone
-      ? (status.guardianForChildren.length ? 'Signed — includes ' + status.guardianForChildren.join(', ') : 'Signed')
+      ? (status.guardianForChildren.length ? 'Signed, includes ' + status.guardianForChildren.join(', ') : 'Signed')
       : 'Needs your signature';
 
     var tiles = [
@@ -355,12 +355,24 @@
     var trailSectionHtml = !status.trailAssigned || !status.trailDetail ? '' :
       '<div class="ap-trail-section-wide">' + compareCardHtml(status.trailDetail) + '</div>';
 
+    var hubGuardianMinors = (state.ctx.minors || []).filter(function (m) { return m.preAssignedToThisSigner; });
+    var hubIsGuardian = hubGuardianMinors.length > 0;
+    var hubChildNames = hubGuardianMinors.map(function (m) { return m.name; }).filter(Boolean);
+    var hubChildLabel = hubChildNames.length ? escapeHtml(hubChildNames.join(', ')) : 'them';
+    var hubGreeting = hubIsGuardian
+      ? 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' invited you and ' + hubChildLabel + ' along on their adventure day.'
+      : 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' invited you along on their adventure day.';
+    var hubSubline = hubIsGuardian
+      ? 'A few things need your attention before the trail day arrives, most of them take a minute, plus confirming you’re ' + hubChildLabel + '’s guardian for the day.'
+      : 'A few things need your attention before the trail day arrives, and most of them take a minute.';
+    var hubIntroText = (hubIsGuardian ? 'You both get placed' : 'You get placed') +
+      ' on a trail that fits the group, not a generic route, with gear at your door the night before you go. ' + escapeHtml(ownerName) + ' picked Palm Springs Adventure Club because it’s the easiest way to have a great adventure on the trails around Palm Springs.';
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-eyebrow">You’re Invited</div>' +
-      '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + ', you’ve been added to an adventure.</div>' +
-      '<div class="ap-subline">Complete the following steps to officially join the adventure.</div>' +
-      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + escapeHtml(ownerName) + '’s heading out with Palm Springs Adventure Club on ' + escapeHtml(tripDate) + ' and added you to the adventure. Palm Springs Adventure Club is a personalized trail experience and gear rental service that unlocks experiences on the trails, canyons, and ridgelines surrounding Palm Springs. We need a few things from you before your adventure.</div></div>' +
+      '<div class="ap-eyebrow">You’re In</div>' +
+      '<div class="ap-greeting">' + hubGreeting + '</div>' +
+      '<div class="ap-subline">' + hubSubline + '</div>' +
+      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>' +
       trailSectionHtml +
       '<div class="ap-tiles-label">Get ready</div>' +
       '<div class="ap-tiles" id="sb-hub-tiles">' + tilesHtml + '</div>' +
@@ -499,8 +511,8 @@
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-back-link" id="sb-back" style="cursor:pointer;">&larr; Back to Your Adventure</div>' +
       '<div class="ap-eyebrow">Your Gear</div>' +
-      '<div class="ap-q-title">Your gear kit is ready.</div>' +
-      '<div class="ap-q-help">Your gear will be delivered the night before your adventure at the address provided by the adventure organizer.</div>' +
+      '<div class="ap-q-title">Your kit’s on its way.</div>' +
+      '<div class="ap-q-help">It’ll be delivered the night before your adventure, to the address ' + escapeHtml(state.ctx.ownerName || 'your trip organizer') + ' provided. It’s yours for the day, packed and ready when you are.</div>' +
       '<div class="ap-card">' +
       '<div class="ap-section-label" style="margin-top:0;">Rental Gear</div>' +
       RENTAL_GEAR_ITEMS.map(function (item) { return '<div class="sb-gear-item">' + escapeHtml(item) + '</div>'; }).join('') +
@@ -688,11 +700,11 @@
         var checklistEl = contentEl.querySelector('#sb-guardian-checklist');
         if (isGuardian !== true || !minors.length) { checklistEl.innerHTML = ''; return; }
         checklistEl.innerHTML =
-          '<div class="sb-additive">Since a child is joining too, we build the day around who’s actually on the trail.</div>' +
+          '<div class="sb-additive">Since a child is joining too, we build the day around who’s actually on the trail, pace and supervision included, not a one-size adventure.</div>' +
           minors.map(function (m) {
             var name = m.name || 'this child';
             var age = AGE_BUCKET_LABELS[m.ageBucket] || '';
-            var alreadyNote = m.alreadyVerified ? '<div class="ap-helper" style="margin:0.1rem 0 0.4rem;">A guardian has already confirmed this — checking again just adds your own confirmation too.</div>' : '';
+            var alreadyNote = m.alreadyVerified ? '<div class="ap-helper" style="margin:0.1rem 0 0.4rem;">A guardian has already confirmed this. Checking again just adds your own confirmation too.</div>' : '';
             return '<div class="ap-toggle-row" data-guardian-participant-id="' + escapeHtml(m.participantId) + '" style="cursor:pointer;">' +
               '<div class="ap-toggle-row-text" style="font-weight:500; font-size:0.78rem;">I am the parent or legal guardian of ' + escapeHtml(name) + ' (' + escapeHtml(age) + '), or have their parent or guardian’s authorization, and I am signing on their behalf' + alreadyNote + '</div>' +
               '<div class="ap-switch' + (state.guardianForChildrenParticipantIds.indexOf(m.participantId) !== -1 ? ' on' : '') + '"></div>' +
@@ -787,11 +799,24 @@
       var ecLine = state.ecName || state.ecPhone
         ? escapeHtml([state.ecName, state.ecPhone].filter(Boolean).join(' \u00b7 '))
         : 'Not provided';
+      var guardianForChildrenParticipantIds = (state.ctx.signer && state.ctx.signer.guardianForChildrenParticipantIds) || [];
+      var confirmMinorsById = {};
+      (state.ctx.minors || []).forEach(function (m) { confirmMinorsById[m.participantId] = m; });
+      var confirmChildNames = guardianForChildrenParticipantIds
+        .map(function (pid) { return confirmMinorsById[pid] ? confirmMinorsById[pid].name : null; })
+        .filter(Boolean);
+      var isGuardianConfirmation = confirmChildNames.length > 0;
+      var confirmTitle = isGuardianConfirmation
+        ? escapeHtml(confirmChildNames.join(', ')) + ' is going to have a great adventure!'
+        : 'You\u2019re in. ' + escapeHtml(state.ctx.ownerName || 'Your trip organizer') + '\u2019s going to be glad to have you out there.';
+      var confirmBody = isGuardianConfirmation
+        ? 'This confirms your authorization and emergency contact are on file.'
+        : 'This confirms your waiver and emergency contact are on file. Nothing else needed from you here.';
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Your Waiver</div>' +
-        '<div class="ap-recap-title">Your waiver is complete.</div>' +
-        '<div class="ap-recap-body">This is confirmation of your waiver signature and emergency contact.</div>' +
+        '<div class="ap-recap-title">' + confirmTitle + '</div>' +
+        '<div class="ap-recap-body">' + confirmBody + '</div>' +
         '<div class="ap-recap-card">' +
         '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
         '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +

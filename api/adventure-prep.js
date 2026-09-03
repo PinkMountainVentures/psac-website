@@ -333,6 +333,12 @@ async function sendSignerLinks(body, res) {
         ownerName: result.ownerName,
         tripDateDisplay,
         signerUrl,
+        // NEW (copy pass, 2026-09-03): the attending-guardian variant (3.3's
+        // case, distinct from signer.isGuardianOnly's Part 5 case) --
+        // sendSignerLinksForBooking now resolves this the same way
+        // getSignerContext already does for the hub.
+        isAttendingGuardian: signer.isAttendingGuardian,
+        guardianForChildNames: signer.guardianForChildNames,
       });
       const sendResult = await sendEmail({
         to: signer.email,

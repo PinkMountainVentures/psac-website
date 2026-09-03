@@ -1188,7 +1188,7 @@
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-eyebrow">Your Adventure</div>' +
-      '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + ', your trail day is ' + formatTripDate(eb.date) + '.</div>' +
+      '<div class="ap-greeting">Hi ' + escapeHtml(firstName) + '. You could have spent ' + formatTripDate(eb.date) + ' by the pool. You picked the trail instead. Here’s everything left before you’re on it.</div>' +
       '<div class="ap-subline"></div>' +
       alertHtml +
       trailSectionHtml +
@@ -1282,7 +1282,7 @@
       attendeesFlowTopHtml(0, 'ap-flow-back', '&larr; Adventure Home', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Confirm your group</h1>' +
-      '<p class="ap-sub">Make sure everyone’s name, age, and fitness level are right before we reach out to your group.</p>' +
+      '<p class="ap-sub">Make sure everyone’s name, age, and fitness level are right to ensure we place your group on the right trail.</p>' +
       '<div class="ap-card">' +
       '<div class="paf-roster" style="border-top:none; padding-top:0; margin-top:0;">' +
       '<div class="paf-roster-sub">Your group</div>' +
@@ -1512,7 +1512,7 @@
       attendeesFlowTopHtml(contactStepIndex, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Add an email for each adult participating in the adventure</h1>' +
-      '<p class="ap-sub">Enter a valid email address for each adult so they can sign a waiver and receive an invite to the adventure.</p>' +
+      '<p class="ap-sub">Enter a valid email for each adult joining you, that’s how we get each of them their own waiver and their own invite.</p>' +
       '<div class="ap-card">' +
       '<div id="ap-contact-rows">' + signers.map(function (p) {
         var meta = [p.age, p.fitness].filter(Boolean).join(' · ');
@@ -1669,7 +1669,7 @@
       attendeesFlowTopHtml(2, 'ap-flow-back', '&larr; Back', attendeesTotalSteps()) +
       '<div class="ap-eyebrow">Attendees</div>' +
       '<h1 class="ap-q">Who is ' + escapeHtml(minor.name || 'their') + '&rsquo;s legal parent or guardian?</h1>' +
-      '<p class="ap-sub">' + escapeHtml(minor.name || 'This person') + ' will need a legal parent or guardian to sign their waiver in a following step.</p>' +
+      '<p class="ap-sub">' + escapeHtml(minor.name || 'This person') + ' needs a parent or guardian on record for their adventure, so every child on the trail has a real adult accountable for them, not just a name on a roster. You’ll confirm the details together in a later step.</p>' +
       '<div class="ap-card">' +
       '<div class="paf-options" id="ap-guardian-opts">' +
       adults.map(function (a) {
@@ -2102,7 +2102,7 @@
         flowTop('&larr; Back') +
         '<div class="ap-eyebrow">Trail Recommendation</div>' +
         '<div class="ap-q-title">How technical can the trail be for your group?</div>' +
-        '<div class="ap-q-help">This helps us match your group’s technical abilities to the trail.</div>' +
+        '<div class="ap-q-help">This helps us place your group on a trail that fits their technical comfort.</div>' +
         '<div class="ap-q-note"><span>&#9432;</span> Most trails have some large rocks and step-ups.</div>' +
         '<div class="ap-radio-list" id="ap-technical"></div>' +
         '<div id="ap-pref-error" class="ap-error"></div>' +
@@ -2135,7 +2135,7 @@
       flowTop('&larr; Back') +
       '<div class="ap-eyebrow">Trail Recommendation</div>' +
       '<div class="ap-q-title">How much sun is acceptable for your group?</div>' +
-      '<div class="ap-q-help">This helps us select a trail matched to the amount of sun exposure that’s okay for your group.</div>' +
+      '<div class="ap-q-help">This helps us place your group on a trail with the right amount of sun for them.</div>' +
       '<div class="ap-q-note"><span>&#9432;</span> Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.</div>' +
       '<div class="ap-radio-list" id="ap-heat"></div>' +
       '<div id="ap-pref-error" class="ap-error"></div>' +
@@ -2238,7 +2238,7 @@
   // component just for the consistent name/stats/summary presentation.
   function compareCardHtml(candidate, badge, ctaLabel, ctaDisabled) {
     var desc = summarize(candidate.overviewCopy, 250) || ((candidate.matchedAttributes || []).length
-      ? 'Matches what you told us: ' + candidate.matchedAttributes.join(', ') + '.'
+      ? 'What you told us you wanted: ' + candidate.matchedAttributes.join(', ') + '.'
       : 'A safe, solid fit for your group.');
     return '<div class="ap-compare-card">' +
       '<div class="ap-compare-photo"' + (candidate.photoUrl ? ' style="background-image:url(\'' + candidate.photoUrl + '\'); background-size:cover; background-position:center;"' : '') + '>' +
@@ -2313,7 +2313,7 @@
           '<div class="ap-eyebrow">Trail Recommendation</div>' +
           '<div class="ap-q-title" style="margin-bottom:1rem;">Want to change something?</div>' +
           '<div class="ap-radio-list" id="ap-review-modify-options">' +
-          '<div class="ap-radio' + (choice === 'redo' ? ' selected' : '') + '" data-val="redo"><div class="ap-radio-dot"></div><div class="ap-radio-text">Answer the questions differently<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Redo the 3 preference questions and get a new match</span></div></div>' +
+          '<div class="ap-radio' + (choice === 'redo' ? ' selected' : '') + '" data-val="redo"><div class="ap-radio-dot"></div><div class="ap-radio-text">Answer the questions differently<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Redo the 3 preference questions and see what fits better</span></div></div>' +
           '<div class="ap-radio' + (choice === 'ask_team' ? ' selected' : '') + '" data-val="ask_team"><div class="ap-radio-dot"></div><div class="ap-radio-text">Tell us more about what you’re looking for<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Give our team a few more details to work with</span></div></div>' +
           '</div>' +
           '<button type="button" class="ap-cta-primary" id="ap-review-modify-continue">Continue</button>' +
@@ -2479,7 +2479,7 @@
           '<div style="margin-bottom:1.4rem;">' + compareCardHtml(current, { text: 'Currently Set', cls: 'badge-current' }, null, false) + '</div>' +
           '<div class="ap-radio-list" id="ap-change-options">' +
           '<div class="ap-radio' + (choice === 'different' ? ' selected' : '') + '" data-val="different"><div class="ap-radio-dot"></div><div class="ap-radio-text">Choose a different trail<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Pick from the other trails that already fit your group</span></div></div>' +
-          '<div class="ap-radio' + (choice === 'redo' ? ' selected' : '') + '" data-val="redo"><div class="ap-radio-dot"></div><div class="ap-radio-text">Answer the questions differently<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Redo the 3 preference questions and get a new match</span></div></div>' +
+          '<div class="ap-radio' + (choice === 'redo' ? ' selected' : '') + '" data-val="redo"><div class="ap-radio-dot"></div><div class="ap-radio-text">Answer the questions differently<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">Redo the 3 preference questions and see what fits better</span></div></div>' +
           '<div class="ap-radio' + (choice === 'ask_team' ? ' selected' : '') + '" data-val="ask_team"><div class="ap-radio-dot"></div><div class="ap-radio-text">Ask our team to pick for you<br><span style="font-weight:400; color:var(--ap-muted); font-size:0.72rem;">We’ll recommend something else personally before your trail day</span></div></div>' +
           '</div>' +
           '<button type="button" class="ap-cta-primary" id="ap-change-continue">Continue</button>' +
@@ -2885,7 +2885,7 @@
         flowTopHtml('&larr; Back') +
         '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
         '<div class="ap-q-title">Where should your gear get delivered?</div>' +
-        '<div class="ap-q-help">Your gear kit will be delivered the evening before your trail day.</div>' +
+        '<div class="ap-q-help">Your gear kit will be delivered the evening before your trail day, so it’s waiting for you, not something you have to think about on trail-day morning.</div>' +
         '<div class="ap-card">' +
         '<div class="ap-field-label">Where are you staying?</div>' +
         '<div class="ap-choice-pills" id="ap-property"></div>' +
@@ -3173,7 +3173,7 @@
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
-        '<div class="ap-recap-title">Your gear is now ready to go.</div>' +
+        '<div class="ap-recap-title">Your gear is on its way to being ready.</div>' +
         '<div class="ap-recap-body">You will be able to make changes to gear kits and delivery/pickup instructions until 10:00pm Pacific 3 days before your adventure day.</div>' +
         '<div class="ap-recap-card">' +
         '<div class="ap-recap-section">' +
@@ -3573,11 +3573,14 @@
       // confirmation, and already called out on the Gear Kits screen and
       // the Adventure Home hub (see this file's own other two
       // ap-deposit-note instances).
+      var bookerConfirmStatus = computeHubStatus();
+      var bookerConfirmBody = 'This confirms your waiver and emergency contact are on file.' +
+        (bookerConfirmStatus.waiversDone ? '' : ' Once the rest of your group signs, you\u2019re fully clear for gear delivery.');
       contentEl.innerHTML =
         flowTopHtml('&larr; Adventure Home') +
         '<div class="ap-eyebrow">Waivers</div>' +
-        '<div class="ap-recap-title">Your waiver is complete.</div>' +
-        '<div class="ap-recap-body">This is confirmation of your waiver signature and emergency contact.</div>' +
+        '<div class="ap-recap-title">Signed. One more thing off your list before the trail.</div>' +
+        '<div class="ap-recap-body">' + bookerConfirmBody + '</div>' +
         '<div class="ap-recap-card">' +
         '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
         '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +
