@@ -1373,7 +1373,7 @@
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
     var wrap = h(
-      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="container' + (status.allSet ? ' ap-hero-wide' : '') + '"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
       alertHtml +
       trailSectionHtml +
