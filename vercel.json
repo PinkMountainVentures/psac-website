@@ -37,6 +37,10 @@
     {
       "path": "/api/sync-kit-subscribers",
       "schedule": "20 */4 * * *"
+    },
+    {
+      "path": "/api/send-gear-out-for-delivery",
+      "schedule": "5,20,35,50 * * * *"
     }
   ],
   "redirects": [

@@ -324,6 +324,11 @@ CREATE TABLE IF NOT EXISTS experience_bookings (
   delivery_time_slot         TEXT,
   delivery_scheduled_at      TIMESTAMPTZ,
   delivery_ready_at          TIMESTAMPTZ,
+  -- NEW (2026-09-05): dedup markers for the two gear-delivery-card-
+  -- triggered guest emails ("out for delivery", "delivered") -- see
+  -- db/2026-09-05_add_gear_delivery_email_dedup.sql's own comment.
+  gear_out_for_delivery_sent_at TIMESTAMPTZ,
+  gear_delivered_email_sent_at  TIMESTAMPTZ,
   return_status              TEXT,
   pickup_service_type        TEXT,
   pickup_scheduled_at        TIMESTAMPTZ,
