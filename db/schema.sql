@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS trails (
   cell_coverage           TEXT,
   emergency_egress_notes  TEXT,
   nearest_neighborhood    TEXT,
+  nearest_town            TEXT,
   drive_time_from_downtown_ps TEXT,
   entry_fee_required      BOOLEAN,
   guided_eligible         BOOLEAN

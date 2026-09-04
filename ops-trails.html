@@ -204,6 +204,7 @@
           <div class="ops-form-row"><label>Parking notes</label><textarea class="ops-textarea" id="f-parkingNotes"></textarea></div>
           <div class="ops-form-grid">
             <div class="ops-form-row"><label>Nearest neighborhood</label><input class="ops-input" id="f-nearestNeighborhood"></div>
+            <div class="ops-form-row"><label>Nearest town (weather lookup)</label><select class="ops-input" id="f-nearestTown"><option value="">--</option><option value="Palm Springs">Palm Springs</option><option value="Cathedral City">Cathedral City</option><option value="Rancho Mirage">Rancho Mirage</option><option value="Palm Desert">Palm Desert</option><option value="Indian Wells">Indian Wells</option><option value="La Quinta">La Quinta</option><option value="Indio">Indio</option><option value="Coachella">Coachella</option><option value="Desert Hot Springs">Desert Hot Springs</option><option value="Thousand Palms">Thousand Palms</option></select></div>
             <div class="ops-form-row"><label>Drive time from downtown PS</label><input class="ops-input" id="f-driveTimeFromDowntownPs" placeholder="15 min"></div>
           </div>
           <div class="check-row"><input type="checkbox" id="f-entryFeeRequired"><label style="margin:0; text-transform:none; font-weight:600;" for="f-entryFeeRequired">Entry fee required</label></div>
@@ -316,7 +317,7 @@
   var BOOL_FIELDS = ['bookable', 'desertRidersTrail', 'entryFeeRequired', 'guidedEligible', 'kidFriendly', 'goodForBeginners', 'goodForAthletes'];
   var ARRAY_CHIP_FIELDS = { optimalSeason: MONTHS, viableSeason: MONTHS, avoidSeason: MONTHS, bestForAttributes: BEST_FOR_ATTRIBUTES_OPTIONS };
   var TEXT_FIELDS = [
-    'trailName', 'alternateNames', 'area', 'trailheadName', 'trailheadGps', 'parkingNotes', 'nearestNeighborhood',
+    'trailName', 'alternateNames', 'area', 'trailheadName', 'trailheadGps', 'parkingNotes', 'nearestNeighborhood', 'nearestTown',
     'driveTimeFromDowntownPs', 'distanceMi', 'elevationGainFt', 'highestPointFt', 'estTimeEasyPace', 'estTimeStrongPace',
     'difficulty', 'technicalRating', 'routeType', 'activityType', 'minAgeRec', 'dogFriendly', 'openingDescription',
     'whatMakesItSpecial', 'trailDayTip', 'heatConsiderations', 'waterSourcesOnTrail', 'knownHazards', 'cellCoverage',
