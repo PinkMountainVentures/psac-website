@@ -176,6 +176,59 @@
 .ap-trail-download-btn { background: var(--desert-green); color: white; border: none; padding: 0.65rem 1.2rem; border-radius: 20px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
 .ap-trail-download-btn:hover { background: #63a677; }
 
+/* Weather glance card (T-3 hub refresh, 2026-09-04) -- renders only when
+   real forecast data is passed in; there is no weather API wired up yet
+   (tracked separately on the build checklist), so the renderer that
+   builds this markup returns '' until that data actually exists. Built
+   now so the layout/tokens are settled ahead of that integration. */
+.ap-weather-card { display: flex; align-items: center; gap: 0.9rem; background: linear-gradient(120deg, rgba(111,168,201,0.12), rgba(111,168,201,0.04)); border: 1px solid rgba(111,168,201,0.25); border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 1.1rem; max-width: 960px; }
+.ap-weather-icon { width: 40px; height: 40px; flex-shrink: 0; }
+.ap-weather-mid { flex: 1; min-width: 0; }
+.ap-weather-temp { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--dark-pine); line-height: 1.1; }
+.ap-weather-cond { font-size: 0.76rem; color: var(--dark-pine); opacity: 0.75; }
+.ap-weather-note { font-size: 0.68rem; color: var(--ap-muted); margin-top: 0.2rem; font-style: italic; }
+.ap-weather-when { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6FA8C9; text-align: right; flex-shrink: 0; }
+
+/* Guide/RideWithGPS emphasis card (T-3 hub refresh, 2026-09-04) --
+   replaces the old single-line .ap-trail-unlocked treatment once a
+   trail guide is actually unlocked (past T-3); .ap-trail-unlocked and
+   .ap-trail-locked-note stay in the stylesheet for the still-locked
+   state and the guardian_only hub's own smaller usage. */
+.ap-guide-card { background: linear-gradient(135deg, var(--dark-pine) 0%, #1e3535 100%); border-radius: 16px; padding: 1.5rem 1.5rem 1.4rem; margin-bottom: 1.1rem; box-shadow: 0 8px 26px rgba(42,71,71,0.25); max-width: 960px; }
+.ap-guide-eyebrow { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.5rem; }
+.ap-guide-eyebrow svg { flex-shrink: 0; }
+.ap-guide-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.5rem; font-weight: 500; color: var(--sand-beige); line-height: 1.25; margin-bottom: 0.5rem; }
+.ap-guide-body { font-size: 0.78rem; color: var(--sand-beige); opacity: 0.85; line-height: 1.55; margin-bottom: 1.1rem; }
+.ap-guide-cta { display: block; width: 100%; background: var(--desert-green); color: white; border: none; padding: 0.9rem; border-radius: 24px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; text-align: center; cursor: pointer; margin-bottom: 0.55rem; }
+.ap-guide-cta:hover { background: #63a677; }
+.ap-guide-howto { display: block; text-align: center; font-size: 0.72rem; font-weight: 600; color: var(--sand-beige); opacity: 0.8; text-decoration: underline; cursor: pointer; background: none; border: none; width: 100%; padding: 0.2rem; }
+
+/* Collapsible prep accordion (T-3 hub refresh, 2026-09-04) -- collapses
+   the tile list into a single summary row once every tile in it is
+   Done, per Airey's ask that finished prep steps stop competing with
+   trail content for attention. Loads collapsed by default; tap to
+   expand, nothing is removed or hidden permanently. */
+.ap-prep-summary { display: flex; align-items: center; gap: 0.7rem; background: rgba(122,189,145,0.10); border: 1px solid rgba(122,189,145,0.3); border-radius: 12px; padding: 0.85rem 1.05rem; cursor: pointer; user-select: none; max-width: 960px; }
+.ap-prep-summary-check { width: 26px; height: 26px; border-radius: 50%; background: var(--desert-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ap-prep-summary-text { flex: 1; font-size: 0.8rem; font-weight: 600; color: #2a7a4a; }
+.ap-prep-summary-sub { font-size: 0.7rem; color: rgba(42,122,74,0.75); font-weight: 500; margin-top: 0.1rem; }
+.ap-prep-chevron { font-size: 0.7rem; color: #2a7a4a; transition: transform 0.2s ease; flex-shrink: 0; }
+.ap-prep-summary.is-open .ap-prep-chevron { transform: rotate(180deg); }
+.ap-prep-details { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.ap-prep-details.is-open { max-height: 2000px; margin-top: 0.65rem; }
+
+/* RideWithGPS "how does this work" instructional page (T-3 hub refresh,
+   2026-09-04) -- plain numbered steps, deliberately not mocked
+   RideWithGPS screenshots (the actual in-app UI isn't something to
+   fabricate inaccurately here). */
+.rwgps-step { display: flex; gap: 0.9rem; margin-bottom: 1.3rem; }
+.rwgps-step:last-child { margin-bottom: 0; }
+.rwgps-num { width: 32px; height: 32px; border-radius: 50%; background: var(--sand-beige); border: 1.5px solid var(--mountain-pink); color: var(--mountain-pink); font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rwgps-step-title { font-size: 0.86rem; font-weight: 600; color: var(--dark-pine); margin-bottom: 0.25rem; }
+.rwgps-step-body { font-size: 0.78rem; color: var(--ap-muted); line-height: 1.55; }
+.rwgps-callout { display: flex; gap: 0.6rem; align-items: flex-start; background: rgba(245,130,113,0.08); border: 1px solid rgba(245,130,113,0.25); border-radius: 10px; padding: 0.85rem 1rem; margin: 1.3rem 0 0.2rem; font-size: 0.76rem; color: var(--dark-pine); line-height: 1.55; max-width: 720px; }
+.rwgps-back { display: block; text-align: center; font-size: 0.76rem; font-weight: 600; color: var(--dark-pine); opacity: 0.65; margin-top: 1rem; cursor: pointer; text-decoration: none; }
+
 .ap-tiles-label { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ap-muted); margin-bottom: 0.7rem; }
 .ap-tiles { display: flex; flex-direction: column; gap: 0.65rem; max-width: 960px; }
 .ap-tile { display: flex; align-items: center; gap: 0.9rem; background: white; border-radius: 10px; padding: 1rem 1.1rem; box-shadow: 0 1px 3px rgba(42,71,71,0.06); cursor: pointer; }
@@ -460,6 +513,15 @@
 .ap-hero-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(2rem, 4.4vw, 2.6rem); font-weight: 500; color: var(--sand-beige); line-height: 1.24; margin-bottom: 0.7rem; text-shadow: 0 2px 8px rgba(0,0,0,0.35); }
 .ap-hero-subline { font-size: 0.9rem; color: rgba(248,241,233,0.85); text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
 .ap-hero-subline:empty { display: none; }
+
+/* Trail-day countdown badge -- pinned to the hero card's top-right
+   corner (T-3 hub refresh, 2026-09-04). .ap-hero-card is already
+   position:relative via the rule above, so this just needs its own
+   position:absolute -- no .annot-style cascade collision here since that
+   class only ever existed in the design-review mockup, not production. */
+.ap-countdown-badge { position: absolute; top: 20px; right: 20px; z-index: 2; background: var(--mountain-pink); box-shadow: 0 4px 14px rgba(20,35,35,0.35); border-radius: 14px; padding: 0.6rem 0.9rem; text-align: center; }
+.ap-countdown-num { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 700; color: white; line-height: 1; }
+.ap-countdown-lbl { font-size: 0.54rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: white; opacity: 0.92; margin-top: 0.15rem; }
 
 /* lean trail-detail card -- used once the hero card above already
    carries the photo, so the trail card below drops its own photo bar

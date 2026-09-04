@@ -403,6 +403,23 @@
     return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
   }
 
+  // Trail-day countdown badge (T-3 hub refresh, 2026-09-04) -- whole-day
+  // count between Pacific "today" and the trip date, clamped to 0 so a
+  // guest checking in on trail day itself (or after) reads 0 rather than
+  // negative. Same Pacific-vs-UTC care as pacificDateString/
+  // isoOffsetDateStr above -- "how many days until trail day" has to be
+  // measured against the guest's own local calendar date, not UTC's.
+  function daysUntilTrip(dateStr) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    var todayStr = pacificDateString(new Date());
+    var tm = todayStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    var tripUTC = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var todayUTC = Date.UTC(Number(tm[1]), Number(tm[2]) - 1, Number(tm[3]));
+    var diff = Math.round((tripUTC - todayUTC) / 86400000);
+    return diff > 0 ? diff : 0;
+  }
+
   // Small Oxford-style joiner for the "Building momentum" state's "just
   // [X], [Y] and [Z] left" copy below -- no equivalent existed anywhere
   // in this file since nothing previously needed to name a variable-
@@ -651,6 +668,7 @@
       case 'planning': frag = renderPlanning(); break;
       case 'waiver': frag = renderWaiver(); break;
       case 'summary': frag = renderSummary(); break;
+      case 'ridewithgpsInfo': frag = renderRideWithGpsInfo(); break;
       case 'waiverDetail': frag = renderWaiverDetail(); break;
       default: frag = renderHub();
     }
@@ -1205,6 +1223,25 @@
     };
   }
 
+  // Weather glance (T-3 hub refresh, 2026-09-04) -- renders nothing
+  // until real forecast data exists; wired against a future
+  // ap.weatherSnapshot shape ({tempF, condition, detail}) once the
+  // Weather API integration (tracked separately on the build checklist)
+  // actually populates it. Deliberately does not fabricate placeholder
+  // numbers for a real guest making outdoor-safety decisions.
+  function weatherCardHtml(weather) {
+    if (!weather || !weather.tempF) return '';
+    return '<div class="ap-weather-card">' +
+      '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" fill="#F5A623"/><g stroke="#F5A623" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v2.4"/><path d="M12 19.6V22"/><path d="M4.2 4.2l1.7 1.7"/><path d="M18.1 18.1l1.7 1.7"/><path d="M2 12h2.4"/><path d="M19.6 12H22"/><path d="M4.2 19.8l1.7-1.7"/><path d="M18.1 5.9l1.7-1.7"/></g></svg>' +
+      '<div class="ap-weather-mid">' +
+      '<div class="ap-weather-temp">' + escapeHtml(String(weather.tempF)) + '°F' + (weather.condition ? ', ' + escapeHtml(weather.condition) : '') + '</div>' +
+      (weather.detail ? '<div class="ap-weather-cond">' + escapeHtml(weather.detail) + '</div>' : '') +
+      '<div class="ap-weather-note">Early read — we’ll keep this current as trail day gets closer.</div>' +
+      '</div>' +
+      '<div class="ap-weather-when">Early&nbsp;read</div>' +
+      '</div>';
+  }
+
   function renderHub() {
     var eb = state.ctx.experienceBooking;
     var ap = state.ctx.adventurePrep || {};
@@ -1213,6 +1250,10 @@
     var depositAmount = computeDepositAmount();
 
     var pastT3 = status.trailSelected && isPastT3Cutoff();
+    // NEW (T-3 hub refresh, 2026-09-04): trail-day countdown, only
+    // meaningful once past T3 -- passed into heroCardHtml below so it
+    // renders pinned to the hero photo's top-right corner.
+    var daysToGo = pastT3 ? daysUntilTrip(eb.date) : null;
     // Sept 2026 walkthrough follow-up: the hub used to show just the
     // trail name here (a separate, name-only ap-trail-* block) -- Airey
     // asked for the same card styling used on the selection/confirmation
@@ -1226,12 +1267,15 @@
       try { hubCandidateTrails = typeof hubCandidateTrails === 'string' ? JSON.parse(hubCandidateTrails || '[]') : (hubCandidateTrails || []); } catch (e) { hubCandidateTrails = []; }
       selectedTrailCandidate = hubCandidateTrails.filter(function (c) { return c.trailId === ap.selectedTrailId; })[0] || { trailName: status.trailName };
     }
-    var trailSectionHtml = !status.trailSelected ? '' :
+    // Pre-T3, the trail section stays exactly as it always has: the
+    // compare card plus the locked note. Past T3, the trail card moves
+    // underneath the new guide card instead (pastT3TrailCardHtml below),
+    // and the old one-line unlocked treatment is replaced by that guide
+    // card -- T-3 hub refresh, 2026-09-04.
+    var trailSectionHtml = (!status.trailSelected || pastT3) ? '' :
       '<div class="ap-trail-section-wide">' +
       compareCardHtml(selectedTrailCandidate, null, null, false, status.allSet) +
-      (pastT3
-        ? '<div class="ap-trail-unlocked"><div class="ap-trail-unlocked-text">Your guide is ready: turn-by-turn navigation, waypoints, and everything else for the trail.</div><button type="button" class="ap-trail-download-btn" id="ap-get-guide">Get Guide</button></div>'
-        : '<div class="ap-trail-locked-note"><span class="lock-icon">' + LOCK_ICON_SVG + '</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>') +
+      '<div class="ap-trail-locked-note"><span class="lock-icon">' + LOCK_ICON_SVG + '</span> Your trail guide and turn-by-turn navigation unlock 3 days before your adventure day.</div>' +
       '</div>';
 
     // Icons: Style B ("Line, salmon accent") from the icon-options
@@ -1242,7 +1286,7 @@
       return { icon: icon, title: title, sub: sub, statusLabel: status2, locked: !!locked, onClick: onClick };
     }
 
-    var tiles = [
+    var prepTiles = [
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>', 'Trail Recommendation',
         status.trailSelected ? status.trailName : (status.awaitingTeamTrail ? 'We’re placing your group personally, no action needed.' : 'Tell us what you’re after and we’ll find your trail'),
         status.hasUnreviewedManualPick ? 'In review' : (status.trailSelected ? 'Done' : (status.awaitingTeamTrail ? 'With Our Team' : 'Not done')),
@@ -1259,11 +1303,17 @@
         status.signers.length ? (status.signers.filter(function (s) { return s.isDone; }).length + ' of ' + status.signers.length + ' signed') : 'Sign your waiver',
         status.waiversDone ? 'Done' : 'Not done', false,
         function () { state.step = 'waiver'; render(); }),
+    ];
+    // Adventure Summary is no longer its own 5th tile once past T3 --
+    // the full receipt card is embedded directly at the bottom of the
+    // hub instead (Airey's direct request, round 3, 2026-09-04). Pre-T3,
+    // it stays exactly as it always has: its own locked/unlocked tile.
+    var tiles = pastT3 ? prepTiles : prepTiles.concat([
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="5.2" y="4.4" width="13.6" height="16.6" rx="2" stroke="#2A4747" stroke-width="1.3"/><rect x="9" y="2.7" width="6" height="3" rx="1" stroke="#2A4747" stroke-width="1.2"/><path d="M8.3 10h6.4M8.3 13.4h4.6" stroke="#2A4747" stroke-width="1.1" stroke-linecap="round"/><path d="M8.3 17l1.9 1.9 3.7-3.9" stroke="#F58271" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>', 'Adventure Summary',
         status.summaryUnlocked ? 'See your full recap' : 'Unlocks once everything above is set',
         status.summaryUnlocked ? 'Done' : 'Locked', !status.summaryUnlocked,
         function () { if (status.summaryUnlocked) { state.step = 'summary'; render(); } }),
-    ];
+    ]);
 
     var tilesHtml = tiles.map(function (t, i) {
       var statusClass = t.statusLabel === 'Done' ? 'status-done' : (t.statusLabel === 'In review' || t.statusLabel === 'With Our Team') ? 'status-review' : t.statusLabel === 'Locked' ? 'status-locked' : 'status-notdone';
@@ -1273,6 +1323,23 @@
         '<div class="ap-tile-status ' + statusClass + '">' + t.statusLabel + '</div>' +
         '</div>';
     }).join('');
+
+    // Collapsible "Get ready" accordion (T-3 hub refresh, 2026-09-04):
+    // once every prep tile above reads Done, they collapse into one
+    // summary row, loaded collapsed by default -- tap to expand, nothing
+    // is hidden permanently, just stops competing with the trail content
+    // above it. Only applies past T3; before that this is normally still
+    // the "getting ready" window, so tiles stay in their usual
+    // always-expanded list.
+    var allPrepDone = pastT3 && status.trailSelected && !status.hasUnreviewedManualPick && status.attendeesDone && status.gearDone && status.waiversDone;
+    var getReadyHtml = allPrepDone
+      ? '<div class="ap-prep-summary" id="ap-prep-toggle">' +
+        '<div class="ap-prep-summary-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '<div><div class="ap-prep-summary-text">Everything’s set — Trail, Attendees, Gear, Waivers</div><div class="ap-prep-summary-sub">Tap to review the details</div></div>' +
+        '<div class="ap-prep-chevron">&#9662;</div>' +
+        '</div>' +
+        '<div class="ap-prep-details" id="ap-prep-details"><div class="ap-tiles" id="ap-hub-tiles" style="margin-top:0.7rem;">' + tilesHtml + '</div></div>'
+      : '<div class="ap-tiles-label">Get ready</div><div class="ap-tiles" id="ap-hub-tiles">' + tilesHtml + '</div>';
 
     var alertHtml = '';
     if (status.rosterDone && !status.waiversDone && status.signers.length) {
@@ -1304,7 +1371,7 @@
     var topSublineHtml = '';
 
     if (status.allSet) {
-      var statLine = escapeHtml(status.trailName) + ' \u00b7 ' + formatTripDate(eb.date) + ' \u00b7 ' + attendingRosterCount() + ' adventurers \u00b7 ' + status.kitCount + ' gear kits packed';
+      var statLine = escapeHtml(status.trailName) + ' · ' + formatTripDate(eb.date) + ' · ' + attendingRosterCount() + ' adventurers · ' + status.kitCount + ' gear kits packed';
       var todayStr = pacificDateString(new Date());
       var tripDateMatch = String(eb.date || '').match(/^\d{4}-\d{2}-\d{2}/);
       var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
@@ -1318,7 +1385,7 @@
         // trail actually has one written.
         var tripTip = (selectedTrailCandidate && selectedTrailCandidate.oneTripTip) ||
           'Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.';
-        topGreetingHtml = 'It\u2019s adventure day! ' + escapeHtml(status.trailName) + ' is waiting.';
+        topGreetingHtml = 'It’s adventure day! ' + escapeHtml(status.trailName) + ' is waiting.';
         topSublineHtml = escapeHtml(tripTip);
       } else if (todayStr === deliveryDateStr) {
         // 2C: Delivery-day reminder. Property type, never the full
@@ -1334,25 +1401,25 @@
         // 2B: Guide unlocked. The trail section below already carries
         // its own Get Guide button once pastT3, so this doesn't repeat
         // one -- just names the moment.
-        topGreetingHtml = 'Your guide\u2019s ready. Turn-by-turn navigation, waypoints, and everything for ' + escapeHtml(status.trailName) + ' is yours now.';
+        topGreetingHtml = 'Your guide’s ready. Turn-by-turn navigation, waypoints, and everything for ' + escapeHtml(status.trailName) + ' is yours now.';
         topSublineHtml = statLine;
       } else {
         // Climax through 2A Countdown, merged per the call above.
-        topGreetingHtml = 'That\u2019s everything. The trail is ready for you.';
+        topGreetingHtml = 'That’s everything. The trail is ready for you.';
         topSublineHtml = statLine;
       }
     } else if (groupPendingState) {
       var missingSignerCount = status.signers.filter(function (s) { return !s.isDone; }).length;
-      topGreetingHtml = 'Your part\u2019s done. ' + missingSignerCount + ' more signature' + (missingSignerCount === 1 ? '' : 's') + ' from your group and you\u2019re fully clear for gear.';
+      topGreetingHtml = 'Your part’s done. ' + missingSignerCount + ' more signature' + (missingSignerCount === 1 ? '' : 's') + ' from your group and you’re fully clear for gear.';
     } else if (doneCount === 1) {
       if (status.trailSelected) {
-        topGreetingHtml = escapeHtml(status.trailName) + '\u2019s locked in. A few more things and you\u2019re fully set for the day.';
+        topGreetingHtml = escapeHtml(status.trailName) + '’s locked in. A few more things and you’re fully set for the day.';
       } else if (status.attendeesDone) {
-        topGreetingHtml = 'Your group\u2019s confirmed. A few more things and you\u2019re fully set for the day.';
+        topGreetingHtml = 'Your group’s confirmed. A few more things and you’re fully set for the day.';
       } else if (status.gearDone) {
-        topGreetingHtml = 'Your gear\u2019s sorted. A few more things and you\u2019re fully set for the day.';
+        topGreetingHtml = 'Your gear’s sorted. A few more things and you’re fully set for the day.';
       } else if (bookerWaiverDone) {
-        topGreetingHtml = 'Your waiver\u2019s signed. A few more things and you\u2019re fully set for the day.';
+        topGreetingHtml = 'Your waiver’s signed. A few more things and you’re fully set for the day.';
       }
     } else if (doneCount >= 2) {
       var remaining = [];
@@ -1360,26 +1427,55 @@
       if (!status.attendeesDone) remaining.push('your group');
       if (!status.gearDone) remaining.push('gear');
       if (!bookerWaiverDone) remaining.push('your waiver');
-      topGreetingHtml = 'Almost there, just ' + joinWithAnd(remaining) + ' left before you\u2019re all set.';
+      topGreetingHtml = 'Almost there, just ' + joinWithAnd(remaining) + ' left before you’re all set.';
     }
     // else doneCount === 0 (or a guest who hasn't reconfirmed their
     // roster yet): topGreetingHtml/topSublineHtml stay the Part 2.1
     // continuity-beat opener set above.
 
     var topCardHtml = status.allSet
-      ? heroCardHtml('Your Adventure', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl)
+      ? heroCardHtml('Your Adventure', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, daysToGo)
       : '<div class="ap-eyebrow">Your Adventure</div>' +
         '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
         '<div class="ap-subline">' + topSublineHtml + '</div>';
+
+    // T-3+ weather glance (T-3 hub refresh, 2026-09-04): renders nothing
+    // until real forecast data exists -- see weatherCardHtml() above.
+    var weatherHtml = pastT3 ? weatherCardHtml(ap.weatherSnapshot) : '';
+
+    // T-3+ guide emphasis card (Airey's direct request, 2026-09-04):
+    // replaces the old single-line .ap-trail-unlocked treatment with a
+    // full card once the guide is actually unlocked, plus a real
+    // RideWithGPS "how does this work" page behind its secondary link.
+    var guideCardHtml = !pastT3 ? '' :
+      '<div class="ap-guide-card">' +
+      '<div class="ap-guide-eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4Z" stroke="#7ABD91" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12.2l2 2 4-4.4" stroke="#7ABD91" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Your digital guide is unlocked</div>' +
+      '<div class="ap-guide-headline">Get the route on your phone, before you’re out of signal.</div>' +
+      '<div class="ap-guide-body">Opens ' + escapeHtml(status.trailName) + ' inside RideWithGPS — turn-by-turn navigation and waypoints, no account needed. Download it for offline use before you head out; cell service on this trail isn’t guaranteed.</div>' +
+      '<button type="button" class="ap-guide-cta" id="ap-get-guide">Get Guide</button>' +
+      '<button type="button" class="ap-guide-howto" id="ap-guide-howto">How does this work? →</button>' +
+      '</div>';
+
+    var pastT3TrailCardHtml = (pastT3 && status.trailSelected)
+      ? '<div class="ap-trail-section-wide">' + compareCardHtml(selectedTrailCandidate, null, null, false, true) + '</div>'
+      : '';
+
+    var depositNoteHtml = '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>';
+
+    // T-3+ embedded Adventure Summary receipt (Airey's direct request,
+    // round 3, 2026-09-04): the full renderSummary() card, not a tile
+    // linking out to it, placed under the deposit note. Uses its own
+    // guide-CTA button id (distinct from the guide card's #ap-get-guide
+    // above, since both now render in the same DOM once past T3).
+    var receiptHtml = pastT3 ? receiptCardHtml('ap-get-guide-receipt') : '';
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
       alertHtml +
-      trailSectionHtml +
-      '<div class="ap-tiles-label">Get ready</div>' +
-      '<div class="ap-tiles" id="ap-hub-tiles">' + tilesHtml + '</div>' +
-      '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>' +
+      (pastT3
+        ? weatherHtml + guideCardHtml + pastT3TrailCardHtml + getReadyHtml + depositNoteHtml + receiptHtml
+        : trailSectionHtml + getReadyHtml + depositNoteHtml) +
       '</div></div>'
     );
 
@@ -1389,10 +1485,22 @@
         if (t && t.onClick) t.onClick();
       });
     });
+    var prepToggle = wrap.querySelector('#ap-prep-toggle');
+    if (prepToggle) prepToggle.addEventListener('click', function () {
+      prepToggle.classList.toggle('is-open');
+      var details = wrap.querySelector('#ap-prep-details');
+      if (details) details.classList.toggle('is-open');
+    });
     var guideBtn = wrap.querySelector('#ap-get-guide');
     if (guideBtn) guideBtn.addEventListener('click', function () {
       window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
     });
+    var guideBtnReceipt = wrap.querySelector('#ap-get-guide-receipt');
+    if (guideBtnReceipt) guideBtnReceipt.addEventListener('click', function () {
+      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+    });
+    var howtoBtn = wrap.querySelector('#ap-guide-howto');
+    if (howtoBtn) howtoBtn.addEventListener('click', function () { state.step = 'ridewithgpsInfo'; render(); });
 
     return wrap;
   }
@@ -2424,9 +2532,20 @@
   // sublineHtml are passed through as already-safe HTML, matching how
   // topGreetingHtml/topSublineHtml are built and inserted everywhere else
   // in this file.
-  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl) {
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays) {
+    // Trail-day countdown badge (T-3 hub refresh, 2026-09-04): only
+    // rendered when a caller passes a real number -- pre-T3 callers pass
+    // null/undefined and get no badge at all, matching this hub's usual
+    // "pure function of current state" rule.
+    var badgeHtml = '';
+    if (countdownDays !== null && countdownDays !== undefined) {
+      var badgeNum = countdownDays > 0 ? String(countdownDays) : 'Today';
+      var badgeLbl = countdownDays > 0 ? (countdownDays === 1 ? 'Day to go' : 'Days to go') : 'Trail day!';
+      badgeHtml = '<div class="ap-countdown-badge"><div class="ap-countdown-num">' + badgeNum + '</div><div class="ap-countdown-lbl">' + badgeLbl + '</div></div>';
+    }
     return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + '"' +
       (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
+      badgeHtml +
       '<div class="ap-hero-card-inner">' +
       '<div class="ap-hero-eyebrow">' + escapeHtml(eyebrowText) + '</div>' +
       '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
@@ -3800,15 +3919,16 @@
   }
 
   // ---------------------------------------------------------------------
-  // Adventure Summary — an ongoing recap, not a one-time gate (handoff
-  // Section 6). The old renderReview's "Confirm & Send" job moved to the
-  // Attendees tile's own renderInvite above; this screen's only job now is
-  // showing where things stand, matching mockup 06 frame 1 (everything
-  // set) / frame 2 (still finishing up) — same markup, driven by whichever
-  // pieces are actually done.
+  // Adventure Summary receipt -- shared builder (T-3 hub refresh,
+  // 2026-09-04). Extracted out of renderSummary() below so the exact
+  // same card can also be embedded directly at the bottom of renderHub()
+  // once past T3 (Airey's direct request, round 3), instead of just
+  // linking out to this standalone screen. guideButtonId lets the two
+  // call sites use distinct DOM ids for their own Get Guide button,
+  // since both can now render in the same DOM at once.
   // ---------------------------------------------------------------------
 
-  function renderSummary() {
+  function receiptCardHtml(guideButtonId) {
     var eb = state.ctx.experienceBooking;
     var ap = state.ctx.adventurePrep || {};
     var status = computeHubStatus();
@@ -3839,13 +3959,10 @@
       : 'Not set yet';
 
     var actionHtml = (allSet && status.trailSelected && isPastT3Cutoff())
-      ? '<div class="ap-receipt-guide-cta"><span>Your trail guide is ready to download.</span><button type="button" id="ap-get-guide">Get Guide</button></div>'
+      ? '<div class="ap-receipt-guide-cta"><span>Your trail guide is ready to download.</span><button type="button" id="' + guideButtonId + '">Get Guide</button></div>'
       : '';
 
-    var wrap = h(
-      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      '<div class="ap-back-link" id="ap-back-to-hub" style="cursor:pointer;">&larr; Adventure Home</div>' +
-      '<div class="ap-receipt"><div class="ap-receipt-inner">' +
+    return '<div class="ap-receipt"><div class="ap-receipt-inner">' +
       '<div class="ap-receipt-mark"><img src="/images/logo.svg" alt="Palm Springs Adventure Club"></div>' +
       '<div class="ap-receipt-eyebrow">Your Adventure Day</div>' +
       '<div class="ap-receipt-headline">' + headline + '</div>' +
@@ -3860,13 +3977,64 @@
       '<div class="ap-receipt-line"><span>Gear pickup</span><b>' + escapeHtml(pickupLine) + '</b></div>' +
       actionHtml +
       '<div class="ap-receipt-footer">palmspringsadventureclub.com</div>' +
-      '</div></div>' +
+      '</div></div>';
+  }
+
+  // ---------------------------------------------------------------------
+  // Adventure Summary — an ongoing recap, not a one-time gate (handoff
+  // Section 6). The old renderReview's "Confirm & Send" job moved to the
+  // Attendees tile's own renderInvite above; this screen's only job now is
+  // showing where things stand, matching mockup 06 frame 1 (everything
+  // set) / frame 2 (still finishing up) — same markup, driven by whichever
+  // pieces are actually done.
+  // ---------------------------------------------------------------------
+
+  function renderSummary() {
+    var ap = state.ctx.adventurePrep || {};
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="ap-back-to-hub" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      receiptCardHtml('ap-get-guide') +
       '</div></div>'
     );
 
     wrap.querySelector('#ap-back-to-hub').addEventListener('click', function () { state.step = 'hub'; render(); });
     var guideBtn = wrap.querySelector('#ap-get-guide');
     if (guideBtn) guideBtn.addEventListener('click', function () {
+      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+    });
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // RideWithGPS "how does this work" page (T-3 hub refresh, 2026-09-04)
+  // -- sits behind the new guide card's secondary link on the hub. Static
+  // content, no API dependency -- deliberately plain numbered steps
+  // rather than mocked RideWithGPS screenshots, since the actual in-app
+  // UI isn't something to fabricate inaccurately here.
+  // ---------------------------------------------------------------------
+
+  function renderRideWithGpsInfo() {
+    var ap = state.ctx.adventurePrep || {};
+    var status = computeHubStatus();
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="ap-rwgps-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      '<div class="ap-eyebrow">Your Digital Guide</div>' +
+      '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 1.4rem;color:var(--dark-pine);">Getting ' + escapeHtml(status.trailName || 'your trail') + ' onto your phone</h2>' +
+      '<div class="ap-card">' +
+      '<div class="rwgps-step"><div class="rwgps-num">1</div><div><div class="rwgps-step-title">Tap Get Guide</div><div class="rwgps-step-body">Opens your trail inside RideWithGPS — a free route-navigation app. No account or sign-up needed on your end.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">2</div><div><div class="rwgps-step-title">Download the route for offline use</div><div class="rwgps-step-body">Look for the download / offline-map option inside RideWithGPS and save the route before you leave cell service. This is the one step that matters most — do it before you get to the trailhead, not after.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">3</div><div><div class="rwgps-step-title">Use it on trail day</div><div class="rwgps-step-body">Turn-by-turn navigation and waypoints, right on your phone, even with no signal — as long as you downloaded it first.</div></div></div>' +
+      '</div>' +
+      '<div class="rwgps-callout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/><path d="M12 8v5" stroke="#F58271" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#F58271"/></svg><div>Cell service on our trails isn’t guaranteed. The offline download in step 2 is what actually gets you navigation out there — the app alone, without downloading first, won’t help once you lose signal.</div></div>' +
+      '<button type="button" class="ap-cta-primary" id="ap-rwgps-open" style="margin-top:1.4rem;">Open in RideWithGPS</button>' +
+      '<a class="rwgps-back" id="ap-rwgps-back-2">&larr; Back to your Adventure Hub</a>' +
+      '</div></div>'
+    );
+    wrap.querySelector('#ap-rwgps-back').addEventListener('click', function () { state.step = 'hub'; render(); });
+    wrap.querySelector('#ap-rwgps-back-2').addEventListener('click', function () { state.step = 'hub'; render(); });
+    wrap.querySelector('#ap-rwgps-open').addEventListener('click', function () {
       window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
     });
     return wrap;
