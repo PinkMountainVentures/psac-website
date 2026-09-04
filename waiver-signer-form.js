@@ -544,7 +544,7 @@
     // Only applies past T3, same reasoning as Surface A.
     var allPrepDone = pastT3 && status.detailsDone && status.waiverDone;
     var getReadyHtml = allPrepDone
-      ? '<div class="ap-tiles-label">Get ready</div><div class="ap-prep-summary" id="sb-prep-toggle">' +
+      ? '<div class="ap-tiles-label" style="margin-top:1.1rem;">Get ready</div><div class="ap-prep-summary" id="sb-prep-toggle">' +
         '<div class="ap-prep-summary-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
         '<div><div class="ap-prep-summary-text">Everything’s set — Your Details, Trail, Gear, Waiver</div><div class="ap-prep-summary-sub">Tap to review the details</div></div>' +
         '<div class="ap-prep-chevron">&#9662;</div>' +
@@ -660,7 +660,7 @@
     // T-3+ embedded Adventure Summary receipt (Airey's direct request,
     // round 3, 2026-09-04): the full renderSummary() card, not a tile
     // linking out to it, placed at the bottom of the hub once past T3.
-    var receiptHtml = pastT3 ? '<div class="ap-eyebrow">Adventure Summary</div>' + receiptCardHtml() : '';
+    var receiptHtml = pastT3 ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml() : '';
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
