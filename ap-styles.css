@@ -167,7 +167,7 @@
 .ap-trail-photo { height: 130px; background: linear-gradient(135deg,#3a5a5a,#2A4747); position: relative; display: flex; align-items: flex-end; padding: 0.9rem 1.1rem; }
 .ap-trail-photo-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(248,241,233,0.5); }
 .ap-trail-body { background: white; padding: 1.1rem 1.3rem 1.3rem; }
-.ap-trail-eyebrow { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.4rem; }
+.ap-trail-eyebrow { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.4rem; }
 .ap-trail-name { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; margin-bottom: 0.6rem; }
 .ap-trail-locked-note { font-size: 0.78rem; color: var(--ap-muted); line-height: 1.6; display: flex; gap: 0.5rem; align-items: center; margin-top: 0.9rem; }
 .ap-trail-locked-note .lock-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
@@ -199,7 +199,7 @@
    status pill borrowed from the hub tiles' own .ap-tile-status
    language instead of a fixed accent color, since this card's whole
    point is that its color changes over time. */
-.gd-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dark-pine); opacity: 0.55; margin-bottom: 0.5rem; max-width: 960px; }
+.gd-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; max-width: 960px; }
 .gd-card { display: flex; flex-direction: column; background: linear-gradient(120deg, rgba(42,71,71,0.05), rgba(42,71,71,0.015)); border: 1px solid rgba(42,71,71,0.14); border-radius: 12px; padding: 1rem 1.1rem 1.05rem; margin-bottom: 1.1rem; max-width: 960px; }
 .gd-top { display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 0.85rem; }
 .gd-icon { width: 34px; height: 34px; flex-shrink: 0; margin-top: 0.1rem; }
@@ -251,7 +251,7 @@
    .ap-trail-locked-note stay in the stylesheet for the still-locked
    state and the guardian_only hub's own smaller usage. */
 .ap-guide-card { background: linear-gradient(135deg, var(--dark-pine) 0%, #1e3535 100%); border-radius: 16px; padding: 1.5rem 1.5rem 1.4rem; margin-bottom: 1.1rem; box-shadow: 0 8px 26px rgba(42,71,71,0.25); max-width: 960px; }
-.ap-guide-eyebrow { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.5rem; }
+.ap-guide-eyebrow { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; }
 .ap-guide-eyebrow svg { flex-shrink: 0; }
 .ap-guide-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.5rem; font-weight: 500; color: var(--sand-beige); line-height: 1.25; margin-bottom: 0.5rem; }
 .ap-guide-body { font-size: 0.78rem; color: var(--sand-beige); opacity: 0.85; line-height: 1.55; margin-bottom: 1.1rem; }
@@ -285,7 +285,7 @@
 .rwgps-callout { display: flex; gap: 0.6rem; align-items: flex-start; background: rgba(245,130,113,0.08); border: 1px solid rgba(245,130,113,0.25); border-radius: 10px; padding: 0.85rem 1rem; margin: 1.3rem 0 0.2rem; font-size: 0.76rem; color: var(--dark-pine); line-height: 1.55; max-width: 720px; }
 .rwgps-back { display: block; text-align: center; font-size: 0.76rem; font-weight: 600; color: var(--dark-pine); opacity: 0.65; margin-top: 1rem; cursor: pointer; text-decoration: none; }
 
-.ap-tiles-label { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ap-muted); margin-bottom: 0.7rem; }
+.ap-tiles-label { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.7rem; }
 .ap-tiles { display: flex; flex-direction: column; gap: 0.65rem; max-width: 960px; }
 .ap-tile { display: flex; align-items: center; gap: 0.9rem; background: white; border-radius: 10px; padding: 1rem 1.1rem; box-shadow: 0 1px 3px rgba(42,71,71,0.06); cursor: pointer; }
 .ap-tile:hover { box-shadow: 0 2px 10px rgba(42,71,71,0.12); }
@@ -309,7 +309,7 @@
 .ap-receipt-inner { position: relative; z-index: 1; }
 .ap-receipt-mark { margin-bottom: 1.4rem; }
 .ap-receipt-mark img { height: 26px; width: auto; display: block; }
-.ap-receipt-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.5rem; }
+.ap-receipt-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; }
 .ap-receipt-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.8rem; font-weight: 500; color: var(--sand-beige); line-height: 1.25; margin-bottom: 1.5rem; }
 .ap-receipt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem 0.6rem; margin-bottom: 1.3rem; }
 .ap-receipt-stat-label { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(248,241,233,0.4); margin-bottom: 0.28rem; }
@@ -569,7 +569,7 @@
 .ap-hero-card.no-photo { background: linear-gradient(155deg, #2A4747 0%, #223b3b 55%, #1c3232 100%); }
 .ap-hero-card.no-photo::before { background: radial-gradient(circle at 85% 8%, rgba(245,130,113,0.26) 0%, transparent 48%), radial-gradient(circle at 10% 95%, rgba(122,189,145,0.18) 0%, transparent 52%); }
 .ap-hero-card-inner { position: relative; z-index: 1; padding: 2.1rem 1.9rem 1.9rem; width: 100%; }
-.ap-hero-eyebrow { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.55rem; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.ap-hero-eyebrow { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.55rem; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
 .ap-hero-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(2rem, 4.4vw, 2.6rem); font-weight: 500; color: var(--sand-beige); line-height: 1.24; margin-bottom: 0.7rem; text-shadow: 0 2px 8px rgba(0,0,0,0.35); }
 .ap-hero-subline { font-size: 0.9rem; color: rgba(248,241,233,0.85); text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
 .ap-hero-subline:empty { display: none; }
@@ -593,7 +593,7 @@
 .ap-reveal-photo { height: 170px; background: linear-gradient(135deg, #3a5a5a, #2A4747); border-radius: 12px 12px 0 0; display: flex; align-items: flex-end; padding: 1rem 1.2rem; margin-top: 0.2rem; max-width: 640px; }
 .ap-reveal-photo-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(248,241,233,0.5); }
 .ap-reveal-card { background: white; border-radius: 0 0 12px 12px; padding: 1.3rem 1.3rem 1.5rem; margin-bottom: 1.3rem; box-shadow: 0 1px 3px rgba(42,71,71,0.08); max-width: 640px; }
-.ap-reveal-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.4rem; }
+.ap-reveal-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.4rem; }
 .ap-reveal-name { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 600; margin-bottom: 0.6rem; color: var(--dark-pine); }
 .ap-reveal-body { font-size: 0.85rem; color: var(--dark-pine); line-height: 1.65; }
 
