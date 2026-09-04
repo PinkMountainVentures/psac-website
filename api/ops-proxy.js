@@ -65,6 +65,9 @@ const checkGearAvailabilityHandler = require('./check-gear-availability');
 // Trails & Parks dashboard (Ops App Redesign, 2026-09-03) — same in-process
 // reuse pattern, own real TRAILS_PARKS_SHARED_SECRET, injected below.
 const manageTrailsParksHandler = require('./manage-trails-parks');
+// People view (Ops App Redesign, 2026-09-04) -- pure reads, no shared
+// secret needed (same posture as getBookingDetail/listAllBookings below).
+const peopleService = require('../lib/people-service');
 
 function captureResponse() {
   const result = { statusCode: 200, body: null };
@@ -87,6 +90,9 @@ const READ_ACTIONS = {
   listOpsAlertsExpanded: () => allBookingsService.listOpsAlertsExpanded({ nowIso: new Date().toISOString() }),
   listStalledBookings: () => allBookingsService.listStalledBookings(),
   listCancellations: () => allBookingsService.listCancellations(),
+  // People view (2026-09-04).
+  listPeople: () => peopleService.listPeople(),
+  getPersonDetail: (body) => peopleService.getPersonDetail({ personId: body.personId }),
 };
 
 // Aug 2026: added 'update_delivery_address' — staff correcting/entering a

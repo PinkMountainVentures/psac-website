@@ -25,6 +25,7 @@ var OpsShell = (function () {
   var NAV_ITEMS = [
     { href: 'ops-all-bookings.html', label: 'All Bookings', pinned: true },
     { href: 'ops-alerts.html', label: 'Ops Alerts', pinned: true },
+    { href: 'ops-people.html', label: 'People' },
     { href: 'ops-trail-swap-requests.html', label: 'Trail Swap Requests' },
     { href: 'ops-stalled-bookings.html', label: 'Stalled Bookings' },
     { href: 'ops-cancellations.html', label: 'Cancellations' },

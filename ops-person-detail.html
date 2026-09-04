@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Person Detail | PSAC Ops</title>
+<!--
+  ops-person-detail.html
+
+  NEW (Ops App Redesign, 2026-09-04 — Airey's direct request): the People
+  list's drill-down page for one person. Wired to /api/ops-proxy's
+  getPersonDetail action (lib/people-service.js).
+
+  Deliberately NOT added to OpsShell.NAV_ITEMS — same reasoning as
+  ops-booking-detail.html: only makes sense with a ?personId= in the URL,
+  it's a drill-down from People, not a section someone browses to
+  directly. No sidebar item highlighted while here.
+
+  Sections, matching Airey's own spec verbatim:
+    - Bookings they've made (experience_bookings.person_id = this person)
+    - Adventures where they were a participant (booking_participants,
+      is_participating = true)
+    - Adventures where they were a guardian, either attending or not
+      (booking_participants.guardian_person_id = this person) — each row
+      also shows whether THIS person was themselves attending that same
+      adventure (derived from the participant list above, not from
+      role_on_booking, which describes the CHILD's row, not the
+      guardian's)
+    - Who they are a guardian for — unique children across the guardian
+      rows above, linked to the child's own Person Detail page when a
+      real person_id is on file for them
+    - Kit email list status, record created date, days since last
+      participated event — all in the summary card up top
+
+  See lib/people-service.js's own header for why the participant/guardian
+  joins only cover experience_bookings (the one live booking type) even
+  though the schema also carries marquee/social/membership bookings.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-app { max-width:1100px; }
+  .ops-back-link { display:inline-block; font-size:0.78rem; color:#2A6F97; text-decoration:none; margin-bottom:0.9rem; }
+
+  .summary-card { border:1px solid var(--ops-border); border-radius:8px; padding:1.1rem 1.4rem; margin-bottom:1.2rem; display:flex; flex-wrap:wrap; gap:1.6rem; align-items:center; }
+  .summary-name { font-size:1.05rem; font-weight:700; color:var(--dark-pine); }
+  .summary-sub { font-size:0.8rem; color:var(--ops-text-mid); }
+
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.3rem 1.5rem; margin-bottom:1.1rem; }
+  .ops-panel-title { font-size:0.92rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
+
+  .kv-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:0.7rem 1.4rem; }
+  .kv-item { font-size:0.82rem; }
+  .kv-label { font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); margin-bottom:0.2rem; }
+  .kv-value { color:var(--ops-text); word-break:break-word; }
+  .kv-value.empty { color:var(--ops-text-mid); }
+
+  .ops-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+  .ops-table th { text-align:left; font-size:0.64rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.5rem 0.6rem; border-bottom:2px solid var(--ops-border); white-space:nowrap; }
+  .ops-table td { padding:0.55rem 0.6rem; border-bottom:1px solid var(--ops-border); vertical-align:top; }
+  .ops-table tr:last-child td { border-bottom:none; }
+  .ops-table tr:hover td { background:#FAFBFB; }
+  .table-scroll-wrap { overflow-x:auto; border:1px solid var(--ops-border); border-radius:6px; -webkit-overflow-scrolling:touch; }
+
+  .ops-tag { display:inline-block; font-size:0.64rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.2rem 0.5rem; border-radius:4px; white-space:nowrap; }
+  .ops-tag.confirmed { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.cancelled { background:#EDEDED; color:#6B7378; }
+  .ops-tag.reason { background:#E7ECEE; color:#3E4A50; font-weight:600; text-transform:none; letter-spacing:0; margin-left:0.25rem; }
+  .ops-tag.pay-succeeded { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.pay-pending { background:#FFF3D6; color:#8a6300; }
+  .ops-tag.pay-failed { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.active { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.expired { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.non_member { background:#EDEDED; color:#6B7378; }
+  .ops-tag.kit-active { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.kit-cancelled, .ops-tag.kit-inactive, .ops-tag.kit-complained { background:#EDEDED; color:#6B7378; }
+  .ops-tag.kit-bounced { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.kit-unknown, .ops-tag.kit-not_synced { background:#EDEDED; color:#8a8f93; }
+  .ops-tag.yes { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.no { background:#EDEDED; color:#8a8f93; }
+
+  .ops-empty-inline { font-size:0.8rem; color:var(--ops-text-mid); padding:0.4rem 0; }
+  .child-chip-row { display:flex; flex-wrap:wrap; gap:0.5rem; }
+  .child-chip { display:inline-flex; align-items:center; font-size:0.78rem; padding:0.35rem 0.7rem; border:1px solid var(--ops-border); border-radius:20px; background:var(--ops-bg); }
+  .child-chip a { color:#2A6F97; text-decoration:none; font-weight:600; }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div id="ops-search-container"></div>
+      <a class="ops-back-link" href="ops-people.html">&larr; Back to People</a>
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var opsCall = OpsShell.opsCall;
+
+  var MEMBER_LABELS = { active: ['Active Member', 'active'], expired: ['Expired Member', 'expired'], non_member: ['Non-Member', 'non_member'] };
+  var KIT_LABELS = {
+    active: ['Active', 'kit-active'], cancelled: ['Cancelled', 'kit-cancelled'], bounced: ['Bounced', 'kit-bounced'],
+    complained: ['Complained', 'kit-complained'], inactive: ['Inactive', 'kit-inactive'],
+    unknown: ['Unknown', 'kit-unknown'], not_synced: ['Not Synced', 'kit-not_synced'],
+  };
+  var PAY_LABELS = { succeeded: ['Succeeded', 'pay-succeeded'], pending: ['Pending', 'pay-pending'], failed: ['Failed', 'pay-failed'] };
+
+  function tag(pair) { return pair ? '<span class="ops-tag ' + pair[1] + '">' + escapeHtml(pair[0]) + '</span>' : ''; }
+  function yesNoTag(v) {
+    if (v === '' || v == null) return '<span class="kv-value empty">—</span>';
+    return '<span class="ops-tag ' + (v ? 'yes' : 'no') + '">' + (v ? 'Yes' : 'No') + '</span>';
+  }
+  function fmtVal(v) {
+    if (v === '' || v == null) return '<span class="kv-value empty">—</span>';
+    if (Array.isArray(v)) return v.length ? escapeHtml(v.join(', ')) : '<span class="kv-value empty">—</span>';
+    return escapeHtml(String(v));
+  }
+  function fmtDollars(amount) {
+    if (amount === '' || amount == null || isNaN(Number(amount))) return '<span class="kv-value empty">—</span>';
+    return '$' + Number(amount).toFixed(2);
+  }
+  function bookingStatusTag(bucket, reasons) {
+    if (bucket === 'cancelled') {
+      return '<span class="ops-tag cancelled">Cancelled</span>' + (reasons || []).map(function (r) { return '<span class="ops-tag reason">' + escapeHtml(OpsShell.cancellationReasonLabel(r)) + '</span>'; }).join('');
+    }
+    return '<span class="ops-tag confirmed">Confirmed</span>';
+  }
+
+  function kvGrid(fields) {
+    var items = fields.map(function (f) {
+      var label = f[0], value = f[1], renderer = f[2];
+      var html = renderer ? renderer(value) : fmtVal(value);
+      return '<div class="kv-item"><div class="kv-label">' + escapeHtml(label) + '</div><div class="kv-value">' + html + '</div></div>';
+    }).join('');
+    return '<div class="kv-grid">' + items + '</div>';
+  }
+
+  function genericTable(rows, columns, emptyMessage) {
+    if (!rows || !rows.length) return '<div class="ops-empty-inline">' + escapeHtml(emptyMessage || 'None on record.') + '</div>';
+    var thead = '<tr>' + columns.map(function (c) { return '<th>' + escapeHtml(c.label) + '</th>'; }).join('') + '</tr>';
+    var tbody = rows.map(function (r) {
+      return '<tr>' + columns.map(function (c) {
+        var v = c.render ? c.render(r) : fmtVal(r[c.key]);
+        return '<td>' + v + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<div class="table-scroll-wrap"><table class="ops-table"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+  }
+
+  function panel(title, innerHtml) {
+    return '<div class="ops-panel"><div class="ops-panel-title">' + escapeHtml(title) + '</div>' + innerHtml + '</div>';
+  }
+
+  function renderSummary(p, daysSinceLastParticipated) {
+    return '<div class="summary-card">'
+      + '<div><div class="summary-name">' + escapeHtml(p.name) + '</div><div class="summary-sub">' + escapeHtml(p.email || '') + (p.phone ? ' · ' + escapeHtml(p.phone) : '') + '</div></div>'
+      + '<div><div class="kv-label">Member Status</div><div class="kv-value">' + tag(MEMBER_LABELS[p.memberStatus] || MEMBER_LABELS.non_member) + '</div></div>'
+      + '<div><div class="kv-label">Kit Email List Status</div><div class="kv-value">' + tag(KIT_LABELS[p.emailListStatus] || KIT_LABELS.not_synced) + '</div></div>'
+      + '<div><div class="kv-label">Record Created</div><div class="kv-value">' + fmtVal(p.createdAt ? String(p.createdAt).slice(0, 10) : '') + '</div></div>'
+      + '<div><div class="kv-label">Days Since Last Participated Event</div><div class="kv-value">' + fmtVal(daysSinceLastParticipated == null ? '' : daysSinceLastParticipated) + '</div></div>'
+      + '</div>';
+  }
+
+  function renderPersonDetails(p) {
+    return panel('Person Details', kvGrid([
+      ['Person ID', p.personId],
+      ['Name', p.name],
+      ['Email', p.email],
+      ['Phone', p.phone],
+      ['Membership Tier', p.membershipTier],
+      ['Member Since', p.memberSince],
+      ['Renewal Date', p.renewalDate],
+      ['Kit Subscriber ID', p.kitSubscriberId],
+    ]));
+  }
+
+  function renderBookingsMade(rows) {
+    var columns = [
+      { key: 'bookingId', label: 'Booking ID', render: function (r) { return '<a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(r.bookingId) + '">#' + escapeHtml(r.bookingId) + '</a>'; } },
+      { key: 'tripDate', label: 'Trail Day' },
+      { key: 'tier', label: 'Tier' },
+      { key: 'bookingStatusBucket', label: 'Status', render: function (r) { return bookingStatusTag(r.bookingStatusBucket, r.cancellationReasons); } },
+      { key: 'paymentStatusBucket', label: 'Payment', render: function (r) { return tag(PAY_LABELS[r.paymentStatusBucket] || PAY_LABELS.succeeded); } },
+      { key: 'total', label: 'Total', render: function (r) { return fmtDollars(r.total); } },
+    ];
+    return panel('Bookings Made', genericTable(rows, columns, 'This person has not booked any adventures.'));
+  }
+
+  function renderParticipatedIn(rows) {
+    var columns = [
+      { key: 'bookingId', label: 'Booking ID', render: function (r) { return '<a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(r.bookingId) + '">#' + escapeHtml(r.bookingId) + '</a>'; } },
+      { key: 'tripDate', label: 'Trail Day' },
+      { key: 'tier', label: 'Tier' },
+      { key: 'roleOnBooking', label: 'Role' },
+      { key: 'bookingStatusBucket', label: 'Status', render: function (r) { return bookingStatusTag(r.bookingStatusBucket, r.cancellationReasons); } },
+    ];
+    return panel('Adventures Where They Were a Participant', genericTable(rows, columns, 'This person has not participated in any adventures.'));
+  }
+
+  function renderGuardianFor(rows) {
+    var columns = [
+      { key: 'bookingId', label: 'Booking ID', render: function (r) { return '<a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(r.bookingId) + '">#' + escapeHtml(r.bookingId) + '</a>'; } },
+      { key: 'tripDate', label: 'Trail Day' },
+      { key: 'childDisplayName', label: 'Child', render: function (r) {
+          if (r.childPersonId) return '<a class="ops-link" href="ops-person-detail.html?personId=' + encodeURIComponent(r.childPersonId) + '">' + escapeHtml(r.childDisplayName) + '</a>';
+          return escapeHtml(r.childDisplayName);
+        } },
+      { key: 'childIsParticipating', label: 'Child Attended', render: function (r) { return yesNoTag(r.childIsParticipating); } },
+      { key: 'guardianWasAttending', label: 'This Person Attended', render: function (r) { return yesNoTag(r.guardianWasAttending); } },
+      { key: 'guardianVerifiedAt', label: 'Guardian Verified At' },
+      { key: 'bookingStatusBucket', label: 'Booking Status', render: function (r) { return bookingStatusTag(r.bookingStatusBucket, r.cancellationReasons); } },
+    ];
+    return panel('Adventures Where They Were a Guardian', genericTable(rows, columns, 'This person is not on record as a guardian for anyone.'));
+  }
+
+  function renderChildren(children) {
+    if (!children || !children.length) return panel('Who They Are a Guardian For', '<div class="ops-empty-inline">Not a guardian for anyone on record.</div>');
+    var chips = children.map(function (c) {
+      var inner = c.personId
+        ? '<a href="ops-person-detail.html?personId=' + encodeURIComponent(c.personId) + '">' + escapeHtml(c.displayName) + '</a>'
+        : escapeHtml(c.displayName) + ' <span class="kv-value empty">(no linked person record)</span>';
+      return '<div class="child-chip">' + inner + '</div>';
+    }).join('');
+    return panel('Who They Are a Guardian For', '<div class="child-chip-row">' + chips + '</div>');
+  }
+
+  function renderAll(data) {
+    var html = renderSummary(data.person, data.daysSinceLastParticipated)
+      + renderPersonDetails(data.person)
+      + renderChildren(data.children || [])
+      + renderBookingsMade(data.bookingsMade || [])
+      + renderParticipatedIn(data.participatedIn || [])
+      + renderGuardianFor(data.guardianFor || []);
+    document.getElementById('detail-content').innerHTML = html;
+  }
+
+  function showError(message) {
+    var el = document.getElementById('error-banner');
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  function getQueryParam(name) {
+    var m = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
+  }
+
+  function load() {
+    var personId = (getQueryParam('personId') || '').trim();
+    if (!personId) {
+      showError('No person ID provided — open this page from a person\'s row on the People list.');
+      return;
+    }
+    document.getElementById('ops-subtitle').textContent = personId;
+    OpsShell.withLoadingState(document.getElementById('detail-content'), function () {
+      return opsCall('getPersonDetail', { personId: personId }).then(function (result) {
+        if (!result.ok) { showError('Could not load person detail.'); throw new Error('load failed'); }
+        if (result.data && result.data.notFound) {
+          document.getElementById('detail-content').innerHTML = '';
+          showError('No person found with that ID — double check it against the People list.');
+          return;
+        }
+        renderAll(result.data);
+      });
+    });
+  }
+
+  OpsShell.boot({
+    activeHref: '',
+    title: 'Person Detail',
+    subtitle: '',
+    onReady: function () {
+      load();
+    },
+  });
+})();
+</script>
+</body>
+</html>

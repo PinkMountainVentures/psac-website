@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>People | PSAC Ops</title>
+<!--
+  ops-people.html
+
+  NEW (Ops App Redesign, 2026-09-04 — Airey's direct request): every
+  person in the database, one row each, with counts and status columns
+  staff can search/filter/sort without a direct SQL session. Wired to
+  /api/ops-proxy's listPeople action (lib/people-service.js) — a pure
+  read, no shared secret needed, same posture as listAllBookings/
+  getBookingDetail.
+
+  Fetches the full list once (same convention as ops-all-bookings.html,
+  not ops-trails.html's server-round-trip search) and filters entirely
+  client-side — the people table is the same order of magnitude as
+  bookings, no pagination anywhere else in this app either.
+
+  "# Events Booked" vs "# Events Participated In (booked + participated)"
+  are two different counts straight from lib/people-service.js — see that
+  file's own header for the exact definition of each; this page just
+  renders them, it doesn't re-derive the logic.
+
+  Row click -> ops-person-detail.html?personId=... (mirrors All Bookings'
+  "-> Booking detail" link-out convention).
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-app { max-width:1200px; }
+  .ops-select, .ops-input { padding:0.6rem 0.75rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.83rem; color:var(--ops-text); background:white; font-family:inherit; }
+  .ops-form-row label { display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.3rem; }
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-bottom:1.4rem; }
+
+  .filter-bar { margin-bottom:1rem; padding:1rem 1.2rem; }
+  .filter-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0 1rem; align-items:start; }
+  .filter-grid .ops-form-row { margin-bottom:0.85rem; }
+  .filter-range { display:flex; gap:0.4rem; }
+  .filter-range input, .filter-range select { width:100%; }
+  .filter-bar-footer { display:flex; justify-content:space-between; align-items:center; margin-top:0.2rem; }
+
+  .table-scroll-wrap { overflow-x:auto; border:1px solid var(--ops-border); border-radius:8px; -webkit-overflow-scrolling:touch; }
+  .ops-table { width:100%; min-width:980px; border-collapse:collapse; font-size:0.8rem; }
+  .ops-table th { text-align:left; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.7rem; border-bottom:2px solid var(--ops-border); background:var(--ops-bg); white-space:nowrap; }
+  .ops-table td { padding:0.6rem 0.7rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; white-space:nowrap; }
+  .ops-table tr.person-row { cursor:pointer; }
+  .ops-table tr.person-row:hover td { background:#FAFBFB; }
+  .name-cell { font-weight:600; color:var(--dark-pine); }
+  .email-cell { color:var(--ops-text-mid); font-size:0.76rem; }
+  .num-cell { font-variant-numeric:tabular-nums; text-align:right; }
+
+  .ops-tag { display:inline-block; font-size:0.64rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.2rem 0.5rem; border-radius:4px; white-space:nowrap; }
+  .ops-tag.active { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.expired { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.non_member { background:#EDEDED; color:#6B7378; }
+  .ops-tag.kit-active { background:rgba(122,189,145,0.18); color:#2a7a4a; }
+  .ops-tag.kit-cancelled, .ops-tag.kit-inactive, .ops-tag.kit-complained { background:#EDEDED; color:#6B7378; }
+  .ops-tag.kit-bounced { background:rgba(245,130,113,0.18); color:#b04a2a; }
+  .ops-tag.kit-unknown, .ops-tag.kit-not_synced { background:#EDEDED; color:#8a8f93; }
+
+  .pager-row { display:flex; justify-content:space-between; align-items:center; margin-top:0.9rem; font-size:0.78rem; color:var(--ops-text-mid); }
+
+  @media (max-width: 900px) {
+    .filter-grid { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div class="ops-title" id="ops-title"></div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div class="ops-subtitle" id="ops-subtitle"></div>
+      <div id="ops-search-container"></div>
+
+      <div id="error-banner" class="ops-error-banner hidden"></div>
+
+      <div class="ops-panel filter-bar">
+        <div class="filter-grid">
+          <div class="ops-form-row">
+            <label>Search (name, email, or booking ID)</label>
+            <input class="ops-input" id="filter-search" placeholder="Search people…">
+          </div>
+          <div class="ops-form-row">
+            <label>Member Status</label>
+            <select class="ops-select" id="filter-member-status">
+              <option value="">All</option>
+              <option value="active">Active Member</option>
+              <option value="expired">Expired Member</option>
+              <option value="non_member">Non-Member</option>
+            </select>
+          </div>
+          <div class="ops-form-row">
+            <label>Kit Email List Status</label>
+            <select class="ops-select" id="filter-kit-status">
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="bounced">Bounced</option>
+              <option value="complained">Complained</option>
+              <option value="inactive">Inactive</option>
+              <option value="unknown">Unknown</option>
+              <option value="not_synced">Not Synced</option>
+            </select>
+          </div>
+          <div class="ops-form-row">
+            <label># Events Booked (min–max)</label>
+            <div class="filter-range">
+              <input class="ops-input" id="filter-booked-min" type="number" min="0" step="1" placeholder="Min">
+              <input class="ops-input" id="filter-booked-max" type="number" min="0" step="1" placeholder="Max">
+            </div>
+          </div>
+          <div class="ops-form-row">
+            <label># Events Participated In (min–max)</label>
+            <div class="filter-range">
+              <input class="ops-input" id="filter-participated-min" type="number" min="0" step="1" placeholder="Min">
+              <input class="ops-input" id="filter-participated-max" type="number" min="0" step="1" placeholder="Max">
+            </div>
+          </div>
+        </div>
+        <div class="filter-bar-footer">
+          <button class="ops-btn-secondary" id="clear-filters-btn">Clear filters</button>
+        </div>
+      </div>
+
+      <div id="table-container"></div>
+      <div class="pager-row"><span id="pager-count"></span><span>Sort: name (A–Z)</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+  var escapeHtml = OpsShell.escapeHtml;
+  var allPeople = [];
+
+  var MEMBER_LABELS = { active: ['Active Member', 'active'], expired: ['Expired Member', 'expired'], non_member: ['Non-Member', 'non_member'] };
+  var KIT_LABELS = {
+    active: ['Active', 'kit-active'], cancelled: ['Cancelled', 'kit-cancelled'], bounced: ['Bounced', 'kit-bounced'],
+    complained: ['Complained', 'kit-complained'], inactive: ['Inactive', 'kit-inactive'],
+    unknown: ['Unknown', 'kit-unknown'], not_synced: ['Not Synced', 'kit-not_synced'],
+  };
+
+  function tag(pair) { return '<span class="ops-tag ' + pair[1] + '">' + escapeHtml(pair[0]) + '</span>'; }
+
+  function renderRows(list) {
+    var container = document.getElementById('table-container');
+    if (!list.length) { container.innerHTML = '<div class="ops-empty">No people match these filters.</div>'; return; }
+    var rows = list.map(function (p) {
+      return '<tr class="person-row" data-person-id="' + escapeHtml(p.personId) + '">'
+        + '<td><div class="name-cell">' + escapeHtml(p.name) + '</div></td>'
+        + '<td><div class="email-cell">' + escapeHtml(p.email) + '</div></td>'
+        + '<td>' + tag(MEMBER_LABELS[p.memberStatus] || MEMBER_LABELS.non_member) + '</td>'
+        + '<td>' + tag(KIT_LABELS[p.emailListStatus] || KIT_LABELS.not_synced) + '</td>'
+        + '<td class="num-cell">' + p.bookedCount + '</td>'
+        + '<td class="num-cell">' + p.combinedCount + '</td>'
+        + '</tr>';
+    }).join('');
+
+    container.innerHTML = '<div class="table-scroll-wrap"><table class="ops-table"><thead><tr>'
+      + '<th>Name</th><th>Email</th><th>Member Status</th><th>Kit Email List Status</th>'
+      + '<th># Events Booked</th><th># Events Participated In</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+    Array.prototype.forEach.call(container.querySelectorAll('tr.person-row'), function (tr) {
+      tr.addEventListener('click', function () {
+        window.location.href = 'ops-person-detail.html?personId=' + encodeURIComponent(tr.getAttribute('data-person-id'));
+      });
+    });
+
+    document.getElementById('pager-count').textContent = 'Showing ' + list.length + ' of ' + allPeople.length + ' people';
+  }
+
+  function applyFilters() {
+    var q = (document.getElementById('filter-search').value || '').trim().toLowerCase();
+    var qBookingId = OpsShell.normalizeBookingIdInput(q);
+    var memberStatus = document.getElementById('filter-member-status').value;
+    var kitStatus = document.getElementById('filter-kit-status').value;
+    var bookedMin = document.getElementById('filter-booked-min').value;
+    var bookedMax = document.getElementById('filter-booked-max').value;
+    var participatedMin = document.getElementById('filter-participated-min').value;
+    var participatedMax = document.getElementById('filter-participated-max').value;
+
+    var list = allPeople.filter(function (p) {
+      if (q) {
+        var nameMatch = String(p.name || '').toLowerCase().indexOf(q) !== -1;
+        var emailMatch = String(p.email || '').toLowerCase().indexOf(q) !== -1;
+        var bookingMatch = (p.bookingIds || []).some(function (id) { return String(id).toLowerCase().indexOf(qBookingId) !== -1; });
+        if (!nameMatch && !emailMatch && !bookingMatch) return false;
+      }
+      if (memberStatus && p.memberStatus !== memberStatus) return false;
+      if (kitStatus && p.emailListStatus !== kitStatus) return false;
+      if (bookedMin !== '' && p.bookedCount < Number(bookedMin)) return false;
+      if (bookedMax !== '' && p.bookedCount > Number(bookedMax)) return false;
+      if (participatedMin !== '' && p.combinedCount < Number(participatedMin)) return false;
+      if (participatedMax !== '' && p.combinedCount > Number(participatedMax)) return false;
+      return true;
+    });
+
+    list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+    renderRows(list);
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-search').value = '';
+    document.getElementById('filter-member-status').value = '';
+    document.getElementById('filter-kit-status').value = '';
+    document.getElementById('filter-booked-min').value = '';
+    document.getElementById('filter-booked-max').value = '';
+    document.getElementById('filter-participated-min').value = '';
+    document.getElementById('filter-participated-max').value = '';
+    applyFilters();
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, ms);
+    };
+  }
+
+  function loadPeople() {
+    var container = document.getElementById('table-container');
+    OpsShell.withLoadingState(container, function () {
+      return OpsShell.opsCall('listPeople', {}).then(function (result) {
+        if (!result.ok) { document.getElementById('error-banner').classList.remove('hidden'); document.getElementById('error-banner').textContent = 'Could not load people.'; throw new Error('load failed'); }
+        allPeople = result.data.people || [];
+        applyFilters();
+      });
+    });
+  }
+
+  document.getElementById('filter-search').addEventListener('input', debounce(applyFilters, 250));
+  ['filter-member-status', 'filter-kit-status', 'filter-booked-min', 'filter-booked-max', 'filter-participated-min', 'filter-participated-max'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', applyFilters);
+    document.getElementById(id).addEventListener('input', debounce(applyFilters, 250));
+  });
+  document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
+
+  OpsShell.boot({
+    activeHref: 'ops-people.html',
+    title: 'People',
+    subtitle: 'Everyone in the database — search, filter, and drill into one person.',
+    onReady: function () {
+      loadPeople();
+    },
+  });
+})();
+</script>
+</body>
+</html>
