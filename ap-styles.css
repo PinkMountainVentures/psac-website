@@ -188,7 +188,7 @@
 .ap-weather-temp { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--dark-pine); line-height: 1.1; }
 .ap-weather-cond { font-size: 0.76rem; color: var(--dark-pine); opacity: 0.75; }
 .ap-weather-note { font-size: 0.68rem; color: var(--ap-muted); margin-top: 0.2rem; font-style: italic; }
-.ap-weather-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #6FA8C9; margin-bottom: 0.5rem; max-width: 960px; }
+.ap-weather-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; max-width: 960px; }
 .ap-weather-day { font-size: 0.72rem; font-weight: 600; color: var(--dark-pine); opacity: 0.7; margin-bottom: 0.55rem; }
 
 /* Guide/RideWithGPS emphasis card (T-3 hub refresh, 2026-09-04) --
@@ -505,6 +505,10 @@
     max-width: calc(100vw - 2.4rem);
     margin-left: 50%;
     transform: translateX(-50%);
+    /* Shrunk 200px off both the floor and ceiling per Airey's direct
+       ask ("just a bit too tall now") -- desktop only, mobile keeps the
+       original clamp(560px, 54vw, 700px) from the base rule above. */
+    min-height: clamp(360px, 54vw, 500px);
   }
 }
 .ap-hero-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,35,35,0.06) 0%, rgba(20,35,35,0.30) 55%, rgba(15,26,26,0.55) 100%); }

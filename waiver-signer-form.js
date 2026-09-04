@@ -667,7 +667,17 @@
       topCardHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>' +
       (pastT3
-        ? weatherHtml + guideCardHtml + pastT3TrailCardHtml + getReadyHtml + receiptHtml
+        // Reordered per Airey's direct request, 2026-09-05 (same
+        // sequence as Surface A's own renderHub()): trail card, then
+        // the guide, then weather, then the "everything's set" prep
+        // strip, then the full summary receipt at the very bottom. No
+        // deposit/refund-hold note on this surface -- that card is
+        // Surface A-only (it's the booking owner's card on file, not
+        // this signer's). A gear delivery/status card is planned to
+        // land between the weather card and the prep strip (see the T-3
+        // hub design doc) -- not built yet, this slot is left ready for
+        // it.
+        ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + getReadyHtml + receiptHtml
         : trailSectionHtml + getReadyHtml) +
       '</div></div>'
     );
@@ -866,8 +876,10 @@
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
-      weatherHtml +
+      // Guide before weather, matching the reordered sequence on the
+      // other two hubs (2026-09-05).
       guideCardHtml +
+      weatherHtml +
       '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '’s day itself is self-guided, without one of our own people along, so here’s everything about it: who’s going, where, when, and what to do if you need to reach us.</div></div>' +
       '<div class="ap-tiles-label">The day</div>' +
       '<div class="ap-tiles" id="sb-guardian-hub-tiles">' + tilesHtml + '</div>' +

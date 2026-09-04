@@ -1509,7 +1509,14 @@
       topCardHtml +
       alertHtml +
       (pastT3
-        ? weatherHtml + guideCardHtml + pastT3TrailCardHtml + getReadyHtml + depositNoteHtml + receiptHtml
+        // Reordered per Airey's direct request, 2026-09-05: trail card,
+        // then the guide, then weather, then the deposit/refund-hold
+        // note, then the collapsible "everything's set" prep strip,
+        // then the full summary receipt at the very bottom. A gear
+        // delivery/status card is planned to land between the weather
+        // card and the deposit note (see the T-3 hub design doc) -- not
+        // built yet, this slot is left ready for it.
+        ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + depositNoteHtml + getReadyHtml + receiptHtml
         : trailSectionHtml + getReadyHtml + depositNoteHtml) +
       '</div></div>'
     );
