@@ -249,6 +249,7 @@
     if (state.ctx && state.ctx.isGuardianOnly) {
       switch (state.step) {
         case 'guardianCertify': frag = renderGuardianOnlyCertify(); break;
+        case 'ridewithgpsInfo': frag = renderRideWithGpsInfo(); break;
         default: frag = renderGuardianOnlyHub();
       }
       root.appendChild(frag);
@@ -711,7 +712,7 @@
 
     var trailDetail = state.ctx.selectedTrail || null;
     var trailSub = trailDetail
-      ? 'Placed for ' + childLabel + '\u2019s age and the group\u2019s own experience, the same trail-matching every recommendation in this system runs on, not a generic route.' +
+      ? 'Placed for ' + childLabel + '’s age and the group’s own experience, the same trail-matching every recommendation in this system runs on, not a generic route.' +
         (trailDetail.distance ? ' ' + trailDetail.distance + ' miles.' : '')
       : 'Not yet assigned';
 
@@ -727,20 +728,20 @@
       ? ' Expected back by around ' + formatHourOfDay(startHour + durationHours) + '.'
       : '';
     var trailheadLine = trailDetail && trailDetail.trailheadLocation ? ' Meeting at ' + escapeHtml(trailDetail.trailheadLocation) + '.' : '';
-    var theDaySub = dayLine + backLine + trailheadLine + ' If anything comes up out there, you\u2019re our first call.';
+    var theDaySub = dayLine + backLine + trailheadLine + ' If anything comes up out there, you’re our first call.';
 
     var tiles = [
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>',
-        (trailDetail ? trailDetail.trailName : childLabelRaw + '\u2019s Trail'), trailSub, null,
+        (trailDetail ? trailDetail.trailName : childLabelRaw + '’s Trail'), trailSub, null,
         { readonly: true }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.2" r="2.6" stroke="#2A4747" stroke-width="1.3"/><path d="M4.2 18.4c0-3 2.1-5.1 4.8-5.1s4.8 2.1 4.8 5.1" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><circle cx="16.6" cy="9" r="2" stroke="#F58271" stroke-width="1.2"/><path d="M14.3 18.4c0-2.4 1-4.3 3.4-4.7" stroke="#F58271" stroke-width="1.2" stroke-linecap="round"/></svg>',
-        'Who\u2019s Going', whosGoingSub, null,
+        'Who’s Going', whosGoingSub, null,
         { readonly: true }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4.3" y="5.4" width="15.4" height="14" rx="2" stroke="#2A4747" stroke-width="1.3"/><path d="M4.3 9.6h15.4" stroke="#2A4747" stroke-width="1.3"/><path d="M8 3.8v3M16 3.8v3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><circle cx="9.4" cy="13.4" r="1.1" fill="#F58271"/></svg>',
         'The Day', theDaySub, null,
         { readonly: true }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.3 16.6c1.7-2.6 2.6 2.6 4.3 0s2.6 2.6 4.3 0 2.6 2.6 4.3 0" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6.3l4.3 4.3" stroke="#F58271" stroke-width="1.4" stroke-linecap="round"/><circle cx="18.7" cy="11" r="1.2" fill="#F58271"/></svg>',
-        childLabelRaw + '\u2019s Waiver', allCertified ? 'Confirmed' : 'Confirm you\u2019re their guardian',
+        childLabelRaw + '’s Waiver', allCertified ? 'Confirmed' : 'Confirm you’re their guardian',
         allCertified ? 'Done' : 'Not done',
         { onClick: function () { state.step = 'guardianCertify'; render(); } }),
     ];
@@ -765,10 +766,22 @@
     // day throughout per Airey's own correction (low task count here
     // doesn't mean low informational need).
     // -----------------------------------------------------------------
-    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '\u2019s guardian for their adventure day.';
+    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '’s guardian for their adventure day.';
     var topSublineHtml = '';
     var pastT3 = isPastT3Cutoff(state.ctx.tripDate);
-    var guideBtnHtml = '';
+    var guideCardHtml = '';
+
+    // T-3 hub refresh, 2026-09-04 (Airey's direct follow-up: "the
+    // guardian hub needs this more than anyone -- they aren't going, but
+    // their child is, and they want all of the same details so they
+    // know their child is safe"). Countdown and weather are gated on
+    // pastT3 alone, same as the other two hubs, independent of the
+    // allCertified branching below -- a guardian who hasn't certified
+    // yet still gets to see how many days out the trail day is and
+    // (once wired) what the weather looks like; certifying doesn't
+    // change what day it is.
+    var daysToGo = pastT3 ? daysUntilTrip(state.ctx.tripDate) : null;
+    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot) : '';
 
     if (allCertified) {
       var todayStr = pacificDateString(new Date());
@@ -777,16 +790,27 @@
       var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
 
       if (todayStr === tripDateStr) {
-        topGreetingHtml = 'It\u2019s adventure day for ' + childLabel + '! ' + escapeHtml(trailDetail ? trailDetail.trailName : 'The trail') + ' is waiting.';
+        topGreetingHtml = 'It’s adventure day for ' + childLabel + '! ' + escapeHtml(trailDetail ? trailDetail.trailName : 'The trail') + ' is waiting.';
         topSublineHtml = theDaySub;
       } else if (todayStr === deliveryDateStr) {
         var deliveryWin = state.ctx.deliveryWindow;
-        topGreetingHtml = childLabel + '\u2019s gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', packed and ready for tomorrow.';
+        topGreetingHtml = childLabel + '’s gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', packed and ready for tomorrow.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
       } else if (pastT3) {
-        topGreetingHtml = childLabel + '\u2019s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
+        topGreetingHtml = childLabel + '’s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
         topSublineHtml = '';
-        guideBtnHtml = '<div class="ap-trail-unlocked" style="margin-top:0.6rem;"><div class="ap-trail-unlocked-text"></div><button type="button" class="ap-trail-download-btn" id="sb-guardian-get-guide">Get Guide</button></div>';
+        // Redesigned guide emphasis card (T-3 hub refresh, 2026-09-04) --
+        // replaces the old single-line .ap-trail-unlocked treatment,
+        // same upgrade the attending hubs got, framed around knowing
+        // what [child]'s day looks like rather than "your" own route.
+        guideCardHtml =
+          '<div class="ap-guide-card">' +
+          '<div class="ap-guide-eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4Z" stroke="#7ABD91" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12.2l2 2 4-4.4" stroke="#7ABD91" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + childLabel + '’s digital guide is unlocked</div>' +
+          '<div class="ap-guide-headline">See exactly where ' + childLabel + '’ll be, turn by turn.</div>' +
+          '<div class="ap-guide-body">Opens ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ' inside RideWithGPS — the exact turn-by-turn route ' + childLabel + '’s group will be following on trail day, so you know exactly where they’ll be and what the terrain looks like along the way. No account needed.</div>' +
+          '<button type="button" class="ap-guide-cta" id="sb-guardian-get-guide">Get Guide</button>' +
+          '<button type="button" class="ap-guide-howto" id="sb-guardian-guide-howto">How does this work? →</button>' +
+          '</div>';
       } else {
         // Climax through 2A Countdown, merged into one state (same call
         // as the other two hubs' own identical reasoning -- no "seen it
@@ -797,16 +821,17 @@
     }
 
     var topCardHtml = allCertified
-      ? heroCardHtml('You\u2019re In', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl)
-      : '<div class="ap-eyebrow">You\u2019re In</div>' +
+      ? heroCardHtml('You’re In', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, daysToGo)
+      : '<div class="ap-eyebrow">You’re In</div>' +
         '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       topCardHtml +
-      guideBtnHtml +
-      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '\u2019s day itself is self-guided, without one of our own people along, so here\u2019s everything about it: who\u2019s going, where, when, and what to do if you need to reach us.</div></div>' +
+      weatherHtml +
+      guideCardHtml +
+      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '’s day itself is self-guided, without one of our own people along, so here’s everything about it: who’s going, where, when, and what to do if you need to reach us.</div></div>' +
       '<div class="ap-tiles-label">The day</div>' +
       '<div class="ap-tiles" id="sb-guardian-hub-tiles">' + tilesHtml + '</div>' +
       '</div></div>'
@@ -822,6 +847,8 @@
     if (guardianGuideBtn) guardianGuideBtn.addEventListener('click', function () {
       window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
     });
+    var guardianHowtoBtn = wrap.querySelector('#sb-guardian-guide-howto');
+    if (guardianHowtoBtn) guardianHowtoBtn.addEventListener('click', function () { state.step = 'ridewithgpsInfo'; render(); });
 
     return wrap;
   }
