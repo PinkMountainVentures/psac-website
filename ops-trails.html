@@ -90,7 +90,20 @@
   @media (max-width: 900px) {
     .ops-form-grid, .ops-form-grid-3 { grid-template-columns:1fr; }
     .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .filter-grid { grid-template-columns:1fr; }
   }
+
+  .filter-bar { margin-bottom:1rem; padding:1rem 1.2rem; }
+  .filter-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0 1rem; align-items:start; }
+  .filter-grid .ops-form-row { margin-bottom:0.85rem; }
+  .filter-range { display:flex; gap:0.4rem; }
+  .filter-bar-footer { display:flex; justify-content:space-between; align-items:center; margin-top:0.2rem; }
+
+  .content-gap-banner { background:rgba(231,111,81,0.12); color:#a8341c; border:1px solid rgba(231,111,81,0.35); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1.2rem; font-size:0.82rem; font-weight:600; }
+  .form-section.section-missing { border:2px solid var(--sunset-red); border-radius:8px; padding:1rem 1.2rem; background:rgba(231,111,81,0.05); margin-top:1rem; }
+  .form-section.section-missing:first-child { margin-top:0; }
+  .missing-pill { display:none; font-size:0.62rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:#a8341c; background:rgba(231,111,81,0.15); border-radius:4px; padding:0.15rem 0.4rem; margin-left:0.5rem; vertical-align:middle; }
+  .missing-pill.is-visible { display:inline-block; }
 </style>
 </head>
 <body>
@@ -112,16 +125,56 @@
 
       <div id="banner-container"></div>
 
-      <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem;">
-        <div class="ops-form-row" style="max-width:320px; margin-bottom:0;">
-          <label>Filter by ID, name, or park</label>
-          <input class="ops-input" id="filter-trail" placeholder="Search trails…" style="margin-bottom:0;">
+      <div class="ops-panel filter-bar">
+        <div class="filter-grid">
+          <div class="ops-form-row">
+            <label>Search (ID, name, or park)</label>
+            <input class="ops-input" id="filter-trail" placeholder="Search trails…" style="margin-bottom:0;">
+          </div>
+          <div class="ops-form-row">
+            <label>Bookable</label>
+            <select class="ops-select" id="filter-bookable" style="margin-bottom:0;">
+              <option value="">All</option>
+              <option value="yes">Bookable only</option>
+              <option value="no">Not bookable only</option>
+            </select>
+          </div>
+          <div class="ops-form-row">
+            <label>Content gap</label>
+            <select class="ops-select" id="filter-content-gap" style="margin-bottom:0;">
+              <option value="">All</option>
+              <option value="yes">Has content gap</option>
+              <option value="no">No content gap</option>
+            </select>
+          </div>
+          <div class="ops-form-row">
+            <label>Park</label>
+            <select class="ops-select" id="filter-park" style="margin-bottom:0;"><option value="">All parks</option></select>
+          </div>
+          <div class="ops-form-row">
+            <label>Difficulty (min–max)</label>
+            <div class="filter-range">
+              <select class="ops-select" id="filter-difficulty-min" style="margin-bottom:0;"><option value="">Min</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+              <select class="ops-select" id="filter-difficulty-max" style="margin-bottom:0;"><option value="">Max</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+            </div>
+          </div>
+          <div class="ops-form-row">
+            <label>Distance, mi (min–max)</label>
+            <div class="filter-range">
+              <input class="ops-input" id="filter-distance-min" type="number" min="0" step="0.1" placeholder="Min" style="margin-bottom:0;">
+              <input class="ops-input" id="filter-distance-max" type="number" min="0" step="0.1" placeholder="Max" style="margin-bottom:0;">
+            </div>
+          </div>
         </div>
-        <button class="ops-btn" id="add-trail-btn">+ Add Trail</button>
+        <div class="filter-bar-footer">
+          <button class="ops-btn-secondary" id="clear-filters-btn">Clear filters</button>
+          <button class="ops-btn" id="add-trail-btn">+ Add Trail</button>
+        </div>
       </div>
 
       <div class="ops-panel hidden" id="trail-form-panel">
         <div class="ops-panel-title" id="trail-form-title">Add Trail</div>
+        <div class="content-gap-banner hidden" id="content-gap-banner"></div>
 
         <div class="form-section">
           <div class="form-section-title">Identity & status</div>
@@ -195,9 +248,9 @@
           <div class="check-row"><input type="checkbox" id="f-goodForAthletes"><label style="margin:0; text-transform:none; font-weight:600;" for="f-goodForAthletes">Good for athletes</label></div>
         </div>
 
-        <div class="form-section">
-          <div class="form-section-title">Descriptions & tips</div>
-          <div class="ops-form-row"><label>Opening description (guest-facing)</label><textarea class="ops-textarea" id="f-openingDescription"></textarea></div>
+        <div class="form-section" id="section-descriptions">
+          <div class="form-section-title">Descriptions & tips<span class="missing-pill" id="pill-descriptions">Missing required content</span></div>
+          <div class="ops-form-row"><label>Opening description (guest-facing) — required</label><textarea class="ops-textarea" id="f-openingDescription"></textarea></div>
           <div class="ops-form-row"><label>What makes it special</label><textarea class="ops-textarea" id="f-whatMakesItSpecial"></textarea></div>
           <div class="ops-form-row"><label>Trail-day tip</label><textarea class="ops-textarea" id="f-trailDayTip"></textarea></div>
         </div>
@@ -215,8 +268,8 @@
           </div>
         </div>
 
-        <div class="form-section">
-          <div class="form-section-title">Links & photo</div>
+        <div class="form-section" id="section-links-photo">
+          <div class="form-section-title">Links & photo<span class="missing-pill" id="pill-links-photo">Missing required content</span></div>
           <div class="ops-form-grid">
             <div class="ops-form-row"><label>RideWithGPS link</label><input class="ops-input" id="f-ridewithgpsLink"></div>
             <div class="ops-form-row"><label>Strava link</label><input class="ops-input" id="f-stravaLink"></div>
@@ -226,7 +279,7 @@
             <div class="ops-form-row"><label>GPX file location</label><input class="ops-input" id="f-gpxFileLocation"></div>
           </div>
           <div class="ops-form-row">
-            <label>Photo</label>
+            <label>Photo — required</label>
             <div class="photo-row">
               <div>
                 <img class="photo-preview hidden" id="photo-preview-img">
@@ -274,6 +327,20 @@
   var escapeHtml = OpsShell.escapeHtml;
   var editingTrailId = null; // null = Add mode
   var parkNames = [];
+  var allTrails = []; // last-fetched (server-search-filtered) list; the new list filters below narrow this client-side, no refetch needed
+  // Fields that drive the "Content gap" tag (list view) AND the red-border/
+  // pill highlighting on the edit form (detail view) -- ONE definition,
+  // read by both, so the two views can never silently disagree about what
+  // counts as a gap (this project's own repeatedly-learned lesson about
+  // two independent copies of the same rule drifting apart).
+  var REQUIRED_CONTENT_FIELDS = [
+    { key: 'openingDescription', label: 'Opening Description', sectionId: 'section-descriptions', pillId: 'pill-descriptions' },
+    { key: 'photoReferences', label: 'Photo', sectionId: 'section-links-photo', pillId: 'pill-links-photo' },
+  ];
+
+  function getMissingContentFields(t) {
+    return REQUIRED_CONTENT_FIELDS.filter(function (f) { return !t[f.key]; });
+  }
 
   function showBanner(kind, message) {
     var cls = kind === 'success' ? 'ops-success-banner' : 'ops-error-banner';
@@ -323,12 +390,14 @@
     if (!trails.length) { container.innerHTML = '<div class="ops-empty">No trails match this filter.</div>'; return; }
     var html = '<table class="ops-table"><thead><tr><th>Trail</th><th>Park</th><th>Status</th><th>Difficulty</th><th>Distance</th><th>Actions</th></tr></thead><tbody>';
     trails.forEach(function (t) {
-      var contentGap = !t.openingDescription || !t.photoReferences;
+      var missingFields = getMissingContentFields(t);
+      var contentGap = missingFields.length > 0;
+      var gapTitle = contentGap ? ' title="Missing: ' + missingFields.map(function (f) { return f.label; }).join(', ') + '"' : '';
       html += '<tr>'
         + '<td class="trail-id-cell">' + escapeHtml(t.trailId) + '<br><span style="font-weight:400; color:var(--ops-text-mid);">' + escapeHtml(t.trailName || '') + '</span></td>'
         + '<td>' + escapeHtml(t.park || '—') + '</td>'
         + '<td><span class="status-tag ' + (t.bookable ? 'st-bookable' : 'st-not-bookable') + '">' + (t.bookable ? 'Bookable' : 'Not bookable') + '</span>'
-        + (contentGap ? ' <span class="status-tag content-gap-tag">Content gap</span>' : '') + '</td>'
+        + (contentGap ? ' <span class="status-tag content-gap-tag"' + gapTitle + '>Content gap</span>' : '') + '</td>'
         + '<td>' + (t.difficulty != null ? t.difficulty + '/5' : '—') + '</td>'
         + '<td>' + (t.distanceMi != null ? t.distanceMi + ' mi' : '—') + '</td>'
         + '<td><button class="ops-btn-small" data-action="edit" data-id="' + escapeHtml(t.trailId) + '">Edit</button>'
@@ -351,8 +420,67 @@
     document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Loading…</div>';
     opsCall('trailsList', { q: q }).then(function (result) {
       if (!result.ok) { document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Could not load Trails.</div>'; return; }
-      renderTrails(result.data.trails || []);
+      allTrails = result.data.trails || [];
+      populateParkFilterOptions();
+      applyFiltersAndRender();
     });
+  }
+
+  // Park filter options are derived from whatever trails are actually
+  // loaded (not the master park_access list) so a real mismatched park
+  // value still shows up as something filterable, not silently absent.
+  function populateParkFilterOptions() {
+    var select = document.getElementById('filter-park');
+    var current = select.value;
+    var parks = [];
+    allTrails.forEach(function (t) { if (t.park && parks.indexOf(t.park) === -1) parks.push(t.park); });
+    parks.sort();
+    var html = '<option value="">All parks</option>';
+    parks.forEach(function (p) { html += '<option value="' + escapeHtml(p) + '"' + (p === current ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; });
+    select.innerHTML = html;
+  }
+
+  // All the new filters (bookable/content gap/park/difficulty/distance)
+  // narrow the already-server-fetched allTrails client-side -- only the
+  // text search box (filter-trail) goes back to the server, since it's
+  // the one filter the SQL query itself already handles.
+  function applyFiltersAndRender() {
+    var bookableFilter = document.getElementById('filter-bookable').value;
+    var gapFilter = document.getElementById('filter-content-gap').value;
+    var parkFilter = document.getElementById('filter-park').value;
+    var diffMin = document.getElementById('filter-difficulty-min').value;
+    var diffMax = document.getElementById('filter-difficulty-max').value;
+    var distMin = document.getElementById('filter-distance-min').value;
+    var distMax = document.getElementById('filter-distance-max').value;
+
+    var filtered = allTrails.filter(function (t) {
+      if (bookableFilter === 'yes' && !t.bookable) return false;
+      if (bookableFilter === 'no' && t.bookable) return false;
+      if (gapFilter) {
+        var hasGap = getMissingContentFields(t).length > 0;
+        if (gapFilter === 'yes' && !hasGap) return false;
+        if (gapFilter === 'no' && hasGap) return false;
+      }
+      if (parkFilter && (t.park || '') !== parkFilter) return false;
+      if (diffMin !== '' && (t.difficulty == null || Number(t.difficulty) < Number(diffMin))) return false;
+      if (diffMax !== '' && (t.difficulty == null || Number(t.difficulty) > Number(diffMax))) return false;
+      if (distMin !== '' && (t.distanceMi == null || Number(t.distanceMi) < Number(distMin))) return false;
+      if (distMax !== '' && (t.distanceMi == null || Number(t.distanceMi) > Number(distMax))) return false;
+      return true;
+    });
+    renderTrails(filtered);
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-trail').value = '';
+    document.getElementById('filter-bookable').value = '';
+    document.getElementById('filter-content-gap').value = '';
+    document.getElementById('filter-park').value = '';
+    document.getElementById('filter-difficulty-min').value = '';
+    document.getElementById('filter-difficulty-max').value = '';
+    document.getElementById('filter-distance-min').value = '';
+    document.getElementById('filter-distance-max').value = '';
+    loadTrails();
   }
 
   function clearForm() {
@@ -363,6 +491,7 @@
     document.getElementById('photo-preview-img').classList.add('hidden');
     document.getElementById('photo-file-input').value = '';
     document.getElementById('photo-upload-status').textContent = '';
+    refreshContentGapUI();
   }
 
   function fillForm(t) {
@@ -373,6 +502,33 @@
     var photoUrl = t.photoReferences ? String(t.photoReferences).split(/[\n,;]/)[0].trim() : '';
     if (photoUrl) { document.getElementById('photo-preview-img').src = photoUrl; document.getElementById('photo-preview-img').classList.remove('hidden'); }
     else { document.getElementById('photo-preview-img').classList.add('hidden'); }
+    refreshContentGapUI();
+  }
+
+  function computeMissingFromForm() {
+    return REQUIRED_CONTENT_FIELDS.filter(function (f) {
+      return !document.getElementById('f-' + f.key).value.trim();
+    });
+  }
+
+  function refreshContentGapUI() {
+    var missing = computeMissingFromForm();
+    var banner = document.getElementById('content-gap-banner');
+    if (missing.length) {
+      banner.textContent = 'Content gap — missing required content: ' + missing.map(function (f) { return f.label; }).join(', ') + '.';
+      banner.classList.remove('hidden');
+    } else {
+      banner.textContent = '';
+      banner.classList.add('hidden');
+    }
+    var missingSectionIds = missing.map(function (f) { return f.sectionId; });
+    REQUIRED_CONTENT_FIELDS.forEach(function (f) {
+      var isMissing = missingSectionIds.indexOf(f.sectionId) !== -1;
+      var sectionEl = document.getElementById(f.sectionId);
+      var pillEl = document.getElementById(f.pillId);
+      if (sectionEl) sectionEl.classList.toggle('section-missing', isMissing);
+      if (pillEl) pillEl.classList.toggle('is-visible', isMissing);
+    });
   }
 
   function openAddForm() {
@@ -465,6 +621,7 @@
           document.getElementById('photo-preview-img').src = url;
           document.getElementById('photo-preview-img').classList.remove('hidden');
           status.textContent = 'Uploaded.';
+          refreshContentGapUI();
         });
       };
       reader.readAsDataURL(file);
@@ -478,6 +635,15 @@
     document.getElementById('trail-form-cancel').addEventListener('click', function () { document.getElementById('trail-form-panel').classList.add('hidden'); });
     document.getElementById('trail-form-submit').addEventListener('click', submitForm);
     document.getElementById('filter-trail').addEventListener('input', debounce(loadTrails, 300));
+    ['filter-bookable', 'filter-content-gap', 'filter-park', 'filter-difficulty-min', 'filter-difficulty-max'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', applyFiltersAndRender);
+    });
+    ['filter-distance-min', 'filter-distance-max'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', debounce(applyFiltersAndRender, 300));
+    });
+    document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
+    document.getElementById('f-openingDescription').addEventListener('input', debounce(refreshContentGapUI, 200));
+    document.getElementById('f-photoReferences').addEventListener('input', debounce(refreshContentGapUI, 200));
     wirePhotoUpload();
     loadTrails();
   }
