@@ -673,10 +673,10 @@
         // strip, then the full summary receipt at the very bottom. No
         // deposit/refund-hold note on this surface -- that card is
         // Surface A-only (it's the booking owner's card on file, not
-        // this signer's). A gear delivery/status card is planned to
-        // land between the weather card and the prep strip (see the T-3
-        // hub design doc) -- not built yet, this slot is left ready for
-        // it.
+        // this signer's). Same goes for the gear delivery/status card
+        // discussed 2026-09-05 -- Airey confirmed it's booker-only (it
+        // shows the real delivery address), so it does NOT land on this
+        // surface; no slot reserved here.
         ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + getReadyHtml + receiptHtml
         : trailSectionHtml + getReadyHtml) +
       '</div></div>'
