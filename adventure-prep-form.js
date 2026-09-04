@@ -1277,6 +1277,135 @@
       '</div>';
   }
 
+  // ---------------------------------------------------------------------
+  // Gear delivery card (T-3+ hub, Surface A only, Airey's direct spec +
+  // design pass, 2026-09-05). Booker-only: shows the real delivery
+  // address, so it never renders on Surface B or the guardian-only hub
+  // (see waiver-signer-form.js's own comment on this). Four states, all
+  // computed here at render time from fields lib/gear-service.js's
+  // existing delivery state machine already writes -- no new columns:
+  //   Packing   -- default. deliveryStatus is blank (staff haven't
+  //                marked the gear ready yet).
+  //   Packed    -- deliveryStatus is 'ready_for_delivery' or
+  //                'delivery_scheduled', tied to that REAL staff action,
+  //                not a T-1 date flip (Airey's explicit call: a booking
+  //                can still read Packing past T-1 if staff haven't
+  //                actually marked it ready). Staff SLA is to have this
+  //                done and a slot picked by noon PT on T-1 (partly so
+  //                Uber Direct dispatch has enough lead time), but nothing
+  //                here enforces that deadline.
+  //   Out for Delivery -- the one time-triggered state: once a staff-
+  //                picked slot (deliveryTimeSlot, e.g. "7:00pm") exists
+  //                AND now is within 1 hour of it. No slot yet -- even
+  //                past T-1 -- holds at Packed rather than guessing
+  //                (also Airey's explicit call).
+  //   Delivered -- deliveryStatus 'delivered' (or the gearDeliveredAt
+  //                fallback lib/ops-status-helpers.js's own
+  //                deliveryReturnStatus() already uses), set by staff or
+  //                Uber through the existing gear-ops checkout flow.
+  // ---------------------------------------------------------------------
+
+  // Delivery day is the evening BEFORE the trip (same convention as
+  // formatOffsetDate(eb.date, -1) elsewhere in this file). deliveryTimeSlot
+  // is a bare time-of-day label with no date attached (ops-gear-
+  // checkout.html's own DELIVERY_WINDOW_SLOTS, e.g. "7:00pm") --
+  // reconstruct a real Pacific-time instant from it so "1 hour before"
+  // can be compared against the actual current time. Same two-step
+  // guess-then-correct technique computeT3CutoffDate above uses via
+  // pacificOffsetMinutes.
+  function computeDeliverySlotDate(tripDateStr, timeSlot) {
+    var m = String(timeSlot || '').match(/^(\d{1,2}):(\d{2})\s*([ap]m)/i);
+    if (!m) return null;
+    var deliveryDateStr = isoOffsetDateStr(tripDateStr, -1);
+    var dm = deliveryDateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!dm) return null;
+    var hour = Number(m[1]) % 12;
+    if (/pm/i.test(m[3])) hour += 12;
+    var minute = Number(m[2]);
+    var y = Number(dm[1]), mo = Number(dm[2]) - 1, d = Number(dm[3]);
+    var guess = new Date(Date.UTC(y, mo, d, hour, minute) + 8 * 3600000);
+    var offset = pacificOffsetMinutes(guess);
+    return new Date(Date.UTC(y, mo, d, hour, minute) - offset * 60000);
+  }
+
+  function computeGearDeliveryStatus(eb, ap, kitCount) {
+    var deliveryStatus = eb.deliveryStatus || (eb.gearDeliveredAt ? 'delivered' : '');
+    var addressLine1 = [ap.deliveryAddressLine1, ap.deliveryAddressLine2].filter(Boolean).join(', ');
+    var addressLine2 = [ap.deliveryCity, ap.deliveryState].filter(Boolean).join(', ') + (ap.deliveryZip ? ' ' + ap.deliveryZip : '');
+    var address = [addressLine1, addressLine2].filter(Boolean).join(', ');
+    var deliveryDayLabel = formatOffsetDate(eb.date, -1);
+
+    if (deliveryStatus === 'delivered') {
+      var deliveredAtText = '';
+      if (eb.gearDeliveredAt) {
+        var deliveredDate = new Date(eb.gearDeliveredAt);
+        deliveredAtText = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' }).format(deliveredDate) + ', ' + deliveryDayLabel;
+      }
+      return { state: 'delivered', kitCount: kitCount, address: address, arrivalText: deliveredAtText || ('Delivered ' + deliveryDayLabel) };
+    }
+
+    if (deliveryStatus === 'ready_for_delivery' || deliveryStatus === 'delivery_scheduled') {
+      if (eb.deliveryTimeSlot) {
+        var slotDate = computeDeliverySlotDate(eb.date, eb.deliveryTimeSlot);
+        if (slotDate && new Date() >= new Date(slotDate.getTime() - 3600000)) {
+          return { state: 'out_for_delivery', kitCount: kitCount, address: address, arrivalText: 'Around ' + eb.deliveryTimeSlot + ' tonight' };
+        }
+        return { state: 'packed', kitCount: kitCount, address: address, arrivalText: eb.deliveryTimeSlot + ', ' + deliveryDayLabel };
+      }
+      return { state: 'packed', kitCount: kitCount, address: address, arrivalText: (ap.deliveryWindow || 'Window to be confirmed') + ', ' + deliveryDayLabel };
+    }
+
+    return { state: 'packing', kitCount: kitCount, address: address, arrivalText: (ap.deliveryWindow || 'Window to be confirmed') + ', ' + deliveryDayLabel };
+  }
+
+  var GEAR_DELIVERY_LABELS = {
+    packing: { pill: 'Packing', headline: 'Being packed' },
+    packed: { pill: 'Packed', headline: 'Packed and ready' },
+    out_for_delivery: { pill: 'Out for Delivery', headline: 'Out for delivery' },
+    delivered: { pill: 'Delivered', headline: 'Delivered' },
+  };
+
+  var GEAR_BOX_ICON_PATHS =
+    '<path d="M12 3.6 4.3 7.2v9.6L12 20.4l7.7-3.6V7.2L12 3.6Z" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '<path d="M4.3 7.2 12 10.8l7.7-3.6M12 10.8v9.6" stroke-width="1.4" stroke-linejoin="round"/>';
+
+  // Icon shape (not color -- the box stays mountain-pink in every state,
+  // Airey's direct design-pass request) carries the Out for Delivery /
+  // Delivered distinction: motion lines for the former, a checkmark
+  // badge for the latter, same badge treatment as the hub's own
+  // "everything's set" check (.ap-prep-summary-check).
+  function gearDeliveryIconSvg(state) {
+    var motionLines = state === 'out_for_delivery'
+      ? '<line x1="1.6" y1="11" x2="3.2" y2="10" stroke-width="1.3" stroke-linecap="round"/><line x1="1.3" y1="14" x2="3" y2="13.4" stroke-width="1.3" stroke-linecap="round"/>'
+      : '';
+    var icon = '<svg class="gd-icon" width="34" height="34" viewBox="0 0 24 24" fill="none">' + GEAR_BOX_ICON_PATHS + motionLines + '</svg>';
+    if (state !== 'delivered') return icon;
+    return '<div class="gd-icon-wrap">' + icon +
+      '<span class="gd-check-badge"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="white" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+      '</div>';
+  }
+
+  function gearDeliveryCardHtml(delivery) {
+    if (!delivery || !delivery.address) return '';
+    var labels = GEAR_DELIVERY_LABELS[delivery.state] || GEAR_DELIVERY_LABELS.packing;
+    var stateClass = 'st-' + delivery.state.replace(/_/g, '');
+    var arrivalRowLabel = delivery.state === 'delivered' ? 'Delivered' : 'Arriving';
+    return '<div class="gd-eyebrow">Gear Delivery</div>' +
+      '<div class="gd-card ' + stateClass + '">' +
+      '<div class="gd-top">' +
+      gearDeliveryIconSvg(delivery.state) +
+      '<div class="gd-headtext"><div class="gd-headline">' + escapeHtml(labels.headline) + '</div></div>' +
+      '<span class="gd-pill">' + escapeHtml(labels.pill) + '</span>' +
+      '</div>' +
+      '<div class="gd-rule"></div>' +
+      '<div class="gd-rows">' +
+      '<div class="gd-row"><span class="gd-row-label">' + escapeHtml(arrivalRowLabel) + '</span><span class="gd-row-value">' + escapeHtml(delivery.arrivalText) + '</span></div>' +
+      '<div class="gd-row"><span class="gd-row-label">Address</span><span class="gd-row-value">' + escapeHtml(delivery.address) + '</span></div>' +
+      (delivery.kitCount ? '<div class="gd-row"><span class="gd-row-label">Kits</span><span class="gd-row-value">' + delivery.kitCount + ' gear kit' + (delivery.kitCount === 1 ? '' : 's') + '</span></div>' : '') +
+      '</div>' +
+      '</div>';
+  }
+
   function renderHub() {
     var eb = state.ctx.experienceBooking;
     var ap = state.ctx.adventurePrep || {};
@@ -1478,6 +1607,10 @@
     // until real forecast data exists -- see weatherCardHtml() above.
     var weatherHtml = pastT3 ? weatherCardHtml(ap.weatherSnapshot, formatTripDate(eb.date)) : '';
 
+    // Gear delivery card (booker-only, see this file's own
+    // computeGearDeliveryStatus()/gearDeliveryCardHtml() above).
+    var gearDeliveryHtml = pastT3 ? gearDeliveryCardHtml(computeGearDeliveryStatus(eb, ap, status.kitCount)) : '';
+
     // T-3+ guide emphasis card (Airey's direct request, 2026-09-04):
     // replaces the old single-line .ap-trail-unlocked treatment with a
     // full card once the guide is actually unlocked, plus a real
@@ -1510,13 +1643,13 @@
       alertHtml +
       (pastT3
         // Reordered per Airey's direct request, 2026-09-05: trail card,
-        // then the guide, then weather, then the deposit/refund-hold
-        // note, then the collapsible "everything's set" prep strip,
-        // then the full summary receipt at the very bottom. A gear
-        // delivery/status card is planned to land between the weather
-        // card and the deposit note (see the T-3 hub design doc) -- not
-        // built yet, this slot is left ready for it.
-        ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + depositNoteHtml + getReadyHtml + receiptHtml
+        // then the guide, then weather, then the gear delivery card
+        // (booker-only, built 2026-09-05 -- see this file's own
+        // computeGearDeliveryStatus()/gearDeliveryCardHtml()), then the
+        // deposit/refund-hold note, then the collapsible "everything's
+        // set" prep strip, then the full summary receipt at the very
+        // bottom.
+        ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + gearDeliveryHtml + depositNoteHtml + getReadyHtml + receiptHtml
         : trailSectionHtml + getReadyHtml + depositNoteHtml) +
       '</div></div>'
     );

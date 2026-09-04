@@ -191,6 +191,60 @@
 .ap-weather-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; max-width: 960px; }
 .ap-weather-day { font-size: 0.72rem; font-weight: 600; color: var(--dark-pine); opacity: 0.7; margin-bottom: 0.55rem; }
 
+/* Gear delivery card (T-3+ hub, Surface A only, design pass + build,
+   2026-09-05 -- see claude/psac-gear-delivery-card-spec-2026-09-05.md
+   in the project docs, and adventure-prep-form.js's own
+   computeGearDeliveryStatus()/gearDeliveryCardHtml()). Same card
+   grammar as .ap-weather-card above (eyebrow + tinted panel), with a
+   status pill borrowed from the hub tiles' own .ap-tile-status
+   language instead of a fixed accent color, since this card's whole
+   point is that its color changes over time. */
+.gd-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dark-pine); opacity: 0.55; margin-bottom: 0.5rem; max-width: 960px; }
+.gd-card { display: flex; flex-direction: column; background: linear-gradient(120deg, rgba(42,71,71,0.05), rgba(42,71,71,0.015)); border: 1px solid rgba(42,71,71,0.14); border-radius: 12px; padding: 1rem 1.1rem 1.05rem; margin-bottom: 1.1rem; max-width: 960px; }
+.gd-top { display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 0.85rem; }
+.gd-icon { width: 34px; height: 34px; flex-shrink: 0; margin-top: 0.1rem; }
+.gd-headtext { flex: 1; min-width: 0; }
+.gd-headline { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; color: var(--dark-pine); line-height: 1.2; }
+.gd-pill { display: inline-block; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 12px; white-space: nowrap; flex-shrink: 0; margin-top: 0.15rem; }
+.gd-rule { height: 1px; background: rgba(42,71,71,0.1); margin: 0 0 0.85rem; }
+.gd-rows { display: flex; flex-direction: column; gap: 0.55rem; }
+.gd-row { display: flex; gap: 0.7rem; align-items: baseline; }
+.gd-row-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ap-muted); width: 84px; flex-shrink: 0; }
+.gd-row-value { font-size: 0.82rem; color: var(--dark-pine); line-height: 1.4; }
+
+/* Icon identity color -- constant mountain-pink on the box icon in
+   every state (Airey's direct design-pass request). State is carried
+   by the pill + card tint, and by the icon's own shape (plain box /
+   box + motion lines / box + checkmark), not by recoloring the icon. */
+.gd-icon path, .gd-icon line { stroke: var(--mountain-pink); }
+
+/* Packing: neutral, nothing to flag yet. */
+.gd-card.st-packing { border-color: rgba(42,71,71,0.14); }
+.gd-card.st-packing .gd-pill { background: rgba(42,71,71,0.07); color: var(--ap-muted); }
+
+/* Packed: same "ready/good" green tint as .ap-tile-status's status-done. */
+.gd-card.st-packed { border-color: rgba(122,189,145,0.35); background: linear-gradient(120deg, rgba(122,189,145,0.10), rgba(122,189,145,0.03)); }
+.gd-card.st-packed .gd-pill { background: rgba(122,189,145,0.2); color: #2a7a4a; }
+
+/* Out for Delivery: same neutral palette as Packing (Airey's direct
+   correction, design pass 2026-09-05 -- an earlier red/pink tint here
+   read as "there's a problem," which wasn't the intent). Distinguished
+   from Packing by its copy and the icon's motion-line shape, not color. */
+.gd-card.st-outfordelivery { border-color: rgba(42,71,71,0.14); }
+.gd-card.st-outfordelivery .gd-pill { background: rgba(42,71,71,0.07); color: var(--ap-muted); }
+
+/* Delivered: solid fill, same "positive solid action" treatment as
+   .ap-guide-cta's button. */
+.gd-card.st-delivered { border-color: rgba(122,189,145,0.4); background: linear-gradient(120deg, rgba(122,189,145,0.14), rgba(122,189,145,0.04)); }
+.gd-card.st-delivered .gd-pill { background: var(--desert-green); color: #fff; }
+
+/* Delivered checkmark badge, overlaid on the box icon -- same badge
+   treatment as the hub's own "everything's set" check
+   (.ap-prep-summary-check). */
+.gd-icon-wrap { position: relative; width: 34px; height: 34px; flex-shrink: 0; margin-top: 0.1rem; }
+.gd-icon-wrap .gd-icon { margin-top: 0; display: block; }
+.gd-check-badge { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--desert-green); border: 2px solid var(--sand-beige); display: flex; align-items: center; justify-content: center; }
+
 /* Guide/RideWithGPS emphasis card (T-3 hub refresh, 2026-09-04) --
    replaces the old single-line .ap-trail-unlocked treatment once a
    trail guide is actually unlocked (past T-3); .ap-trail-unlocked and
