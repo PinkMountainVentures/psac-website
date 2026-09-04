@@ -251,7 +251,7 @@
    .ap-trail-locked-note stay in the stylesheet for the still-locked
    state and the guardian_only hub's own smaller usage. */
 .ap-guide-card { background: linear-gradient(135deg, var(--dark-pine) 0%, #1e3535 100%); border-radius: 16px; padding: 1.5rem 1.5rem 1.4rem; margin-bottom: 1.1rem; box-shadow: 0 8px 26px rgba(42,71,71,0.25); max-width: 960px; }
-.ap-guide-eyebrow { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; }
+.ap-guide-eyebrow { display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--desert-green); margin-bottom: 0.5rem; }
 .ap-guide-eyebrow svg { flex-shrink: 0; }
 .ap-guide-headline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.5rem; font-weight: 500; color: var(--sand-beige); line-height: 1.25; margin-bottom: 0.5rem; }
 .ap-guide-body { font-size: 0.78rem; color: var(--sand-beige); opacity: 0.85; line-height: 1.55; margin-bottom: 1.1rem; }
