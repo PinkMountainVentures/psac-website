@@ -187,7 +187,8 @@
 .ap-weather-temp { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--dark-pine); line-height: 1.1; }
 .ap-weather-cond { font-size: 0.76rem; color: var(--dark-pine); opacity: 0.75; }
 .ap-weather-note { font-size: 0.68rem; color: var(--ap-muted); margin-top: 0.2rem; font-style: italic; }
-.ap-weather-when { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6FA8C9; text-align: right; flex-shrink: 0; }
+.ap-weather-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #6FA8C9; margin-bottom: 0.5rem; max-width: 960px; }
+.ap-weather-day { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dark-pine); opacity: 0.6; margin-bottom: 0.2rem; }
 
 /* Guide/RideWithGPS emphasis card (T-3 hub refresh, 2026-09-04) --
    replaces the old single-line .ap-trail-unlocked treatment once a

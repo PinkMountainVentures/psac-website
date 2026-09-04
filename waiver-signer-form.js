@@ -419,16 +419,17 @@
   // guest making outdoor-safety decisions. Separate copy from Surface
   // A's own weatherCardHtml() -- these are two separate client bundles
   // with no shared import path (see this file's header comment).
-  function weatherCardHtml(weather) {
+  function weatherCardHtml(weather, tripDateLabel) {
     if (!weather || !weather.tempF) return '';
-    return '<div class="ap-weather-card">' +
+    return '<div class="ap-weather-eyebrow">Adventure Day Weather Forecast</div>' +
+      '<div class="ap-weather-card">' +
       '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" fill="#F5A623"/><g stroke="#F5A623" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v2.4"/><path d="M12 19.6V22"/><path d="M4.2 4.2l1.7 1.7"/><path d="M18.1 18.1l1.7 1.7"/><path d="M2 12h2.4"/><path d="M19.6 12H22"/><path d="M4.2 19.8l1.7-1.7"/><path d="M18.1 5.9l1.7-1.7"/></g></svg>' +
       '<div class="ap-weather-mid">' +
+      (tripDateLabel ? '<div class="ap-weather-day">Adventure Day: ' + escapeHtml(tripDateLabel) + '</div>' : '') +
       '<div class="ap-weather-temp">' + escapeHtml(String(weather.tempF)) + '°F' + (weather.condition ? ', ' + escapeHtml(weather.condition) : '') + '</div>' +
       (weather.detail ? '<div class="ap-weather-cond">' + escapeHtml(weather.detail) + '</div>' : '') +
-      '<div class="ap-weather-note">Early read — we’ll keep this current as trail day gets closer.</div>' +
+      '<div class="ap-weather-note">Weather will be updated as trail day gets closer.</div>' +
       '</div>' +
-      '<div class="ap-weather-when">Early&nbsp;read</div>' +
       '</div>';
   }
 
@@ -601,7 +602,7 @@
 
     // T-3+ weather glance (T-3 hub refresh, 2026-09-04): renders nothing
     // until real forecast data exists -- see weatherCardHtml() above.
-    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot) : '';
+    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot, tripDate) : '';
 
     // T-3+ guide emphasis card (Airey's direct request, 2026-09-04):
     // replaces the old single-line .ap-trail-unlocked treatment with a
@@ -781,7 +782,7 @@
     // (once wired) what the weather looks like; certifying doesn't
     // change what day it is.
     var daysToGo = pastT3 ? daysUntilTrip(state.ctx.tripDate) : null;
-    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot) : '';
+    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot, formatTripDate(state.ctx.tripDate)) : '';
 
     if (allCertified) {
       var todayStr = pacificDateString(new Date());
