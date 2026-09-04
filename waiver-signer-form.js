@@ -419,16 +419,52 @@
   // guest making outdoor-safety decisions. Separate copy from Surface
   // A's own weatherCardHtml() -- these are two separate client bundles
   // with no shared import path (see this file's header comment).
+  // Picks an icon that actually matches the reported condition text,
+  // instead of always showing a sun regardless of what the forecast
+  // says (caught by Airey reviewing a "95F, Mostly cloudy" card with a
+  // sun icon on it). Matches on keywords in the condition string since
+  // that's already a humanized label (weatherService's conditionLabel()
+  // -- either Google's own localized description text, or a humanized
+  // version of its CLEAR/PARTLY_CLOUDY/RAIN/... type enum), not the raw
+  // enum itself. Falls back to sun for clear/unrecognized conditions.
+  // Separate copy from Surface A's own weatherIconSvg() -- same "two
+  // separate client bundles" reason weatherCardHtml() is duplicated.
+  function weatherIconSvg(condition) {
+    var c = String(condition || '').toLowerCase();
+    var cloud = 'M6.5 19a4.5 4.5 0 0 1-.62-8.96A6 6 0 0 1 17.6 8.06 4.5 4.5 0 0 1 17 19H6.5Z';
+    if (c.indexOf('thunder') !== -1) {
+      return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><path d="' + cloud + '" fill="#9BB0BE"/><path d="M12.5 13l-3 5h2.5l-1 4 4-5.5h-2.5l1-3.5Z" fill="#F5A623"/></svg>';
+    }
+    if (c.indexOf('snow') !== -1) {
+      return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><path d="' + cloud + '" fill="#9BB0BE"/><g stroke="#8FCBE0" stroke-width="1.4" stroke-linecap="round"><path d="M8 18v3M6.5 19.5h3"/><path d="M12 18v3M10.5 19.5h3"/><path d="M16 18v3M14.5 19.5h3"/></g></svg>';
+    }
+    if (c.indexOf('rain') !== -1 || c.indexOf('shower') !== -1) {
+      return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><path d="' + cloud + '" fill="#9BB0BE"/><g stroke="#6FA8C9" stroke-width="1.6" stroke-linecap="round"><path d="M8 18.5v2"/><path d="M12 18.5v2"/><path d="M16 18.5v2"/></g></svg>';
+    }
+    if (c.indexOf('wind') !== -1) {
+      return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><g stroke="#9BB0BE" stroke-width="1.6" stroke-linecap="round"><path d="M3 8h11a2.5 2.5 0 1 0-2.2-3.7"/><path d="M3 12h15a2.5 2.5 0 1 1-2.2 3.9"/><path d="M3 16h9a2 2 0 1 1-1.8 2.9"/></g></svg>';
+    }
+    if (c.indexOf('cloud') !== -1) {
+      if (c.indexOf('partly') !== -1 || c.indexOf('mostly clear') !== -1) {
+        return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.6" fill="#F5A623"/><g stroke="#F5A623" stroke-width="1.3" stroke-linecap="round"><path d="M9 2.4v1.6"/><path d="M3.4 8H5"/><path d="M4.9 3.9l1.1 1.1"/></g><path d="M8 20a4 4 0 0 1-.5-7.97A5.3 5.3 0 0 1 18 13.5 4 4 0 0 1 17.5 20H8Z" fill="#9BB0BE"/></svg>';
+      }
+      return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><path d="' + cloud + '" fill="#9BB0BE"/></svg>';
+    }
+    return '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" fill="#F5A623"/><g stroke="#F5A623" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v2.4"/><path d="M12 19.6V22"/><path d="M4.2 4.2l1.7 1.7"/><path d="M18.1 18.1l1.7 1.7"/><path d="M2 12h2.4"/><path d="M19.6 12H22"/><path d="M4.2 19.8l1.7-1.7"/><path d="M18.1 5.9l1.7-1.7"/></g></svg>';
+  }
+
   function weatherCardHtml(weather, tripDateLabel) {
     if (!weather || !weather.tempF) return '';
     return '<div class="ap-weather-eyebrow">Adventure Day Weather Forecast</div>' +
       '<div class="ap-weather-card">' +
-      '<svg class="ap-weather-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" fill="#F5A623"/><g stroke="#F5A623" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v2.4"/><path d="M12 19.6V22"/><path d="M4.2 4.2l1.7 1.7"/><path d="M18.1 18.1l1.7 1.7"/><path d="M2 12h2.4"/><path d="M19.6 12H22"/><path d="M4.2 19.8l1.7-1.7"/><path d="M18.1 5.9l1.7-1.7"/></g></svg>' +
+      (tripDateLabel ? '<div class="ap-weather-day">' + escapeHtml(tripDateLabel) + '</div>' : '') +
+      '<div class="ap-weather-row">' +
+      weatherIconSvg(weather.condition) +
       '<div class="ap-weather-mid">' +
-      (tripDateLabel ? '<div class="ap-weather-day">Adventure Day: ' + escapeHtml(tripDateLabel) + '</div>' : '') +
       '<div class="ap-weather-temp">' + escapeHtml(String(weather.tempF)) + '°F' + (weather.condition ? ', ' + escapeHtml(weather.condition) : '') + '</div>' +
       (weather.detail ? '<div class="ap-weather-cond">' + escapeHtml(weather.detail) + '</div>' : '') +
-      '<div class="ap-weather-note">Weather will be updated as trail day gets closer.</div>' +
+      '<div class="ap-weather-note">Weather will be kept up to date as your adventure day gets closer.</div>' +
+      '</div>' +
       '</div>' +
       '</div>';
   }
