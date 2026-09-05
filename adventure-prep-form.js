@@ -420,6 +420,18 @@
     return diff > 0 ? diff : 0;
   }
 
+  // Phase 2.5 Trail Day (2026-09-04) -- expectedReturnAt comes back from
+  // the server as a real timestamp; this is the one place that needs a
+  // clock-time display ("1:40pm") rather than a calendar date, so it gets
+  // its own small helper alongside pacificDateString above.
+  function formatPacificTime(isoString) {
+    if (!isoString) return '';
+    var d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    var formatted = d.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
+    return formatted.replace(' ', '').toLowerCase();
+  }
+
   // Small Oxford-style joiner for the "Building momentum" state's "just
   // [X], [Y] and [Z] left" copy below -- no equivalent existed anywhere
   // in this file since nothing previously needed to name a variable-
@@ -669,6 +681,8 @@
       case 'waiver': frag = renderWaiver(); break;
       case 'summary': frag = renderSummary(); break;
       case 'ridewithgpsInfo': frag = renderRideWithGpsInfo(); break;
+      case 'headingOut': frag = renderHeadingOutSheet(); break;
+      case 'emergencySosInfo': frag = renderEmergencySosInfo(); break;
       case 'waiverDetail': frag = renderWaiverDetail(); break;
       default: frag = renderHub();
     }
@@ -1406,6 +1420,342 @@
       '</div>';
   }
 
+  // ---------------------------------------------------------------------
+  // Phase 3 Post-Adventure / "Peaks to Pools" gear-return card
+  // (claude/psac-adventure-hub-post-adventure-return-proposal-
+  // 2026-09-03.md). Mirrors computeGearDeliveryStatus()/
+  // gearDeliveryCardHtml()/computeDeliverySlotDate() directly above --
+  // same "Your Gear" eyebrow, same .gd-card family, same read-the-
+  // existing-state-don't-invent-new-mechanics posture -- built entirely
+  // on top of lib/gear-service.js's ALREADY-EXISTING return/reconciliation
+  // machinery (schedulePickup -> markPickedUp -> markReturned -> per-item
+  // checkInItem -> syncReturnStatusIfSettled -> reconciliation writes
+  // deposit_status). This is a new READ/RENDER layer, not new backend
+  // mechanics -- see lib/adventure-prep-service.js's getContextByToken
+  // for the columns/gear_check_log rows this reads.
+  //
+  // DUE-BY, NOT A WINDOW (Airey's direct catch): unlike delivery, where a
+  // range is fine because PSAC holds that commitment, a return window
+  // puts the GUEST on the hook -- and a range lets a guest argue "I'm
+  // still in my window" the moment staff or Uber actually shows up. So
+  // ap.returnWindow is now a single due-by deadline ("Ready by 7:00pm",
+  // see renderPickupScreen's ALL_WINDOWS above), and PSAC's own visit
+  // happens strictly AFTER that instant, never before -- there's nothing
+  // to arrive "early" for. Confirmed against the real backend: return_
+  // status only ever flips to 'pickup_scheduled' (schedulePickup, lib/
+  // gear-service.js) when an actual pickup run is dispatched, which in
+  // practice only happens after the due-by instant -- so the state below
+  // is decided by comparing now() to that instant directly, the same way
+  // computeGearDeliveryStatus's own out_for_delivery check works, rather
+  // than trusting return_status alone to have flipped in time.
+  //
+  // Return day is the trip day itself, not T-1 like delivery -- gear goes
+  // out the evening before the trip and comes back the evening of it, per
+  // the real copy on renderPickupScreen ("picked up the evening after
+  // your adventure"). No date offset here, unlike computeDeliverySlotDate.
+  function computeGearReturnSlotDate(tripDateStr, dueByLabel) {
+    var m = String(dueByLabel || '').match(/(\d{1,2}):(\d{2})\s*([ap]m)/i);
+    if (!m) return null;
+    var dm = String(tripDateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!dm) return null;
+    var hour = Number(m[1]) % 12;
+    if (/pm/i.test(m[3])) hour += 12;
+    var minute = Number(m[2]);
+    var y = Number(dm[1]), mo = Number(dm[2]) - 1, d = Number(dm[3]);
+    var guess = new Date(Date.UTC(y, mo, d, hour, minute) + 8 * 3600000);
+    var offset = pacificOffsetMinutes(guess);
+    return new Date(Date.UTC(y, mo, d, hour, minute) - offset * 60000);
+  }
+
+  /**
+   * Returns a fully render-ready object ({state, pill, headline, note,
+   * rows, showEscapeHatch}) -- gearReturnCardHtml below is a pure
+   * renderer of whatever this decides, same division of labor
+   * computeGearDeliveryStatus/gearDeliveryCardHtml already use.
+   *
+   * State mapping against the real return_status/deposit_status/
+   * gear_check_log columns (see this block's own header above for the
+   * due-by reasoning behind the first branch):
+   *   Return Due / On the Way  -- return_status '' or 'pickup_scheduled',
+   *                               split purely by now() vs. the guest's
+   *                               own due-by instant.
+   *   Picked Up                -- return_status 'picked_up', or 'returned'
+   *                               with no gear_check_log rows yet (check-
+   *                               in hasn't actually started server-side).
+   *   Checking In               -- return_status 'returned', gear_check_log
+   *                               rows exist, nothing Missing-in-grace.
+   *   Double-Checking           -- return_status 'returned', at least one
+   *                               item Missing with an unexpired
+   *                               grace_deadline -- the one state with the
+   *                               "Left something behind?" escape hatch,
+   *                               since a guest-found item here is exactly
+   *                               what can clear this before the grace
+   *                               window closes.
+   *   Checked In / Wrapping Up / Charge Applied -- return_status
+   *                               'checked_in' (lib/gear-service.js's
+   *                               syncReturnStatusIfSettled already only
+   *                               flips this once every item is judged),
+   *                               branched by deposit_status:
+   *                               released -> Checked In (good outcome);
+   *                               full_capture_pending_review -> Wrapping
+   *                               Up (a neutral holding state -- the final
+   *                               charge amount genuinely isn't knowable
+   *                               yet); partial_capture/full_capture/
+   *                               shortfall_charged -> Charge Applied,
+   *                               amount = reconciledAmountCents, plus
+   *                               shortfallChargedAmountCents on top for
+   *                               shortfall_charged specifically (that's
+   *                               a second, later charge on top of the
+   *                               original capture -- see lib/gear-
+   *                               service.js's own reconciliation writes).
+   */
+  function computeGearReturnStatus(eb, ap) {
+    var returnStatus = eb.returnStatus || '';
+    var dueByLabel = ap.returnWindow || '';
+    var bareTime = (dueByLabel.match(/(\d{1,2}:\d{2}\s*[ap]m)/i) || [])[1] || 'this evening';
+    var addressLine1 = (ap.returnSameAsDelivery === false && ap.returnAddressLine1)
+      ? ap.returnAddressLine1
+      : [ap.deliveryAddressLine1, ap.deliveryAddressLine2].filter(Boolean).join(', ');
+    var addressLine2 = (ap.returnSameAsDelivery === false && ap.returnLocation)
+      ? ap.returnLocation
+      : [ap.deliveryCity, ap.deliveryState].filter(Boolean).join(', ') + (ap.deliveryZip ? ' ' + ap.deliveryZip : '');
+    var address = [addressLine1, addressLine2].filter(Boolean).join(', ');
+    var dueDate = computeGearReturnSlotDate(eb.date, dueByLabel);
+
+    function withRows(base, rows) { base.rows = rows; return base; }
+
+    if (returnStatus === '' || returnStatus === 'pickup_scheduled') {
+      if (dueDate && new Date() >= dueDate) {
+        return withRows({
+          state: 'on_the_way', pill: 'On the Way', headline: 'We’re on our way',
+          note: 'We’re headed over to grab your gear after the ' + bareTime + ' deadline.',
+        }, [{ label: 'Address', value: address }]);
+      }
+      return withRows({
+        state: 'return_due', pill: 'Return Due', headline: 'Ready by ' + bareTime,
+        note: 'Have it ready and waiting at the address below. That’s when we come get it.',
+      }, [{ label: 'Ready By', value: bareTime }, { label: 'Address', value: address }]);
+    }
+
+    if (returnStatus === 'picked_up') {
+      return withRows({
+        state: 'picked_up', pill: 'Picked Up', headline: 'Picked up',
+        note: 'Your gear’s on its way back to us. We’ll check it in shortly.',
+      }, [{ label: 'Address', value: address }]);
+    }
+
+    if (returnStatus === 'returned' || returnStatus === 'checked_in') {
+      var gearCheckLog = eb.gearCheckLog || [];
+      var nowMs = Date.now();
+
+      if (returnStatus === 'checked_in') {
+        var depositStatus = eb.depositStatus || '';
+        if (depositStatus === 'partial_capture' || depositStatus === 'full_capture' || depositStatus === 'shortfall_charged') {
+          var amountCents = (eb.reconciledAmountCents || 0) + (depositStatus === 'shortfall_charged' ? (eb.shortfallChargedAmountCents || 0) : 0);
+          return withRows({
+            state: 'charge_applied', pill: 'Charge Applied', headline: 'Deposit charge applied',
+            note: 'A charge was applied based on your gear’s condition. Details are in your email.',
+          }, [{ label: 'Amount', value: '$' + (amountCents / 100).toFixed(2) }]);
+        }
+        if (depositStatus === 'full_capture_pending_review') {
+          return withRows({
+            state: 'wrapping_up', pill: 'Wrapping Up', headline: 'Wrapping up',
+            note: 'We’re finishing a final review before closing this out. We’ll let you know shortly.',
+          }, []);
+        }
+        return withRows({
+          state: 'checked_in_clean', pill: 'Checked In', headline: 'All checked in',
+          note: 'Everything came back in good shape. Your deposit hold has been released.',
+        }, []);
+      }
+
+      if (!gearCheckLog.length) {
+        return withRows({
+          state: 'picked_up', pill: 'Picked Up', headline: 'Picked up',
+          note: 'Your gear’s on its way back to us. We’ll check it in shortly.',
+        }, [{ label: 'Address', value: address }]);
+      }
+
+      var missingInGrace = gearCheckLog.filter(function (r) {
+        return r.condition === 'Missing' && r.graceDeadline && new Date(r.graceDeadline).getTime() > nowMs;
+      });
+      if (missingInGrace.length) {
+        var graceDeadlineText = formatPacificTime(missingInGrace[0].graceDeadline) || 'shortly';
+        return withRows({
+          state: 'double_checking', pill: 'Double-Checking', headline: 'Double-checking one item',
+          note: 'We’re still looking for ' + (missingInGrace[0].itemName || 'one item') + '. We’ll give it until ' + graceDeadlineText + ' before finalizing anything.',
+          showEscapeHatch: true,
+        }, [{ label: 'Item', value: missingInGrace[0].itemName || 'Unnamed item' }, { label: 'Until', value: graceDeadlineText }]);
+      }
+
+      return withRows({
+        state: 'checking_in', pill: 'Checking In', headline: 'Checking your gear in',
+        note: 'We’re going through your gear item by item. Almost done.',
+      }, []);
+    }
+
+    // Fallback -- unrecognized return_status value; hold at Return Due
+    // rather than guessing (same "never guess a later state" posture
+    // computeGearDeliveryStatus's own Packed branch takes).
+    return withRows({
+      state: 'return_due', pill: 'Return Due', headline: 'Ready by ' + bareTime,
+      note: 'Have it ready and waiting at the address below. That’s when we come get it.',
+    }, [{ label: 'Ready By', value: bareTime }, { label: 'Address', value: address }]);
+  }
+
+  // Icon shape (not color -- box stays mountain-pink in every state, same
+  // rule gearDeliveryIconSvg follows): motion lines for On the Way,
+  // checkmark badge for the good-outcome Checked In state, an attention
+  // badge for the two states that actually need a guest's eyes
+  // (Double-Checking, Charge Applied).
+  function gearReturnIconSvg(state) {
+    var motionLines = state === 'on_the_way'
+      ? '<line x1="1.6" y1="11" x2="3.2" y2="10" stroke-width="1.3" stroke-linecap="round"/><line x1="1.3" y1="14" x2="3" y2="13.4" stroke-width="1.3" stroke-linecap="round"/>'
+      : '';
+    var icon = '<svg class="gd-icon" width="34" height="34" viewBox="0 0 24 24" fill="none">' + GEAR_BOX_ICON_PATHS + motionLines + '</svg>';
+    if (state === 'checked_in_clean') {
+      return '<div class="gd-icon-wrap">' + icon +
+        '<span class="gd-check-badge"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="white" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+        '</div>';
+    }
+    if (state === 'double_checking' || state === 'charge_applied') {
+      return '<div class="gd-icon-wrap">' + icon + '<span class="gd-alert-badge">!</span></div>';
+    }
+    return icon;
+  }
+
+  // "Left something behind? Tell us" -- the gear-return-side escape
+  // hatch, live only on the Double-Checking state (the one place a
+  // guest's own reply can actually clear something before the grace
+  // window closes). Same reveal/collapse markup trailDayReadyStripHtml's
+  // own gear-issue escape hatch uses (.ap-ready-link/.ap-issue-panel),
+  // wired below in renderHub -- posts to send-help-message.js with
+  // requestType 'gear_return_note' (lib/gear-issue-service.js's own
+  // contextLabel/urgency params, added alongside this).
+  function gearReturnNoteEscapeHatchHtml() {
+    return '<span class="ap-ready-link" id="ap-gear-return-note-toggle">Left something behind? Tell us →</span>' +
+      '<div class="ap-issue-panel" id="ap-gear-return-note-panel">' +
+      '<div class="ap-issue-label">Tell us what we might be missing</div>' +
+      '<textarea class="ap-issue-textarea" id="ap-gear-return-note-textarea" placeholder="What did you notice, or leave behind?"></textarea>' +
+      '<div class="ap-issue-row"><span class="ap-issue-note">Goes straight to our team.</span><button type="button" class="ap-issue-send" id="ap-gear-return-note-send">Send</button></div>' +
+      '<div id="ap-gear-return-note-status"></div>' +
+      '</div>';
+  }
+
+  function gearReturnCardHtml(ret) {
+    if (!ret) return '';
+    var stateClass = 'st-' + ret.state.replace(/_/g, '');
+    var rowsHtml = (ret.rows || []).map(function (row) {
+      return '<div class="gd-row"><span class="gd-row-label">' + escapeHtml(row.label) + '</span><span class="gd-row-value">' + escapeHtml(row.value) + '</span></div>';
+    }).join('');
+    return '<div class="gd-eyebrow">Your Gear</div>' +
+      '<div class="gd-card ' + stateClass + '">' +
+      '<div class="gd-top">' +
+      gearReturnIconSvg(ret.state) +
+      '<div class="gd-headtext"><div class="gd-headline">' + escapeHtml(ret.headline) + '</div></div>' +
+      '<span class="gd-pill">' + escapeHtml(ret.pill) + '</span>' +
+      '</div>' +
+      '<div class="gd-rule"></div>' +
+      (rowsHtml ? '<div class="gd-rows">' + rowsHtml + '</div>' : '') +
+      (ret.note ? '<div class="gd-note">' + escapeHtml(ret.note) + '</div>' : '') +
+      (ret.showEscapeHatch ? gearReturnNoteEscapeHatchHtml() : '') +
+      '</div>';
+  }
+
+
+  // ---------------------------------------------------------------------
+  // Phase 2.5 Trail Day (claude/psac-trail-day-phase-proposal-2026-09-04.md).
+  // Anti-overwhelm design: ONE required guest action (Heading Out, see
+  // headingOutButtonHtml/renderHeadingOutSheet below); gear/guide status
+  // is auto-resolved from state the system already has, with a quiet
+  // escape hatch for the rare problem case; the SAR check-in expectation
+  // stays visible (it matters) but never becomes a new task on trail day
+  // itself -- it was already introduced at T-3 (see showT3SafetyNote in
+  // renderHub below).
+  // ---------------------------------------------------------------------
+
+  // Ambient reminder directly under the morning hero card -- quiet but
+  // explicit, leading with the value frame (this is a benefit of booking
+  // with PSAC) before the mechanism, per Airey's direct language notes
+  // across two review rounds.
+  function ambientCheckinNoteHtml() {
+    return '<div class="ap-ambient-note">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l8 3.6v5.4c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6.1l8-3.6Z" stroke="#7a8a8a" stroke-width="1.4" stroke-linejoin="round"/></svg>' +
+      '<span><b style="color:var(--dark-pine);">You’ll need to check in once you’re back.</b> It’s part of how every PSAC trip looks out for you, we’ll text you around your expected return time, and a reply is required. Nothing to do until then.</span>' +
+      '</div>';
+  }
+
+  // "Ready to go" -- not a checklist the guest fills out, a reflection of
+  // state the system already has. Gear is assume-good with an escape
+  // hatch (built on the exact same reveal/collapse grammar as the
+  // page-level "Questions?" panel -- see .ap-issue-panel in ap-styles.css
+  // and the click wiring in renderHub below). Guide has two computed
+  // states, neither asked: tapped-at-least-once (ap.guideFirstOpenedAt),
+  // or a nudge -- never a gate, the guest can tap Heading Out either way.
+  function trailDayReadyStripHtml(ap, status) {
+    var guideOpened = !!ap.guideFirstOpenedAt;
+    var checkIconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#7ABD91" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var nudgeIconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16.2v.1" stroke="#F58271" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/></svg>';
+
+    var gearRow = '<div class="ap-ready-row">' +
+      '<div class="ap-ready-icon ok">' + checkIconSvg + '</div>' +
+      '<div class="ap-ready-text">' +
+      '<div class="t1">Your gear’s all here</div>' +
+      '<div class="t2">Packed and delivered last night.</div>' +
+      '<span class="ap-ready-link" id="ap-gear-issue-toggle">Something not right? →</span>' +
+      '<div class="ap-issue-panel" id="ap-gear-issue-panel">' +
+      '<div class="ap-issue-label">Tell us what’s wrong</div>' +
+      '<textarea class="ap-issue-textarea" id="ap-gear-issue-textarea" placeholder="What’s off with your gear?"></textarea>' +
+      '<div class="ap-issue-row"><span class="ap-issue-note">Goes straight to our team.</span><button type="button" class="ap-issue-send" id="ap-gear-issue-send">Send</button></div>' +
+      '<div id="ap-gear-issue-status"></div>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+
+    var guideRow = guideOpened
+      ? '<div class="ap-ready-row"><div class="ap-ready-icon ok">' + checkIconSvg + '</div><div class="ap-ready-text"><div class="t1">Guide downloaded</div><div class="t2">' + escapeHtml(status.trailName || 'Your trail') + '’s route is ready for offline use.</div></div></div>'
+      : '<div class="ap-ready-row"><div class="ap-ready-icon nudge">' + nudgeIconSvg + '</div><div class="ap-ready-text"><div class="t1">Don’t forget your guide</div><div class="t2">Download it for offline use before you go.</div><span class="ap-ready-link" id="ap-ready-get-guide">Get Guide →</span></div></div>';
+
+    return '<div class="ap-ready-strip"><div class="ap-card">' +
+      '<div class="ap-ready-title">Ready to go</div>' +
+      gearRow + guideRow +
+      '</div></div>';
+  }
+
+  function headingOutButtonHtml() {
+    return '<button type="button" class="ap-cta-primary" id="ap-heading-out-btn">Heading Out</button>' +
+      '<div class="ap-helper" style="max-width:640px;margin:0 auto 1.3rem;text-align:center;">Tapping this opens a 10-second headcount, then you’re on your way.</div>';
+  }
+
+  // Underway: same hero-photo card as the morning, dimmed to read as
+  // "later in the day" (see heroCardHtml's dimmed param), now stating the
+  // check-in's real stakes plainly -- naming search and rescue and its
+  // real cost directly, per Airey's request, while staying even in tone
+  // rather than alarmist.
+  function underwayHeroHtml(ap, status, selectedTrailCandidate) {
+    var expectedReturnLabel = formatPacificTime(ap.expectedReturnAt) || 'later today';
+    var subline = 'Expect you back around <b>' + escapeHtml(expectedReturnLabel) + '</b>. We’ll text you then, and we need a reply, that’s how we know your group made it back safe. ' +
+      'Miss it and we start trying to reach you right away, if that doesn’t work, it becomes a real search and rescue response, an expensive step we take seriously and hope never to need. ' +
+      '<a class="ap-hero-link" id="ap-signal-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">If you can’t get signal →</a>';
+    return heroCardHtml('On The Trail', 'You’re on the trail.', subline, selectedTrailCandidate && selectedTrailCandidate.photoUrl, null, true);
+  }
+
+  function underwaySupportingNoteHtml() {
+    return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
+      'If we still haven’t heard from your group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan already makes to every guest. ' +
+      'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>';
+  }
+
+  function gearPickupReminderHtml(ap) {
+    var windowText = ap.returnWindow || 'this evening';
+    var whereText = ap.returnSameAsDelivery === false && ap.returnLocation ? ap.returnLocation : 'with your property’s front desk';
+    return '<div class="ap-ready-strip"><div class="ap-card">' +
+      '<div class="ap-ready-row" style="border-top:none;padding-top:0;">' +
+      '<div class="ap-ready-icon nudge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16.2v.1" stroke="#F58271" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/></svg></div>' +
+      '<div class="ap-ready-text"><div class="t1">Tonight: gear pickup</div><div class="t2">' + escapeHtml(windowText) + ', ' + escapeHtml(whereText) + '.</div></div>' +
+      '</div></div></div>';
+  }
+
   function renderHub() {
     var eb = state.ctx.experienceBooking;
     var ap = state.ctx.adventurePrep || {};
@@ -1414,6 +1764,18 @@
     var depositAmount = computeDepositAmount();
 
     var pastT3 = status.trailSelected && isPastT3Cutoff();
+    // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05): true for
+    // every day strictly after the trip date itself, forever after --
+    // same "pure function of today's date" rule pastT3 above already
+    // follows. Fixes a real bug this hub had with no post-trip branch at
+    // all: without this, the day after a trip (and every day after that)
+    // fell through to the pastT3 "guide unlocked" copy below, since that
+    // check only ever looks at whether T-3 has passed, never whether the
+    // trip itself already happened.
+    var todayStrForTripCheck = pacificDateString(new Date());
+    var tripDateMatchForTripCheck = String(eb.date || '').match(/^\d{4}-\d{2}-\d{2}/);
+    var tripDateStrForTripCheck = tripDateMatchForTripCheck ? tripDateMatchForTripCheck[0] : '';
+    var pastTripDay = !!(tripDateStrForTripCheck && todayStrForTripCheck > tripDateStrForTripCheck);
     // NEW (T-3 hub refresh, 2026-09-04): trail-day countdown, only
     // meaningful once past T3 -- passed into heroCardHtml below so it
     // renders pinned to the hero photo's top-right corner.
@@ -1533,6 +1895,14 @@
 
     var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + '. You could have spent ' + formatTripDate(eb.date) + ' by the pool. You picked the trail instead. Here’s everything left before you’re on it.';
     var topSublineHtml = '';
+    // Phase 2.5 Trail Day (2026-09-04): hoisted out of the branches below
+    // so the wrap-order construction further down can tell whether
+    // today's card is the Trail Day one at all (isTrailDayToday) and
+    // whether the T-3 guide-unlocked card should carry the new safety-net
+    // paragraph (showT3SafetyNote -- only the 2B state, not trail day or
+    // delivery day, which each have their own distinct copy already).
+    var isTrailDayToday = false;
+    var showT3SafetyNote = false;
 
     if (status.allSet) {
       var statLine = escapeHtml(status.trailName) + ' · ' + formatTripDate(eb.date) + ' · ' + attendingRosterCount() + ' adventurers · ' + status.kitCount + ' gear kits packed';
@@ -1542,11 +1912,12 @@
       var deliveryDateStr = isoOffsetDateStr(eb.date, -1);
 
       if (todayStr === tripDateStr) {
-        // 2D: Trail-day. oneTripTip (Trail Database column AU) is
-        // wired through already but empty for every trail today -- see
+        // 2D / Phase 2.5: Trail-day. oneTripTip (Trail Database column AU)
+        // is wired through already but empty for every trail today -- see
         // this doc's own flagged content gap -- so this falls back to
         // the audit's own confirmed-good sun-exposure line until a
         // trail actually has one written.
+        isTrailDayToday = true;
         var tripTip = (selectedTrailCandidate && selectedTrailCandidate.oneTripTip) ||
           'Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.';
         topGreetingHtml = 'It’s adventure day! ' + escapeHtml(status.trailName) + ' is waiting.';
@@ -1561,10 +1932,28 @@
         var propertyLabel = propertyLabels[propertyRaw] || 'your place';
         topGreetingHtml = 'Your gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', at your ' + escapeHtml(propertyLabel) + '.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
+      } else if (pastTripDay) {
+        // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05): the
+        // trip itself is over. PSAC always frames forward, never back --
+        // never "how the trail day behind you went," always what's next.
+        // The full Welcome Back/Check-in/Closing/Steady-State redesign
+        // (feedback capture, the "Everyone back?" roster-confirm gap
+        // fix, etc.) is a separate, larger build, tracked in
+        // claude/psac-adventure-hub-post-adventure-return-proposal-
+        // 2026-09-03.md. This is deliberately the minimal correct slice:
+        // stop the hub from showing stale "guide's ready" copy once the
+        // trip has passed (the real bug pastTripDay above fixes), and
+        // put the thing that actually matters now -- the gear-return
+        // card, below -- in front of the guest instead.
+        topGreetingHtml = 'You’ve earned the pool. Your gear’s the one thing left.';
+        topSublineHtml = 'You lived ' + escapeHtml(status.trailName) + '. Here’s what’s next.';
       } else if (pastT3) {
         // 2B: Guide unlocked. The trail section below already carries
         // its own Get Guide button once pastT3, so this doesn't repeat
-        // one -- just names the moment.
+        // one -- just names the moment. Also the one state that gets the
+        // new T-3 safety-net paragraph (Phase 2.5 Trail Day, 2026-09-04)
+        // -- see guideCardHtml below.
+        showT3SafetyNote = true;
         topGreetingHtml = 'Your guide’s ready. Turn-by-turn navigation, waypoints, and everything for ' + escapeHtml(status.trailName) + ' is yours now.';
         topSublineHtml = statLine;
       } else {
@@ -1611,10 +2000,24 @@
     // computeGearDeliveryStatus()/gearDeliveryCardHtml() above).
     var gearDeliveryHtml = pastT3 ? gearDeliveryCardHtml(computeGearDeliveryStatus(eb, ap, status.kitCount)) : '';
 
+    // Gear return card (Phase 3 Post-Adventure, 2026-09-05 -- see this
+    // file's own computeGearReturnStatus()/gearReturnCardHtml() further
+    // below). Booker-only, same as the delivery card above.
+    var gearReturnHtml = pastTripDay ? gearReturnCardHtml(computeGearReturnStatus(eb, ap)) : '';
+
     // T-3+ guide emphasis card (Airey's direct request, 2026-09-04):
     // replaces the old single-line .ap-trail-unlocked treatment with a
     // full card once the guide is actually unlocked, plus a real
     // RideWithGPS "how does this work" page behind its secondary link.
+    // showT3SafetyNote (Phase 2.5 Trail Day, 2026-09-04): only the 2B
+    // state gets this paragraph -- trail day and delivery day each carry
+    // their own distinct check-in copy already (ambientCheckinNoteHtml /
+    // underwayHeroHtml above), so this doesn't repeat there. Leads with
+    // the value frame (a benefit of booking with PSAC), then the real,
+    // named cost of not responding -- per Airey's direct language notes.
+    var t3SafetyNoteHtml = !showT3SafetyNote ? '' :
+      '<div class="ap-guide-body" style="margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid rgba(248,241,233,0.14);"><b>One more thing for trail day: every PSAC trip includes a real safety net.</b> Once you’re out there, we’ll text you around when we expect you back, and we’ll need a reply, it’s how we know your group made it home safe. If we don’t hear from you, we start trying to reach you right away, and if that doesn’t work, it becomes an actual search and rescue response, an expensive, serious step we hope to never need but will absolutely take. Nothing to do now, just something to expect.</div>';
+
     var guideCardHtml = !pastT3 ? '' :
       '<div class="ap-guide-card">' +
       '<div class="ap-guide-eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4Z" stroke="#7ABD91" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12.2l2 2 4-4.4" stroke="#7ABD91" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Your digital guide is unlocked</div>' +
@@ -1622,6 +2025,7 @@
       '<div class="ap-guide-body">Opens ' + escapeHtml(status.trailName) + ' inside RideWithGPS — turn-by-turn navigation and waypoints, no account needed. Download it for offline use before you head out; cell service on this trail isn’t guaranteed.</div>' +
       '<button type="button" class="ap-guide-cta" id="ap-get-guide">Get Guide</button>' +
       '<button type="button" class="ap-guide-howto" id="ap-guide-howto">How does this work? →</button>' +
+      t3SafetyNoteHtml +
       '</div>';
 
     var pastT3TrailCardHtml = (pastT3 && status.trailSelected)
@@ -1637,20 +2041,49 @@
     // above, since both now render in the same DOM once past T3).
     var receiptHtml = pastT3 ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml('ap-get-guide-receipt') : '';
 
+    // Phase 2.5 Trail Day layout (2026-09-04): a genuinely different card
+    // order from every other pastT3 day, per Airey's own ask -- ambient
+    // check-in note and the auto-resolved Ready-to-go strip sit directly
+    // under the hero, THEN the one required action (Heading Out), THEN
+    // the weather card (kept on the page, per Airey's direct request,
+    // just moved below the button -- still carries its own eyebrow,
+    // weatherCardHtml already renders one unchanged). Once headingOutAt
+    // is set, the hero flips to the dimmed Underway treatment and the
+    // Heading Out button/Ready strip are gone -- nothing left to do but
+    // wait for the check-in. "Previous cards should be available" (Airey's
+    // original ask) is satisfied by getReadyHtml, the same collapsible
+    // "everything's set" strip every other pastT3 day already uses.
+    var trailDayBodyHtml = '';
+    if (isTrailDayToday) {
+      trailDayBodyHtml = !ap.headingOutAt
+        ? (topCardHtml + ambientCheckinNoteHtml() + trailDayReadyStripHtml(ap, status) + headingOutButtonHtml() + weatherHtml + getReadyHtml + depositNoteHtml + receiptHtml)
+        : (underwayHeroHtml(ap, status, selectedTrailCandidate) + underwaySupportingNoteHtml() + gearPickupReminderHtml(ap) + weatherHtml + getReadyHtml + depositNoteHtml + receiptHtml);
+    }
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      topCardHtml +
+      (isTrailDayToday ? '' : topCardHtml) +
       alertHtml +
-      (pastT3
-        // Reordered per Airey's direct request, 2026-09-05: trail card,
-        // then the guide, then weather, then the gear delivery card
-        // (booker-only, built 2026-09-05 -- see this file's own
-        // computeGearDeliveryStatus()/gearDeliveryCardHtml()), then the
-        // deposit/refund-hold note, then the collapsible "everything's
-        // set" prep strip, then the full summary receipt at the very
-        // bottom.
-        ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + gearDeliveryHtml + depositNoteHtml + getReadyHtml + receiptHtml
-        : trailSectionHtml + getReadyHtml + depositNoteHtml) +
+      (pastTripDay
+        // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05):
+        // deliberately minimal -- just the gear-return card, the
+        // collapsible prep strip (still useful as a record), and the
+        // summary receipt. No weather, no gear-delivery card, no
+        // deposit-hold note -- those are all about the trip that already
+        // happened.
+        ? gearReturnHtml + getReadyHtml + receiptHtml
+        : isTrailDayToday
+          ? trailDayBodyHtml
+          : pastT3
+            // Reordered per Airey's direct request, 2026-09-05: trail card,
+            // then the guide, then weather, then the gear delivery card
+            // (booker-only, built 2026-09-05 -- see this file's own
+            // computeGearDeliveryStatus()/gearDeliveryCardHtml()), then the
+            // deposit/refund-hold note, then the collapsible "everything's
+            // set" prep strip, then the full summary receipt at the very
+            // bottom.
+            ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + gearDeliveryHtml + depositNoteHtml + getReadyHtml + receiptHtml
+            : trailSectionHtml + getReadyHtml + depositNoteHtml) +
       '</div></div>'
     );
 
@@ -1666,16 +2099,109 @@
       var details = wrap.querySelector('#ap-prep-details');
       if (details) details.classList.toggle('is-open');
     });
+    // openGuide: shared by every "Get Guide" entry point on this screen
+    // (the guide card, the embedded receipt, and the trail-day Ready-to-go
+    // strip's own nudge link) -- opens the real link, and best-effort
+    // records the first-tap signal server-side (markGuideOpened,
+    // Phase 2.5 Trail Day, 2026-09-04) plus an optimistic local update so
+    // the Ready-to-go strip flips to "Guide downloaded" without a full
+    // reload. Fire-and-forget: a failed markGuideOpened call shouldn't
+    // block or error out opening the actual guide.
+    function openGuide() {
+      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+      if (!ap.guideFirstOpenedAt) {
+        ap.guideFirstOpenedAt = new Date().toISOString();
+        apiPost('/api/adventure-prep', { action: 'markGuideOpened', token: TOKEN }).catch(function () {});
+      }
+    }
     var guideBtn = wrap.querySelector('#ap-get-guide');
-    if (guideBtn) guideBtn.addEventListener('click', function () {
-      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
-    });
+    if (guideBtn) guideBtn.addEventListener('click', openGuide);
     var guideBtnReceipt = wrap.querySelector('#ap-get-guide-receipt');
-    if (guideBtnReceipt) guideBtnReceipt.addEventListener('click', function () {
-      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
-    });
+    if (guideBtnReceipt) guideBtnReceipt.addEventListener('click', openGuide);
+    var guideBtnReady = wrap.querySelector('#ap-ready-get-guide');
+    if (guideBtnReady) guideBtnReady.addEventListener('click', openGuide);
     var howtoBtn = wrap.querySelector('#ap-guide-howto');
     if (howtoBtn) howtoBtn.addEventListener('click', function () { state.step = 'ridewithgpsInfo'; render(); });
+
+    // Phase 2.5 Trail Day wiring (2026-09-04).
+    var headingOutBtn = wrap.querySelector('#ap-heading-out-btn');
+    if (headingOutBtn) headingOutBtn.addEventListener('click', function () { state.step = 'headingOut'; render(); });
+
+    var signalLink = wrap.querySelector('#ap-signal-link');
+    if (signalLink) signalLink.addEventListener('click', function () { state.step = 'emergencySosInfo'; render(); });
+
+    // Gear-issue escape hatch -- same reveal/collapse interaction as the
+    // page-level "Questions?" panel, just scoped inline to this one row.
+    var issueToggle = wrap.querySelector('#ap-gear-issue-toggle');
+    var issuePanel = wrap.querySelector('#ap-gear-issue-panel');
+    if (issueToggle && issuePanel) {
+      issueToggle.addEventListener('click', function () {
+        var isOpen = issuePanel.classList.toggle('is-open');
+        if (isOpen) {
+          var ta = wrap.querySelector('#ap-gear-issue-textarea');
+          if (ta) ta.focus();
+        }
+      });
+    }
+    var issueSendBtn = wrap.querySelector('#ap-gear-issue-send');
+    if (issueSendBtn) {
+      issueSendBtn.addEventListener('click', function () {
+        var ta = wrap.querySelector('#ap-gear-issue-textarea');
+        var statusEl = wrap.querySelector('#ap-gear-issue-status');
+        var message = ta ? ta.value.trim() : '';
+        if (!message) { if (ta) ta.focus(); return; }
+        issueSendBtn.disabled = true;
+        issueSendBtn.textContent = 'Sending…';
+        apiPost('/api/send-help-message', { token: TOKEN, message: message, requestType: 'gear_issue' }).then(function (res) {
+          issueSendBtn.disabled = false;
+          issueSendBtn.textContent = 'Send';
+          if (res.ok && res.body && res.body.status === 'sent') {
+            if (ta) ta.value = '';
+            if (statusEl) statusEl.innerHTML = '<div class="ap-issue-sent-note">Sent. Our team’s on it.</div>';
+          } else if (statusEl) {
+            statusEl.innerHTML = '<div class="ap-error">' + escapeHtml((res.body && res.body.message) || 'Something went wrong sending that. Please try again.') + '</div>';
+          }
+        });
+      });
+    }
+
+    // Gear-return-note escape hatch (Phase 3 Post-Adventure, 2026-09-05)
+    // -- "Left something behind? Tell us," live only on the Double-
+    // Checking state (see gearReturnNoteEscapeHatchHtml/
+    // computeGearReturnStatus above). Same reveal/collapse interaction as
+    // the gear-issue escape hatch just above.
+    var returnNoteToggle = wrap.querySelector('#ap-gear-return-note-toggle');
+    var returnNotePanel = wrap.querySelector('#ap-gear-return-note-panel');
+    if (returnNoteToggle && returnNotePanel) {
+      returnNoteToggle.addEventListener('click', function () {
+        var isOpen = returnNotePanel.classList.toggle('is-open');
+        if (isOpen) {
+          var ta = wrap.querySelector('#ap-gear-return-note-textarea');
+          if (ta) ta.focus();
+        }
+      });
+    }
+    var returnNoteSendBtn = wrap.querySelector('#ap-gear-return-note-send');
+    if (returnNoteSendBtn) {
+      returnNoteSendBtn.addEventListener('click', function () {
+        var ta = wrap.querySelector('#ap-gear-return-note-textarea');
+        var statusEl = wrap.querySelector('#ap-gear-return-note-status');
+        var message = ta ? ta.value.trim() : '';
+        if (!message) { if (ta) ta.focus(); return; }
+        returnNoteSendBtn.disabled = true;
+        returnNoteSendBtn.textContent = 'Sending…';
+        apiPost('/api/send-help-message', { token: TOKEN, message: message, requestType: 'gear_return_note' }).then(function (res) {
+          returnNoteSendBtn.disabled = false;
+          returnNoteSendBtn.textContent = 'Send';
+          if (res.ok && res.body && res.body.status === 'sent') {
+            if (ta) ta.value = '';
+            if (statusEl) statusEl.innerHTML = '<div class="ap-issue-sent-note">Sent. Our team’s on it.</div>';
+          } else if (statusEl) {
+            statusEl.innerHTML = '<div class="ap-error">' + escapeHtml((res.body && res.body.message) || 'Something went wrong sending that. Please try again.') + '</div>';
+          }
+        });
+      });
+    }
 
     return wrap;
   }
@@ -2707,7 +3233,7 @@
   // sublineHtml are passed through as already-safe HTML, matching how
   // topGreetingHtml/topSublineHtml are built and inserted everywhere else
   // in this file.
-  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays) {
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays, dimmed) {
     // Trail-day countdown badge (T-3 hub refresh, 2026-09-04): only
     // rendered when a caller passes a real number -- pre-T3 callers pass
     // null/undefined and get no badge at all, matching this hub's usual
@@ -2718,7 +3244,11 @@
       var badgeLbl = countdownDays > 0 ? (countdownDays === 1 ? 'Day to go' : 'Days to go') : 'Trail day!';
       badgeHtml = '<div class="ap-countdown-badge"><div class="ap-countdown-num">' + badgeNum + '</div><div class="ap-countdown-lbl">' + badgeLbl + '</div></div>';
     }
-    return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + '"' +
+    // `dimmed` (NEW, Phase 2.5 Trail Day, 2026-09-04): the Underway state
+    // reuses this exact same card/photo treatment, just read as "later in
+    // the day" via a darker overlay -- see .ap-hero-card.dimmed in
+    // ap-styles.css.
+    return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + (dimmed ? ' dimmed' : '') + '"' +
       (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
       badgeHtml +
       '<div class="ap-hero-card-inner">' +
@@ -3520,7 +4050,13 @@
     // ---- Screen 2: pickup (hotel path: fixed windows + auto-sweep note;
     // non-hotel path: return location pills + all 4 windows, no auto-note) ----
     function renderPickupScreen() {
-      var ALL_WINDOWS = ['3:00pm – 5:00pm', '5:00pm – 7:00pm', '7:00pm – 9:00pm', '9:00pm – 11:00pm'];
+      // Due-by deadlines, not windows (Airey's direct fix, 2026-09-0X --
+      // see gearReturnCardHtml's own comment below for the operational
+      // reasoning). Early edge of the same four ranges this field used to
+      // offer, so the latest option (9:00pm) still lands safely ahead of
+      // the hotel path's own "final sweep after 9:00pm" backstop below --
+      // Airey's own call on why the early edge, not the late edge.
+      var ALL_WINDOWS = ['Ready by 3:00pm', 'Ready by 5:00pm', 'Ready by 7:00pm', 'Ready by 9:00pm'];
       var RETURN_LOCATIONS = ['Front door', 'Front gate', 'Hand delivery'];
       var hotel = isHotelPath();
 
@@ -3529,7 +4065,7 @@
           flowTopHtml('&larr; Back') +
           '<div class="ap-eyebrow">Gear Kits &amp; Delivery/Pickup</div>' +
           '<div class="ap-q-title">Where should your gear get picked up?</div>' +
-          '<div class="ap-q-help">Your gear will be picked up the evening after your adventure from the location specified below.</div>' +
+          '<div class="ap-q-help">Your gear will be picked up the evening after your adventure from the location specified below. Whichever time you choose, have it ready and waiting by then, that’s when we come get it.</div>' +
           '<div class="ap-card">' +
           '<div class="ap-toggle-row" id="ap-same-toggle"><div class="ap-toggle-row-text">Same as delivery address</div><div class="ap-switch' + (state.returnSameAsDelivery ? ' on' : '') + '"></div></div>' +
           (state.returnSameAsDelivery ? '' :
@@ -3541,10 +4077,10 @@
           (hotel ? '' :
             '<div class="ap-field-label">Return Location</div>' +
             '<div class="ap-choice-pills" id="ap-return-location"></div>') +
-          '<div class="ap-field-label">Return Time' + (hotel ? ' (optional)' : '') + '</div>' +
+          '<div class="ap-field-label">Ready By' + (hotel ? ' (optional)' : '') + '</div>' +
           '<div class="ap-window-list" id="ap-return-windows"></div>' +
           (hotel
-            ? '<div class="ap-auto-note">Since you’re staying at a hotel, front desk pickup works well. Pick a time above if you know it, or leave it, we’ll do a <b>final pickup sweep at the front desk after 9:00pm</b> either way.</div>'
+            ? '<div class="ap-auto-note">Since you’re staying at a hotel, front desk pickup works well. Choose a ready-by time above if you know it, or leave it, we’ll do a <b>final pickup sweep at the front desk after 9:00pm</b> either way.</div>'
             : '') +
           '<div class="ap-field-label">Return Note (optional)</div>' +
           '<textarea class="ap-field-textarea" id="ap-return-note" placeholder="Any other note or instructions about pickup">' + escapeHtml(state.returnNote) + '</textarea>' +
@@ -3666,7 +4202,7 @@
         (hotel
           ? '<div class="ap-recap-line"><span>Return Location</span><b>Front desk, final sweep after 9pm</b></div>'
           : '<div class="ap-recap-line"><span>Return Location</span><b>' + escapeHtml(state.returnLocation || 'Not set') + '</b></div>') +
-        '<div class="ap-recap-line"><span>Return Time</span><b>' + escapeHtml(state.returnWindow || 'Not specified') + '</b></div>' +
+        '<div class="ap-recap-line"><span>Ready By</span><b>' + escapeHtml(state.returnWindow || 'Not specified') + '</b></div>' +
         (state.returnNote ? '<div class="ap-recap-line"><span>Note</span><b>' + escapeHtml(state.returnNote) + '</b></div>' : '');
 
       contentEl.innerHTML =
@@ -4212,6 +4748,122 @@
     wrap.querySelector('#ap-rwgps-open').addEventListener('click', function () {
       window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
     });
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Phase 2.5 Trail Day -- Heading Out roster-confirm sheet (claude/
+  // psac-trail-day-phase-proposal-2026-09-04.md). Every name pre-checked;
+  // the common case (whole group's going) costs one tap total, same as a
+  // plain confirm button would. Checkbox state is toggled directly in the
+  // DOM (not a full re-render) so unchecking someone doesn't reset on
+  // every click -- the roster only affects the eventual return check-in's
+  // "who's back" roster, never the pace/timing math (always the full
+  // roster's easy-pace estimate, computed server-side either way).
+  // ---------------------------------------------------------------------
+
+  function renderHeadingOutSheet() {
+    var attendingRoster = state.roster.filter(function (p) { return p.roleOnBooking !== 'guardian_only'; });
+    var absentIds = {}; // participantId -> true once unchecked
+
+    var rowsHtml = attendingRoster.map(function (p) {
+      var youSuffix = p.roleOnBooking === 'owner' ? ' (you)' : '';
+      return '<div class="ap-roster-row" data-participant-id="' + escapeHtml(p.participantId) + '">' +
+        '<span class="ap-roster-name">' + escapeHtml(p.name) + youSuffix + '</span>' +
+        '<div class="ap-check" data-check-for="' + escapeHtml(p.participantId) + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '</div>';
+    }).join('');
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="ap-heading-out-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      '<div class="ap-eyebrow">Before You Go</div>' +
+      '<h1 class="ap-q">Everyone heading out?</h1>' +
+      '<div class="ap-card">' +
+      '<div class="ap-sub" style="margin:0 0 1rem;">Everyone’s checked by default, uncheck anyone not coming along today.</div>' +
+      rowsHtml +
+      '<div class="ap-roster-hint" id="ap-roster-hint" style="display:none;"></div>' +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="ap-heading-out-confirm">Confirm, Heading Out</button>' +
+      '<div class="ap-helper" style="text-align:center;">Writes your real start time and today’s headcount.</div>' +
+      '<div class="ap-helper" style="text-align:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(42,71,71,0.08);">Timing note: the check-in clock always uses the trail’s full-group, easy-pace estimate from here, the most conservative read, regardless of who’s checked above or how fast your group moves.</div>' +
+      '</div></div>'
+    );
+
+    function updateHint() {
+      var hintEl = wrap.querySelector('#ap-roster-hint');
+      var absentNames = attendingRoster.filter(function (p) { return absentIds[p.participantId]; }).map(function (p) { return p.name; });
+      if (!hintEl) return;
+      if (!absentNames.length) { hintEl.style.display = 'none'; return; }
+      hintEl.style.display = 'block';
+      hintEl.textContent = joinWithAnd(absentNames) + ' unchecked, not hiking today.';
+    }
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('[data-check-for]'), function (el) {
+      el.addEventListener('click', function () {
+        var pid = el.getAttribute('data-check-for');
+        var nowOff = !el.classList.contains('off');
+        el.classList.toggle('off', nowOff);
+        el.innerHTML = nowOff ? '' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        if (nowOff) { absentIds[pid] = true; } else { delete absentIds[pid]; }
+        updateHint();
+      });
+    });
+
+    wrap.querySelector('#ap-heading-out-back').addEventListener('click', function () { state.step = 'hub'; render(); });
+
+    var confirmBtn = wrap.querySelector('#ap-heading-out-confirm');
+    confirmBtn.addEventListener('click', function () {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Confirming…';
+      apiPost('/api/adventure-prep', {
+        action: 'confirmHeadingOut',
+        token: TOKEN,
+        absentParticipantIds: Object.keys(absentIds),
+      }).then(function (res) {
+        if (res.ok && res.body && res.body.ok) {
+          state.ctx.adventurePrep = state.ctx.adventurePrep || {};
+          state.ctx.adventurePrep.headingOutAt = res.body.headingOutAt;
+          state.ctx.adventurePrep.expectedReturnAt = res.body.expectedReturnAt;
+          state.step = 'hub';
+          render();
+        } else {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm, Heading Out';
+        }
+      });
+    });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Phase 2.5 Trail Day -- "If you can't get signal" (claude/psac-trail-
+  // day-phase-proposal-2026-09-04.md). Same treatment as
+  // renderRideWithGpsInfo above: plain numbered steps, no fabricated
+  // screenshots, a callout, a back link. iPhone step sourced against
+  // Apple's own current support documentation (support.apple.com/en-us/
+  // 101573); Android step deliberately hedged since that support is far
+  // less universal and varies by brand/model/carrier.
+  // ---------------------------------------------------------------------
+
+  function renderEmergencySosInfo() {
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="ap-sos-back" style="cursor:pointer;">&larr; Back to your Adventure Hub</div>' +
+      '<div class="ap-eyebrow">If You Can’t Get Signal</div>' +
+      '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 1.4rem;color:var(--dark-pine);">What your phone can already do out there</h2>' +
+      '<div class="ap-card">' +
+      '<div class="rwgps-step"><div class="rwgps-num">1</div><div><div class="rwgps-step-title">Always try 911 first</div><div class="rwgps-step-body">If you have any signal at all, a regular call is faster than anything below. These are for when a call won’t go through.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">2</div><div><div class="rwgps-step-title"><span class="rwgps-model-tag">iPhone 14+</span>Emergency SOS via satellite</div><div class="rwgps-step-body">No signal, no wifi: your phone offers “Emergency Text via Satellite.” Step outside with a clear view of the sky, answer a few tap-through questions, and it connects you to help, sharing your location automatically.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">3</div><div><div class="rwgps-step-title"><span class="rwgps-model-tag">Some Android</span>Satellite emergency texting</div><div class="rwgps-step-body">Newer phones from some Android makers offer a similar feature. Coverage varies a lot by brand and model, worth checking your own phone’s settings before trail day, not on it.</div></div></div>' +
+      '</div>' +
+      '<div class="rwgps-callout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/><path d="M12 8v5" stroke="#F58271" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#F58271"/></svg><div>Worth two minutes before you leave: open your phone’s own settings and confirm this feature is there and how it works. That’s not something to learn for the first time out on the trail.</div></div>' +
+      '<a class="rwgps-back" id="ap-sos-back-2">&larr; Back to your Adventure Hub</a>' +
+      '</div></div>'
+    );
+    wrap.querySelector('#ap-sos-back').addEventListener('click', function () { state.step = 'hub'; render(); });
+    wrap.querySelector('#ap-sos-back-2').addEventListener('click', function () { state.step = 'hub'; render(); });
     return wrap;
   }
 

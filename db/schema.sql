@@ -626,7 +626,14 @@ CREATE TABLE IF NOT EXISTS adventure_prep (
   -- NEW (Section 8.5): real placeholder column, replacing the literal
   -- 'PENDING_REAL_INTEGRATION:<trailId>:<timestamp>' string written today.
   -- No real RideWithGPS integration exists yet or is built by this migration.
-  ride_with_gps_experience_access TEXT
+  ride_with_gps_experience_access TEXT,
+  -- NEW (Phase 2.5 Trail Day, claude/psac-trail-day-phase-proposal-2026-09-04.md,
+  -- 2026-09-04) -- see db/2026-09-04_add_trail_day_fields.sql for the full
+  -- reasoning on each of these four columns.
+  heading_out_at          TIMESTAMPTZ,
+  expected_return_at      TIMESTAMPTZ,
+  trail_day_roster_json   JSONB,
+  guide_first_opened_at   TIMESTAMPTZ
 );
 
 -- participatingRosterRef (live column) is deliberately DROPPED here, same

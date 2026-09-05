@@ -58,6 +58,11 @@
   .resolve-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-top:1rem; }
   .resolve-panel textarea { width:100%; min-height:56px; border:1px solid var(--ops-border); border-radius:5px; padding:0.6rem 0.8rem; font-size:0.82rem; font-family:inherit; margin-top:0.6rem; }
   .resolve-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.8rem; }
+  /* NEW (Phase 2.5 Trail Day, 2026-09-04): the gear-issue Resolve panel's
+     quoted guest message -- same job as a payment alert's own detail
+     text, just with a real guest quote worth reading before resolving. */
+  .resolve-quote { background:#FCFCFB; border:1px solid var(--ops-border); border-left:3px solid var(--mountain-pink); border-radius:0 6px 6px 0; padding:0.7rem 0.9rem; font-size:0.82rem; color:var(--ops-text); margin-top:0.8rem; line-height:1.55; }
+  .resolve-meta { font-size:0.74rem; color:var(--ops-text-mid); margin-top:0.5rem; display:flex; gap:1.2rem; flex-wrap:wrap; }
 
   .blocked-note { background:#FFF9EC; border:1.5px solid #E9CB7A; padding:0.9rem 1.1rem; font-size:0.8rem; color:#6b4e00; line-height:1.6; border-radius:6px; }
 </style>
@@ -95,6 +100,12 @@
   var escapeHtml = OpsShell.escapeHtml;
   var activeCategory = 'All';
   var allData = null;
+  // NEW (Phase 2.5 Trail Day, 2026-09-04): openResolvePanel only ever got
+  // an alertId before (data-resolve-alert), enough for the plain payment/
+  // hold-failure Resolve panel -- a gear-issue row needs the rest of the
+  // row (the guest's quoted message, reporter name/email) to show
+  // something worth reading before resolving. Populated at render() time.
+  var rowsById = {};
   // BUG FIX (Aug 2026): see OpsShell.normalizeBookingIdInput's own comment
   // — defense in depth here too, in case this ever gets a '#'-prefixed
   // value (e.g. a hand-built/bookmarked URL).
@@ -108,6 +119,12 @@
     reconciliation_required: 'Reconciliation',
     manual_adjustment_short_allocation: 'Manual Adjustment',
     gear_low_stock: 'Gear',
+    // NEW (Phase 2.5 Trail Day, 2026-09-04): gear-issue reports from the
+    // trail-day "Something not right?" escape hatch. Same Gear category
+    // as gear_low_stock, but resolvable like the payment/hold-failure
+    // family -- see lib/gear-issue-service.js and lib/all-bookings-
+    // service.js's listOpsAlertsExpanded for the read/write side.
+    gear_issue: 'Gear',
   };
 
   // First-pass human-readable labels for the payment/hold-failure family's
@@ -163,11 +180,18 @@
   }
 
   function actionCell(row) {
-    if (row.source === 'payment_hold_failure') {
+    if (row.source === 'payment_hold_failure' || row.source === 'gear_issue') {
       if (row.status === 'Resolved') {
         return '<span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(row.resolvedBy || '') + (row.resolvedAt ? (' — ' + escapeHtml(String(row.resolvedAt).slice(0, 10))) : '') + '</span>';
       }
-      return '<button class="ops-btn-secondary" data-resolve-alert="' + escapeHtml(row.alertId) + '">Resolve</button>';
+      // Gear issues get "Review & Resolve" (there's a guest message worth
+      // reading first) -- payment/hold-failure alerts keep the plain
+      // "Resolve" label they've always had. Same button, same handler,
+      // same resolveOpsAlert action either way -- resolveAlert() (lib/
+      // hold-clearance-service.js) updates by alert_id alone, no source
+      // check, so nothing server-side needed to support this.
+      var label = row.source === 'gear_issue' ? 'Review & Resolve' : 'Resolve';
+      return '<button class="ops-btn-secondary" data-resolve-alert="' + escapeHtml(row.alertId) + '">' + label + '</button>';
     }
     if (row.source === 'stalled_call_today') return '<a class="ops-link" href="ops-stalled-bookings.html?bookingId=' + encodeURIComponent(row.bookingId) + '">Call script &rarr;</a>';
     if (row.source === 'reconciliation_required') return '<a class="ops-link" href="ops-reconciliation-review.html?bookingId=' + encodeURIComponent(row.bookingId) + '">Review &rarr;</a>';
@@ -178,7 +202,7 @@
   }
 
   function statusTag(row) {
-    if (row.source === 'payment_hold_failure') return row.status === 'Resolved' ? '<span class="ops-tag resolved">Resolved</span>' : '<span class="ops-tag open">Open</span>';
+    if (row.source === 'payment_hold_failure' || row.source === 'gear_issue') return row.status === 'Resolved' ? '<span class="ops-tag resolved">Resolved</span>' : '<span class="ops-tag open">Open</span>';
     if (row.source === 'gear_low_stock') return '<span class="ops-tag standard">Live — auto-clears</span>';
     return '<span class="ops-tag open">Open</span>';
   }
@@ -214,6 +238,7 @@
       .concat(data.stalledCallToday.filter(passesFilter))
       .concat(data.gearLowStock.filter(passesFilter));
     urgent.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+    urgent.forEach(function (row) { if (row.alertId) rowsById[row.alertId] = row; });
 
     var awareness = data.cancellationsFyi.filter(passesFilter);
 
@@ -234,11 +259,29 @@
   }
 
   function openResolvePanel(alertId) {
+    var row = rowsById[alertId];
+    var isGearIssue = row && row.source === 'gear_issue';
     var container = document.getElementById('resolve-container');
     container.innerHTML = '<div class="resolve-panel">'
-      + '<strong>Resolve — #' + escapeHtml(alertId) + '</strong>'
-      + '<div style="font-size:0.8rem; color:var(--ops-text-mid); margin-top:0.4rem;">Confirm the underlying issue is actually fixed before resolving — this does not retry any charge or hold itself, it only records that it\'s been handled.</div>'
-      + '<textarea id="resolve-notes" placeholder="Notes (optional)"></textarea>'
+      // GENERALIZED (Phase 3 Post-Adventure, 2026-09-05): was a hardcoded
+      // "Gear issue" label -- now reads the row's own description so a
+      // return-note alert reads correctly here too (see lib/all-bookings-
+      // service.js's listOpsAlertsExpanded for where that description is set).
+      + '<strong>' + (isGearIssue ? 'Resolve — ' + escapeHtml(row.description || 'Gear issue') + ', #' + escapeHtml(row.bookingId || '') : 'Resolve — #' + escapeHtml(alertId)) + '</strong>'
+      + '<div style="font-size:0.8rem; color:var(--ops-text-mid); margin-top:0.4rem;">'
+      + (isGearIssue
+        ? 'Confirm the guest\'s actually taken care of before resolving — this doesn\'t dispatch anything on its own, it only records that it\'s been handled.'
+        : 'Confirm the underlying issue is actually fixed before resolving — this does not retry any charge or hold itself, it only records that it\'s been handled.')
+      + '</div>'
+      + (isGearIssue
+        ? '<div class="resolve-quote">&ldquo;' + escapeHtml(row.guestMessage || '') + '&rdquo;</div>'
+          + '<div class="resolve-meta">'
+          + (row.guestName ? '<span>Reported by ' + escapeHtml(row.guestName) + '</span>' : '')
+          + (row.guestEmail ? '<span>Reply-to: ' + escapeHtml(row.guestEmail) + '</span>' : '')
+          + '<span>Sent to reservations@ &middot; ' + escapeHtml(String(row.createdAt || '').slice(0, 16).replace('T', ' ')) + '</span>'
+          + '</div>'
+        : '')
+      + '<textarea id="resolve-notes" placeholder="Notes (optional)' + (isGearIssue ? ' — e.g. how it was handled' : '') + '"></textarea>'
       + '<div class="resolve-panel-footer">'
       + '<button class="ops-btn-secondary" id="resolve-cancel">Cancel</button>'
       + '<button class="ops-btn" id="resolve-confirm">Mark Resolved</button>'

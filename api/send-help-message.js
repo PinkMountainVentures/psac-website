@@ -46,6 +46,17 @@
  * flagged: there was previously no way for a guest's own request to
  * reach Ops at all, only the mailto: fallback this replaces.
  *
+ * requestType: 'gear_issue' (added Phase 2.5 Trail Day, 2026-09-04, for
+ * the "Something not right?" escape hatch on the trail-day Ready-to-go
+ * card) works the same way as trail_swap: distinct email copy, plus a
+ * real logged row -- lib/gear-issue-service.js's logIntake, which reuses
+ * the existing generic ops_alerts table rather than a new one (see that
+ * file's own header for why) -- so a gear issue surfaces in Ops Alerts'
+ * Urgent tier / Gear category the same way a payment/hold-failure alert
+ * already does, not just as an email that can get lost in an inbox
+ * during the one window it matters most: while the guest is still out
+ * there.
+ *
  * RATE LIMITING (added per Airey's question, 2026-09-02): a valid token is
  * the only gate on this endpoint (same posture as every other Adventure
  * Prep action), so without a cap, a single known token -- a guest's own
@@ -67,6 +78,7 @@ const { sendEmail } = require('../lib/send-email');
 const { renderAdventurePrepQuestionEmail } = require('../lib/email-templates/adventure-prep-question-email');
 const { genId } = require('../lib/ids');
 const trailSwapService = require('../lib/trail-swap-service');
+const gearIssueService = require('../lib/gear-issue-service');
 
 const STAFF_INBOX = 'reservations@palmspringsadventureclub.com';
 const MAX_MESSAGE_LENGTH = 4000;
@@ -214,6 +226,8 @@ module.exports = async function handler(req, res) {
     const token = body.token;
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     const isTrailSwap = body.requestType === 'trail_swap';
+    const isGearIssue = body.requestType === 'gear_issue';
+    const isGearReturnNote = body.requestType === 'gear_return_note';
 
     if (!token) {
       res.status(400).json({ error: 'missing_token' });
@@ -249,15 +263,15 @@ module.exports = async function handler(req, res) {
       tripDateDisplay: formatTripDate(ctx.tripDate),
       sourcePage: ctx.sourcePage,
       message: message,
-      eyebrow: isTrailSwap ? 'TRAIL SWAP REQUEST' : undefined,
-      headline: isTrailSwap ? (guestNameSafe + ' <em>wants a different trail.</em>') : undefined,
-      preheader: isTrailSwap ? (guestNameSafe + ' would like a different trail for their trip.') : undefined,
+      eyebrow: isTrailSwap ? 'TRAIL SWAP REQUEST' : (isGearIssue ? 'GEAR ISSUE, TRAIL DAY' : (isGearReturnNote ? 'GEAR RETURN NOTE' : undefined)),
+      headline: isTrailSwap ? (guestNameSafe + ' <em>wants a different trail.</em>') : (isGearIssue ? (guestNameSafe + ' <em>reported a gear issue on trail day.</em>') : (isGearReturnNote ? (guestNameSafe + ' <em>left a note after their gear return.</em>') : undefined)),
+      preheader: isTrailSwap ? (guestNameSafe + ' would like a different trail for their trip.') : (isGearIssue ? (guestNameSafe + ' reported a gear issue on trail day.') : (isGearReturnNote ? (guestNameSafe + ' left a note after their gear was picked up.') : undefined)),
     });
 
     const sendResult = await sendEmail({
       to: STAFF_INBOX,
       replyTo: ctx.guestEmail || undefined,
-      subject: (isTrailSwap ? 'Trail swap request from ' : 'Question from ') + guestNameSafe + ' — ' + ctx.bookingId,
+      subject: (isTrailSwap ? 'Trail swap request from ' : (isGearIssue ? 'Gear issue reported by ' : (isGearReturnNote ? 'Gear return note from ' : 'Question from '))) + guestNameSafe + ' — ' + ctx.bookingId,
       html: html,
     });
 
@@ -279,6 +293,41 @@ module.exports = async function handler(req, res) {
       } catch (swapErr) {
         // eslint-disable-next-line no-console
         console.error('send-help-message: trail swap logIntake failed after successful email send', swapErr);
+      }
+    }
+
+    // Same best-effort posture as the trail-swap logIntake above: the
+    // email already sent successfully at this point, so a failure here
+    // logs server-side rather than turning into a scary error for a
+    // guest whose message did go through.
+    if (isGearIssue) {
+      try {
+        await gearIssueService.logIntake({ bookingId: ctx.bookingId, guestConcernSummary: message });
+      } catch (gearErr) {
+        // eslint-disable-next-line no-console
+        console.error('send-help-message: gear issue logIntake failed after successful email send', gearErr);
+      }
+    }
+
+    // gear_return_note (Phase 3 Post-Adventure, 2026-09-05): the "Left
+    // something behind? Tell us" escape hatch on the gear-return card's
+    // Double-Checking state. Reuses gearIssueService.logIntake -- same
+    // ops_alerts row shape as a trail-day gear issue -- but with
+    // 'standard_24hr' urgency (a forgotten item after the trip is not a
+    // same-day emergency the way an on-trail gear problem is) and a
+    // contextLabel so Ops Alerts' read side (lib/all-bookings-service.js)
+    // doesn't describe it as "reported on trail day" when it wasn't.
+    if (isGearReturnNote) {
+      try {
+        await gearIssueService.logIntake({
+          bookingId: ctx.bookingId,
+          guestConcernSummary: message,
+          contextLabel: 'GEAR RETURN NOTE',
+          urgency: 'standard_24hr',
+        });
+      } catch (gearReturnErr) {
+        // eslint-disable-next-line no-console
+        console.error('send-help-message: gear return note logIntake failed after successful email send', gearReturnErr);
       }
     }
 

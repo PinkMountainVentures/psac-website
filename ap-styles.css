@@ -245,6 +245,57 @@
 .gd-icon-wrap .gd-icon { margin-top: 0; display: block; }
 .gd-check-badge { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--desert-green); border: 2px solid var(--sand-beige); display: flex; align-items: center; justify-content: center; }
 
+/* Alert badge, overlaid on the box icon -- same treatment as
+   .gd-check-badge above, mountain-pink instead of desert-green. Marks
+   the two return-side states that actually need a guest's eyes
+   (Double-Checking, Charge Applied) -- see gearReturnIconSvg. */
+.gd-alert-badge { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--mountain-pink); border: 2px solid var(--sand-beige); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; line-height: 1; }
+
+/* Short explanatory line under a card's rows -- gearReturnCardHtml's own
+   .gd-note (also usable anywhere else on this card family that needs
+   one line of plain-prose context rather than another label/value row). */
+.gd-note { font-size: 0.78rem; color: var(--ap-muted); line-height: 1.5; margin-top: 0.7rem; }
+
+/* ---------------------------------------------------------------------
+   Gear-RETURN card states (Phase 3 Post-Adventure / "Peaks to Pools",
+   2026-09-05 -- see claude/psac-adventure-hub-post-adventure-return-
+   proposal-2026-09-03.md, and adventure-prep-form.js's own
+   computeGearReturnStatus()/gearReturnCardHtml()). Same .gd-card family
+   as the delivery states above; reuses their exact palette logic --
+   neutral for "in progress, nothing to flag," green for a good outcome,
+   mountain-pink for the two states that actually want a guest's eyes.
+   --------------------------------------------------------------------- */
+
+/* Return Due / On the Way: same neutral palette as Packing/Out for
+   Delivery above -- nothing wrong, just a due-by clock ticking. */
+.gd-card.st-returndue { border-color: rgba(42,71,71,0.14); }
+.gd-card.st-returndue .gd-pill { background: rgba(42,71,71,0.07); color: var(--ap-muted); }
+.gd-card.st-ontheway { border-color: rgba(42,71,71,0.14); }
+.gd-card.st-ontheway .gd-pill { background: rgba(42,71,71,0.07); color: var(--ap-muted); }
+
+/* Picked Up / Checking In / Wrapping Up: same "proceeding fine, in
+   progress" green tint as Packed above. */
+.gd-card.st-pickedup { border-color: rgba(122,189,145,0.35); background: linear-gradient(120deg, rgba(122,189,145,0.10), rgba(122,189,145,0.03)); }
+.gd-card.st-pickedup .gd-pill { background: rgba(122,189,145,0.2); color: #2a7a4a; }
+.gd-card.st-checkingin { border-color: rgba(122,189,145,0.35); background: linear-gradient(120deg, rgba(122,189,145,0.10), rgba(122,189,145,0.03)); }
+.gd-card.st-checkingin .gd-pill { background: rgba(122,189,145,0.2); color: #2a7a4a; }
+.gd-card.st-wrappingup { border-color: rgba(122,189,145,0.35); background: linear-gradient(120deg, rgba(122,189,145,0.10), rgba(122,189,145,0.03)); }
+.gd-card.st-wrappingup .gd-pill { background: rgba(122,189,145,0.2); color: #2a7a4a; }
+
+/* Double-Checking / Charge Applied: mountain-pink, same "worth a second
+   look" tint the trail-day Ready-to-go strip's own nudge cue already
+   uses -- not alarming (that's --sunset-red's job elsewhere), just
+   asking for a guest's attention. */
+.gd-card.st-doublechecking { border-color: rgba(245,130,113,0.35); background: linear-gradient(120deg, rgba(245,130,113,0.10), rgba(245,130,113,0.03)); }
+.gd-card.st-doublechecking .gd-pill { background: rgba(245,130,113,0.2); color: #c65a42; }
+.gd-card.st-chargeapplied { border-color: rgba(245,130,113,0.35); background: linear-gradient(120deg, rgba(245,130,113,0.10), rgba(245,130,113,0.03)); }
+.gd-card.st-chargeapplied .gd-pill { background: rgba(245,130,113,0.2); color: #c65a42; }
+
+/* Checked In (clean): solid fill, same "positive solid action" treatment
+   as Delivered above. */
+.gd-card.st-checkedinclean { border-color: rgba(122,189,145,0.4); background: linear-gradient(120deg, rgba(122,189,145,0.14), rgba(122,189,145,0.04)); }
+.gd-card.st-checkedinclean .gd-pill { background: var(--desert-green); color: #fff; }
+
 /* Guide/RideWithGPS emphasis card (T-3 hub refresh, 2026-09-04) --
    replaces the old single-line .ap-trail-unlocked treatment once a
    trail guide is actually unlocked (past T-3); .ap-trail-unlocked and
@@ -582,6 +633,67 @@
 .ap-countdown-badge { position: absolute; top: 20px; right: 20px; z-index: 2; background: var(--mountain-pink); box-shadow: 0 4px 14px rgba(20,35,35,0.35); border-radius: 14px; padding: 0.6rem 0.9rem; text-align: center; }
 .ap-countdown-num { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 700; color: white; line-height: 1; }
 .ap-countdown-lbl { font-size: 0.54rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: white; opacity: 0.92; margin-top: 0.15rem; }
+
+/* ---------------------------------------------------------------------
+   Phase 2.5 Trail Day (claude/psac-trail-day-phase-proposal-2026-09-04.md,
+   2026-09-04). Reuses .ap-hero-card/.ap-card/.ap-cta-primary/.ap-back-link
+   throughout rather than inventing parallel styles -- these are the few
+   pieces genuinely new to this phase.
+--------------------------------------------------------------------- */
+
+/* Underway state: same hero-photo card, read as "later in the day" via a
+   darker overlay rather than a different treatment entirely -- still
+   recognizably the same card the guest saw this morning. */
+.ap-hero-card.dimmed::before { background: linear-gradient(180deg, rgba(20,35,35,0.28) 0%, rgba(20,35,35,0.5) 55%, rgba(15,26,26,0.72) 100%); }
+
+/* Ambient check-in line, directly under the morning hero card -- quiet
+   but explicit, answering "does the guest know they'll need to check in"
+   without a second education moment (that already happened at T-3). */
+.ap-ambient-note { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.78rem; color: var(--ap-muted, #7a8a8a); line-height: 1.5; margin: 0 auto 1rem; max-width: 960px; padding: 0 0.1rem; }
+.ap-ambient-note svg { flex-shrink: 0; margin-top: 0.15rem; }
+
+/* "Ready to go" strip -- auto-resolved gear/guide state, not a checklist
+   the guest fills out. Each row carries its own quiet escape hatch. */
+.ap-ready-strip { max-width: 960px; margin: 0 auto 1.1rem; }
+.ap-ready-title { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--dark-pine); opacity: 0.55; margin-bottom: 0.8rem; }
+.ap-ready-row { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.6rem 0; border-top: 1px solid rgba(42,71,71,0.08); }
+.ap-ready-row:first-of-type { border-top: none; padding-top: 0; }
+.ap-ready-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 0.05rem; }
+.ap-ready-icon.ok { background: rgba(122,189,145,0.16); }
+.ap-ready-icon.nudge { background: rgba(245,130,113,0.14); }
+.ap-ready-text { flex: 1; }
+.ap-ready-text .t1 { font-size: 0.86rem; font-weight: 600; color: var(--dark-pine); line-height: 1.4; }
+.ap-ready-text .t2 { font-size: 0.76rem; color: var(--ap-muted, #7a8a8a); line-height: 1.45; margin-top: 0.1rem; }
+.ap-ready-link { font-size: 0.74rem; font-weight: 600; color: var(--mountain-pink); cursor: pointer; white-space: nowrap; margin-top: 0.3rem; display: inline-block; }
+
+/* Gear-issue inline reveal -- same reveal/collapse grammar as
+   .help-panel (see this file's own rules near the top), just scoped
+   inline inside the Ready-to-go card instead of a full-width dark bar,
+   since this is a per-line escape hatch, not the page-level Questions
+   panel. */
+.ap-issue-panel { display: none; margin-top: 0.7rem; padding-top: 0.8rem; border-top: 1px dashed rgba(42,71,71,0.12); }
+.ap-issue-panel.is-open { display: block; }
+.ap-issue-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; }
+.ap-issue-textarea { width: 100%; background: rgba(42,71,71,0.03); border: 1px solid rgba(42,71,71,0.12); border-radius: 6px; color: var(--dark-pine); font-family: inherit; font-size: 0.8rem; padding: 0.6rem 0.7rem; min-height: 56px; resize: vertical; }
+.ap-issue-row { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; margin-top: 0.55rem; }
+.ap-issue-note { font-size: 0.7rem; color: var(--ap-muted, #7a8a8a); }
+.ap-issue-send { background: var(--dark-pine); color: var(--sand-beige); border: none; border-radius: 20px; padding: 0.45rem 0.95rem; font-size: 0.74rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.ap-issue-sent-note { font-size: 0.72rem; color: #2a7a4a; margin-top: 0.5rem; }
+
+/* Heading Out roster-confirm sheet -- everyone pre-checked, uncheck to
+   mark a no-show. */
+.ap-roster-row { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 0; border-top: 1px solid rgba(42,71,71,0.08); }
+.ap-roster-row:first-of-type { border-top: none; }
+.ap-roster-name { font-size: 0.92rem; color: var(--dark-pine); font-weight: 500; }
+.ap-check { width: 24px; height: 24px; border-radius: 6px; background: var(--desert-green); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.ap-check.off { background: transparent; border: 1.6px solid rgba(42,71,71,0.2); }
+.ap-roster-hint { font-size: 0.74rem; color: var(--ap-muted, #7a8a8a); margin: 0.9rem 0 0.2rem; font-style: italic; }
+
+/* Small brand/OS pill on the emergency-SOS page's step titles ("iPhone
+   14+" / "Some Android") -- reuses .rwgps-step's existing grammar,
+   this is the one piece that page didn't already have. */
+.rwgps-model-tag { display: inline-block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: rgba(42,71,71,0.07); color: var(--dark-pine); border-radius: 4px; padding: 0.15rem 0.45rem; margin-right: 0.45rem; }
+
 
 /* lean trail-detail card -- used once the hero card above already
    carries the photo, so the trail card below drops its own photo bar

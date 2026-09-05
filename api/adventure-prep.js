@@ -62,6 +62,8 @@
  *   POST /api/adventure-prep { action: 'sendSignerLinks', token, participantId? }  -- shape simplified this update, no `signers` array needed anymore; optional participantId (NEW, per-row "Resend waiver invite," 2026-09-03) narrows which signer(s) actually get emailed to just that one, without changing the full-booking DB bookkeeping sendSignerLinksForBooking always does
  *   POST /api/adventure-prep { action: 'adjustGearKitCount', token, requestedKitCount }
  *   POST /api/adventure-prep { action: 'setRosterGearKits', token, updates: [{participantId, gearKit}] }  -- NEW (Task 15): backs the Gear Kits screen's per-person kit toggle; see lib/adventure-prep-service.js's own header comment on why this is deliberately separate from confirmRoster
+ *   POST /api/adventure-prep { action: 'confirmHeadingOut', token, absentParticipantIds? }  -- NEW (Phase 2.5 Trail Day, 2026-09-04): backs the Heading Out roster-confirm sheet, see lib/adventure-prep-service.js's confirmHeadingOut()
+ *   POST /api/adventure-prep { action: 'markGuideOpened', token }  -- NEW (Phase 2.5 Trail Day, 2026-09-04): fires on every Get Guide tap, first-tap-wins server-side
  */
 
 'use strict';
@@ -442,6 +444,45 @@ async function setRosterGearKits(body, res) {
   res.status(200).json(result);
 }
 
+// -- confirmHeadingOut, NEW (Phase 2.5 Trail Day, 2026-09-04) ---------------
+// Backs the Heading Out roster-confirm sheet. See
+// lib/adventure-prep-service.js's confirmHeadingOut() for the full
+// contract (idempotent, computes expectedReturn off the full roster's
+// easy-pace estimate).
+async function confirmHeadingOut(body, res) {
+  const token = body.token;
+  if (!token) {
+    res.status(400).json({ error: 'missing_token' });
+    return;
+  }
+  const result = await adventurePrepService.confirmHeadingOut(token, {
+    absentParticipantIds: Array.isArray(body.absentParticipantIds) ? body.absentParticipantIds : [],
+  });
+  if (!result || result.ok === false) {
+    res.status(404).json({ error: 'invalid_token' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
+// -- markGuideOpened, NEW (Phase 2.5 Trail Day, 2026-09-04) -----------------
+// Fires whenever a guest taps Get Guide, anywhere it appears (hub guide
+// card, embedded receipt). First-tap-wins server-side -- see
+// lib/adventure-prep-service.js's markGuideOpened().
+async function markGuideOpened(body, res) {
+  const token = body.token;
+  if (!token) {
+    res.status(400).json({ error: 'missing_token' });
+    return;
+  }
+  const result = await adventurePrepService.markGuideOpened(token);
+  if (!result || result.ok === false) {
+    res.status(404).json({ error: 'invalid_token' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 const POST_ACTIONS = {
   saveFields,
   confirmRoster,
@@ -450,6 +491,8 @@ const POST_ACTIONS = {
   sendSignerLinks,
   adjustGearKitCount,
   setRosterGearKits,
+  confirmHeadingOut,
+  markGuideOpened,
 };
 
 module.exports = async function handler(req, res) {
