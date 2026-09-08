@@ -1811,9 +1811,9 @@
   }
 
   function underwaySupportingNoteHtml() {
-    return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
-      'If we still haven’t heard from your group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan already makes to every guest. ' +
-      'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>';
+    return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If you don’t check in before your expected return time, two more nudges follow, one right at the expected return time and a more direct one three hours after your expected return time. ' +
+      'If we still haven’t heard from your group after that, we call in an actual search and rescue effort, a costly, serious undertaking. ' +
+      'This isn’t a scare tactic. It’s a safety net and a real expectation.</div>';
   }
 
   // Full roster return + SAR experience (2026-09-08) -- supersedes the
@@ -2181,7 +2181,19 @@
       ? '<div class="ap-trail-eyebrow">Your Trail</div><div class="ap-trail-section-wide">' + compareCardHtml(selectedTrailCandidate, null, null, false, true) + '</div>'
       : '';
 
-    var depositNoteHtml = '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>';
+    // BUG FIX (live-test feedback, 2026-09-08): this note used to render
+    // unconditionally for the whole pastT3 window, including after the
+    // deposit hold had already been placed successfully -- a guest
+    // seeing "Out for Delivery" gear (the hold-placement night) would
+    // still be told a hold "gets placed... we'll let you know right
+    // before it happens" even once it already had. deposit_status starts
+    // at 'scheduled_t1' (booking-time default, hold not yet attempted)
+    // and only ever moves off it once the hold job has actually run
+    // (held/failed/unavailable/requires_action/skipped), so "not yet at
+    // scheduled_t1" is the correct signal to stop promising something
+    // that already happened (or was already attempted).
+    var depositHoldAttempted = !!eb.depositStatus && eb.depositStatus !== 'scheduled_t1';
+    var depositNoteHtml = depositHoldAttempted ? '' : '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>';
 
     // T-3+ embedded Adventure Summary receipt (Airey's direct request,
     // round 3, 2026-09-04): the full renderSummary() card, not a tile
@@ -4408,7 +4420,7 @@
         pickupRowsHtml +
         '</div>' +
         '</div>' +
-        '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>' +
+        (eb.depositStatus && eb.depositStatus !== 'scheduled_t1' ? '' : '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>') +
         '<button type="button" class="ap-cta-primary" id="ap-continue-waivers">Continue to Waivers</button>' +
         '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);

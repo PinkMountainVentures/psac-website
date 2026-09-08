@@ -596,9 +596,9 @@
   }
 
   function underwaySupportingNoteHtml() {
-    return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
-      'If we still haven’t heard from your group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan already makes to every guest. ' +
-      'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>';
+    return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If you don’t check in before your expected return time, two more nudges follow, one right at the expected return time and a more direct one three hours after your expected return time. ' +
+      'If we still haven’t heard from your group after that, we call in an actual search and rescue effort, a costly, serious undertaking. ' +
+      'This isn’t a scare tactic. It’s a safety net and a real expectation.</div>';
   }
 
   // "Everyone Back?" entry point -- opens the roster-confirm sheet
@@ -1979,9 +1979,9 @@
         'Miss it and we start trying to reach the group right away, if that doesn’t work, it becomes a real search and rescue response, an expensive step we take seriously and hope never to need. ' +
         '<a class="ap-hero-link" id="sb-guardian-worried-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">Worried about ' + childLabel + '? →</a>';
       underwayHtml = heroCardHtml('On The Trail', childLabel + ' is on the trail.', underwaySubline, trailDetail && trailDetail.photoUrl, null, true) +
-        '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
-        'If we still haven’t heard from ' + childLabel + '’s group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan makes on every trip. ' +
-        'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>' +
+        '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If ' + childLabel + '’s group doesn’t check in before their expected return time, two more nudges follow, one right at the expected return time and a more direct one three hours after their expected return time. ' +
+        'If we still haven’t heard from ' + childLabel + '’s group after that, we call in an actual search and rescue effort, a costly, serious undertaking. ' +
+        'This isn’t a scare tactic. It’s a safety net and a real expectation.</div>' +
         openIncidentNoticeHtml();
     }
 
