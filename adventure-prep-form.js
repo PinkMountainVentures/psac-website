@@ -1911,10 +1911,20 @@
     // below), and the guest stays in the Underway/trail-day experience
     // until a return roster actually comes back clean.
     var showPostAdventure = pastTripDay || (!!ap.trailCheckinAt && isReturnRosterClean(ap));
+    // Post-adventure hero-copy fix (2026-09-08): hoisted here so both the
+    // showPostAdventure headline branch below AND the gearReturnHtml
+    // card further down share one computeGearReturnStatus() call instead
+    // of computing it twice -- see gearReturnHtml's own comment.
+    var gearReturnStatus = showPostAdventure ? computeGearReturnStatus(eb, ap) : null;
     // NEW (T-3 hub refresh, 2026-09-04): trail-day countdown, only
     // meaningful once past T3 -- passed into heroCardHtml below so it
     // renders pinned to the hero photo's top-right corner.
-    var daysToGo = pastT3 ? daysUntilTrip(eb.date) : null;
+    // Post-adventure hero-copy fix (2026-09-08): suppressed once
+    // showPostAdventure is true -- daysUntilTrip() clamps a past trip
+    // date to 0, which used to read as "Today / Trail day!" on a booking
+    // that's actually long over. The countdown badge only makes sense
+    // while the trip hasn't happened yet.
+    var daysToGo = (pastT3 && !showPostAdventure) ? daysUntilTrip(eb.date) : null;
     // Sept 2026 walkthrough follow-up: the hub used to show just the
     // trail name here (a separate, name-only ap-trail-* block) -- Airey
     // asked for the same card styling used on the selection/confirmation
@@ -2092,8 +2102,21 @@
         // Widened from pastTripDay to showPostAdventure (Web trail
         // check-in, 2026-09-05): a same-day "I'm Back" tap lands here too,
         // not just the day-after date rollover.
-        topGreetingHtml = 'You’ve earned the pool. Your gear’s the one thing left.';
-        topSublineHtml = 'You lived ' + escapeHtml(status.trailName) + '. Here’s what’s next.';
+        // Post-adventure hero-copy fix (2026-09-08): this used to be a
+        // static, unconditional headline that kept saying "your gear's
+        // the one thing left" even once gear had actually been checked
+        // in -- Airey's bug report, 2026-09-08. Now branches on the same
+        // gearReturnStatus the gear-return card below already reflects,
+        // reusing the gear-free framing already established and audited
+        // on Surface B's own showPostAdventure copy for consistency.
+        var gearReturnDone = gearReturnStatus && (gearReturnStatus.state === 'checked_in_clean' || gearReturnStatus.state === 'charge_applied' || gearReturnStatus.state === 'wrapping_up');
+        if (gearReturnDone) {
+          topGreetingHtml = 'You did it. ' + escapeHtml(status.trailName) + '’s behind you.';
+          topSublineHtml = 'Nice work out there. Here’s your trip, all in one place.';
+        } else {
+          topGreetingHtml = 'You’ve earned the pool. Your gear’s the one thing left.';
+          topSublineHtml = 'You lived ' + escapeHtml(status.trailName) + '. Here’s what’s next.';
+        }
       } else if (pastT3) {
         // 2B: Guide unlocked. The trail section below already carries
         // its own Get Guide button once pastT3, so this doesn't repeat
@@ -2152,7 +2175,7 @@
     // below). Booker-only, same as the delivery card above. Uses
     // showPostAdventure (Web trail check-in, 2026-09-05), not raw
     // pastTripDay, so a same-day "I'm Back" tap surfaces this immediately.
-    var gearReturnHtml = showPostAdventure ? gearReturnCardHtml(computeGearReturnStatus(eb, ap)) : '';
+    var gearReturnHtml = showPostAdventure ? gearReturnCardHtml(gearReturnStatus) : '';
 
     // T-3+ guide emphasis card (Airey's direct request, 2026-09-04):
     // replaces the old single-line .ap-trail-unlocked treatment with a

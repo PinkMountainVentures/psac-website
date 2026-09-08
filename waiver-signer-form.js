@@ -1577,12 +1577,6 @@
     var topGreetingHtml = hubGreeting;
     var topSublineHtml = hubSubline;
     var doneCount = [status.detailsDone, status.waiverDone].filter(Boolean).length;
-    // NEW (T-3 hub refresh, 2026-09-04): trail-day countdown, only
-    // meaningful once past T3 -- passed into heroCardHtml below so it
-    // renders pinned to the hero photo's top-right corner, same as
-    // Surface A.
-    var daysToGo = pastT3 ? daysUntilTrip(state.ctx.tripDate) : null;
-
     // Surface B trail-day arc (2026-09-08): hoisted out of the branches
     // below, same "pure function of today's date" pattern Surface A's
     // own renderHub() already established -- computed unconditionally
@@ -1595,6 +1589,15 @@
     var tripDateStrForTripCheck = tripDateMatchForTripCheck ? tripDateMatchForTripCheck[0] : '';
     var pastTripDay = !!(tripDateStrForTripCheck && todayStrForTripCheck > tripDateStrForTripCheck);
     var showPostAdventure = pastTripDay || (!!state.ctx.trailCheckinAt && isReturnRosterClean(state.ctx));
+    // NEW (T-3 hub refresh, 2026-09-04): trail-day countdown, only
+    // meaningful once past T3 -- passed into heroCardHtml below so it
+    // renders pinned to the hero photo's top-right corner, same as
+    // Surface A.
+    // Post-adventure hero-copy fix (2026-09-08): suppressed once
+    // showPostAdventure is true, same fix as Surface A -- daysUntilTrip()
+    // clamps a past trip date to 0, which used to read as "Today / Trail
+    // day!" on a booking that's actually long over.
+    var daysToGo = (pastT3 && !showPostAdventure) ? daysUntilTrip(state.ctx.tripDate) : null;
 
     if (status.allSet) {
       var statLine = (status.trailAssigned ? escapeHtml(status.trailName) + ' · ' : '') + formatTripDate(state.ctx.tripDate);
@@ -1900,9 +1903,6 @@
     // yet still gets to see how many days out the trail day is and
     // (once wired) what the weather looks like; certifying doesn't
     // change what day it is.
-    var daysToGo = pastT3 ? daysUntilTrip(state.ctx.tripDate) : null;
-    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot, formatTripDate(state.ctx.tripDate)) : '';
-
     // Surface B trail-day arc (2026-09-08), guardian-only reframe:
     // Airey's resolved call -- no roster-confirm buttons for this
     // persona at either transition (a guardian at home can't take a
@@ -1910,14 +1910,25 @@
     // isUnderway/showPostAdventure here are purely reflective, read off
     // the same booking-level fields an attending signer's own confirm
     // writes. See the design doc's Part 2a for the full reasoning.
+    // Post-adventure hero-copy fix (2026-09-08): hoisted above daysToGo
+    // (computed unconditionally, not just inside allCertified) so the
+    // countdown badge can be suppressed once the trip is actually over --
+    // same fix as Surface A/attending-signer renderHub(), and the same
+    // "certifying doesn't change what day it is" reasoning applies to
+    // showPostAdventure too: a guardian who never certified but whose
+    // child's trip has long since passed still shouldn't see "Today /
+    // Trail day!".
+    var todayStr = pacificDateString(new Date());
+    var tripDateMatch = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
+    var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
+    var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
+    var pastTripDay = !!(tripDateStr && todayStr > tripDateStr);
+    var showPostAdventure = pastTripDay || (!!state.ctx.trailCheckinAt && isReturnRosterClean(state.ctx));
+    var daysToGo = (pastT3 && !showPostAdventure) ? daysUntilTrip(state.ctx.tripDate) : null;
+    var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot, formatTripDate(state.ctx.tripDate)) : '';
+
     var isUnderway = false;
     if (allCertified) {
-      var todayStr = pacificDateString(new Date());
-      var tripDateMatch = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
-      var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
-      var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
-      var pastTripDay = !!(tripDateStr && todayStr > tripDateStr);
-      var showPostAdventure = pastTripDay || (!!state.ctx.trailCheckinAt && isReturnRosterClean(state.ctx));
       isUnderway = todayStr === tripDateStr && !showPostAdventure && !!state.ctx.headingOutAt;
 
       if (todayStr === tripDateStr && !showPostAdventure && !isUnderway) {
