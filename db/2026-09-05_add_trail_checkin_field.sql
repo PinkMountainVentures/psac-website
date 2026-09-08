@@ -1,0 +1,18 @@
+-- Web trail check-in (2026-09-05). One new column on adventure_prep,
+-- nullable/idempotent, closing the gap Airey flagged directly: "Heading
+-- Out" (db/2026-09-04_add_trail_day_fields.sql) has always had a way to
+-- start the clock, but nothing has ever existed to stop it.
+--
+-- trail_checkin_at: the real "I'm back" timestamp, written once when the
+-- guest taps the check-in button on the hub's Underway card. Scoped
+-- deliberately narrow -- web only, a direct single-tap confirm, no
+-- roster/payload -- per Airey's explicit call: SMS inbound (the other
+-- half of the original safety PRD, item 3 in psac-build-checklist.md's
+-- "New items raised by Airey" list -- webhook, nudges, escalation) stays
+-- unscoped, to be fully defined and built in its own separate pass.
+--
+-- This is also the flag showPostAdventure in adventure-prep-form.js
+-- checks alongside the pure-date pastTripDay, so checking in surfaces the
+-- gear-return/post-adventure hub content immediately, without waiting on
+-- the calendar to roll over to the next day.
+ALTER TABLE adventure_prep ADD COLUMN IF NOT EXISTS trail_checkin_at TIMESTAMPTZ;

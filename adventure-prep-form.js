@@ -212,6 +212,25 @@
   // below (rosterRowHtml) round-trips correctly against existing data.
   var FITNESS_OPTIONS = ['Easygoing pace', 'Comfortable hiker', 'Strong / experienced'];
 
+  // Full roster return + SAR experience (2026-09-08) -- the six-option
+  // "What's going on?" triage, straight out of the Protocol-grounded
+  // table in claude/psac-trail-checkin-return-roster-and-sar-experience-
+  // proposal-2026-09-08.md. Order matters: injury/lost/heat lead (the
+  // three unconditionally-Critical branches), running_longer and
+  // overdue_unknown follow (Urgent), other last. running_longer is
+  // filtered out of the list entirely once a guest is escalating out of
+  // an existing running_longer report (state.checkinOmitRunningLonger) --
+  // "five remaining options still live" per the doc's own escalation-path
+  // design.
+  var CHECKIN_OPTIONS = [
+    { key: 'injury', label: 'Someone’s hurt' },
+    { key: 'lost_separated', label: 'Someone’s lost, or we got separated' },
+    { key: 'heat_illness', label: 'Someone’s showing signs of heat illness' },
+    { key: 'running_longer', label: 'Everyone’s fine, just taking longer than expected' },
+    { key: 'overdue_unknown', label: 'We’re just not back yet and don’t know why' },
+    { key: 'other', label: 'Something else' },
+  ];
+
   var state = {
     ctx: null,
     step: 'hub',
@@ -247,6 +266,26 @@
     forceTrailRefresh: false, // set true by "Answer the questions differently" so loadCandidates() re-runs the engine (operation:'refresh') instead of reusing the existing candidateTrails
     busy: false,
     error: '',
+    // NEW (full roster return + SAR experience, 2026-09-08) -- see
+    // renderTrailReturnRosterSheet/renderTrailCheckinTriage below.
+    // checkinAffectedIds carries forward from the roster sheet (pre-set
+    // to whoever's missing on a non-clean confirm) into the triage
+    // screen's own reportTrailCheckinIncident calls; checkinCategory null
+    // means "still choosing"; checkinOmitRunningLonger is set once the
+    // guest has already reported running_longer and is escalating out of
+    // it via "Things change? Get help now" (five remaining options, per
+    // the proposal doc); checkinLostSeparatedWho resolves the
+    // lost/separated branch's own pronoun question ('self' | 'other')
+    // before its real guidance renders; hasOpenIncident is a
+    // session-local "we heard you" signal for the hub's own status note,
+    // not authoritative (the ops side is, see ops-alerts.html).
+    checkinAffectedIds: [],
+    checkinOmitRunningLonger: false,
+    checkinCategory: null,
+    checkinLostSeparatedWho: null,
+    checkinRunningLongerConfirmed: false,
+    checkinRunningLongerDisplay: '',
+    hasOpenIncident: false,
   };
 
   // ---------------------------------------------------------------------
@@ -430,6 +469,25 @@
     if (isNaN(d.getTime())) return '';
     var formatted = d.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
     return formatted.replace(' ', '').toLowerCase();
+  }
+
+  // Full roster return + SAR experience (2026-09-08) -- formats the
+  // running-longer branch's own <input type="time"> value (guest's local
+  // device clock, not a Pacific-time conversion like formatPacificTime
+  // above; a guest physically on the trail typing their own expected
+  // finish time is already reading their own local clock, there's no
+  // separate timezone to reconcile) into the same lowercase "3:45pm"
+  // style the rest of this file already uses.
+  function formatTimeInputLabel(hhmm) {
+    var parts = String(hhmm || '').split(':');
+    if (parts.length !== 2) return '';
+    var hour = parseInt(parts[0], 10);
+    var minute = parts[1];
+    if (isNaN(hour)) return '';
+    var ampm = hour >= 12 ? 'pm' : 'am';
+    var hour12 = hour % 12;
+    if (hour12 === 0) hour12 = 12;
+    return hour12 + ':' + minute + ampm;
   }
 
   // Small Oxford-style joiner for the "Building momentum" state's "just
@@ -683,6 +741,8 @@
       case 'ridewithgpsInfo': frag = renderRideWithGpsInfo(); break;
       case 'headingOut': frag = renderHeadingOutSheet(); break;
       case 'emergencySosInfo': frag = renderEmergencySosInfo(); break;
+      case 'trailReturnRoster': frag = renderTrailReturnRosterSheet(); break;
+      case 'trailCheckinTriage': frag = renderTrailCheckinTriage(); break;
       case 'waiverDetail': frag = renderWaiverDetail(); break;
       default: frag = renderHub();
     }
@@ -1733,10 +1793,20 @@
   // real cost directly, per Airey's request, while staying even in tone
   // rather than alarmist.
   function underwayHeroHtml(ap, status, selectedTrailCandidate) {
-    var expectedReturnLabel = formatPacificTime(ap.expectedReturnAt) || 'later today';
+    // Full roster return + SAR experience (2026-09-08): guestRevisedReturnAt
+    // (set once a running_longer report's own revised finish time lands,
+    // see lib/trail-checkin-incident-service.js's reportTrailCheckinIncident)
+    // takes over from the original, conservative expectedReturnAt here --
+    // "the hub's Underway card updates its own 'Expect you back around...'
+    // line to the new self-reported time" per the proposal doc. The
+    // original stays untouched server-side either way, this is a display
+    // preference only.
+    var effectiveReturn = ap.guestRevisedReturnAt || ap.expectedReturnAt;
+    var expectedReturnLabel = formatPacificTime(effectiveReturn) || 'later today';
     var subline = 'Expect you back around <b>' + escapeHtml(expectedReturnLabel) + '</b>. We’ll text you then, and we need a reply, that’s how we know your group made it back safe. ' +
       'Miss it and we start trying to reach you right away, if that doesn’t work, it becomes a real search and rescue response, an expensive step we take seriously and hope never to need. ' +
-      '<a class="ap-hero-link" id="ap-signal-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">If you can’t get signal →</a>';
+      '<a class="ap-hero-link" id="ap-signal-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">If you can’t get signal →</a>' +
+      ' · <a class="ap-hero-link" id="ap-need-help-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">Need help, or running behind? →</a>';
     return heroCardHtml('On The Trail', 'You’re on the trail.', subline, selectedTrailCandidate && selectedTrailCandidate.photoUrl, null, true);
   }
 
@@ -1744,6 +1814,56 @@
     return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
       'If we still haven’t heard from your group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan already makes to every guest. ' +
       'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>';
+  }
+
+  // Full roster return + SAR experience (2026-09-08) -- supersedes the
+  // 2026-09-05 single-tap "I'm Back" build. PSAC needs the actual
+  // headcount back ("the client told us exactly who headed out, I need
+  // to know who came back"), not just a signal that someone tapped a
+  // button, so this opens the roster-confirm sheet
+  // (renderTrailReturnRosterSheet) instead of firing one action directly
+  // -- same visual family/button treatment as headingOutButtonHtml above.
+  function trailReturnEntryHtml() {
+    return '<button type="button" class="ap-cta-primary" id="ap-trail-return-btn">Everyone Back?</button>' +
+      '<div class="ap-helper" style="max-width:640px;margin:0 auto 1.3rem;text-align:center;">A quick headcount lets us know your whole group made it back safe.</div>';
+  }
+
+  // Roster source for the return check-in: prefers the Heading Out
+  // snapshot (who actually went, ap.trailDayRoster's present:true rows),
+  // falls back to the full attending roster when that snapshot is empty
+  // -- the same fallback lib/trail-checkin-incident-service.js's own
+  // getReturnRosterSource() applies server-side (found on review, v8:
+  // nothing here before had an answer for a guest who never tapped
+  // Heading Out, or came in via the SMS STARTED path, which doesn't fill
+  // trail_day_roster_json either).
+  function trailReturnRosterSource(ap) {
+    var headingOutRoster = ap && ap.trailDayRoster;
+    if (Array.isArray(headingOutRoster) && headingOutRoster.length) {
+      return headingOutRoster.filter(function (r) { return r.present !== false; })
+        .map(function (r) { return { participantId: r.participantId, name: r.name }; });
+    }
+    return state.roster.filter(function (p) { return p.roleOnBooking !== 'guardian_only'; })
+      .map(function (p) { return { participantId: p.participantId, name: p.name }; });
+  }
+
+  // Whether trail_return_roster_json (once written) says everyone
+  // actually came back -- gates showPostAdventure in renderHub below, per
+  // Airey's direct instruction: a roster that isn't clean must log the
+  // report and surface it to ops, never silently flip to the post-
+  // adventure/gear-return experience.
+  function isReturnRosterClean(ap) {
+    var roster = ap && ap.trailReturnRoster;
+    if (!Array.isArray(roster) || !roster.length) return false;
+    return roster.every(function (r) { return r.present; });
+  }
+
+  // Session-local "we heard you" status line for the Underway hero once
+  // a report's gone in this visit -- not authoritative (the ops side,
+  // ops-alerts.html, is), just enough so a guest who lands back on the
+  // hub after reporting isn’t left wondering whether anything happened.
+  function openIncidentNoticeHtml() {
+    if (!state.hasOpenIncident) return '';
+    return '<div class="ap-checkin-callout">We’ve got your report, PSAC is on it. Situation changed, or need to add something? <span class="ap-checkin-back" id="ap-checkin-notice-link" style="margin:0;display:inline;">Tap here →</span></div>';
   }
 
   function gearPickupReminderHtml(ap) {
@@ -1776,6 +1896,21 @@
     var tripDateMatchForTripCheck = String(eb.date || '').match(/^\d{4}-\d{2}-\d{2}/);
     var tripDateStrForTripCheck = tripDateMatchForTripCheck ? tripDateMatchForTripCheck[0] : '';
     var pastTripDay = !!(tripDateStrForTripCheck && todayStrForTripCheck > tripDateStrForTripCheck);
+    // showPostAdventure (Web trail check-in, 2026-09-05): the real signal
+    // for "show the post-adventure/gear-return hub," widened past the
+    // pure-calendar pastTripDay above to also fire the moment the guest
+    // taps "I'm Back," even on trail day itself, same calendar date as
+    // the trip. Without this, a guest who checks in same-day would sit in
+    // Underway/trail-day copy until midnight for no real reason -- see
+    // db/2026-09-05_add_trail_checkin_field.sql.
+    // Full roster return + SAR experience (2026-09-08): gated on a CLEAN
+    // roster now, not just the presence of a trailCheckinAt timestamp --
+    // Airey's direct instruction was "don't flip to the post-adventure
+    // experience" when not everyone's confirmed back, that report gets
+    // logged and surfaced to ops instead (see renderTrailReturnRosterSheet
+    // below), and the guest stays in the Underway/trail-day experience
+    // until a return roster actually comes back clean.
+    var showPostAdventure = pastTripDay || (!!ap.trailCheckinAt && isReturnRosterClean(ap));
     // NEW (T-3 hub refresh, 2026-09-04): trail-day countdown, only
     // meaningful once past T3 -- passed into heroCardHtml below so it
     // renders pinned to the hero photo's top-right corner.
@@ -1911,12 +2046,21 @@
       var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
       var deliveryDateStr = isoOffsetDateStr(eb.date, -1);
 
-      if (todayStr === tripDateStr) {
+      if (todayStr === tripDateStr && !showPostAdventure) {
         // 2D / Phase 2.5: Trail-day. oneTripTip (Trail Database column AU)
         // is wired through already but empty for every trail today -- see
         // this doc's own flagged content gap -- so this falls back to
         // the audit's own confirmed-good sun-exposure line until a
         // trail actually has one written.
+        // Full roster return + SAR experience (2026-09-08): checking
+        // !showPostAdventure here (rather than the old !ap.trailCheckinAt)
+        // is what lets a same-day CLEAN return roster fall straight
+        // through to the showPostAdventure branch below instead of
+        // staying on trail-day copy until the calendar rolls over --
+        // while a non-clean confirm (someone still missing) correctly
+        // stays on trail-day/Underway copy, since showPostAdventure
+        // itself now requires a clean roster too (see its own definition
+        // above).
         isTrailDayToday = true;
         var tripTip = (selectedTrailCandidate && selectedTrailCandidate.oneTripTip) ||
           'Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.';
@@ -1932,7 +2076,7 @@
         var propertyLabel = propertyLabels[propertyRaw] || 'your place';
         topGreetingHtml = 'Your gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', at your ' + escapeHtml(propertyLabel) + '.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
-      } else if (pastTripDay) {
+      } else if (showPostAdventure) {
         // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05): the
         // trip itself is over. PSAC always frames forward, never back --
         // never "how the trail day behind you went," always what's next.
@@ -1945,6 +2089,9 @@
         // trip has passed (the real bug pastTripDay above fixes), and
         // put the thing that actually matters now -- the gear-return
         // card, below -- in front of the guest instead.
+        // Widened from pastTripDay to showPostAdventure (Web trail
+        // check-in, 2026-09-05): a same-day "I'm Back" tap lands here too,
+        // not just the day-after date rollover.
         topGreetingHtml = 'You’ve earned the pool. Your gear’s the one thing left.';
         topSublineHtml = 'You lived ' + escapeHtml(status.trailName) + '. Here’s what’s next.';
       } else if (pastT3) {
@@ -2002,8 +2149,10 @@
 
     // Gear return card (Phase 3 Post-Adventure, 2026-09-05 -- see this
     // file's own computeGearReturnStatus()/gearReturnCardHtml() further
-    // below). Booker-only, same as the delivery card above.
-    var gearReturnHtml = pastTripDay ? gearReturnCardHtml(computeGearReturnStatus(eb, ap)) : '';
+    // below). Booker-only, same as the delivery card above. Uses
+    // showPostAdventure (Web trail check-in, 2026-09-05), not raw
+    // pastTripDay, so a same-day "I'm Back" tap surfaces this immediately.
+    var gearReturnHtml = showPostAdventure ? gearReturnCardHtml(computeGearReturnStatus(eb, ap)) : '';
 
     // T-3+ guide emphasis card (Airey's direct request, 2026-09-04):
     // replaces the old single-line .ap-trail-unlocked treatment with a
@@ -2053,24 +2202,34 @@
     // wait for the check-in. "Previous cards should be available" (Airey's
     // original ask) is satisfied by getReadyHtml, the same collapsible
     // "everything's set" strip every other pastT3 day already uses.
+    // Underway branch also carries the new "Everyone Back?" roster-confirm
+    // entry point (full roster return + SAR experience, 2026-09-08),
+    // directly under the supporting safety-net note and above the
+    // gear-pickup reminder -- the one required action left on trail day
+    // once a guest is out there. openIncidentNoticeHtml() surfaces a
+    // session-local "we heard you" note once a report's gone in this same
+    // visit, so a guest bounced back to the hub from the triage screen
+    // isn't left wondering whether anything actually happened.
     var trailDayBodyHtml = '';
     if (isTrailDayToday) {
       trailDayBodyHtml = !ap.headingOutAt
         ? (topCardHtml + ambientCheckinNoteHtml() + trailDayReadyStripHtml(ap, status) + headingOutButtonHtml() + weatherHtml + getReadyHtml + depositNoteHtml + receiptHtml)
-        : (underwayHeroHtml(ap, status, selectedTrailCandidate) + underwaySupportingNoteHtml() + gearPickupReminderHtml(ap) + weatherHtml + getReadyHtml + depositNoteHtml + receiptHtml);
+        : (underwayHeroHtml(ap, status, selectedTrailCandidate) + underwaySupportingNoteHtml() + openIncidentNoticeHtml() + trailReturnEntryHtml() + gearPickupReminderHtml(ap) + weatherHtml + getReadyHtml + depositNoteHtml + receiptHtml);
     }
 
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       (isTrailDayToday ? '' : topCardHtml) +
       alertHtml +
-      (pastTripDay
+      (showPostAdventure
         // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05):
         // deliberately minimal -- just the gear-return card, the
         // collapsible prep strip (still useful as a record), and the
         // summary receipt. No weather, no gear-delivery card, no
         // deposit-hold note -- those are all about the trip that already
-        // happened.
+        // happened. Uses showPostAdventure (Web trail check-in,
+        // 2026-09-05), not raw pastTripDay, so a same-day "I'm Back" tap
+        // lands here too, not just the day-after date rollover.
         ? gearReturnHtml + getReadyHtml + receiptHtml
         : isTrailDayToday
           ? trailDayBodyHtml
@@ -2129,6 +2288,31 @@
 
     var signalLink = wrap.querySelector('#ap-signal-link');
     if (signalLink) signalLink.addEventListener('click', function () { state.step = 'emergencySosInfo'; render(); });
+
+    // Full roster return + SAR experience wiring (2026-09-08): the
+    // "Everyone Back?" button now opens the roster-confirm sheet instead
+    // of firing one action directly (renderTrailReturnRosterSheet does
+    // the actual confirmTrailReturnRoster/reportTrailCheckinIncident
+    // calls) -- same entry-into-a-sub-screen pattern as headingOutBtn
+    // above. "Need help, or running behind?" (on the hero card) and the
+    // session-local incident notice link (once one's showing) both drop
+    // straight into the triage screen instead, resetting any prior
+    // triage-in-progress state first.
+    var trailReturnBtn = wrap.querySelector('#ap-trail-return-btn');
+    if (trailReturnBtn) trailReturnBtn.addEventListener('click', function () { state.step = 'trailReturnRoster'; render(); });
+
+    function openCheckinTriage() {
+      state.checkinAffectedIds = [];
+      state.checkinOmitRunningLonger = false;
+      state.checkinCategory = null;
+      state.checkinLostSeparatedWho = null;
+      state.step = 'trailCheckinTriage';
+      render();
+    }
+    var needHelpLink = wrap.querySelector('#ap-need-help-link');
+    if (needHelpLink) needHelpLink.addEventListener('click', openCheckinTriage);
+    var checkinNoticeLink = wrap.querySelector('#ap-checkin-notice-link');
+    if (checkinNoticeLink) checkinNoticeLink.addEventListener('click', openCheckinTriage);
 
     // Gear-issue escape hatch -- same reveal/collapse interaction as the
     // page-level "Questions?" panel, just scoped inline to this one row.
@@ -4836,6 +5020,474 @@
 
     return wrap;
   }
+
+  // ---------------------------------------------------------------------
+  // Full roster return + SAR experience (2026-09-08, claude/psac-trail-
+  // checkin-return-roster-and-sar-experience-proposal-2026-09-08.md, v8).
+  // Same visual family as renderHeadingOutSheet above -- everyone
+  // pre-checked, uncheck anyone not actually back. Unlike Heading Out,
+  // this is NOT write-once: a guest can come back through here again
+  // once a previously-missing person actually returns (see
+  // lib/trail-checkin-incident-service.js's own confirmTrailReturnRoster,
+  // which re-writes the snapshot every call rather than short-circuiting
+  // on an existing value).
+  // ---------------------------------------------------------------------
+
+  function renderTrailReturnRosterSheet() {
+    var ap = state.ctx.adventurePrep || {};
+    var status = computeHubStatus();
+    var rosterSource = trailReturnRosterSource(ap);
+    var absentIds = {}; // participantId -> true once unchecked (not back)
+
+    var rowsHtml = rosterSource.map(function (p) {
+      return '<div class="ap-roster-row" data-participant-id="' + escapeHtml(p.participantId) + '">' +
+        '<span class="ap-roster-name">' + escapeHtml(p.name) + '</span>' +
+        '<div class="ap-check" data-check-for="' + escapeHtml(p.participantId) + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '</div>';
+    }).join('');
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="ap-return-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      '<div class="ap-eyebrow">Welcome Back</div>' +
+      '<h1 class="ap-q">Everyone back from ' + escapeHtml(status.trailName || 'the trail') + '?</h1>' +
+      '<div class="ap-card">' +
+      '<div class="ap-sub" style="margin:0 0 1rem;">Everyone’s checked by default, uncheck anyone who isn’t back with you yet.</div>' +
+      rowsHtml +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="ap-return-confirm">Confirm, Everyone’s Back</button>' +
+      '<div class="ap-checkin-back" id="ap-return-need-help" style="text-align:center;">Need help, or running behind? &rarr;</div>' +
+      '</div></div>'
+    );
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('[data-check-for]'), function (el) {
+      el.addEventListener('click', function () {
+        var pid = el.getAttribute('data-check-for');
+        var nowOff = !el.classList.contains('off');
+        el.classList.toggle('off', nowOff);
+        el.innerHTML = nowOff ? '' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        if (nowOff) { absentIds[pid] = true; } else { delete absentIds[pid]; }
+      });
+    });
+
+    wrap.querySelector('#ap-return-back').addEventListener('click', function () { state.step = 'hub'; render(); });
+    wrap.querySelector('#ap-return-need-help').addEventListener('click', function () {
+      state.checkinAffectedIds = [];
+      state.checkinOmitRunningLonger = false;
+      state.checkinCategory = null;
+      state.checkinLostSeparatedWho = null;
+      state.step = 'trailCheckinTriage';
+      render();
+    });
+
+    var confirmBtn = wrap.querySelector('#ap-return-confirm');
+    confirmBtn.addEventListener('click', function () {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Checking In…';
+      apiPost('/api/adventure-prep', {
+        action: 'confirmTrailReturnRoster',
+        token: TOKEN,
+        presentParticipantIds: rosterSource.filter(function (p) { return !absentIds[p.participantId]; }).map(function (p) { return p.participantId; }),
+      }).then(function (res) {
+        if (res.ok && res.body && res.body.ok) {
+          state.ctx.adventurePrep = state.ctx.adventurePrep || {};
+          state.ctx.adventurePrep.trailCheckinAt = res.body.trailCheckinAt;
+          state.ctx.adventurePrep.trailReturnRoster = res.body.roster;
+          if (res.body.clean) {
+            state.step = 'hub';
+            render();
+          } else {
+            // Not everyone's back -- log it, surface it to ops, and guide
+            // the group through what happens next, rather than silently
+            // flipping to the post-adventure/gear-return experience (see
+            // showPostAdventure in renderHub, gated on a CLEAN roster
+            // now, not just trailCheckinAt). Straight into the same
+            // triage a guest reaches from "Need help, or running
+            // behind?", pre-scoped to whoever's still missing.
+            state.checkinAffectedIds = (res.body.roster || []).filter(function (r) { return !r.present; }).map(function (r) { return r.participantId; });
+            state.checkinOmitRunningLonger = false;
+            state.checkinCategory = null;
+            state.checkinLostSeparatedWho = null;
+            state.step = 'trailCheckinTriage';
+            render();
+          }
+        } else {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm, Everyone’s Back';
+        }
+      });
+    });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Full roster return + SAR experience (2026-09-08) -- the six-option
+  // "What's going on?" triage and its branch-specific guidance, reached
+  // either from the roster sheet above (pre-scoped to whoever's missing)
+  // or directly from the Underway hero's own "Need help, or running
+  // behind?" link (checkinAffectedIds empty in that case -- the affected-
+  // roster question isn't asked as its own screen here, per the design
+  // doc; a report with no one flagged still carries the category and
+  // whatever the intake form/branch fields add). Writes the incident row
+  // IMMEDIATELY on category selection (submitReport below), before a
+  // guest has typed a word of detail, so ops sees a live alert the
+  // instant something's picked. Every branch except running_longer
+  // carries the same optional, autosave-on-blur intake form
+  // (personalDescription/medicalNote/vehicleDescription/otherNotes);
+  // heat_illness's symptom quick-picks and lost_separated's pronoun
+  // question are the only category-specific inputs beyond that shared
+  // block. Nothing here is ever read back by this file or any other
+  // guest-facing surface -- see lib/trail-checkin-incident-service.js's
+  // own header comment.
+  // ---------------------------------------------------------------------
+
+  function renderTrailCheckinTriage() {
+    var ap = state.ctx.adventurePrep || {};
+    var status = computeHubStatus();
+    var trailName = status.trailName || 'the trail';
+
+    function goHub() { state.step = 'hub'; render(); }
+
+    function submitReport(payload) {
+      var body = { action: 'reportTrailCheckinIncident', token: TOKEN, affectedParticipantIds: state.checkinAffectedIds || [] };
+      for (var k in payload) { if (payload.hasOwnProperty(k)) body[k] = payload[k]; }
+      return apiPost('/api/adventure-prep', body).then(function (res) {
+        if (res.ok && res.body && res.body.ok) state.hasOpenIncident = true;
+        return res;
+      });
+    }
+
+    function call911ButtonHtml() {
+      return '<a class="ap-cta-critical" href="tel:911">Call 911 Now</a>';
+    }
+    function psacLineBlockHtml(note) {
+      return '<a class="ap-cta-primary" href="tel:8582329391" style="margin-top:0.9rem;">Call PSAC’s Emergency Line: 858-232-9391</a>' +
+        '<div class="ap-helper" style="text-align:center;">' + note + '</div>';
+    }
+    function intakeFormHtml() {
+      return '<div class="ap-field-label" style="margin-top:1.3rem;">What they were wearing (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="ap-checkin-personal"></textarea>' +
+        '<div class="ap-field-label">Any medical conditions (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="ap-checkin-medical"></textarea>' +
+        '<div class="ap-field-label">Vehicle / where you parked (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="ap-checkin-vehicle"></textarea>' +
+        '<div class="ap-field-label">Anything else PSAC should know (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="ap-checkin-other"></textarea>';
+    }
+    function wireIntakeForm(wrapEl) {
+      var fieldMap = { 'ap-checkin-personal': 'personalDescription', 'ap-checkin-medical': 'medicalNote', 'ap-checkin-vehicle': 'vehicleDescription', 'ap-checkin-other': 'otherNotes' };
+      var lastSaved = {};
+      var _loop = function (elId, payloadKey) {
+        var el = wrapEl.querySelector('#' + elId);
+        if (!el) return;
+        lastSaved[elId] = '';
+        el.addEventListener('blur', function () {
+          var val = el.value.trim();
+          if (val === lastSaved[elId]) return;
+          lastSaved[elId] = val;
+          var payload = { category: state.checkinCategory };
+          payload[payloadKey] = val;
+          submitReport(payload);
+        });
+      };
+      for (var elId in fieldMap) { _loop(elId, fieldMap[elId]); }
+    }
+
+    function pickCategory(key) {
+      state.checkinCategory = key;
+      state.checkinLostSeparatedWho = null;
+      submitReport({ category: key });
+      render();
+    }
+
+    // ---- Screen: "What's going on?" ----
+    if (!state.checkinCategory) {
+      var options = CHECKIN_OPTIONS.filter(function (o) {
+        return !(state.checkinOmitRunningLonger && o.key === 'running_longer');
+      });
+      var wrapList = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-back-link" id="ap-triage-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+        '<div class="ap-eyebrow">Need Help, Or Running Behind?</div>' +
+        '<h1 class="ap-q">What’s going on?</h1>' +
+        '<div class="ap-sub">Pick whichever’s closest, you’ll get the right next step either way.</div>' +
+        options.map(function (o) { return '<div class="ap-checkin-opt" data-key="' + o.key + '">' + escapeHtml(o.label) + '</div>'; }).join('') +
+        '</div></div>'
+      );
+      wrapList.querySelector('#ap-triage-back').addEventListener('click', goHub);
+      Array.prototype.forEach.call(wrapList.querySelectorAll('[data-key]'), function (el) {
+        el.addEventListener('click', function () { pickCategory(el.getAttribute('data-key')); });
+      });
+      return wrapList;
+    }
+
+    // ---- Lost/separated: pronoun sub-question fixes the real bug found
+    // on review (v7) -- v1 through v6 assumed the reporter was the
+    // missing person, which contradicts "separated." The correct
+    // instructions genuinely differ depending on the answer, see below. ----
+    if (state.checkinCategory === 'lost_separated' && !state.checkinLostSeparatedWho) {
+      var wrapWho = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Lost Or Separated</div>' +
+        '<h1 class="ap-q">Is it you who’s separated from the group, or someone else?</h1>' +
+        '<div class="ap-choice-pills" style="margin-top:1rem;">' +
+        '<div class="ap-pill" data-who="self">It’s me</div>' +
+        '<div class="ap-pill" data-who="other">Someone else</div>' +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapWho.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      Array.prototype.forEach.call(wrapWho.querySelectorAll('[data-who]'), function (el) {
+        el.addEventListener('click', function () {
+          var who = el.getAttribute('data-who');
+          state.checkinLostSeparatedWho = who;
+          submitReport({ category: 'lost_separated', categoryDetail: who === 'self' ? 'Reporter themselves is separated from the group' : 'Someone else in the group is separated' });
+          render();
+        });
+      });
+      return wrapWho;
+    }
+
+    // ---- Injury ----
+    if (state.checkinCategory === 'injury') {
+      var wrapInjury = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Someone’s Hurt</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        '<div class="ap-checkin-note">Tell them what happened, your location (' + escapeHtml(trailName) + ', last known point), and any medical conditions.</div>' +
+        psacLineBlockHtml('So we can share your booking details with 911 and stand by.') +
+        '<div class="ap-checkin-callout">While you wait: control bleeding with steady, direct pressure. Keep them warm and in shade. Minimize movement.</div>' +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapInjury.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapInjury);
+      return wrapInjury;
+    }
+
+    // ---- Lost/separated: real guidance, now that who's known ----
+    if (state.checkinCategory === 'lost_separated') {
+      var isSelf = state.checkinLostSeparatedWho === 'self';
+      var guidanceBody = isSelf
+        ? 'Stop moving. Retrace your steps only if it’s safe to do so. Tell them the trail name, your last known location, what you’re wearing, and any medical conditions.'
+        : 'Give them your GPS coordinates if your phone shows them, the trail name, the last place you were together, what they were wearing, and any medical conditions they have.';
+      var wrapLost = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">' + (isSelf ? 'You’re Separated' : 'Someone’s Separated') + '</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        '<div class="ap-checkin-note">' + guidanceBody + '</div>' +
+        psacLineBlockHtml('So we can share your booking details with 911 and stand by.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapLost.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; state.checkinLostSeparatedWho = null; render(); });
+      wireIntakeForm(wrapLost);
+      return wrapLost;
+    }
+
+    // ---- Heat illness: unconditional "call 911 now," no gate in front
+    // of it (Airey's direct correction, v6 -- the exhaustion-vs-stroke
+    // line moves too fast in desert heat for an app-mediated question to
+    // safely decide which side of it a group is on). The symptom
+    // question is descriptive detail gathered alongside the 911
+    // instruction, never a gate in front of it. ----
+    if (state.checkinCategory === 'heat_illness') {
+      var HEAT_SYMPTOMS = ['Confusion', 'Hot or dry skin', 'Loss of consciousness', 'Mainly heavy sweating and weakness'];
+      var wrapHeat = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Heat Illness</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        '<div class="ap-checkin-callout">While you wait: move them to shade. Help them hydrate if they’re conscious and able to. Begin active cooling, wet cloth, fanning.</div>' +
+        '<div class="ap-field-label" style="margin-top:0.9rem;">What are you seeing? (optional, for 911 and PSAC, doesn’t change what to do above)</div>' +
+        '<div class="ap-choice-pills" id="ap-heat-symptoms">' +
+        HEAT_SYMPTOMS.map(function (s) { return '<div class="ap-pill" data-val="' + escapeHtml(s) + '">' + escapeHtml(s) + '</div>'; }).join('') +
+        '</div>' +
+        psacLineBlockHtml('So we can share your booking details with 911 and stand by.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapHeat.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      Array.prototype.forEach.call(wrapHeat.querySelectorAll('#ap-heat-symptoms .ap-pill'), function (el) {
+        el.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrapHeat.querySelectorAll('#ap-heat-symptoms .ap-pill'), function (p) { p.classList.remove('selected'); });
+          el.classList.add('selected');
+          submitReport({ category: 'heat_illness', categoryDetail: el.getAttribute('data-val') });
+        });
+      });
+      wireIntakeForm(wrapHeat);
+      return wrapHeat;
+    }
+
+    // ---- Running longer, everyone's fine: no 911/PSAC-line prompt,
+    // points at RideWithGPS's own live position/progress before asking
+    // the two questions, and the confirmation screen carries a standing
+    // escalation action -- "Things change? Get help now" -- rather than
+    // being a dead end (Airey's direct ask). ----
+    if (state.checkinCategory === 'running_longer') {
+      if (state.checkinRunningLongerConfirmed) {
+        var wrapRLConfirm = h(
+          '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+          '<div class="ap-eyebrow">Running Longer</div>' +
+          '<h1 class="ap-q">Got it, we’ve updated your expected return.</h1>' +
+          '<div class="ap-card">' +
+          '<div class="ap-sub" style="margin:0;">New target: <b>' + escapeHtml(state.checkinRunningLongerDisplay || 'later today') + '</b>. We’ll watch for your real check-in around then.</div>' +
+          '</div>' +
+          '<button type="button" class="ap-cta-critical" id="ap-checkin-escalate">Things Change? Get Help Now</button>' +
+          '<div class="ap-back-link" id="ap-triage-tohub" style="cursor:pointer;text-align:center;">&larr; Back to your Adventure Hub</div>' +
+          '</div></div>'
+        );
+        wrapRLConfirm.querySelector('#ap-triage-tohub').addEventListener('click', goHub);
+        wrapRLConfirm.querySelector('#ap-checkin-escalate').addEventListener('click', function () {
+          state.checkinOmitRunningLonger = true;
+          state.checkinCategory = null;
+          render();
+        });
+        return wrapRLConfirm;
+      }
+
+      var wrapRL = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Running Longer, Everyone’s Fine</div>' +
+        '<h1 class="ap-q">Good to know you’re okay. Let’s get your expected return updated.</h1>' +
+        '<div class="ap-card">' +
+        '<div class="ap-checkin-note" id="ap-checkin-rwgps-link" style="cursor:pointer;text-decoration:underline;">Check RideWithGPS, it shows exactly where you are on the route and how much you have left &rarr;</div>' +
+        '<div class="ap-field-label" style="margin-top:0.9rem;">About when do you now expect to finish?</div>' +
+        '<input class="ap-field-input" type="time" id="ap-checkin-finish-time">' +
+        '<div class="ap-field-label">About how much further do you have left?</div>' +
+        '<div class="ap-window-list" id="ap-checkin-remaining">' +
+        ['Almost done', 'A few miles', 'More than half left', 'Not sure'].map(function (d) {
+          return '<div class="ap-window-opt" data-val="' + d + '">' + d + '</div>';
+        }).join('') +
+        '</div>' +
+        '<div id="ap-checkin-running-error" class="ap-error"></div>' +
+        '</div>' +
+        '<button type="button" class="ap-cta-primary" id="ap-checkin-running-submit">Update My Status</button>' +
+        '<div class="ap-back-link" id="ap-triage-tohub2" style="cursor:pointer;text-align:center;">&larr; Back to your Adventure Hub</div>' +
+        '</div></div>'
+      );
+
+      var chosenRemaining = null;
+      wrapRL.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wrapRL.querySelector('#ap-triage-tohub2').addEventListener('click', goHub);
+      wrapRL.querySelector('#ap-checkin-rwgps-link').addEventListener('click', function () {
+        window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+      });
+      Array.prototype.forEach.call(wrapRL.querySelectorAll('#ap-checkin-remaining .ap-window-opt'), function (el) {
+        el.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrapRL.querySelectorAll('#ap-checkin-remaining .ap-window-opt'), function (o) { o.classList.remove('selected'); });
+          el.classList.add('selected');
+          chosenRemaining = el.getAttribute('data-val');
+        });
+      });
+
+      wrapRL.querySelector('#ap-checkin-running-submit').addEventListener('click', function () {
+        var timeVal = wrapRL.querySelector('#ap-checkin-finish-time').value;
+        var errorEl = wrapRL.querySelector('#ap-checkin-running-error');
+        if (!timeVal && !chosenRemaining) {
+          errorEl.textContent = 'Give us at least one, a new time or how much you have left.';
+          return;
+        }
+        var payload = { category: 'running_longer' };
+        var displayLabel = '';
+        if (timeVal) {
+          var parts = timeVal.split(':');
+          var now = new Date();
+          var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+          if (target.getTime() < now.getTime()) target.setDate(target.getDate() + 1);
+          payload.reportedNewFinishEstimate = target.toISOString();
+          displayLabel = formatTimeInputLabel(timeVal);
+        }
+        if (chosenRemaining) payload.reportedRemainingDistance = chosenRemaining;
+        submitReport(payload).then(function (res) {
+          if (res.ok && res.body && res.body.ok) {
+            if (res.body.guestRevisedReturnAt) {
+              state.ctx.adventurePrep = state.ctx.adventurePrep || {};
+              state.ctx.adventurePrep.guestRevisedReturnAt = res.body.guestRevisedReturnAt;
+            }
+            state.checkinRunningLongerConfirmed = true;
+            state.checkinRunningLongerDisplay = displayLabel || (chosenRemaining || 'later today');
+            render();
+          } else {
+            errorEl.textContent = 'Something went wrong saving that, try again.';
+          }
+        });
+      });
+
+      return wrapRL;
+    }
+
+    // ---- Not back yet, no idea why: leads with PSAC's emergency line,
+    // not 911, per the Protocol's own contact-table entry for this exact
+    // case. ----
+    if (state.checkinCategory === 'overdue_unknown') {
+      var wrapOverdue = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Not Back Yet</div>' +
+        '<h1 class="ap-q">Let’s get PSAC on the line.</h1>' +
+        '<div class="ap-card">' +
+        '<div class="ap-checkin-note">We don’t have to know why yet.</div>' +
+        psacLineBlockHtml('So we can help figure out what’s going on and coordinate next steps.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapOverdue.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapOverdue);
+      return wrapOverdue;
+    }
+
+    // ---- Something else: free text, PSAC's emergency line as the
+    // fallback contact either way. ----
+    if (state.checkinCategory === 'other') {
+      var wrapOther = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Something Else</div>' +
+        '<h1 class="ap-q">Tell us what’s going on.</h1>' +
+        '<div class="ap-card">' +
+        '<textarea class="ap-field-textarea" id="ap-checkin-detail" placeholder="What’s happening?" style="height:90px;"></textarea>' +
+        psacLineBlockHtml('If anything feels urgent, this is the fastest way to reach a real person.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapOther.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      var detailEl = wrapOther.querySelector('#ap-checkin-detail');
+      var lastDetail = '';
+      detailEl.addEventListener('blur', function () {
+        var val = detailEl.value.trim();
+        if (val === lastDetail) return;
+        lastDetail = val;
+        submitReport({ category: 'other', categoryDetail: val });
+      });
+      wireIntakeForm(wrapOther);
+      return wrapOther;
+    }
+
+    // Defensive fallback -- an unrecognized category shouldn't be
+    // reachable (CHECKIN_OPTIONS is the only source of category values),
+    // but resets cleanly back to the option list rather than rendering
+    // nothing if it ever happens.
+    state.checkinCategory = null;
+    return renderTrailCheckinTriage();
+  }
+
 
   // ---------------------------------------------------------------------
   // Phase 2.5 Trail Day -- "If you can't get signal" (claude/psac-trail-

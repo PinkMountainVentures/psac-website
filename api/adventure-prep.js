@@ -64,6 +64,8 @@
  *   POST /api/adventure-prep { action: 'setRosterGearKits', token, updates: [{participantId, gearKit}] }  -- NEW (Task 15): backs the Gear Kits screen's per-person kit toggle; see lib/adventure-prep-service.js's own header comment on why this is deliberately separate from confirmRoster
  *   POST /api/adventure-prep { action: 'confirmHeadingOut', token, absentParticipantIds? }  -- NEW (Phase 2.5 Trail Day, 2026-09-04): backs the Heading Out roster-confirm sheet, see lib/adventure-prep-service.js's confirmHeadingOut()
  *   POST /api/adventure-prep { action: 'markGuideOpened', token }  -- NEW (Phase 2.5 Trail Day, 2026-09-04): fires on every Get Guide tap, first-tap-wins server-side
+ *   POST /api/adventure-prep { action: 'confirmTrailReturnRoster', token, presentParticipantIds? }  -- NEW (full roster return + SAR experience, 2026-09-08): backs the "Everyone back from [trail]?" roster-confirm sheet, see lib/trail-checkin-incident-service.js's confirmTrailReturnRoster(). Supersedes the 2026-09-05 single-tap confirmTrailCheckin design.
+ *   POST /api/adventure-prep { action: 'reportTrailCheckinIncident', token, category, categoryDetail?, affectedParticipantIds?, personalDescription?, medicalNote?, vehicleDescription?, reportedNewFinishEstimate?, reportedRemainingDistance?, otherNotes? }  -- NEW (full roster return + SAR experience, 2026-09-08): backs the six-option "What's going on?" triage, see lib/trail-checkin-incident-service.js's reportTrailCheckinIncident(). Web only -- SMS inbound stays scoped separately, own future pass.
  */
 
 'use strict';
@@ -483,6 +485,72 @@ async function markGuideOpened(body, res) {
   res.status(200).json(result);
 }
 
+// -- confirmTrailReturnRoster / reportTrailCheckinIncident, NEW (full
+// roster return + SAR experience, 2026-09-08) ------------------------
+// Backs the "Everyone back from [trail]?" roster-confirm sheet and the
+// six-option "What's going on?" triage on the Underway hub card. Both
+// resolve Surface A's own adventure_prep_token to a bookingId here, then
+// call straight into lib/trail-checkin-incident-service.js, the one
+// shared engine every surface (Surface A here, every Surface B variant
+// via api/waiver.js) calls into -- see that file's own header for the
+// full contract (one-way tier rule, revision-count backstop, etc.).
+// Superseded design note: this replaces confirmTrailCheckin(), the
+// single-tap "I'm Back" build from earlier the same day -- see
+// lib/adventure-prep-service.js's own header comment on that.
+const trailCheckinIncidentService = require('../lib/trail-checkin-incident-service');
+
+async function confirmTrailReturnRoster(body, res) {
+  const token = body.token;
+  if (!token) {
+    res.status(400).json({ error: 'missing_token' });
+    return;
+  }
+  const booking = await adventurePrepService.findBookingByToken(token);
+  if (!booking) {
+    res.status(404).json({ error: 'invalid_token' });
+    return;
+  }
+  const result = await trailCheckinIncidentService.confirmTrailReturnRoster(booking.booking_id, {
+    presentParticipantIds: Array.isArray(body.presentParticipantIds) ? body.presentParticipantIds : [],
+    reportedByRole: 'booker',
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
+async function reportTrailCheckinIncident(body, res) {
+  const token = body.token;
+  if (!token) {
+    res.status(400).json({ error: 'missing_token' });
+    return;
+  }
+  const booking = await adventurePrepService.findBookingByToken(token);
+  if (!booking) {
+    res.status(404).json({ error: 'invalid_token' });
+    return;
+  }
+  const result = await trailCheckinIncidentService.reportTrailCheckinIncident(booking.booking_id, {
+    category: body.category,
+    categoryDetail: body.categoryDetail,
+    affectedParticipantIds: Array.isArray(body.affectedParticipantIds) ? body.affectedParticipantIds : [],
+    personalDescription: body.personalDescription,
+    medicalNote: body.medicalNote,
+    vehicleDescription: body.vehicleDescription,
+    reportedNewFinishEstimate: body.reportedNewFinishEstimate,
+    reportedRemainingDistance: body.reportedRemainingDistance,
+    otherNotes: body.otherNotes,
+    reportedByRole: 'booker',
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 const POST_ACTIONS = {
   saveFields,
   confirmRoster,
@@ -493,6 +561,8 @@ const POST_ACTIONS = {
   setRosterGearKits,
   confirmHeadingOut,
   markGuideOpened,
+  confirmTrailReturnRoster,
+  reportTrailCheckinIncident,
 };
 
 module.exports = async function handler(req, res) {

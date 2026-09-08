@@ -25,11 +25,14 @@
  *   POST /api/waiver { action: 'saveWaiverSignature', token?, signerToken?, signerName, signerEmail?, signerPhone?, smsConsent?, isGuardian?, guardianForChildrenParticipantIds?, participantsCovered? }
  *   POST /api/waiver { action: 'saveSignerDetails', signerToken, signerEmail?, signerPhone?, smsConsent?, ... }
  *   POST /api/waiver { action: 'saveEmergencyContact', token?, signerToken?, contactName, contactPhone, contactEmail }
+ *   POST /api/waiver { action: 'confirmTrailReturnRoster', signerToken, presentParticipantIds? }  -- NEW (full roster return + SAR experience, 2026-09-08): Surface B's half of the "Everyone back from [trail]?" roster-confirm sheet, see lib/trail-checkin-incident-service.js's confirmTrailReturnRoster(). Resolves signerToken via waiverService.resolveSignerForCheckin() to the bookingId Surface A's own adventure-prep.js action also resolves to, so both surfaces write the same roster snapshot.
+ *   POST /api/waiver { action: 'reportTrailCheckinIncident', signerToken, category, categoryDetail?, affectedParticipantIds?, personalDescription?, medicalNote?, vehicleDescription?, reportedNewFinishEstimate?, reportedRemainingDistance?, otherNotes? }  -- NEW (full roster return + SAR experience, 2026-09-08): Surface B's half of the six-option "What's going on?" triage, see lib/trail-checkin-incident-service.js's reportTrailCheckinIncident(). reportedByRole is derived server-side from the signer's own role (participant / participant_guardian / guardian_only), never trusted from the client.
  */
 
 'use strict';
 
 const waiverService = require('../lib/waiver-service');
+const trailCheckinIncidentService = require('../lib/trail-checkin-incident-service');
 
 function parseBody(req) {
   var body = req.body;
@@ -141,6 +144,71 @@ async function saveEmergencyContact(body, req, res) {
   res.status(200).json(result);
 }
 
+// -- confirmTrailReturnRoster / reportTrailCheckinIncident, NEW (full
+// roster return + SAR experience, 2026-09-08) ------------------------
+// Surface B's half of the shared engine -- see api/adventure-prep.js's
+// own copy of this same comment for the full contract (one-way tier
+// rule, revision-count backstop, etc., all in
+// lib/trail-checkin-incident-service.js). The one real difference from
+// Surface A: reportedByRole here isn't a fixed 'booker' constant, it's
+// resolved per-signer by waiverService.resolveSignerForCheckin() into
+// one of 'participant' / 'participant_guardian' / 'guardian_only', per
+// Airey's explicit call that every Surface B variant needs access to
+// this, with framing that differs by role -- the framing itself lives
+// in waiver-signer-form.js, this just makes sure the right role lands
+// on the incident/roster record no matter which signer reports it.
+async function confirmTrailReturnRoster(body, res) {
+  if (!body.signerToken) {
+    res.status(400).json({ error: 'missing_identifier' });
+    return;
+  }
+  const signer = await waiverService.resolveSignerForCheckin(body.signerToken);
+  if (!signer || signer.notFound) {
+    res.status(404).json({ error: 'invalid_signer_token' });
+    return;
+  }
+  const result = await trailCheckinIncidentService.confirmTrailReturnRoster(signer.bookingId, {
+    presentParticipantIds: Array.isArray(body.presentParticipantIds) ? body.presentParticipantIds : [],
+    reportedByParticipantId: signer.participantId,
+    reportedByRole: signer.reportedByRole,
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
+async function reportTrailCheckinIncident(body, res) {
+  if (!body.signerToken) {
+    res.status(400).json({ error: 'missing_identifier' });
+    return;
+  }
+  const signer = await waiverService.resolveSignerForCheckin(body.signerToken);
+  if (!signer || signer.notFound) {
+    res.status(404).json({ error: 'invalid_signer_token' });
+    return;
+  }
+  const result = await trailCheckinIncidentService.reportTrailCheckinIncident(signer.bookingId, {
+    category: body.category,
+    categoryDetail: body.categoryDetail,
+    affectedParticipantIds: Array.isArray(body.affectedParticipantIds) ? body.affectedParticipantIds : [],
+    personalDescription: body.personalDescription,
+    medicalNote: body.medicalNote,
+    vehicleDescription: body.vehicleDescription,
+    reportedNewFinishEstimate: body.reportedNewFinishEstimate,
+    reportedRemainingDistance: body.reportedRemainingDistance,
+    otherNotes: body.otherNotes,
+    reportedByParticipantId: signer.participantId,
+    reportedByRole: signer.reportedByRole,
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method === 'GET') {
@@ -162,6 +230,14 @@ module.exports = async function handler(req, res) {
     }
     if (body.action === 'saveEmergencyContact') {
       await saveEmergencyContact(body, req, res);
+      return;
+    }
+    if (body.action === 'confirmTrailReturnRoster') {
+      await confirmTrailReturnRoster(body, res);
+      return;
+    }
+    if (body.action === 'reportTrailCheckinIncident') {
+      await reportTrailCheckinIncident(body, res);
       return;
     }
     res.status(400).json({ error: 'unknown_action' });

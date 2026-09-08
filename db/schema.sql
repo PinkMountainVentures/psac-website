@@ -205,7 +205,13 @@ CREATE TABLE IF NOT EXISTS trails (
   nearest_town            TEXT,
   drive_time_from_downtown_ps TEXT,
   entry_fee_required      BOOLEAN,
-  guided_eligible         BOOLEAN
+  guided_eligible         BOOLEAN,
+  -- NEW (full roster return + SAR experience, 2026-09-08) -- trailhead
+  -- land-manager contact, settled deliberately on the trailhead steward
+  -- rather than full multi-jurisdiction modeling. See
+  -- db/2026-09-08_add_trail_checkin_return_and_incidents.sql.
+  land_manager_name       TEXT,
+  land_manager_phone      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS trail_landmarks (
@@ -633,7 +639,14 @@ CREATE TABLE IF NOT EXISTS adventure_prep (
   heading_out_at          TIMESTAMPTZ,
   expected_return_at      TIMESTAMPTZ,
   trail_day_roster_json   JSONB,
-  guide_first_opened_at   TIMESTAMPTZ
+  guide_first_opened_at   TIMESTAMPTZ,
+  -- NEW (Web trail check-in, 2026-09-05) -- see
+  -- db/2026-09-05_add_trail_checkin_field.sql for the full reasoning.
+  trail_checkin_at        TIMESTAMPTZ,
+  -- NEW (full roster return + SAR experience, 2026-09-08) -- see
+  -- db/2026-09-08_add_trail_checkin_return_and_incidents.sql.
+  trail_return_roster_json JSONB,
+  guest_revised_return_at  TIMESTAMPTZ
 );
 
 -- participatingRosterRef (live column) is deliberately DROPPED here, same
@@ -707,6 +720,35 @@ CREATE TABLE IF NOT EXISTS ops_alerts (
 
 CREATE INDEX IF NOT EXISTS idx_ops_alerts_booking ON ops_alerts(booking_id);
 CREATE INDEX IF NOT EXISTS idx_ops_alerts_status ON ops_alerts(status);
+
+-- ---------- Trail Check-In Incidents (full roster return + SAR experience, 2026-09-08) ----------
+-- See db/2026-09-08_add_trail_checkin_return_and_incidents.sql for the full
+-- reasoning on every column below.
+
+CREATE TABLE IF NOT EXISTS trail_checkin_incidents (
+  incident_id                   TEXT PRIMARY KEY,   -- INC-XXXXXXXX
+  booking_id                    TEXT NOT NULL REFERENCES experience_bookings(booking_id),
+  category                      TEXT NOT NULL,      -- 'injury' | 'lost_separated' | 'heat_illness' | 'running_longer' | 'overdue_unknown' | 'other'
+  category_detail               TEXT,
+  affected_participant_ids      JSONB,
+  personal_description          TEXT,
+  medical_note                  TEXT,
+  vehicle_description            TEXT,
+  reported_new_finish_estimate  TIMESTAMPTZ,
+  reported_remaining_distance    TEXT,
+  other_notes                    TEXT,
+  reported_by_participant_id     TEXT REFERENCES booking_participants(participant_id),
+  reported_by_role                TEXT,             -- 'booker' | 'participant' | 'participant_guardian' | 'guardian_only'
+  revision_count                  INTEGER NOT NULL DEFAULT 0,
+  reported_at                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status                           TEXT NOT NULL DEFAULT 'Open',
+  resolved_at                     TIMESTAMPTZ,
+  resolved_by                     TEXT,
+  staff_notes                      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_trail_checkin_incidents_booking ON trail_checkin_incidents(booking_id);
+CREATE INDEX IF NOT EXISTS idx_trail_checkin_incidents_status ON trail_checkin_incidents(status);
 
 CREATE TABLE IF NOT EXISTS trail_swap_requests (
   swap_request_id                    TEXT PRIMARY KEY,  -- SWAP-XXXXXXXX
