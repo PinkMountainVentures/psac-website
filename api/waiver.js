@@ -27,12 +27,15 @@
  *   POST /api/waiver { action: 'saveEmergencyContact', token?, signerToken?, contactName, contactPhone, contactEmail }
  *   POST /api/waiver { action: 'confirmTrailReturnRoster', signerToken, presentParticipantIds? }  -- NEW (full roster return + SAR experience, 2026-09-08): Surface B's half of the "Everyone back from [trail]?" roster-confirm sheet, see lib/trail-checkin-incident-service.js's confirmTrailReturnRoster(). Resolves signerToken via waiverService.resolveSignerForCheckin() to the bookingId Surface A's own adventure-prep.js action also resolves to, so both surfaces write the same roster snapshot.
  *   POST /api/waiver { action: 'reportTrailCheckinIncident', signerToken, category, categoryDetail?, affectedParticipantIds?, personalDescription?, medicalNote?, vehicleDescription?, reportedNewFinishEstimate?, reportedRemainingDistance?, otherNotes? }  -- NEW (full roster return + SAR experience, 2026-09-08): Surface B's half of the six-option "What's going on?" triage, see lib/trail-checkin-incident-service.js's reportTrailCheckinIncident(). reportedByRole is derived server-side from the signer's own role (participant / participant_guardian / guardian_only), never trusted from the client.
+ *   POST /api/waiver { action: 'confirmHeadingOut', signerToken, absentParticipantIds? }  -- NEW (Surface B trail-day arc, 2026-09-08): Surface B's half of the Heading Out roster-confirm sheet, see lib/adventure-prep-service.js's confirmHeadingOutByBookingId(). Idempotent, same as Surface A's own action.
+ *   POST /api/waiver { action: 'markGuideOpened', signerToken }  -- NEW (Surface B trail-day arc, 2026-09-08): fires on every Get Guide tap, first-tap-wins server-side, same as Surface A's own action.
  */
 
 'use strict';
 
 const waiverService = require('../lib/waiver-service');
 const trailCheckinIncidentService = require('../lib/trail-checkin-incident-service');
+const adventurePrepService = require('../lib/adventure-prep-service');
 
 function parseBody(req) {
   var body = req.body;
@@ -209,6 +212,52 @@ async function reportTrailCheckinIncident(body, res) {
   res.status(200).json(result);
 }
 
+// -- confirmHeadingOut / markGuideOpened, NEW (Surface B trail-day arc,
+// 2026-09-08) ----------------------------------------------------------
+// Backs Surface B's own Heading Out button and Get Guide tap -- same
+// core logic as Surface A's identically-named actions
+// (lib/adventure-prep-service.js's confirmHeadingOutByBookingId/
+// markGuideOpenedByBookingId, split out from the token-coupled originals
+// this week for exactly this reason), resolved to a bookingId via
+// waiverService.resolveSignerBookingId() instead of a booker token.
+async function confirmHeadingOut(body, res) {
+  if (!body.signerToken) {
+    res.status(400).json({ error: 'missing_identifier' });
+    return;
+  }
+  const signer = await waiverService.resolveSignerBookingId(body.signerToken);
+  if (!signer || signer.notFound) {
+    res.status(404).json({ error: 'invalid_signer_token' });
+    return;
+  }
+  const result = await adventurePrepService.confirmHeadingOutByBookingId(signer.bookingId, {
+    absentParticipantIds: Array.isArray(body.absentParticipantIds) ? body.absentParticipantIds : [],
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
+async function markGuideOpened(body, res) {
+  if (!body.signerToken) {
+    res.status(400).json({ error: 'missing_identifier' });
+    return;
+  }
+  const signer = await waiverService.resolveSignerBookingId(body.signerToken);
+  if (!signer || signer.notFound) {
+    res.status(404).json({ error: 'invalid_signer_token' });
+    return;
+  }
+  const result = await adventurePrepService.markGuideOpenedByBookingId(signer.bookingId);
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method === 'GET') {
@@ -238,6 +287,14 @@ module.exports = async function handler(req, res) {
     }
     if (body.action === 'reportTrailCheckinIncident') {
       await reportTrailCheckinIncident(body, res);
+      return;
+    }
+    if (body.action === 'confirmHeadingOut') {
+      await confirmHeadingOut(body, res);
+      return;
+    }
+    if (body.action === 'markGuideOpened') {
+      await markGuideOpened(body, res);
       return;
     }
     res.status(400).json({ error: 'unknown_action' });

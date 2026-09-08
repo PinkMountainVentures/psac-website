@@ -1784,7 +1784,7 @@
 
   function headingOutButtonHtml() {
     return '<button type="button" class="ap-cta-primary" id="ap-heading-out-btn">Heading Out</button>' +
-      '<div class="ap-helper" style="max-width:640px;margin:0 auto 1.3rem;text-align:center;">Tapping this opens a 10-second headcount, then you’re on your way.</div>';
+      '<div class="ap-helper" style="max-width:640px;margin:0 auto 1.3rem;text-align:center;">Tapping this opens a 10-second headcount, then you’re on your way. This is the list we’ll expect to hear from later today, so it’s worth getting right.</div>';
   }
 
   // Underway: same hero-photo card as the morning, dimmed to read as
@@ -5260,7 +5260,7 @@
         '<div class="ap-card">' +
         call911ButtonHtml() +
         '<div class="ap-checkin-note">Tell them what happened, your location (' + escapeHtml(trailName) + ', last known point), and any medical conditions.</div>' +
-        psacLineBlockHtml('So we can share your booking details with 911 and stand by.') +
+        psacLineBlockHtml('So we can loop in 911 or the land manager immediately, share your booking details, and stay with you until help arrives.') +
         '<div class="ap-checkin-callout">While you wait: control bleeding with steady, direct pressure. Keep them warm and in shade. Minimize movement.</div>' +
         intakeFormHtml() +
         '</div>' +
@@ -5285,7 +5285,7 @@
         '<div class="ap-card">' +
         call911ButtonHtml() +
         '<div class="ap-checkin-note">' + guidanceBody + '</div>' +
-        psacLineBlockHtml('So we can share your booking details with 911 and stand by.') +
+        psacLineBlockHtml('So we can loop in 911 or the land manager immediately, share your booking details, and stay with you until help arrives.') +
         intakeFormHtml() +
         '</div>' +
         '</div></div>'
@@ -5315,7 +5315,7 @@
         '<div class="ap-choice-pills" id="ap-heat-symptoms">' +
         HEAT_SYMPTOMS.map(function (s) { return '<div class="ap-pill" data-val="' + escapeHtml(s) + '">' + escapeHtml(s) + '</div>'; }).join('') +
         '</div>' +
-        psacLineBlockHtml('So we can share your booking details with 911 and stand by.') +
+        psacLineBlockHtml('So we can loop in 911 or the land manager immediately, share your booking details, and stay with you until help arrives.') +
         intakeFormHtml() +
         '</div>' +
         '</div></div>'

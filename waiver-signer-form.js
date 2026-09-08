@@ -76,7 +76,29 @@
     guardianForChildrenParticipantIds: [], // NEW (Task 16): array of participant_ids, replaces the old name-keyed guardianForChildren — matches lib/waiver-service.js's real saveWaiverSignature contract
     ecName: '',
     ecPhone: '',
+    // Surface B trail-day arc (2026-09-08) -- same triage-flow fields
+    // adventure-prep-form.js's own state object carries, see that file's
+    // renderTrailCheckinTriage() for what each drives.
+    checkinAffectedIds: [],
+    checkinOmitRunningLonger: false,
+    checkinCategory: null,
+    checkinLostSeparatedWho: null,
+    checkinRunningLongerConfirmed: false,
+    checkinRunningLongerDisplay: '',
+    hasOpenIncident: false,
   };
+
+  // Surface B trail-day arc (2026-09-08) -- same six triage options as
+  // Surface A's own CHECKIN_OPTIONS (adventure-prep-form.js), shared
+  // engine per the approved proposal's "Multi-surface access" section.
+  var CHECKIN_OPTIONS = [
+    { key: 'injury', label: 'Someone’s hurt' },
+    { key: 'lost_separated', label: 'Someone’s lost, or we got separated' },
+    { key: 'heat_illness', label: 'Someone’s showing signs of heat illness' },
+    { key: 'running_longer', label: 'Everyone’s fine, just taking longer than expected' },
+    { key: 'overdue_unknown', label: 'They’re just not back yet and we don’t know why' },
+    { key: 'other', label: 'Something else' },
+  ];
 
   // Matches lib/adventure-prep-service.js's own AGE_BUCKET_MAP (reversed)
   // — getSignerContext returns each minor's raw age_bucket enum value
@@ -185,6 +207,31 @@
     var parts = dtf.formatToParts(date).reduce(function (acc, p) { acc[p.type] = p.value; return acc; }, {});
     return parts.year + '-' + parts.month + '-' + parts.day;
   }
+  // Surface B trail-day arc (2026-09-08) -- ported unchanged from
+  // adventure-prep-form.js.
+  function formatPacificTime(isoString) {
+    if (!isoString) return '';
+    var d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    var formatted = d.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
+    return formatted.replace(' ', '').toLowerCase();
+  }
+
+  // Surface B trail-day arc (2026-09-08) -- formats the running-longer
+  // branch's own <input type="time"> value (guest's local device clock),
+  // ported unchanged from adventure-prep-form.js.
+  function formatTimeInputLabel(hhmm) {
+    var parts = String(hhmm || '').split(':');
+    if (parts.length !== 2) return '';
+    var hour = parseInt(parts[0], 10);
+    var minute = parts[1];
+    if (isNaN(hour)) return '';
+    var ampm = hour >= 12 ? 'pm' : 'am';
+    var hour12 = hour % 12;
+    if (hour12 === 0) hour12 = 12;
+    return hour12 + ':' + minute + ampm;
+  }
+
   function isoOffsetDateStr(dateStr, dayOffset) {
     var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return '';
@@ -250,6 +297,7 @@
       switch (state.step) {
         case 'guardianCertify': frag = renderGuardianOnlyCertify(); break;
         case 'ridewithgpsInfo': frag = renderRideWithGpsInfo(); break;
+        case 'trailCheckinTriage': frag = renderGuardianTrailCheckinTriage(); break;
         default: frag = renderGuardianOnlyHub();
       }
       root.appendChild(frag);
@@ -263,6 +311,11 @@
       case 'waiver': frag = renderWaiver(); break;
       case 'summary': frag = renderSummary(); break;
       case 'ridewithgpsInfo': frag = renderRideWithGpsInfo(); break;
+      // Surface B trail-day arc (2026-09-08).
+      case 'headingOut': frag = renderHeadingOutSheet(); break;
+      case 'emergencySosInfo': frag = renderEmergencySosInfo(); break;
+      case 'trailReturnRoster': frag = renderTrailReturnRosterSheet(); break;
+      case 'trailCheckinTriage': frag = renderTrailCheckinTriage(); break;
       default: frag = renderHub();
     }
     root.appendChild(frag);
@@ -365,7 +418,7 @@
   // sublineHtml are passed through as already-safe HTML, matching how
   // topGreetingHtml/topSublineHtml are built and inserted everywhere else
   // in this file.
-  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays) {
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays, dimmed) {
     // Trail-day countdown badge (T-3 hub refresh, 2026-09-04): only
     // rendered when a caller passes a real number -- pre-T3 callers pass
     // null/undefined and get no badge at all.
@@ -375,7 +428,11 @@
       var badgeLbl = countdownDays > 0 ? (countdownDays === 1 ? 'Day to go' : 'Days to go') : 'Trail day!';
       badgeHtml = '<div class="ap-countdown-badge"><div class="ap-countdown-num">' + badgeNum + '</div><div class="ap-countdown-lbl">' + badgeLbl + '</div></div>';
     }
-    return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + '"' +
+    // `dimmed` (Surface B trail-day arc, 2026-09-08) -- same Underway
+    // treatment Surface A's own heroCardHtml already carries, see
+    // .ap-hero-card.dimmed in ap-styles.css (shared file, no new CSS
+    // needed here).
+    return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + (dimmed ? ' dimmed' : '') + '"' +
       (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
       badgeHtml +
       '<div class="ap-hero-card-inner">' +
@@ -472,6 +529,940 @@
   // ---------------------------------------------------------------------
   // Scoped Adventure Home hub (mockup-07 frame 1)
   // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Surface B trail-day arc (2026-09-08, claude/psac-surface-b-trail-day-
+  // design-copy-2026-09-08.md) -- attending-signer path. Ported from
+  // adventure-prep-form.js's own Phase 2.5/Phase 3 build, adapted to this
+  // file's own conventions (own state object, /api/waiver, signerToken)
+  // and with every gear-logistics piece dropped per Airey's direct call:
+  // only the booker coordinates gear return, so nothing about gear
+  // condition, pickup, or return belongs on this surface.
+  // ---------------------------------------------------------------------
+
+  // Whether trail_return_roster_json (once written) says everyone
+  // actually came back -- gates showPostAdventure in renderHub below,
+  // same rule adventure-prep-form.js's own isReturnRosterClean() follows.
+  function isReturnRosterClean(ctx) {
+    var roster = ctx && ctx.trailReturnRoster;
+    if (!Array.isArray(roster) || !roster.length) return false;
+    return roster.every(function (r) { return r.present; });
+  }
+
+  // Roster source for the return check-in: prefers the Heading Out
+  // snapshot (ctx.trailDayRoster's present:true rows), falls back to the
+  // unified attendingRoster when that snapshot is empty -- same fallback
+  // lib/trail-checkin-incident-service.js's own getReturnRosterSource()
+  // applies server-side, matching adventure-prep-form.js's own
+  // trailReturnRosterSource.
+  function trailReturnRosterSource(ctx) {
+    var headingOutRoster = ctx && ctx.trailDayRoster;
+    if (Array.isArray(headingOutRoster) && headingOutRoster.length) {
+      return headingOutRoster.filter(function (r) { return r.present !== false; })
+        .map(function (r) { return { participantId: r.participantId, name: r.name }; });
+    }
+    return ctx.attendingRoster || [];
+  }
+
+  // "Ready to go" -- guide row only, gear row dropped (see this block's
+  // own header comment). Same reveal/collapse-free single-row markup
+  // gearPickupReminderHtml's own single-row usage established on Surface
+  // A, since guide becomes the only (and so first) row here.
+  function readyStripHtml(status) {
+    var guideOpened = !!state.ctx.guideFirstOpenedAt;
+    var checkIconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#7ABD91" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var nudgeIconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16.2v.1" stroke="#F58271" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/></svg>';
+    var guideRow = guideOpened
+      ? '<div class="ap-ready-row" style="border-top:none;padding-top:0;"><div class="ap-ready-icon ok">' + checkIconSvg + '</div><div class="ap-ready-text"><div class="t1">Guide downloaded</div><div class="t2">' + escapeHtml(status.trailName || 'Your trail') + '’s route is ready for offline use.</div></div></div>'
+      : '<div class="ap-ready-row" style="border-top:none;padding-top:0;"><div class="ap-ready-icon nudge">' + nudgeIconSvg + '</div><div class="ap-ready-text"><div class="t1">Don’t forget your guide</div><div class="t2">Download it for offline use before you go.</div><span class="ap-ready-link" id="sb-ready-get-guide">Get Guide →</span></div></div>';
+    return '<div class="ap-ready-strip"><div class="ap-card"><div class="ap-ready-title">Ready to go</div>' + guideRow + '</div></div>';
+  }
+
+  function headingOutButtonHtml() {
+    return '<button type="button" class="ap-cta-primary" id="sb-heading-out-btn">Heading Out</button>' +
+      '<div class="ap-helper" style="max-width:640px;margin:0 auto 1.3rem;text-align:center;">Tapping this opens a 10-second headcount, then you’re on your way. This is the list we’ll expect to hear from later today, so it’s worth getting right.</div>';
+  }
+
+  // Underway: same hero-photo card as the morning, dimmed to read as
+  // "later in the day," stating the check-in's real stakes plainly --
+  // verbatim copy from adventure-prep-form.js's own underwayHeroHtml.
+  function underwayHeroHtml(status) {
+    var effectiveReturn = state.ctx.guestRevisedReturnAt || state.ctx.expectedReturnAt;
+    var expectedReturnLabel = formatPacificTime(effectiveReturn) || 'later today';
+    var subline = 'Expect you back around <b>' + escapeHtml(expectedReturnLabel) + '</b>. We’ll text you then, and we need a reply, that’s how we know your group made it back safe. ' +
+      'Miss it and we start trying to reach you right away, if that doesn’t work, it becomes a real search and rescue response, an expensive step we take seriously and hope never to need. ' +
+      '<a class="ap-hero-link" id="sb-signal-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">If you can’t get signal →</a>' +
+      ' · <a class="ap-hero-link" id="sb-need-help-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">Need help, or running behind? →</a>';
+    return heroCardHtml('On The Trail', 'You’re on the trail.', subline, status.trailDetail && status.trailDetail.photoUrl, null, true);
+  }
+
+  function underwaySupportingNoteHtml() {
+    return '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
+      'If we still haven’t heard from your group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan already makes to every guest. ' +
+      'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>';
+  }
+
+  // "Everyone Back?" entry point -- opens the roster-confirm sheet
+  // (renderTrailReturnRosterSheet) instead of firing one action directly,
+  // same reasoning as Surface A's own trailReturnEntryHtml.
+  function trailReturnEntryHtml() {
+    return '<button type="button" class="ap-cta-primary" id="sb-trail-return-btn">Everyone Back?</button>' +
+      '<div class="ap-helper" style="max-width:640px;margin:0 auto 1.3rem;text-align:center;">A quick headcount lets us know your whole group made it back safe.</div>';
+  }
+
+  // Session-local "we heard you" status line for the Underway hero once a
+  // report's gone in this visit -- not authoritative, just enough so a
+  // guest bounced back to the hub isn't left wondering whether anything
+  // happened. Verbatim from adventure-prep-form.js's own version.
+  function openIncidentNoticeHtml() {
+    if (!state.hasOpenIncident) return '';
+    return '<div class="ap-checkin-callout">We’ve got your report, Palm Springs Adventure Club is on it. Situation changed, or need to add something? <span class="ap-checkin-back" id="sb-checkin-notice-link" style="margin:0;display:inline;">Tap here →</span></div>';
+  }
+
+  // "If you can't get signal" info page -- verbatim port of
+  // adventure-prep-form.js's own renderEmergencySosInfo, purely static
+  // content with no signerToken/apiPost dependency, so no adaptation
+  // needed beyond the back-link's own step target.
+  function renderEmergencySosInfo() {
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="sb-sos-back" style="cursor:pointer;">&larr; Back to your Adventure Hub</div>' +
+      '<div class="ap-eyebrow">If You Can’t Get Signal</div>' +
+      '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 1.4rem;color:var(--dark-pine);">What your phone can already do out there</h2>' +
+      '<div class="ap-card">' +
+      '<div class="rwgps-step"><div class="rwgps-num">1</div><div><div class="rwgps-step-title">Always try 911 first</div><div class="rwgps-step-body">If you have any signal at all, a regular call is faster than anything below. These are for when a call won’t go through.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">2</div><div><div class="rwgps-step-title"><span class="rwgps-model-tag">iPhone 14+</span>Emergency SOS via satellite</div><div class="rwgps-step-body">No signal, no wifi: your phone offers “Emergency Text via Satellite.” Step outside with a clear view of the sky, answer a few tap-through questions, and it connects you to help, sharing your location automatically.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">3</div><div><div class="rwgps-step-title"><span class="rwgps-model-tag">Some Android</span>Satellite emergency texting</div><div class="rwgps-step-body">Newer phones from some Android makers offer a similar feature. Coverage varies a lot by brand and model, worth checking your own phone’s settings before trail day, not on it.</div></div></div>' +
+      '</div>' +
+      '<div class="rwgps-callout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/><path d="M12 8v5" stroke="#F58271" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#F58271"/></svg><div>Worth two minutes before you leave: open your phone’s own settings and confirm this feature is there and how it works. That’s not something to learn for the first time out on the trail.</div></div>' +
+      '<a class="rwgps-back" id="sb-sos-back-2">&larr; Back to your Adventure Hub</a>' +
+      '</div></div>'
+    );
+    wrap.querySelector('#sb-sos-back').addEventListener('click', goHub);
+    wrap.querySelector('#sb-sos-back-2').addEventListener('click', goHub);
+    return wrap;
+  }
+
+  // Heading Out roster-confirm sheet -- verbatim port of
+  // adventure-prep-form.js's own renderHeadingOutSheet, adapted to this
+  // surface's own roster source (state.ctx.attendingRoster, the unified
+  // list getSignerContext() now returns) and /api/waiver + signerToken.
+  function renderHeadingOutSheet() {
+    var attendingRoster = state.ctx.attendingRoster || [];
+    var absentIds = {}; // participantId -> true once unchecked
+
+    var rowsHtml = attendingRoster.map(function (p) {
+      return '<div class="ap-roster-row" data-participant-id="' + escapeHtml(p.participantId) + '">' +
+        '<span class="ap-roster-name">' + escapeHtml(p.name) + '</span>' +
+        '<div class="ap-check" data-check-for="' + escapeHtml(p.participantId) + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '</div>';
+    }).join('');
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="sb-heading-out-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      '<div class="ap-eyebrow">Before You Go</div>' +
+      '<h1 class="ap-q">Everyone heading out?</h1>' +
+      '<div class="ap-card">' +
+      '<div class="ap-sub" style="margin:0 0 1rem;">Everyone’s checked by default, uncheck anyone not coming along today.</div>' +
+      rowsHtml +
+      '<div class="ap-roster-hint" id="sb-roster-hint" style="display:none;"></div>' +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="sb-heading-out-confirm">Confirm, Heading Out</button>' +
+      '<div class="ap-helper" style="text-align:center;">Writes your real start time and today’s headcount.</div>' +
+      '<div class="ap-helper" style="text-align:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(42,71,71,0.08);">Timing note: the check-in clock always uses the trail’s full-group, easy-pace estimate from here, the most conservative read, regardless of who’s checked above or how fast your group moves.</div>' +
+      '</div></div>'
+    );
+
+    function updateHint() {
+      var hintEl = wrap.querySelector('#sb-roster-hint');
+      var absentNames = attendingRoster.filter(function (p) { return absentIds[p.participantId]; }).map(function (p) { return p.name; });
+      if (!hintEl) return;
+      if (!absentNames.length) { hintEl.style.display = 'none'; return; }
+      hintEl.style.display = 'block';
+      hintEl.textContent = joinWithAnd(absentNames) + ' unchecked, not hiking today.';
+    }
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('[data-check-for]'), function (el) {
+      el.addEventListener('click', function () {
+        var pid = el.getAttribute('data-check-for');
+        var nowOff = !el.classList.contains('off');
+        el.classList.toggle('off', nowOff);
+        el.innerHTML = nowOff ? '' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        if (nowOff) { absentIds[pid] = true; } else { delete absentIds[pid]; }
+        updateHint();
+      });
+    });
+
+    wrap.querySelector('#sb-heading-out-back').addEventListener('click', goHub);
+
+    var confirmBtn = wrap.querySelector('#sb-heading-out-confirm');
+    confirmBtn.addEventListener('click', function () {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Confirming\u2026';
+      apiPost('/api/waiver', {
+        action: 'confirmHeadingOut',
+        signerToken: SIGNER_TOKEN,
+        absentParticipantIds: Object.keys(absentIds),
+      }).then(function (res) {
+        if (res.ok && res.body && res.body.ok) {
+          state.ctx.headingOutAt = res.body.headingOutAt;
+          state.ctx.expectedReturnAt = res.body.expectedReturnAt;
+          goHub();
+        } else {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm, Heading Out';
+        }
+      });
+    });
+
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // Everyone Back? roster-confirm sheet + six-option triage, attending-
+  // signer path -- verbatim port of adventure-prep-form.js's own
+  // renderTrailReturnRosterSheet/renderTrailCheckinTriage, per the
+  // approved proposal's "Multi-surface access" section: same engine,
+  // same six options, same copy for an attending signer (including one
+  // who's also a participant-guardian for a minor -- no special-cased
+  // copy needed, the affected-roster step already covers flagging a
+  // specific minor). Only the plumbing differs: signerToken instead of
+  // token, /api/waiver instead of /api/adventure-prep -- both actions
+  // (confirmTrailReturnRoster, reportTrailCheckinIncident) were already
+  // dispatched from api/waiver.js as of this week's build.
+  // ---------------------------------------------------------------------
+
+  function renderTrailReturnRosterSheet() {
+    var status = computeStatus();
+    var rosterSource = trailReturnRosterSource(state.ctx);
+    var absentIds = {}; // participantId -> true once unchecked (not back)
+
+    var rowsHtml = rosterSource.map(function (p) {
+      return '<div class="ap-roster-row" data-participant-id="' + escapeHtml(p.participantId) + '">' +
+        '<span class="ap-roster-name">' + escapeHtml(p.name) + '</span>' +
+        '<div class="ap-check" data-check-for="' + escapeHtml(p.participantId) + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '</div>';
+    }).join('');
+
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="sb-return-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      '<div class="ap-eyebrow">Welcome Back</div>' +
+      '<h1 class="ap-q">Everyone back from ' + escapeHtml(status.trailName || 'the trail') + '?</h1>' +
+      '<div class="ap-card">' +
+      '<div class="ap-sub" style="margin:0 0 1rem;">Everyone’s checked by default, uncheck anyone who isn’t back with you yet.</div>' +
+      rowsHtml +
+      '</div>' +
+      '<button type="button" class="ap-cta-primary" id="sb-return-confirm">Confirm, Everyone’s Back</button>' +
+      '<div class="ap-checkin-back" id="sb-return-need-help" style="text-align:center;">Need help, or running behind? &rarr;</div>' +
+      '</div></div>'
+    );
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('[data-check-for]'), function (el) {
+      el.addEventListener('click', function () {
+        var pid = el.getAttribute('data-check-for');
+        var nowOff = !el.classList.contains('off');
+        el.classList.toggle('off', nowOff);
+        el.innerHTML = nowOff ? '' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        if (nowOff) { absentIds[pid] = true; } else { delete absentIds[pid]; }
+      });
+    });
+
+    wrap.querySelector('#sb-return-back').addEventListener('click', goHub);
+    wrap.querySelector('#sb-return-need-help').addEventListener('click', function () {
+      state.checkinAffectedIds = [];
+      state.checkinOmitRunningLonger = false;
+      state.checkinCategory = null;
+      state.checkinLostSeparatedWho = null;
+      state.step = 'trailCheckinTriage';
+      render();
+    });
+
+    var confirmBtn = wrap.querySelector('#sb-return-confirm');
+    confirmBtn.addEventListener('click', function () {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Checking In\u2026';
+      apiPost('/api/waiver', {
+        action: 'confirmTrailReturnRoster',
+        signerToken: SIGNER_TOKEN,
+        presentParticipantIds: rosterSource.filter(function (p) { return !absentIds[p.participantId]; }).map(function (p) { return p.participantId; }),
+      }).then(function (res) {
+        if (res.ok && res.body && res.body.ok) {
+          state.ctx.trailCheckinAt = res.body.trailCheckinAt;
+          state.ctx.trailReturnRoster = res.body.roster;
+          if (res.body.clean) {
+            goHub();
+          } else {
+            // Not everyone's back -- log it, surface it to ops, and guide
+            // the group through what happens next, rather than silently
+            // flipping to the Post-Adventure state (showPostAdventure in
+            // renderHub is gated on a CLEAN roster too). Straight into
+            // the same triage a guest reaches from "Need help, or
+            // running behind?", pre-scoped to whoever's still missing.
+            state.checkinAffectedIds = (res.body.roster || []).filter(function (r) { return !r.present; }).map(function (r) { return r.participantId; });
+            state.checkinOmitRunningLonger = false;
+            state.checkinCategory = null;
+            state.checkinLostSeparatedWho = null;
+            state.step = 'trailCheckinTriage';
+            render();
+          }
+        } else {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm, Everyone’s Back';
+        }
+      });
+    });
+
+    return wrap;
+  }
+
+  function renderTrailCheckinTriage() {
+    var status = computeStatus();
+    var trailName = status.trailName || 'the trail';
+
+    function submitReport(payload) {
+      var body = { action: 'reportTrailCheckinIncident', signerToken: SIGNER_TOKEN, affectedParticipantIds: state.checkinAffectedIds || [] };
+      for (var k in payload) { if (payload.hasOwnProperty(k)) body[k] = payload[k]; }
+      return apiPost('/api/waiver', body).then(function (res) {
+        if (res.ok && res.body && res.body.ok) state.hasOpenIncident = true;
+        return res;
+      });
+    }
+
+    function call911ButtonHtml() {
+      return '<a class="ap-cta-critical" href="tel:911">Call 911 Now</a>';
+    }
+    function psacLineBlockHtml(note) {
+      return '<a class="ap-cta-primary" href="tel:8582329391" style="margin-top:0.9rem;">Call Palm Springs Adventure Club’s Emergency Line: 858-232-9391</a>' +
+        '<div class="ap-helper" style="text-align:center;">' + note + '</div>';
+    }
+    function intakeFormHtml() {
+      return '<div class="ap-field-label" style="margin-top:1.3rem;">What they were wearing (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-checkin-personal"></textarea>' +
+        '<div class="ap-field-label">Any medical conditions (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-checkin-medical"></textarea>' +
+        '<div class="ap-field-label">Vehicle / where you parked (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-checkin-vehicle"></textarea>' +
+        '<div class="ap-field-label">Anything else Palm Springs Adventure Club should know (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-checkin-other"></textarea>';
+    }
+    function wireIntakeForm(wrapEl) {
+      var fieldMap = { 'sb-checkin-personal': 'personalDescription', 'sb-checkin-medical': 'medicalNote', 'sb-checkin-vehicle': 'vehicleDescription', 'sb-checkin-other': 'otherNotes' };
+      var lastSaved = {};
+      var _loop = function (elId, payloadKey) {
+        var el = wrapEl.querySelector('#' + elId);
+        if (!el) return;
+        lastSaved[elId] = '';
+        el.addEventListener('blur', function () {
+          var val = el.value.trim();
+          if (val === lastSaved[elId]) return;
+          lastSaved[elId] = val;
+          var payload = { category: state.checkinCategory };
+          payload[payloadKey] = val;
+          submitReport(payload);
+        });
+      };
+      for (var elId in fieldMap) { _loop(elId, fieldMap[elId]); }
+    }
+
+    function pickCategory(key) {
+      state.checkinCategory = key;
+      state.checkinLostSeparatedWho = null;
+      submitReport({ category: key });
+      render();
+    }
+
+    // ---- Screen: "What's going on?" ----
+    if (!state.checkinCategory) {
+      var options = CHECKIN_OPTIONS.filter(function (o) {
+        return !(state.checkinOmitRunningLonger && o.key === 'running_longer');
+      });
+      var wrapList = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-back-link" id="sb-triage-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+        '<div class="ap-eyebrow">Need Help, Or Running Behind?</div>' +
+        '<h1 class="ap-q">What’s going on?</h1>' +
+        '<div class="ap-sub">Pick whichever’s closest, you’ll get the right next step either way.</div>' +
+        options.map(function (o) { return '<div class="ap-checkin-opt" data-key="' + o.key + '">' + escapeHtml(o.label) + '</div>'; }).join('') +
+        '</div></div>'
+      );
+      wrapList.querySelector('#sb-triage-back').addEventListener('click', goHub);
+      Array.prototype.forEach.call(wrapList.querySelectorAll('[data-key]'), function (el) {
+        el.addEventListener('click', function () { pickCategory(el.getAttribute('data-key')); });
+      });
+      return wrapList;
+    }
+
+    // ---- Lost/separated: pronoun sub-question ----
+    if (state.checkinCategory === 'lost_separated' && !state.checkinLostSeparatedWho) {
+      var wrapWho = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Lost Or Separated</div>' +
+        '<h1 class="ap-q">Is it you who’s separated from the group, or someone else?</h1>' +
+        '<div class="ap-choice-pills" style="margin-top:1rem;">' +
+        '<div class="ap-pill" data-who="self">It’s me</div>' +
+        '<div class="ap-pill" data-who="other">Someone else</div>' +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapWho.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      Array.prototype.forEach.call(wrapWho.querySelectorAll('[data-who]'), function (el) {
+        el.addEventListener('click', function () {
+          var who = el.getAttribute('data-who');
+          state.checkinLostSeparatedWho = who;
+          submitReport({ category: 'lost_separated', categoryDetail: who === 'self' ? 'Reporter themselves is separated from the group' : 'Someone else in the group is separated' });
+          render();
+        });
+      });
+      return wrapWho;
+    }
+
+    // ---- Injury ----
+    if (state.checkinCategory === 'injury') {
+      var wrapInjury = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Someone’s Hurt</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        '<div class="ap-checkin-note">Tell them what happened, your location (' + escapeHtml(trailName) + ', last known point), and any medical conditions.</div>' +
+        psacLineBlockHtml('So we can loop in 911 or the land manager immediately, share your booking details, and stay with you until help arrives.') +
+        '<div class="ap-checkin-callout">While you wait: control bleeding with steady, direct pressure. Keep them warm and in shade. Minimize movement.</div>' +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapInjury.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapInjury);
+      return wrapInjury;
+    }
+
+    // ---- Lost/separated: real guidance, now that who's known ----
+    if (state.checkinCategory === 'lost_separated') {
+      var isSelf = state.checkinLostSeparatedWho === 'self';
+      var guidanceBody = isSelf
+        ? 'Stop moving. Retrace your steps only if it’s safe to do so. Tell them the trail name, your last known location, what you’re wearing, and any medical conditions.'
+        : 'Give them your GPS coordinates if your phone shows them, the trail name, the last place you were together, what they were wearing, and any medical conditions they have.';
+      var wrapLost = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">' + (isSelf ? 'You’re Separated' : 'Someone’s Separated') + '</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        '<div class="ap-checkin-note">' + guidanceBody + '</div>' +
+        psacLineBlockHtml('So we can loop in 911 or the land manager immediately, share your booking details, and stay with you until help arrives.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapLost.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; state.checkinLostSeparatedWho = null; render(); });
+      wireIntakeForm(wrapLost);
+      return wrapLost;
+    }
+
+    // ---- Heat illness: unconditional "call 911 now" ----
+    if (state.checkinCategory === 'heat_illness') {
+      var HEAT_SYMPTOMS = ['Confusion', 'Hot or dry skin', 'Loss of consciousness', 'Mainly heavy sweating and weakness'];
+      var wrapHeat = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Heat Illness</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        '<div class="ap-checkin-callout">While you wait: move them to shade. Help them hydrate if they’re conscious and able to. Begin active cooling, wet cloth, fanning.</div>' +
+        '<div class="ap-field-label" style="margin-top:0.9rem;">What are you seeing? (optional, for 911 and Palm Springs Adventure Club, doesn’t change what to do above)</div>' +
+        '<div class="ap-choice-pills" id="sb-heat-symptoms">' +
+        HEAT_SYMPTOMS.map(function (s) { return '<div class="ap-pill" data-val="' + escapeHtml(s) + '">' + escapeHtml(s) + '</div>'; }).join('') +
+        '</div>' +
+        psacLineBlockHtml('So we can loop in 911 or the land manager immediately, share your booking details, and stay with you until help arrives.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapHeat.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      Array.prototype.forEach.call(wrapHeat.querySelectorAll('#sb-heat-symptoms .ap-pill'), function (el) {
+        el.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrapHeat.querySelectorAll('#sb-heat-symptoms .ap-pill'), function (p) { p.classList.remove('selected'); });
+          el.classList.add('selected');
+          submitReport({ category: 'heat_illness', categoryDetail: el.getAttribute('data-val') });
+        });
+      });
+      wireIntakeForm(wrapHeat);
+      return wrapHeat;
+    }
+
+    // ---- Running longer, everyone's fine ----
+    if (state.checkinCategory === 'running_longer') {
+      if (state.checkinRunningLongerConfirmed) {
+        var wrapRLConfirm = h(
+          '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+          '<div class="ap-eyebrow">Running Longer</div>' +
+          '<h1 class="ap-q">Got it, we’ve updated your expected return.</h1>' +
+          '<div class="ap-card">' +
+          '<div class="ap-sub" style="margin:0;">New target: <b>' + escapeHtml(state.checkinRunningLongerDisplay || 'later today') + '</b>. We’ll watch for your real check-in around then.</div>' +
+          '</div>' +
+          '<button type="button" class="ap-cta-critical" id="sb-checkin-escalate">Things Change? Get Help Now</button>' +
+          '<div class="ap-back-link" id="sb-triage-tohub" style="cursor:pointer;text-align:center;">&larr; Back to your Adventure Hub</div>' +
+          '</div></div>'
+        );
+        wrapRLConfirm.querySelector('#sb-triage-tohub').addEventListener('click', goHub);
+        wrapRLConfirm.querySelector('#sb-checkin-escalate').addEventListener('click', function () {
+          state.checkinOmitRunningLonger = true;
+          state.checkinCategory = null;
+          render();
+        });
+        return wrapRLConfirm;
+      }
+
+      var wrapRL = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Running Longer, Everyone’s Fine</div>' +
+        '<h1 class="ap-q">Good to know you’re okay. Let’s get your expected return updated.</h1>' +
+        '<div class="ap-card">' +
+        '<div class="ap-checkin-note" id="sb-checkin-rwgps-link" style="cursor:pointer;text-decoration:underline;">Check RideWithGPS, it shows exactly where you are on the route and how much you have left &rarr;</div>' +
+        '<div class="ap-field-label" style="margin-top:0.9rem;">About when do you now expect to finish?</div>' +
+        '<input class="ap-field-input" type="time" id="sb-checkin-finish-time">' +
+        '<div class="ap-field-label">About how much further do you have left?</div>' +
+        '<div class="ap-window-list" id="sb-checkin-remaining">' +
+        ['Almost done', 'A few miles', 'More than half left', 'Not sure'].map(function (d) {
+          return '<div class="ap-window-opt" data-val="' + d + '">' + d + '</div>';
+        }).join('') +
+        '</div>' +
+        '<div id="sb-checkin-running-error" class="ap-error"></div>' +
+        '</div>' +
+        '<button type="button" class="ap-cta-primary" id="sb-checkin-running-submit">Update My Status</button>' +
+        '<div class="ap-back-link" id="sb-triage-tohub2" style="cursor:pointer;text-align:center;">&larr; Back to your Adventure Hub</div>' +
+        '</div></div>'
+      );
+
+      var chosenRemaining = null;
+      wrapRL.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wrapRL.querySelector('#sb-triage-tohub2').addEventListener('click', goHub);
+      wrapRL.querySelector('#sb-checkin-rwgps-link').addEventListener('click', function () {
+        window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
+      });
+      Array.prototype.forEach.call(wrapRL.querySelectorAll('#sb-checkin-remaining .ap-window-opt'), function (el) {
+        el.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrapRL.querySelectorAll('#sb-checkin-remaining .ap-window-opt'), function (o) { o.classList.remove('selected'); });
+          el.classList.add('selected');
+          chosenRemaining = el.getAttribute('data-val');
+        });
+      });
+
+      wrapRL.querySelector('#sb-checkin-running-submit').addEventListener('click', function () {
+        var timeVal = wrapRL.querySelector('#sb-checkin-finish-time').value;
+        var errorEl = wrapRL.querySelector('#sb-checkin-running-error');
+        if (!timeVal && !chosenRemaining) {
+          errorEl.textContent = 'Give us at least one, a new time or how much you have left.';
+          return;
+        }
+        var payload = { category: 'running_longer' };
+        var displayLabel = '';
+        if (timeVal) {
+          var parts = timeVal.split(':');
+          var now = new Date();
+          var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+          if (target.getTime() < now.getTime()) target.setDate(target.getDate() + 1);
+          payload.reportedNewFinishEstimate = target.toISOString();
+          displayLabel = formatTimeInputLabel(timeVal);
+        }
+        if (chosenRemaining) payload.reportedRemainingDistance = chosenRemaining;
+        submitReport(payload).then(function (res) {
+          if (res.ok && res.body && res.body.ok) {
+            if (res.body.guestRevisedReturnAt) {
+              state.ctx.guestRevisedReturnAt = res.body.guestRevisedReturnAt;
+            }
+            state.checkinRunningLongerConfirmed = true;
+            state.checkinRunningLongerDisplay = displayLabel || (chosenRemaining || 'later today');
+            render();
+          } else {
+            errorEl.textContent = 'Something went wrong saving that, try again.';
+          }
+        });
+      });
+
+      return wrapRL;
+    }
+
+    // ---- Not back yet, no idea why ----
+    if (state.checkinCategory === 'overdue_unknown') {
+      var wrapOverdue = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Not Back Yet</div>' +
+        '<h1 class="ap-q">Let’s get Palm Springs Adventure Club on the line.</h1>' +
+        '<div class="ap-card">' +
+        '<div class="ap-checkin-note">We don’t have to know why yet.</div>' +
+        psacLineBlockHtml('So we can help figure out what’s going on and coordinate next steps.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapOverdue.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapOverdue);
+      return wrapOverdue;
+    }
+
+    // ---- Something else ----
+    if (state.checkinCategory === 'other') {
+      var wrapOther = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Something Else</div>' +
+        '<h1 class="ap-q">Tell us what’s going on.</h1>' +
+        '<div class="ap-card">' +
+        '<textarea class="ap-field-textarea" id="sb-checkin-detail" placeholder="What’s happening?" style="height:90px;"></textarea>' +
+        psacLineBlockHtml('If anything feels urgent, this is the fastest way to reach a real person.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapOther.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      var detailEl = wrapOther.querySelector('#sb-checkin-detail');
+      var lastDetail = '';
+      detailEl.addEventListener('blur', function () {
+        var val = detailEl.value.trim();
+        if (val === lastDetail) return;
+        lastDetail = val;
+        submitReport({ category: 'other', categoryDetail: val });
+      });
+      wireIntakeForm(wrapOther);
+      return wrapOther;
+    }
+
+    // Defensive fallback.
+    state.checkinCategory = null;
+    return renderTrailCheckinTriage();
+  }
+
+  // Surface B trail-day arc (2026-09-08), guardian-only reframe of the
+  // check-in triage (design doc Part 2d): "Worried about [child]?"
+  // replaces "What's going on?", same six CHECKIN_OPTIONS and the same
+  // reportTrailCheckinIncident engine as the attending path's own
+  // renderTrailCheckinTriage(), only the copy changes -- third-person-
+  // about-the-child throughout, no location-dependent language (this
+  // reader isn't on the trail and has no coordinates or map to give),
+  // affected-roster defaults to the guardian's own ward(s) with no
+  // toggle (seeded once in openGuardianCheckinTriage(), above), and one
+  // added line allowing the reader's own judgment to call 911 directly.
+  // Same real information depth as the attending-signer version
+  // throughout, per Airey's resolved framing principle -- never softened.
+  function renderGuardianTrailCheckinTriage() {
+    var status = computeStatus();
+    var trailName = status.trailName || 'the trail';
+    var myMinors = (state.ctx.minors || []).filter(function (m) { return m.preAssignedToThisSigner; });
+    var childNames = myMinors.map(function (m) { return m.name; }).filter(Boolean);
+    var childLabel = childNames.length ? escapeHtml(childNames.join(' and ')) : 'them';
+
+    function submitReport(payload) {
+      var body = { action: 'reportTrailCheckinIncident', signerToken: SIGNER_TOKEN, affectedParticipantIds: state.checkinAffectedIds || [] };
+      for (var k in payload) { if (payload.hasOwnProperty(k)) body[k] = payload[k]; }
+      return apiPost('/api/waiver', body).then(function (res) {
+        if (res.ok && res.body && res.body.ok) state.hasOpenIncident = true;
+        return res;
+      });
+    }
+
+    function call911ButtonHtml() {
+      return '<a class="ap-cta-critical" href="tel:911">Call 911 Now</a>';
+    }
+    // Reframed emergency-line block (design doc Part 2d): same number,
+    // note reworded around what this reader can actually supply -- no
+    // personal location, since they aren't on the trail. A custom note
+    // still overrides the default, for the two branches that keep the
+    // attending path's own framing (overdue_unknown, other).
+    function psacLineBlockHtml(note) {
+      var noteText = note || ('You’re not on the trail, so this is the fastest way to get help: ' + escapeHtml(trailName) + ', ' + childLabel + '’s start time, and expected return, and we can loop in 911 or the land manager immediately.');
+      return '<a class="ap-cta-primary" href="tel:8582329391" style="margin-top:0.9rem;">Call Palm Springs Adventure Club’s Emergency Line: 858-232-9391</a>' +
+        '<div class="ap-helper" style="text-align:center;">' + noteText + '</div>';
+    }
+    // Added per the proposal's own "allows the reader's own judgment"
+    // clause -- the attending version doesn't need this line, since that
+    // reader is already the one calling from the scene.
+    function lifeThreateningLineHtml() {
+      return '<div class="ap-helper" style="text-align:center;">If you believe this is life-threatening, you can also call 911 directly and give them the trail name, we can share the rest once you’re connected.</div>';
+    }
+    function reframedNoteHtml() {
+      return '<div class="ap-checkin-note">Give them ' + escapeHtml(trailName) + ', and any medical conditions ' + childLabel + ' has. If you don’t have exact details, that’s okay, tell them what you do know.</div>';
+    }
+    function intakeFormHtml() {
+      return '<div class="ap-field-label" style="margin-top:1.3rem;">What ' + childLabel + ' was wearing (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-guardian-checkin-personal"></textarea>' +
+        '<div class="ap-field-label">Any medical conditions (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-guardian-checkin-medical"></textarea>' +
+        '<div class="ap-field-label">Anything else Palm Springs Adventure Club should know (optional)</div>' +
+        '<textarea class="ap-field-textarea" id="sb-guardian-checkin-other"></textarea>';
+    }
+    function wireIntakeForm(wrapEl) {
+      var fieldMap = { 'sb-guardian-checkin-personal': 'personalDescription', 'sb-guardian-checkin-medical': 'medicalNote', 'sb-guardian-checkin-other': 'otherNotes' };
+      var lastSaved = {};
+      var _loop = function (elId, payloadKey) {
+        var el = wrapEl.querySelector('#' + elId);
+        if (!el) return;
+        lastSaved[elId] = '';
+        el.addEventListener('blur', function () {
+          var val = el.value.trim();
+          if (val === lastSaved[elId]) return;
+          lastSaved[elId] = val;
+          var payload = { category: state.checkinCategory };
+          payload[payloadKey] = val;
+          submitReport(payload);
+        });
+      };
+      for (var elId in fieldMap) { _loop(elId, fieldMap[elId]); }
+    }
+
+    function pickCategory(key) {
+      state.checkinCategory = key;
+      submitReport({ category: key });
+      render();
+    }
+
+    // ---- Screen: "Worried about [child]?" ----
+    if (!state.checkinCategory) {
+      var options = CHECKIN_OPTIONS.filter(function (o) {
+        return !(state.checkinOmitRunningLonger && o.key === 'running_longer');
+      });
+      var wrapList = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-back-link" id="sb-guardian-triage-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+        '<div class="ap-eyebrow">Worried About ' + childLabel + '</div>' +
+        '<h1 class="ap-q">Worried about ' + childLabel + '?</h1>' +
+        '<div class="ap-sub">Pick whichever’s closest, you’ll get the right next step either way.</div>' +
+        options.map(function (o) { return '<div class="ap-checkin-opt" data-key="' + o.key + '">' + escapeHtml(o.label) + '</div>'; }).join('') +
+        '</div></div>'
+      );
+      wrapList.querySelector('#sb-guardian-triage-back').addEventListener('click', goHub);
+      Array.prototype.forEach.call(wrapList.querySelectorAll('[data-key]'), function (el) {
+        el.addEventListener('click', function () { pickCategory(el.getAttribute('data-key')); });
+      });
+      return wrapList;
+    }
+
+    // ---- Injury ----
+    if (state.checkinCategory === 'injury') {
+      var wrapInjury = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-guardian-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Someone’s Hurt</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        reframedNoteHtml() +
+        psacLineBlockHtml() +
+        lifeThreateningLineHtml() +
+        '<div class="ap-checkin-callout">While you wait: control bleeding with steady, direct pressure. Keep them warm and in shade. Minimize movement.</div>' +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapInjury.querySelector('#sb-guardian-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapInjury);
+      return wrapInjury;
+    }
+
+    // ---- Lost/separated ----
+    if (state.checkinCategory === 'lost_separated') {
+      var wrapLost = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-guardian-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Someone’s Separated</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        reframedNoteHtml() +
+        psacLineBlockHtml() +
+        lifeThreateningLineHtml() +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapLost.querySelector('#sb-guardian-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapLost);
+      return wrapLost;
+    }
+
+    // ---- Heat illness ----
+    if (state.checkinCategory === 'heat_illness') {
+      var HEAT_SYMPTOMS = ['Confusion', 'Hot or dry skin', 'Loss of consciousness', 'Mainly heavy sweating and weakness'];
+      var wrapHeat = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-guardian-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Heat Illness</div>' +
+        '<h1 class="ap-q">Call 911 now.</h1>' +
+        '<div class="ap-card">' +
+        call911ButtonHtml() +
+        reframedNoteHtml() +
+        '<div class="ap-checkin-callout">While you wait: move them to shade. Help them hydrate if they’re conscious and able to. Begin active cooling, wet cloth, fanning.</div>' +
+        '<div class="ap-field-label" style="margin-top:0.9rem;">What are you seeing? (optional, for 911 and Palm Springs Adventure Club, doesn’t change what to do above)</div>' +
+        '<div class="ap-choice-pills" id="sb-guardian-heat-symptoms">' +
+        HEAT_SYMPTOMS.map(function (s) { return '<div class="ap-pill" data-val="' + escapeHtml(s) + '">' + escapeHtml(s) + '</div>'; }).join('') +
+        '</div>' +
+        psacLineBlockHtml() +
+        lifeThreateningLineHtml() +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapHeat.querySelector('#sb-guardian-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      Array.prototype.forEach.call(wrapHeat.querySelectorAll('#sb-guardian-heat-symptoms .ap-pill'), function (el) {
+        el.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrapHeat.querySelectorAll('#sb-guardian-heat-symptoms .ap-pill'), function (p) { p.classList.remove('selected'); });
+          el.classList.add('selected');
+          submitReport({ category: 'heat_illness', categoryDetail: el.getAttribute('data-val') });
+        });
+      });
+      wireIntakeForm(wrapHeat);
+      return wrapHeat;
+    }
+
+    // ---- Running longer, everyone's fine ----
+    if (state.checkinCategory === 'running_longer') {
+      if (state.checkinRunningLongerConfirmed) {
+        var wrapRLConfirm = h(
+          '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+          '<div class="ap-eyebrow">Running Longer</div>' +
+          '<h1 class="ap-q">Got it, we’ve updated ' + childLabel + '’s expected return.</h1>' +
+          '<div class="ap-card">' +
+          '<div class="ap-sub" style="margin:0;">New target: <b>' + escapeHtml(state.checkinRunningLongerDisplay || 'later today') + '</b>. We’ll watch for the group’s real check-in around then.</div>' +
+          '</div>' +
+          '<button type="button" class="ap-cta-critical" id="sb-guardian-checkin-escalate">Things Change? Get Help Now</button>' +
+          '<div class="ap-back-link" id="sb-guardian-triage-tohub" style="cursor:pointer;text-align:center;">&larr; Back to your Adventure Hub</div>' +
+          '</div></div>'
+        );
+        wrapRLConfirm.querySelector('#sb-guardian-triage-tohub').addEventListener('click', goHub);
+        wrapRLConfirm.querySelector('#sb-guardian-checkin-escalate').addEventListener('click', function () {
+          state.checkinOmitRunningLonger = true;
+          state.checkinCategory = null;
+          render();
+        });
+        return wrapRLConfirm;
+      }
+
+      var wrapRL = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-guardian-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Running Longer, Everyone’s Fine</div>' +
+        '<h1 class="ap-q">Good to know ' + childLabel + '’s group is okay.</h1>' +
+        '<div class="ap-sub" style="margin-top:0.4rem;">If you’re in touch with them directly, here’s what’s useful to ask for.</div>' +
+        '<div class="ap-card">' +
+        '<div class="ap-field-label">About when do they now expect to finish?</div>' +
+        '<input class="ap-field-input" type="time" id="sb-guardian-checkin-finish-time">' +
+        '<div class="ap-field-label">About how much further do they have left?</div>' +
+        '<div class="ap-window-list" id="sb-guardian-checkin-remaining">' +
+        ['Almost done', 'A few miles', 'More than half left', 'Not sure'].map(function (d) {
+          return '<div class="ap-window-opt" data-val="' + d + '">' + d + '</div>';
+        }).join('') +
+        '</div>' +
+        '<div id="sb-guardian-checkin-running-error" class="ap-error"></div>' +
+        '</div>' +
+        '<button type="button" class="ap-cta-primary" id="sb-guardian-checkin-running-submit">Update Their Status</button>' +
+        '<div class="ap-back-link" id="sb-guardian-triage-tohub2" style="cursor:pointer;text-align:center;">&larr; Back to your Adventure Hub</div>' +
+        '</div></div>'
+      );
+
+      var chosenRemaining = null;
+      wrapRL.querySelector('#sb-guardian-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wrapRL.querySelector('#sb-guardian-triage-tohub2').addEventListener('click', goHub);
+      Array.prototype.forEach.call(wrapRL.querySelectorAll('#sb-guardian-checkin-remaining .ap-window-opt'), function (el) {
+        el.addEventListener('click', function () {
+          Array.prototype.forEach.call(wrapRL.querySelectorAll('#sb-guardian-checkin-remaining .ap-window-opt'), function (o) { o.classList.remove('selected'); });
+          el.classList.add('selected');
+          chosenRemaining = el.getAttribute('data-val');
+        });
+      });
+
+      wrapRL.querySelector('#sb-guardian-checkin-running-submit').addEventListener('click', function () {
+        var timeVal = wrapRL.querySelector('#sb-guardian-checkin-finish-time').value;
+        var errorEl = wrapRL.querySelector('#sb-guardian-checkin-running-error');
+        if (!timeVal && !chosenRemaining) {
+          errorEl.textContent = 'Give us at least one, a new time or how much they have left.';
+          return;
+        }
+        var payload = { category: 'running_longer' };
+        var displayLabel = '';
+        if (timeVal) {
+          var parts = timeVal.split(':');
+          var now = new Date();
+          var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+          if (target.getTime() < now.getTime()) target.setDate(target.getDate() + 1);
+          payload.reportedNewFinishEstimate = target.toISOString();
+          displayLabel = formatTimeInputLabel(timeVal);
+        }
+        if (chosenRemaining) payload.reportedRemainingDistance = chosenRemaining;
+        submitReport(payload).then(function (res) {
+          if (res.ok && res.body && res.body.ok) {
+            if (res.body.guestRevisedReturnAt) {
+              state.ctx.guestRevisedReturnAt = res.body.guestRevisedReturnAt;
+            }
+            state.checkinRunningLongerConfirmed = true;
+            state.checkinRunningLongerDisplay = displayLabel || (chosenRemaining || 'later today');
+            render();
+          } else {
+            errorEl.textContent = 'Something went wrong saving that, try again.';
+          }
+        });
+      });
+
+      return wrapRL;
+    }
+
+    // ---- Not back yet, no idea why ----
+    if (state.checkinCategory === 'overdue_unknown') {
+      var wrapOverdue = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-guardian-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Not Back Yet</div>' +
+        '<h1 class="ap-q">Let’s get Palm Springs Adventure Club on the line about ' + childLabel + '’s group.</h1>' +
+        '<div class="ap-card">' +
+        '<div class="ap-checkin-note">We don’t have to know why yet.</div>' +
+        psacLineBlockHtml('So we can help figure out what’s going on and coordinate next steps.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapOverdue.querySelector('#sb-guardian-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      wireIntakeForm(wrapOverdue);
+      return wrapOverdue;
+    }
+
+    // ---- Something else ----
+    if (state.checkinCategory === 'other') {
+      var wrapOther = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-checkin-back" id="sb-guardian-triage-reselect">&larr; Change what’s going on</div>' +
+        '<div class="ap-eyebrow">Something Else</div>' +
+        '<h1 class="ap-q">Tell us what’s going on with ' + childLabel + '’s group.</h1>' +
+        '<div class="ap-card">' +
+        '<textarea class="ap-field-textarea" id="sb-guardian-checkin-detail" placeholder="What’s happening?" style="height:90px;"></textarea>' +
+        psacLineBlockHtml('If anything feels urgent, this is the fastest way to reach a real person.') +
+        intakeFormHtml() +
+        '</div>' +
+        '</div></div>'
+      );
+      wrapOther.querySelector('#sb-guardian-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
+      var detailEl = wrapOther.querySelector('#sb-guardian-checkin-detail');
+      var lastDetail = '';
+      detailEl.addEventListener('blur', function () {
+        var val = detailEl.value.trim();
+        if (val === lastDetail) return;
+        lastDetail = val;
+        submitReport({ category: 'other', categoryDetail: val });
+      });
+      wireIntakeForm(wrapOther);
+      return wrapOther;
+    }
+
+    // Defensive fallback.
+    state.checkinCategory = null;
+    return renderGuardianTrailCheckinTriage();
+  }
+
   function renderHub() {
     var signer = state.ctx.signer || {};
     var ownerName = state.ctx.ownerName || 'Your trip organizer';
@@ -592,6 +1583,19 @@
     // Surface A.
     var daysToGo = pastT3 ? daysUntilTrip(state.ctx.tripDate) : null;
 
+    // Surface B trail-day arc (2026-09-08): hoisted out of the branches
+    // below, same "pure function of today's date" pattern Surface A's
+    // own renderHub() already established -- computed unconditionally
+    // since these depend only on the trip date and booking-level
+    // check-in state, not on whether this signer's own prep steps are
+    // done.
+    var isTrailDayToday = false;
+    var todayStrForTripCheck = pacificDateString(new Date());
+    var tripDateMatchForTripCheck = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
+    var tripDateStrForTripCheck = tripDateMatchForTripCheck ? tripDateMatchForTripCheck[0] : '';
+    var pastTripDay = !!(tripDateStrForTripCheck && todayStrForTripCheck > tripDateStrForTripCheck);
+    var showPostAdventure = pastTripDay || (!!state.ctx.trailCheckinAt && isReturnRosterClean(state.ctx));
+
     if (status.allSet) {
       var statLine = (status.trailAssigned ? escapeHtml(status.trailName) + ' · ' : '') + formatTripDate(state.ctx.tripDate);
       var todayStr = pacificDateString(new Date());
@@ -599,7 +1603,8 @@
       var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
       var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
 
-      if (todayStr === tripDateStr) {
+      if (todayStr === tripDateStr && !showPostAdventure) {
+        isTrailDayToday = true;
         var tripTip = (status.trailDetail && status.trailDetail.oneTripTip) ||
           'Most trails are sun-exposed open-desert trails. We recommend an early start when temperatures are coolest.';
         topGreetingHtml = 'It’s adventure day! ' + escapeHtml(status.trailAssigned ? status.trailName : 'Your trail') + ' is waiting.';
@@ -611,6 +1616,13 @@
         var deliveryWin = state.ctx.deliveryWindow;
         topGreetingHtml = 'Your gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', to the address ' + escapeHtml(ownerName) + ' provided.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
+      } else if (showPostAdventure) {
+        // Post-Adventure, gear-free (Surface B trail-day arc, 2026-09-08):
+        // no gear-return card on this surface, Airey's direct call --
+        // only the booker coordinates gear return. Same "always frame
+        // forward" principle as Surface A's own version.
+        topGreetingHtml = 'You did it. ' + escapeHtml(status.trailName) + '’s behind you.';
+        topSublineHtml = 'Nice work out there. Here’s your trip, all in one place.';
       } else if (pastT3) {
         topGreetingHtml = 'Your guide’s ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(status.trailName) + ' is yours now.';
         topSublineHtml = statLine;
@@ -662,23 +1674,42 @@
     // linking out to it, placed at the bottom of the hub once past T3.
     var receiptHtml = pastT3 ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml() : '';
 
+    // Surface B trail-day arc (2026-09-08): the ready-strip/Heading Out/
+    // Underway body, built only for the trail-day-today state -- same
+    // isTrailDayToday-gated construction as Surface A's own
+    // trailDayBodyHtml, gear excluded throughout.
+    var trailDayBodyHtml = '';
+    if (isTrailDayToday) {
+      trailDayBodyHtml = !state.ctx.headingOutAt
+        ? (topCardHtml + readyStripHtml(status) + headingOutButtonHtml() + weatherHtml + getReadyHtml + receiptHtml)
+        : (underwayHeroHtml(status) + underwaySupportingNoteHtml() + openIncidentNoticeHtml() + trailReturnEntryHtml() + weatherHtml + getReadyHtml + receiptHtml);
+    }
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      topCardHtml +
-      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>' +
-      (pastT3
-        // Reordered per Airey's direct request, 2026-09-05 (same
-        // sequence as Surface A's own renderHub()): trail card, then
-        // the guide, then weather, then the "everything's set" prep
-        // strip, then the full summary receipt at the very bottom. No
-        // deposit/refund-hold note on this surface -- that card is
-        // Surface A-only (it's the booking owner's card on file, not
-        // this signer's). Same goes for the gear delivery/status card
-        // discussed 2026-09-05 -- Airey confirmed it's booker-only (it
-        // shows the real delivery address), so it does NOT land on this
-        // surface; no slot reserved here.
-        ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + getReadyHtml + receiptHtml
-        : trailSectionHtml + getReadyHtml) +
+      (isTrailDayToday ? '' : topCardHtml) +
+      (isTrailDayToday || showPostAdventure ? '' : '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>') +
+      (showPostAdventure
+        // Post-Adventure, gear-free (Surface B trail-day arc, 2026-09-08):
+        // deliberately minimal, same as Surface A's own version minus
+        // the gear-return card -- the collapsible prep strip (still a
+        // useful record) and the summary receipt.
+        ? getReadyHtml + receiptHtml
+        : isTrailDayToday
+          ? trailDayBodyHtml
+          : pastT3
+            // Reordered per Airey's direct request, 2026-09-05 (same
+            // sequence as Surface A's own renderHub()): trail card, then
+            // the guide, then weather, then the "everything's set" prep
+            // strip, then the full summary receipt at the very bottom. No
+            // deposit/refund-hold note on this surface -- that card is
+            // Surface A-only (it's the booking owner's card on file, not
+            // this signer's). Same goes for the gear delivery/status card
+            // discussed 2026-09-05 -- Airey confirmed it's booker-only (it
+            // shows the real delivery address), so it does NOT land on this
+            // surface; no slot reserved here.
+            ? pastT3TrailCardHtml + guideCardHtml + weatherHtml + getReadyHtml + receiptHtml
+            : trailSectionHtml + getReadyHtml) +
       '</div></div>'
     );
 
@@ -694,12 +1725,54 @@
       var details = wrap.querySelector('#sb-prep-details');
       if (details) details.classList.toggle('is-open');
     });
-    var guideBtn = wrap.querySelector('#sb-get-guide');
-    if (guideBtn) guideBtn.addEventListener('click', function () {
+
+    // openGuide: shared by every "Get Guide" entry point on this screen
+    // (the guide card and, new on this surface, the trail-day Ready-to-go
+    // strip's own nudge link) -- opens the real link, and now also
+    // best-effort records the first-tap signal server-side
+    // (markGuideOpened, Surface B trail-day arc, 2026-09-08 -- this
+    // action didn't exist on Surface B before this build, so the guide
+    // card's own tap was never recorded here until now) plus an
+    // optimistic local update so the Ready-to-go strip flips to "Guide
+    // downloaded" without a full reload. Fire-and-forget: a failed
+    // markGuideOpened call shouldn't block or error out opening the
+    // actual guide.
+    function openGuide() {
       window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
-    });
+      if (!state.ctx.guideFirstOpenedAt) {
+        state.ctx.guideFirstOpenedAt = new Date().toISOString();
+        apiPost('/api/waiver', { action: 'markGuideOpened', signerToken: SIGNER_TOKEN }).catch(function () {});
+      }
+    }
+    var guideBtn = wrap.querySelector('#sb-get-guide');
+    if (guideBtn) guideBtn.addEventListener('click', openGuide);
+    var guideBtnReady = wrap.querySelector('#sb-ready-get-guide');
+    if (guideBtnReady) guideBtnReady.addEventListener('click', openGuide);
     var howtoBtn = wrap.querySelector('#sb-guide-howto');
     if (howtoBtn) howtoBtn.addEventListener('click', function () { state.step = 'ridewithgpsInfo'; render(); });
+
+    // Surface B trail-day arc wiring (2026-09-08).
+    var headingOutBtn = wrap.querySelector('#sb-heading-out-btn');
+    if (headingOutBtn) headingOutBtn.addEventListener('click', function () { state.step = 'headingOut'; render(); });
+
+    var signalLink = wrap.querySelector('#sb-signal-link');
+    if (signalLink) signalLink.addEventListener('click', function () { state.step = 'emergencySosInfo'; render(); });
+
+    var trailReturnBtn = wrap.querySelector('#sb-trail-return-btn');
+    if (trailReturnBtn) trailReturnBtn.addEventListener('click', function () { state.step = 'trailReturnRoster'; render(); });
+
+    function openCheckinTriage() {
+      state.checkinAffectedIds = [];
+      state.checkinOmitRunningLonger = false;
+      state.checkinCategory = null;
+      state.checkinLostSeparatedWho = null;
+      state.step = 'trailCheckinTriage';
+      render();
+    }
+    var needHelpLink = wrap.querySelector('#sb-need-help-link');
+    if (needHelpLink) needHelpLink.addEventListener('click', openCheckinTriage);
+    var checkinNoticeLink = wrap.querySelector('#sb-checkin-notice-link');
+    if (checkinNoticeLink) checkinNoticeLink.addEventListener('click', openCheckinTriage);
 
     return wrap;
   }
@@ -830,19 +1903,38 @@
     var daysToGo = pastT3 ? daysUntilTrip(state.ctx.tripDate) : null;
     var weatherHtml = pastT3 ? weatherCardHtml(state.ctx.weatherSnapshot, formatTripDate(state.ctx.tripDate)) : '';
 
+    // Surface B trail-day arc (2026-09-08), guardian-only reframe:
+    // Airey's resolved call -- no roster-confirm buttons for this
+    // persona at either transition (a guardian at home can't take a
+    // physical headcount of people they aren't standing next to), so
+    // isUnderway/showPostAdventure here are purely reflective, read off
+    // the same booking-level fields an attending signer's own confirm
+    // writes. See the design doc's Part 2a for the full reasoning.
+    var isUnderway = false;
     if (allCertified) {
       var todayStr = pacificDateString(new Date());
       var tripDateMatch = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
       var tripDateStr = tripDateMatch ? tripDateMatch[0] : '';
       var deliveryDateStr = isoOffsetDateStr(state.ctx.tripDate, -1);
+      var pastTripDay = !!(tripDateStr && todayStr > tripDateStr);
+      var showPostAdventure = pastTripDay || (!!state.ctx.trailCheckinAt && isReturnRosterClean(state.ctx));
+      isUnderway = todayStr === tripDateStr && !showPostAdventure && !!state.ctx.headingOutAt;
 
-      if (todayStr === tripDateStr) {
+      if (todayStr === tripDateStr && !showPostAdventure && !isUnderway) {
         topGreetingHtml = 'It’s adventure day for ' + childLabel + '! ' + escapeHtml(trailDetail ? trailDetail.trailName : 'The trail') + ' is waiting.';
         topSublineHtml = theDaySub;
       } else if (todayStr === deliveryDateStr) {
         var deliveryWin = state.ctx.deliveryWindow;
         topGreetingHtml = childLabel + '’s gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', packed and ready for tomorrow.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
+      } else if (showPostAdventure) {
+        // Post-Adventure, reframed and gear-free (Surface B trail-day
+        // arc, 2026-09-08): same "always frame forward" principle,
+        // third-person-about-the-child throughout, per the resolved
+        // framing principle -- same real information, only the
+        // grammatical subject changes.
+        topGreetingHtml = childLabel + ' made it back from ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + '.';
+        topSublineHtml = 'Nice adventure for ' + childLabel + '. Here’s a recap of the day.';
       } else if (pastT3) {
         topGreetingHtml = childLabel + '’s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
         topSublineHtml = '';
@@ -873,14 +1965,34 @@
         '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
         '<div class="ap-subline">' + topSublineHtml + '</div>';
 
+    // Underway, reframed (Surface B trail-day arc, 2026-09-08): own hero
+    // card entirely, same "On The Trail" eyebrow + dimmed treatment the
+    // attending path's own underwayHeroHtml uses -- replaces topCardHtml
+    // for this one state, per the resolved framing principle (third-
+    // person-about-the-child, same real stakes and numbers, no location-
+    // dependent language since this reader isn't the one on the trail).
+    var underwayHtml = '';
+    if (isUnderway) {
+      var effectiveReturn = state.ctx.guestRevisedReturnAt || state.ctx.expectedReturnAt;
+      var expectedReturnLabel = formatPacificTime(effectiveReturn) || 'later today';
+      var underwaySubline = childLabel + '’s group is expected back around <b>' + escapeHtml(expectedReturnLabel) + '</b>. We’ll text them then, and we need a reply, that’s how we know ' + childLabel + ' made it back safe. ' +
+        'Miss it and we start trying to reach the group right away, if that doesn’t work, it becomes a real search and rescue response, an expensive step we take seriously and hope never to need. ' +
+        '<a class="ap-hero-link" id="sb-guardian-worried-link" style="color:var(--sand-beige);text-decoration:underline;text-underline-offset:2px;cursor:pointer;">Worried about ' + childLabel + '? →</a>';
+      underwayHtml = heroCardHtml('On The Trail', childLabel + ' is on the trail.', underwaySubline, trailDetail && trailDetail.photoUrl, null, true) +
+        '<div class="ap-subline" style="max-width:960px;margin:0.9rem auto 0;">If a reply doesn’t come in, two more nudges follow, one right at the expected time and a more direct one three hours after. ' +
+        'If we still haven’t heard from ' + childLabel + '’s group after that, we call in an actual search and rescue team, a costly, serious undertaking, and the same commitment the club’s own operating plan makes on every trip. ' +
+        'This isn’t a scare tactic, it’s a real safety net, and a real expectation.</div>' +
+        openIncidentNoticeHtml();
+    }
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
-      topCardHtml +
+      (isUnderway ? underwayHtml : topCardHtml) +
       // Guide before weather, matching the reordered sequence on the
       // other two hubs (2026-09-05).
       guideCardHtml +
       weatherHtml +
-      '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '’s day itself is self-guided, without one of our own people along, so here’s everything about it: who’s going, where, when, and what to do if you need to reach us.</div></div>' +
+      (isUnderway ? '' : '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '’s day itself is self-guided, without one of our own people along, so here’s everything about it: who’s going, where, when, and what to do if you need to reach us.</div></div>') +
       '<div class="ap-tiles-label">The day</div>' +
       '<div class="ap-tiles" id="sb-guardian-hub-tiles">' + tilesHtml + '</div>' +
       '</div></div>'
@@ -898,6 +2010,23 @@
     });
     var guardianHowtoBtn = wrap.querySelector('#sb-guardian-guide-howto');
     if (guardianHowtoBtn) guardianHowtoBtn.addEventListener('click', function () { state.step = 'ridewithgpsInfo'; render(); });
+
+    // "Worried about [child]?" / session-local incident-notice link --
+    // both drop straight into the guardian-only reframed triage, same
+    // reset-then-navigate pattern the attending path's own
+    // openCheckinTriage() follows.
+    function openGuardianCheckinTriage() {
+      state.checkinAffectedIds = myMinors.map(function (m) { return m.participantId; });
+      state.checkinOmitRunningLonger = false;
+      state.checkinCategory = null;
+      state.checkinLostSeparatedWho = null;
+      state.step = 'trailCheckinTriage';
+      render();
+    }
+    var worriedLink = wrap.querySelector('#sb-guardian-worried-link');
+    if (worriedLink) worriedLink.addEventListener('click', openGuardianCheckinTriage);
+    var checkinNoticeLink = wrap.querySelector('#sb-checkin-notice-link');
+    if (checkinNoticeLink) checkinNoticeLink.addEventListener('click', openGuardianCheckinTriage);
 
     return wrap;
   }
