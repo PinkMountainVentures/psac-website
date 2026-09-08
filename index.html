@@ -454,10 +454,10 @@
 </style>
 
 <div id="adventure-modal">
-  <div id="adventure-modal-inner">
+  <div id="adventure-modal-inner" role="dialog" aria-modal="true" aria-label="Book your adventure">
     <div id="adventure-modal-header">
       <img src="images/logo.svg" alt="Palm Springs Adventure Club">
-      <button id="adventure-modal-close" onclick="document.getElementById('adventure-modal').style.display='none'">&times;</button>
+      <button id="adventure-modal-close" aria-label="Close">&times;</button>
     </div>
     <div id="adventure-form-root"></div>
   </div>
@@ -468,22 +468,58 @@
 <script>
   document.addEventListener("DOMContentLoaded", function() {
     var modal = document.getElementById('adventure-modal');
+    var closeBtn = document.getElementById('adventure-modal-close');
     var mounted = false;
+    var lastTrigger = null;
+
+    // Keyboard-only guests could previously Tab straight out of the
+    // modal (Stripe's card fields included) into the page behind the
+    // dark overlay, since nothing removed the rest of the page from the
+    // tab order while the modal was open. `inert` takes every top-level
+    // sibling out of both the tab order and the accessibility tree in
+    // one attribute, so the modal's own controls become the only
+    // focusable things left on the page -- no manual Tab-key trap needed,
+    // and it also stops the overlay from being click-through-able.
+    function setBackgroundInert(on) {
+      Array.prototype.forEach.call(document.body.children, function (el) {
+        if (el === modal) return;
+        if (on) { el.setAttribute('inert', ''); }
+        else { el.removeAttribute('inert'); }
+      });
+    }
+
+    function openModal(trigger) {
+      lastTrigger = trigger || null;
+      if (!mounted) {
+        PSACAdventureForm.mount(document.getElementById('adventure-form-root'));
+        mounted = true;
+      }
+      modal.style.display = 'flex';
+      setBackgroundInert(true);
+      closeBtn.focus();
+    }
+
+    function closeModal() {
+      modal.style.display = 'none';
+      setBackgroundInert(false);
+      // Send focus back to whichever "Start My Adventure" link/button
+      // opened the modal, instead of dropping it back to the top of the
+      // document, so a keyboard user doesn't lose their place on the page.
+      if (lastTrigger && typeof lastTrigger.focus === 'function') lastTrigger.focus();
+    }
+
     document.querySelectorAll('.start-adventure-btn').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
-        if (!mounted) {
-          PSACAdventureForm.mount(document.getElementById('adventure-form-root'));
-          mounted = true;
-        }
-        modal.style.display = 'flex';
+        openModal(btn);
       });
     });
+    closeBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', function(e) {
-      if (e.target === modal) modal.style.display = 'none';
+      if (e.target === modal) closeModal();
     });
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') modal.style.display = 'none';
+      if (e.key === 'Escape') closeModal();
     });
   });
 </script>

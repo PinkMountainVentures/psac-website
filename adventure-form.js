@@ -128,6 +128,17 @@
   var SMS_CONSENT_FINEPRINT = 'Optional, not required to book. Message frequency varies by reservation. Message and data rates may apply. Reply STOP to cancel, HELP for help.';
   var SMS_CONSENT_TEXT = SMS_CONSENT_LABEL + ' ' + SMS_CONSENT_FINEPRINT + ' See Terms of Service and Privacy Policy at palmspringsadventureclub.com.';
 
+  // Marketing email opt-in, shown at checkout (Your Kit / pricing step),
+  // separate from and unrelated to the SMS consent above -- this one
+  // subscribes to Kit (api/kit-subscribe.js), the same list the homepage
+  // waitlist form and Surface B's Confirm Your Details screen both write
+  // to. Copy matches waiver-signer-form.js's KIT_OPTIN_LABEL verbatim
+  // (2026-09-08 booking-flow cleanup) so the same opt-in reads identically
+  // everywhere a guest sees it, rather than drifting into two versions of
+  // the same ask.
+  var KIT_OPTIN_LABEL = 'Yes, sign me up for occasional emails from Palm Springs Adventure Club about trail guides, gear tips, and future adventures.';
+  var KIT_OPTIN_FINEPRINT = 'Optional, not required to book. Unsubscribe anytime.';
+
   // Gear delivery is evening-before-only, no morning-of delivery. Working
   // backward from that (see psac-gear-delivery-timing-for-booking-flow.md):
   // guest's delivery address is due T-3, which leaves a T-2 buffer day for
@@ -190,6 +201,7 @@
       contact_email: '',
       contact_phone: '',
       contact_sms_consent: false,
+      kitOptIn: false,
       policiesAgreed: false,
       tier: 'trail',
       rating: null,
@@ -1291,7 +1303,7 @@
     html += '<div class="paf-price-tier">' + esc(tier.name) + '</div>';
     if (EARLY_GUEST_DISCOUNT > 0) {
       html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span><s style="opacity:0.45;">$' + displayBookingFee + '</s> $' + tier.booking + '</span></div>';
-      html += '<div class="paf-price-line" style="color:var(--clr-pine, #2A4747);"><span>Early Guest discount</span><span>-$' + EARLY_GUEST_DISCOUNT + '</span></div>';
+      html += '<div class="paf-price-line" style="padding-left:1.25rem; color:var(--desert-green);"><span>Early Guest discount</span><span>-$' + EARLY_GUEST_DISCOUNT + '</span></div>';
     } else {
       html += '<div class="paf-price-line"><span>Personalized ' + esc(tier.name) + '</span><span>$' + tier.booking + '</span></div>';
     }
@@ -1326,6 +1338,12 @@
     html += '<label class="paf-policy-agree">' +
       '<input type="checkbox" data-field="policy-checkbox"' + (state.answers.policiesAgreed ? ' checked' : '') + '>' +
       '<span>I agree to the <a href="/refund-policy" target="_blank" rel="noopener">Cancellation &amp; Refund Policy</a>, <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>, and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span>' +
+      '</label>';
+    html += '<label class="paf-sms-consent" style="margin-top:0.6rem;">' +
+      '<input type="checkbox" data-field="kit-optin-checkbox"' + (state.answers.kitOptIn ? ' checked' : '') + '>' +
+      '<span>' + esc(KIT_OPTIN_LABEL) +
+      '<br><small class="paf-sms-fineprint">' + esc(KIT_OPTIN_FINEPRINT) + '</small>' +
+      '</span>' +
       '</label>';
     html += '<button type="button" class="paf-reserve-btn" data-field="reserve">' + esc(reserveLabel) + '</button>';
     if (!isCustom) {
@@ -1368,6 +1386,13 @@
     policyCheckbox.addEventListener('change', function () {
       state.answers.policiesAgreed = policyCheckbox.checked;
       reserveBtn.disabled = !policyCheckbox.checked;
+    });
+
+    // Optional, never gates the reserve button -- same non-blocking
+    // treatment as the SMS consent checkbox on the contact step.
+    var kitOptinCheckbox = root.querySelector('[data-field="kit-optin-checkbox"]');
+    kitOptinCheckbox.addEventListener('change', function () {
+      state.answers.kitOptIn = kitOptinCheckbox.checked;
     });
 
     reserveBtn.addEventListener('click', function () {
@@ -1646,6 +1671,18 @@
   }
 
   function submitForm() {
+    // Fire-and-forget, same pattern as waiver-signer-form.js's identical
+    // call on Surface B: Kit is the system of record for list membership
+    // (lib/kit-sync-service.js), this never touches Postgres or the
+    // booking record, and a failed subscribe should never block or delay
+    // an already-completed booking.
+    if (state.answers.kitOptIn && state.answers.contact_email) {
+      fetch('/api/kit-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: state.answers.contact_email })
+      }).catch(function () {});
+    }
     var payload = buildPayload();
     fetch('/api/save-booking', {
       method: 'POST',
