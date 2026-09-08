@@ -1068,7 +1068,6 @@ select.paf-roster-input {
 .paf-closing-headline { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--dark-pine); line-height: 1.15; margin-bottom: 1.2rem; }
 .paf-closing-dynamic { font-size: 0.92rem; color: var(--dark-pine); line-height: 1.75; background: var(--sand-beige); padding: 1.2rem 1.3rem; border-radius: 8px; margin-bottom: 1.5rem; }
 .paf-closing-dynamic em { font-style: italic; color: var(--mountain-pink); }
-.paf-closing-sub { font-size: 0.85rem; color: rgba(42,71,71,0.65); margin-bottom: 0.7rem; }
 
 .paf-value-list { margin-bottom: 0.4rem; }
 .paf-value-item { display: flex; align-items: flex-start; gap: 10px; font-size: 0.85rem; color: var(--dark-pine); line-height: 1.5; padding: 0.5rem 0; border-bottom: 1px solid rgba(42,71,71,0.08); }
@@ -1082,9 +1081,6 @@ select.paf-roster-input {
 .paf-inline-confirm { background: var(--sand-beige); border-radius: 8px; padding: 1rem 1.1rem; }
 .paf-inline-confirm-text { font-size: 0.82rem; color: var(--dark-pine); line-height: 1.55; margin-bottom: 0.8rem; }
 .paf-inline-confirm-actions { display: flex; gap: 1.4rem; }
-.paf-rating { display: flex; gap: 8px; }
-.paf-star { background: none; border: none; font-size: 1.9rem; color: rgba(42,71,71,0.22); cursor: pointer; line-height: 1; padding: 0; }
-.paf-star.is-filled { color: var(--mountain-pink); }
 
 .paf-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 1.1rem; margin-top: 0.8rem; border-top: 1px solid rgba(42,71,71,0.1); flex-shrink: 0; }
 .paf-nav-btn { font-family: 'Montserrat', sans-serif; cursor: pointer; }

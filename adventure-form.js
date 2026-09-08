@@ -204,7 +204,6 @@
       kitOptIn: false,
       policiesAgreed: false,
       tier: 'trail',
-      rating: null,
       paymentIntentId: null,
       paymentStatus: null,
       depositPaymentIntentId: null,
@@ -1582,35 +1581,16 @@
         // on this card already exists in styles.css. First-draft copy —
         // not yet design-reviewed, same caveat as the matching CTA added
         // to booking-confirmation-email.js.
-        // Moved directly under the tan recap box (2026-09-08): this is the
-        // one thing most guests actually need to do next, so it shouldn't
-        // sit below the optional star rating. The rating question now
-        // follows it instead of the other way around.
-        html += '<div style="margin-bottom:1.8rem; padding-bottom:1.5rem; border-bottom:1px solid rgba(42,71,71,0.12); text-align:center;">';
+        // Moved directly under the tan recap box (2026-09-08) and now the
+        // last thing on this card: the star rating that used to follow it
+        // was removed the same day (never wired to persist anywhere, see
+        // that day's chat) rather than left half-built in front of guests.
+        html += '<div style="text-align:center;">';
         html += '<div style="font-size:0.85rem; color:#2A4747; opacity:0.75; margin-bottom:0.75rem;">A few more details whenever you\'re ready: delivery address, waivers, and your gear kit.</div>';
         html += '<a href="' + esc(state.answers.adventurePrepUrl) + '" style="display:inline-block; background-color:#F58271; color:#FFFFFF; font-weight:600; text-decoration:none; padding:0.85rem 1.75rem; border-radius:8px;">Finish setting up your adventure</a>';
         html += '</div>';
       }
-      html += '<div class="paf-closing-sub">How did that feel?</div>';
-      html += '<div class="paf-rating" data-field="rating"></div>';
       root.innerHTML = html;
-      var ratingWrap = root.querySelector('[data-field="rating"]');
-      for (var i = 1; i <= 5; i++) {
-        (function (n) {
-          var star = document.createElement('button');
-          star.type = 'button';
-          star.className = 'paf-star';
-          star.innerHTML = '★';
-          if (state.answers.rating >= n) star.classList.add('is-filled');
-          star.addEventListener('click', function () {
-            state.answers.rating = n;
-            Array.prototype.forEach.call(ratingWrap.children, function (s, idx) {
-              s.classList.toggle('is-filled', idx < n);
-            });
-          });
-          ratingWrap.appendChild(star);
-        })(i);
-      }
     };
     c.isValid = function () { return true; };
     return c;
