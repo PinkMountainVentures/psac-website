@@ -1741,7 +1741,7 @@
   function ambientCheckinNoteHtml() {
     return '<div class="ap-ambient-note">' +
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l8 3.6v5.4c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6.1l8-3.6Z" stroke="#7a8a8a" stroke-width="1.4" stroke-linejoin="round"/></svg>' +
-      '<span><b style="color:var(--dark-pine);">You’ll need to check in once you’re back.</b> It’s part of how every PSAC trip looks out for you, we’ll text you around your expected return time, and a reply is required. Nothing to do until then.</span>' +
+      '<span><b style="color:var(--dark-pine);">You’ll need to check in once you’re back.</b> It’s part of how every Palm Springs Adventure Club trip looks out for you, we’ll text you around your expected return time, and a reply is required. Nothing to do until then.</span>' +
       '</div>';
   }
 
@@ -1863,7 +1863,7 @@
   // hub after reporting isn’t left wondering whether anything happened.
   function openIncidentNoticeHtml() {
     if (!state.hasOpenIncident) return '';
-    return '<div class="ap-checkin-callout">We’ve got your report, PSAC is on it. Situation changed, or need to add something? <span class="ap-checkin-back" id="ap-checkin-notice-link" style="margin:0;display:inline;">Tap here →</span></div>';
+    return '<div class="ap-checkin-callout">We’ve got your report, Palm Springs Adventure Club is on it. Situation changed, or need to add something? <span class="ap-checkin-back" id="ap-checkin-notice-link" style="margin:0;display:inline;">Tap here →</span></div>';
   }
 
   function gearPickupReminderHtml(ap) {
@@ -1996,7 +1996,7 @@
     var getReadyHtml = allPrepDone
       ? '<div class="ap-tiles-label" style="margin-top:1.1rem;">Get ready</div><div class="ap-prep-summary" id="ap-prep-toggle">' +
         '<div class="ap-prep-summary-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
-        '<div><div class="ap-prep-summary-text">Everything’s set — Trail, Attendees, Gear, Waivers</div><div class="ap-prep-summary-sub">Tap to review the details</div></div>' +
+        '<div><div class="ap-prep-summary-text">Everything’s set: Trail, Attendees, Gear, Waivers</div><div class="ap-prep-summary-sub">Tap to review the details</div></div>' +
         '<div class="ap-prep-chevron">&#9662;</div>' +
         '</div>' +
         '<div class="ap-prep-details" id="ap-prep-details"><div class="ap-tiles" id="ap-hub-tiles" style="margin-top:0.7rem;">' + tilesHtml + '</div></div>'
@@ -2165,13 +2165,13 @@
     // the value frame (a benefit of booking with PSAC), then the real,
     // named cost of not responding -- per Airey's direct language notes.
     var t3SafetyNoteHtml = !showT3SafetyNote ? '' :
-      '<div class="ap-guide-body" style="margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid rgba(248,241,233,0.14);"><b>One more thing for trail day: every PSAC trip includes a real safety net.</b> Once you’re out there, we’ll text you around when we expect you back, and we’ll need a reply, it’s how we know your group made it home safe. If we don’t hear from you, we start trying to reach you right away, and if that doesn’t work, it becomes an actual search and rescue response, an expensive, serious step we hope to never need but will absolutely take. Nothing to do now, just something to expect.</div>';
+      '<div class="ap-guide-body" style="margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid rgba(248,241,233,0.14);"><b>One more thing for trail day: every Palm Springs Adventure Club trip includes a real safety net.</b> Once you’re out there, we’ll text you around when we expect you back, and we’ll need a reply, it’s how we know your group made it home safe. If we don’t hear from you, we start trying to reach you right away, and if that doesn’t work, it becomes an actual search and rescue response, an expensive, serious step we hope to never need but will absolutely take. Nothing to do now, just something to expect.</div>';
 
     var guideCardHtml = !pastT3 ? '' :
       '<div class="ap-guide-card">' +
       '<div class="ap-guide-eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4Z" stroke="#7ABD91" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12.2l2 2 4-4.4" stroke="#7ABD91" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Your digital guide is unlocked</div>' +
       '<div class="ap-guide-headline">Get the route on your phone, before you’re out of signal.</div>' +
-      '<div class="ap-guide-body">Opens ' + escapeHtml(status.trailName) + ' inside RideWithGPS — turn-by-turn navigation and waypoints, no account needed. Download it for offline use before you head out; cell service on this trail isn’t guaranteed.</div>' +
+      '<div class="ap-guide-body">Opens ' + escapeHtml(status.trailName) + ' inside RideWithGPS, with turn-by-turn navigation and waypoints, no account needed. Download it for offline use before you head out; cell service on this trail isn’t guaranteed.</div>' +
       '<button type="button" class="ap-guide-cta" id="ap-get-guide">Get Guide</button>' +
       '<button type="button" class="ap-guide-howto" id="ap-guide-howto">How does this work? →</button>' +
       t3SafetyNoteHtml +
@@ -3357,13 +3357,13 @@
   // tertile split (1-2 / 3 / 4-5) is a build-session judgment call — flagged
   // for Airey to confirm rather than silently invented and left unflagged.
   function difficultyLabel(n) {
-    if (n == null) return '—';
+    if (n == null) return '-';
     if (n <= 2) return 'Easy';
     if (n === 3) return 'Moderate';
     return 'Hard';
   }
   function technicalLabel(n) {
-    if (n == null) return '—';
+    if (n == null) return '-';
     if (n <= 2) return 'Low';
     if (n === 3) return 'Moderate';
     return 'High';
@@ -3460,8 +3460,8 @@
       '<div class="ap-compare-body">' +
       '<div class="ap-compare-name">' + escapeHtml(candidate.trailName || '') + '</div>' +
       '<div class="ap-compare-stats">' +
-      '<div><div class="ap-compare-stat-label">Distance</div><div class="ap-compare-stat-value">' + (candidate.distance != null ? candidate.distance + ' mi' : '—') + '</div></div>' +
-      '<div><div class="ap-compare-stat-label">Elevation</div><div class="ap-compare-stat-value">' + (candidate.elevation != null ? candidate.elevation + ' ft' : '—') + '</div></div>' +
+      '<div><div class="ap-compare-stat-label">Distance</div><div class="ap-compare-stat-value">' + (candidate.distance != null ? candidate.distance + ' mi' : '-') + '</div></div>' +
+      '<div><div class="ap-compare-stat-label">Elevation</div><div class="ap-compare-stat-value">' + (candidate.elevation != null ? candidate.elevation + ' ft' : '-') + '</div></div>' +
       '<div><div class="ap-compare-stat-label">Difficulty</div><div class="ap-compare-stat-value">' + difficultyLabel(candidate.difficultyRating) + '</div></div>' +
       '<div><div class="ap-compare-stat-label">Technical</div><div class="ap-compare-stat-value">' + technicalLabel(candidate.technicalRating) + '</div></div>' +
       '</div>' +
@@ -4214,7 +4214,7 @@
           if (std && std.lat != null) fields.deliveryLat = std.lat;
           if (std && std.lng != null) fields.deliveryLng = std.lng;
           if (!v.validated) {
-            errorEl.textContent = 'We couldn’t fully confirm that address — you can continue, we’ll double check before delivery.';
+            errorEl.textContent = 'We couldn’t fully confirm that address, but you can continue, we’ll double check before delivery.';
           }
           return saveFields(fields);
         }).then(function (res) {
@@ -4646,7 +4646,7 @@
       if (scrollBox.scrollHeight <= scrollBox.clientHeight + 6) {
         scrolledToEnd = true;
         agreeRow.classList.remove('disabled');
-        hint.textContent = 'You’ve reviewed the full agreement — tap the checkbox to confirm.';
+        hint.textContent = 'You’ve reviewed the full agreement. Tap the checkbox to confirm.';
         hint.classList.add('done');
       }
       agreeRow.addEventListener('click', function () {
@@ -4918,11 +4918,11 @@
       '<div class="ap-eyebrow">Your Digital Guide</div>' +
       '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 1.4rem;color:var(--dark-pine);">Getting ' + escapeHtml(status.trailName || 'your trail') + ' onto your phone</h2>' +
       '<div class="ap-card">' +
-      '<div class="rwgps-step"><div class="rwgps-num">1</div><div><div class="rwgps-step-title">Tap Get Guide</div><div class="rwgps-step-body">Opens your trail inside RideWithGPS — a free route-navigation app. No account or sign-up needed on your end.</div></div></div>' +
-      '<div class="rwgps-step"><div class="rwgps-num">2</div><div><div class="rwgps-step-title">Download the route for offline use</div><div class="rwgps-step-body">Look for the download / offline-map option inside RideWithGPS and save the route before you leave cell service. This is the one step that matters most — do it before you get to the trailhead, not after.</div></div></div>' +
-      '<div class="rwgps-step"><div class="rwgps-num">3</div><div><div class="rwgps-step-title">Use it on trail day</div><div class="rwgps-step-body">Turn-by-turn navigation and waypoints, right on your phone, even with no signal — as long as you downloaded it first.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">1</div><div><div class="rwgps-step-title">Tap Get Guide</div><div class="rwgps-step-body">Opens your trail inside RideWithGPS, a free route-navigation app. No account or sign-up needed on your end.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">2</div><div><div class="rwgps-step-title">Download the route for offline use</div><div class="rwgps-step-body">Look for the download / offline-map option inside RideWithGPS and save the route before you leave cell service. This is the one step that matters most: do it before you get to the trailhead, not after.</div></div></div>' +
+      '<div class="rwgps-step"><div class="rwgps-num">3</div><div><div class="rwgps-step-title">Use it on trail day</div><div class="rwgps-step-body">Turn-by-turn navigation and waypoints, right on your phone, even with no signal, as long as you downloaded it first.</div></div></div>' +
       '</div>' +
-      '<div class="rwgps-callout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/><path d="M12 8v5" stroke="#F58271" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#F58271"/></svg><div>Cell service on our trails isn’t guaranteed. The offline download in step 2 is what actually gets you navigation out there — the app alone, without downloading first, won’t help once you lose signal.</div></div>' +
+      '<div class="rwgps-callout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9" stroke="#F58271" stroke-width="1.6"/><path d="M12 8v5" stroke="#F58271" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#F58271"/></svg><div>Cell service on our trails isn’t guaranteed. The offline download in step 2 is what actually gets you navigation out there. The app alone, without downloading first, won’t help once you lose signal.</div></div>' +
       '<button type="button" class="ap-cta-primary" id="ap-rwgps-open" style="margin-top:1.4rem;">Open in RideWithGPS</button>' +
       '<a class="rwgps-back" id="ap-rwgps-back-2">&larr; Back to your Adventure Hub</a>' +
       '</div></div>'
@@ -5162,7 +5162,7 @@
       return '<a class="ap-cta-critical" href="tel:911">Call 911 Now</a>';
     }
     function psacLineBlockHtml(note) {
-      return '<a class="ap-cta-primary" href="tel:8582329391" style="margin-top:0.9rem;">Call PSAC’s Emergency Line: 858-232-9391</a>' +
+      return '<a class="ap-cta-primary" href="tel:8582329391" style="margin-top:0.9rem;">Call Palm Springs Adventure Club’s Emergency Line: 858-232-9391</a>' +
         '<div class="ap-helper" style="text-align:center;">' + note + '</div>';
     }
     function intakeFormHtml() {
@@ -5172,7 +5172,7 @@
         '<textarea class="ap-field-textarea" id="ap-checkin-medical"></textarea>' +
         '<div class="ap-field-label">Vehicle / where you parked (optional)</div>' +
         '<textarea class="ap-field-textarea" id="ap-checkin-vehicle"></textarea>' +
-        '<div class="ap-field-label">Anything else PSAC should know (optional)</div>' +
+        '<div class="ap-field-label">Anything else Palm Springs Adventure Club should know (optional)</div>' +
         '<textarea class="ap-field-textarea" id="ap-checkin-other"></textarea>';
     }
     function wireIntakeForm(wrapEl) {
@@ -5311,7 +5311,7 @@
         '<div class="ap-card">' +
         call911ButtonHtml() +
         '<div class="ap-checkin-callout">While you wait: move them to shade. Help them hydrate if they’re conscious and able to. Begin active cooling, wet cloth, fanning.</div>' +
-        '<div class="ap-field-label" style="margin-top:0.9rem;">What are you seeing? (optional, for 911 and PSAC, doesn’t change what to do above)</div>' +
+        '<div class="ap-field-label" style="margin-top:0.9rem;">What are you seeing? (optional, for 911 and Palm Springs Adventure Club, doesn’t change what to do above)</div>' +
         '<div class="ap-choice-pills" id="ap-heat-symptoms">' +
         HEAT_SYMPTOMS.map(function (s) { return '<div class="ap-pill" data-val="' + escapeHtml(s) + '">' + escapeHtml(s) + '</div>'; }).join('') +
         '</div>' +
@@ -5439,7 +5439,7 @@
         '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
         '<div class="ap-checkin-back" id="ap-triage-reselect">&larr; Change what’s going on</div>' +
         '<div class="ap-eyebrow">Not Back Yet</div>' +
-        '<h1 class="ap-q">Let’s get PSAC on the line.</h1>' +
+        '<h1 class="ap-q">Let’s get Palm Springs Adventure Club on the line.</h1>' +
         '<div class="ap-card">' +
         '<div class="ap-checkin-note">We don’t have to know why yet.</div>' +
         psacLineBlockHtml('So we can help figure out what’s going on and coordinate next steps.') +
