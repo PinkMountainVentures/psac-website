@@ -1571,7 +1571,7 @@
       // the "everything hits differently after" line already on the
       // homepage, so the closing screen echoes language the guest may
       // already recognize.
-      html += "And when it's done, everything will hit differently. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started but it will feel like somewhere new. So will you.";
+      html += "And when it's done, everything will hit differently. The pool. The drink. The dinner. The conversation. You'll return to exactly where you started but it will feel like somewhere new. So will you.";
       html += '</div>';
       if (state.answers.adventurePrepUrl) {
         // NEW (Aug 2026): "Finish setting up your adventure" (PRD Section
@@ -1586,8 +1586,8 @@
         // was removed the same day (never wired to persist anywhere, see
         // that day's chat) rather than left half-built in front of guests.
         html += '<div style="text-align:center;">';
-        html += '<div style="font-size:0.85rem; color:#2A4747; opacity:0.75; margin-bottom:0.75rem;">A few more details whenever you\'re ready: delivery address, waivers, and your gear kit.</div>';
-        html += '<a href="' + esc(state.answers.adventurePrepUrl) + '" style="display:inline-block; background-color:#F58271; color:#FFFFFF; font-weight:600; text-decoration:none; padding:0.85rem 1.75rem; border-radius:8px;">Finish setting up your adventure</a>';
+        html += '<div style="font-size:0.85rem; color:#2A4747; opacity:0.75; margin-bottom:0.75rem;">A few more details whenever you\'re ready: delivery address, waivers, and your gear&nbsp;kit.</div>';
+        html += '<a href="' + esc(state.answers.adventurePrepUrl) + '" style="display:inline-block; background-color:#7ABD91; color:#FFFFFF; font-weight:600; text-decoration:none; padding:0.85rem 1.75rem; border-radius:8px;">Finish setting up your adventure</a>';
         html += '</div>';
       }
       root.innerHTML = html;
