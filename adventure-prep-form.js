@@ -2129,6 +2129,7 @@
     // delivery day, which each have their own distinct copy already).
     var isTrailDayToday = false;
     var showT3SafetyNote = false;
+    var postAdventureCardHtml = null;
 
     if (status.allSet) {
       var statLine = escapeHtml(status.trailName) + ' · ' + formatTripDate(eb.date) + ' · ' + attendingRosterCount() + ' adventurers · ' + status.kitCount + ' gear kits packed';
