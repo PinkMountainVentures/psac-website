@@ -1053,7 +1053,7 @@
     document.body.insertAdjacentHTML('beforeend',
       '<footer class="site-footer"><div class="container"><div class="footer-content">' +
       '<div class="footer-column"><h3>Palm Springs Adventure Club</h3><p>Operated by Pink Mountain Ventures LLC, DBA Palm Springs Adventure Club<br>301 N Palm Canyon Drive, Suite 103179<br>Palm Springs, CA 92262<br><br>hello@palmspringsadventureclub.com</p></div>' +
-      '<div class="footer-column"><h3>Explore</h3><ul><li><a href="/peaks-to-pools">Peaks to Pools</a></li><li><a href="/membership">The Club</a></li><li><a href="/how-it-works">How It Works</a></li></ul></div>' +
+      '<div class="footer-column"><h3>Explore</h3><ul><li><a href="/peaks-to-pools">Peaks to Pools</a></li><li><a href="/how-it-works">How It Works</a></li></ul></div>' +
       '<div class="footer-column"><h3>Policies</h3><ul><li><a href="/refund-policy">Cancellation &amp; Refund Policy</a></li><li><a href="/terms">Terms of Service</a></li><li><a href="/privacy">Privacy Policy</a></li></ul></div>' +
       '<div class="footer-column"><h3>Connect</h3><div class="social-links"><a href="#">IG</a></div></div>' +
       '</div><div class="footer-tagline"><p>Peaks to Pools. Earn your peace.</p></div>' +

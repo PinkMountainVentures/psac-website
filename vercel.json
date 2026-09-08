@@ -48,6 +48,11 @@
       "source": "/after-the-trail-experience",
       "destination": "/peaks-to-pools",
       "permanent": true
+    },
+    {
+      "source": "/membership",
+      "destination": "/",
+      "permanent": false
     }
   ],
   "headers": [
