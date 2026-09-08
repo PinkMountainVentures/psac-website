@@ -510,34 +510,54 @@
   }
 
   // Post-Adventure Phase 3 card sequencing (final spec, section 3):
-  // The Turn -> Check-in -> Closing -> Steady State, pure function of
+  // The Turn -> Check-in -> Closing -> Steady State.
+  //
+  // REVISED (Airey's direct request, same day as the build, 2026-09-08):
+  // The Turn's hero-photo card is no longer one exclusive phase among
+  // four -- it's now a permanent masthead, pinned at the top of the hub
+  // for the entire post-adventure period (replacing the old pre-trip
+  // "Adventure Summary" receipt hero, which kept showing stale
+  // "Everything's set, the trail's waiting" copy long after the trip
+  // had already happened -- see renderHub()'s own showPostAdventure
+  // branch). Check-in/Closing/Steady State now stack underneath it as
+  // independent cards, each gated on its own trigger, rather than one
+  // slot swapping between all four. This function's job changes to
+  // match: instead of returning one exclusive phase name, it returns
+  // which of the three lower cards should show, all pure functions of
   // state, never a stored "has this guest seen this card" flag, same
   // principle every other phase of this hub already follows.
   //
-  // FLAGGED FOR AIREY: the source spec (and the Post-Adventure Phase 3
-  // final-spec doc built from it) defines Closing's and Steady State's
-  // trigger conditions as literally identical ("Closing card's own
-  // conditions are met"), which never actually says which one should
-  // render once those shared conditions are true -- there's no stored
-  // "already saw this" flag anywhere in this hub's design to break the
-  // tie. This build's own resolution, consistent with the "pure
-  // function of dates, never a flag" principle: Closing gets a real
-  // window to be seen (starting once gear's back AND the guest has
-  // either already given feedback or CLOSING_MIN_DAYS have passed since
-  // trail day), then Steady State takes over permanently once
-  // CLOSING_WINDOW_DAYS have passed since trail day, whether or not
-  // gear ever actually finished reconciling. A judgment call, not
-  // something the spec itself settled -- worth a direct look.
+  // FLAGGED FOR AIREY (unchanged from the original build): the source
+  // spec (and the Post-Adventure Phase 3 final-spec doc built from it)
+  // defines Closing's and Steady State's trigger conditions as literally
+  // identical ("Closing card's own conditions are met"), which never
+  // actually says which one should render once those shared conditions
+  // are true -- there's no stored "already saw this" flag anywhere in
+  // this hub's design to break the tie. This build's own resolution,
+  // consistent with the "pure function of dates, never a flag"
+  // principle: Closing gets a real window to be seen (starting once
+  // gear's back AND the guest has either already given feedback or
+  // CLOSING_MIN_DAYS have passed since trail day), then Steady State
+  // takes over permanently once CLOSING_WINDOW_DAYS have passed since
+  // trail day, whether or not gear ever actually finished reconciling.
+  // A judgment call, not something the spec itself settled -- worth a
+  // direct look.
   var CLOSING_MIN_DAYS = 4;
   var CLOSING_WINDOW_DAYS = 14;
 
-  function computePostAdventurePhase(tripDateStr, feedbackSubmitted, gearReturnDone) {
-    if (!isPastT1SendTime(tripDateStr)) return 'turn';
-    if (!feedbackSubmitted) return 'checkin';
+  function computePostAdventureState(tripDateStr, feedbackSubmitted, gearReturnDone) {
+    var pastTurnWindow = isPastT1SendTime(tripDateStr);
     var since = daysSinceTrip(tripDateStr);
-    if (since >= CLOSING_WINDOW_DAYS) return 'steady';
-    if (gearReturnDone && (feedbackSubmitted || since >= CLOSING_MIN_DAYS)) return 'closing';
-    return 'steady';
+    return {
+      // Whether the T+1 email's own send time has passed -- the Turn
+      // hero's own "tomorrow morning we'll ask" note only makes sense
+      // before this, even though the hero card itself now stays up
+      // long after.
+      pastTurnWindow: pastTurnWindow,
+      showCheckin: pastTurnWindow && !feedbackSubmitted,
+      showClosing: pastTurnWindow && feedbackSubmitted && gearReturnDone && since < CLOSING_WINDOW_DAYS,
+      showSteady: pastTurnWindow && feedbackSubmitted && (!gearReturnDone || since >= CLOSING_WINDOW_DAYS)
+    };
   }
 
   // Phase 2.5 Trail Day (2026-09-04) -- expectedReturnAt comes back from
@@ -2130,6 +2150,9 @@
     var isTrailDayToday = false;
     var showT3SafetyNote = false;
     var postAdventureCardHtml = null;
+    var postAdventureCheckinHtml = '';
+    var postAdventureClosingHtml = '';
+    var postAdventureSteadyHtml = '';
 
     if (status.allSet) {
       var statLine = escapeHtml(status.trailName) + ' · ' + formatTripDate(eb.date) + ' · ' + attendingRosterCount() + ' adventurers · ' + status.kitCount + ' gear kits packed';
@@ -2196,25 +2219,20 @@
         // two-state branch on gearReturnDone. Replaced by the real
         // Turn/Check-in/Closing/Steady-State sequence below (see
         // claude/psac-post-adventure-phase3-final-spec-2026-09-08.md,
-        // sections 3-6, and computePostAdventurePhase above).
+        // sections 3-6, and computePostAdventureState above).
         // gearReturnDone itself is kept -- it still names the same
         // terminal gear-return states the gear-return card below reads
         // -- but it no longer drives the headline directly, only the
         // Closing card's own trigger, per the spec's trigger table.
         var gearReturnDone = gearReturnStatus && (gearReturnStatus.state === 'checked_in_clean' || gearReturnStatus.state === 'charge_applied' || gearReturnStatus.state === 'wrapping_up');
-        var postAdventurePhase = computePostAdventurePhase(eb.date, !!ap.feedbackSubmitted, gearReturnDone);
-        if (postAdventurePhase === 'turn') {
-          topGreetingHtml = 'The pool hits differently after adventure.';
-          topSublineHtml = escapeHtml(status.trailName) + ' gave you the peak. This is the part where you earn the pool.';
-          postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, null) +
-            '<div class="ap-turn-note">Tomorrow morning we’ll ask how the peak went, takes less than a minute, right here.</div>';
-        } else if (postAdventurePhase === 'checkin') {
-          postAdventureCardHtml = checkinCardHtml(status.trailName);
-        } else if (postAdventurePhase === 'closing') {
-          postAdventureCardHtml = closingCardHtml();
-        } else {
-          postAdventureCardHtml = steadyStateCardHtml(status.trailName, selectedTrailCandidate && selectedTrailCandidate.photoUrl);
-        }
+        var pa = computePostAdventureState(eb.date, !!ap.feedbackSubmitted, gearReturnDone);
+        topGreetingHtml = 'The pool hits differently after adventure.';
+        topSublineHtml = escapeHtml(status.trailName) + ' gave you the peak. This is the part where you earn the pool.';
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, null) +
+          (pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how the peak went, takes less than a minute, right here.</div>');
+        postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName) : '';
+        postAdventureClosingHtml = pa.showClosing ? closingCardHtml() : '';
+        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(status.trailName, selectedTrailCandidate && selectedTrailCandidate.photoUrl) : '';
       } else if (pastT3) {
         // 2B: Guide unlocked. The trail section below already carries
         // its own Get Guide button once pastT3, so this doesn't repeat
@@ -2323,7 +2341,7 @@
     // linking out to it, placed under the deposit note. Uses its own
     // guide-CTA button id (distinct from the guide card's #ap-get-guide
     // above, since both now render in the same DOM once past T3).
-    var receiptHtml = pastT3 ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml('ap-get-guide-receipt') : '';
+    var receiptHtml = (pastT3 && !showPostAdventure) ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml('ap-get-guide-receipt') : '';
 
     // Phase 2.5 Trail Day layout (2026-09-04): a genuinely different card
     // order from every other pastT3 day, per Airey's own ask -- ambient
@@ -2357,15 +2375,19 @@
       (isTrailDayToday ? '' : topCardHtml) +
       alertHtml +
       (showPostAdventure
-        // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05):
-        // deliberately minimal -- just the gear-return card, the
-        // collapsible prep strip (still useful as a record), and the
-        // summary receipt. No weather, no gear-delivery card, no
-        // deposit-hold note -- those are all about the trip that already
-        // happened. Uses showPostAdventure (Web trail check-in,
-        // 2026-09-05), not raw pastTripDay, so a same-day "I'm Back" tap
-        // lands here too, not just the day-after date rollover.
-        ? gearReturnHtml + getReadyHtml + receiptHtml
+        // Post-Adventure / "Peaks to Pools" (Phase 3, 2026-09-05;
+        // restacked 2026-09-08 per Airey's direct request -- see
+        // computePostAdventureState's own header comment). topCardHtml
+        // above is now always The Turn's pinned hero-photo card for
+        // this whole window; Check-in, the gear-return card, Closing,
+        // and the Steady State "start a new adventure" invite stack
+        // beneath it here, each gated on its own trigger rather than
+        // one slot swapping between all of them. No weather, no
+        // gear-delivery card, no deposit-hold note, and no more stale
+        // pre-trip Adventure Summary receipt (receiptHtml is now
+        // suppressed for this whole window, see its own declaration
+        // above) -- those are all about the trip that already happened.
+        ? postAdventureCheckinHtml + gearReturnHtml + postAdventureClosingHtml + postAdventureSteadyHtml + getReadyHtml
         : isTrailDayToday
           ? trailDayBodyHtml
           : pastT3

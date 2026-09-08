@@ -300,24 +300,30 @@
   }
 
   // Post-Adventure Phase 3 card sequencing -- same
-  // computePostAdventurePhase as adventure-prep-form.js, see that
-  // file's own header comment for the Closing-vs-Steady-State
-  // resolution (CLOSING_MIN_DAYS/CLOSING_WINDOW_DAYS), flagged to Airey
-  // there. `gearReturnDone` is always passed true from this file's own
-  // callers below -- Surface B carries no gear-return state at all
-  // (Airey's direct, pre-existing call: gear return is booker-only,
-  // this surface has always stayed gear-free), so the Closing gate here
-  // is purely the day-since-trip threshold.
+  // computePostAdventureState as adventure-prep-form.js, see that
+  // file's own header comment for both the Closing-vs-Steady-State
+  // resolution (CLOSING_MIN_DAYS/CLOSING_WINDOW_DAYS) and the
+  // 2026-09-08 same-day restack (Airey's direct request: The Turn's
+  // hero-photo card is now a permanent masthead for the whole
+  // post-adventure window, not one exclusive phase among four --
+  // Check-in/Closing/Steady State stack underneath it instead, each
+  // gated on its own trigger). `gearReturnDone` is always passed true
+  // from this file's own callers below -- Surface B carries no
+  // gear-return state at all (Airey's direct, pre-existing call: gear
+  // return is booker-only, this surface has always stayed gear-free),
+  // so the Closing gate here is purely the day-since-trip threshold.
   var CLOSING_MIN_DAYS = 4;
   var CLOSING_WINDOW_DAYS = 14;
 
-  function computePostAdventurePhase(tripDateStr, feedbackSubmitted, gearReturnDone) {
-    if (!isPastT1SendTime(tripDateStr)) return 'turn';
-    if (!feedbackSubmitted) return 'checkin';
+  function computePostAdventureState(tripDateStr, feedbackSubmitted, gearReturnDone) {
+    var pastTurnWindow = isPastT1SendTime(tripDateStr);
     var since = daysSinceTrip(tripDateStr);
-    if (since >= CLOSING_WINDOW_DAYS) return 'steady';
-    if (gearReturnDone && (feedbackSubmitted || since >= CLOSING_MIN_DAYS)) return 'closing';
-    return 'steady';
+    return {
+      pastTurnWindow: pastTurnWindow,
+      showCheckin: pastTurnWindow && !feedbackSubmitted,
+      showClosing: pastTurnWindow && feedbackSubmitted && gearReturnDone && since < CLOSING_WINDOW_DAYS,
+      showSteady: pastTurnWindow && feedbackSubmitted && (!gearReturnDone || since >= CLOSING_WINDOW_DAYS)
+    };
   }
   function joinWithAnd(items) {
     if (items.length === 0) return '';
@@ -1837,6 +1843,9 @@
     var topGreetingHtml = hubGreeting;
     var topSublineHtml = hubSubline;
     var postAdventureCardHtml = null;
+    var postAdventureCheckinHtml = '';
+    var postAdventureClosingHtml = '';
+    var postAdventureSteadyHtml = '';
     var doneCount = [status.detailsDone, status.waiverDone].filter(Boolean).length;
     // Surface B trail-day arc (2026-09-08): hoisted out of the branches
     // below, same "pure function of today's date" pattern Surface A's
@@ -1885,23 +1894,18 @@
         // claude/psac-post-adventure-phase3-final-spec-2026-09-08.md,
         // sections 3-6) -- The Turn -> Check-in -> Closing -> Steady
         // State, replacing the old static two-line headline. Gear-free
-        // throughout, same as before -- see computePostAdventurePhase's
+        // throughout, same as before -- see computePostAdventureState's
         // own header comment for why gearReturnDone is always true here.
-        var postAdventurePhase = computePostAdventurePhase(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
-        if (postAdventurePhase === 'turn') {
-          var turnHeadline = hubIsGuardian ? hubChildLabel + ' did the peak. Now, the pool.' : 'The pool hits differently after adventure.';
-          var turnSubline = hubIsGuardian ? 'A real one out there today, the easy part’s still ahead.' : (escapeHtml(ownerName) + ' brought you along for the peak. The pool’s next, for both of you.');
-          topGreetingHtml = turnHeadline;
-          topSublineHtml = turnSubline;
-          postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, status.trailDetail && status.trailDetail.photoUrl, null) +
-            (hubIsGuardian ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how your day went, takes less than a minute, right here.</div>');
-        } else if (postAdventurePhase === 'checkin') {
-          postAdventureCardHtml = checkinCardHtml(status.trailName, hubIsGuardian, hubChildLabel);
-        } else if (postAdventurePhase === 'closing') {
-          postAdventureCardHtml = closingCardHtml(hubIsGuardian);
-        } else {
-          postAdventureCardHtml = steadyStateCardHtml(status.trailName, hubIsGuardian, hubChildLabel, status.trailDetail && status.trailDetail.photoUrl);
-        }
+        var pa = computePostAdventureState(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
+        var turnHeadline = hubIsGuardian ? hubChildLabel + ' did the peak. Now, the pool.' : 'The pool hits differently after adventure.';
+        var turnSubline = hubIsGuardian ? 'A real one out there today, the easy part’s still ahead.' : (escapeHtml(ownerName) + ' brought you along for the peak. The pool’s next, for both of you.');
+        topGreetingHtml = turnHeadline;
+        topSublineHtml = turnSubline;
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, status.trailDetail && status.trailDetail.photoUrl, null) +
+          (hubIsGuardian || pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how your day went, takes less than a minute, right here.</div>');
+        postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName, hubIsGuardian, hubChildLabel) : '';
+        postAdventureClosingHtml = pa.showClosing ? closingCardHtml(hubIsGuardian) : '';
+        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(status.trailName, hubIsGuardian, hubChildLabel, status.trailDetail && status.trailDetail.photoUrl) : '';
       } else if (pastT3) {
         topGreetingHtml = 'Your guide’s ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(status.trailName) + ' is yours now.';
         topSublineHtml = statLine;
@@ -1953,7 +1957,7 @@
     // T-3+ embedded Adventure Summary receipt (Airey's direct request,
     // round 3, 2026-09-04): the full renderSummary() card, not a tile
     // linking out to it, placed at the bottom of the hub once past T3.
-    var receiptHtml = pastT3 ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml() : '';
+    var receiptHtml = (pastT3 && !showPostAdventure) ? '<div class="ap-eyebrow" style="margin-top:1.1rem;">Adventure Summary</div>' + receiptCardHtml() : '';
 
     // Surface B trail-day arc (2026-09-08): the ready-strip/Heading Out/
     // Underway body, built only for the trail-day-today state -- same
@@ -1971,11 +1975,17 @@
       (isTrailDayToday ? '' : topCardHtml) +
       (isTrailDayToday || showPostAdventure ? '' : '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>') +
       (showPostAdventure
-        // Post-Adventure, gear-free (Surface B trail-day arc, 2026-09-08):
-        // deliberately minimal, same as Surface A's own version minus
-        // the gear-return card -- the collapsible prep strip (still a
-        // useful record) and the summary receipt.
-        ? getReadyHtml + receiptHtml
+        // Post-Adventure, gear-free (Surface B trail-day arc, 2026-09-08;
+        // restacked 2026-09-08 same day, per Airey's direct request --
+        // see computePostAdventureState's own header comment). topCardHtml
+        // above is now always The Turn's pinned hero-photo card for this
+        // whole window; Check-in, Closing, and the Steady State "start a
+        // new adventure" invite stack beneath it here, same as Surface A
+        // minus the gear-return card (this surface has never carried gear
+        // state). The collapsible prep strip is still a useful record; the
+        // old stale pre-trip Adventure Summary receipt is retired for this
+        // whole window (see receiptHtml's own declaration above).
+        ? postAdventureCheckinHtml + postAdventureClosingHtml + postAdventureSteadyHtml + getReadyHtml
         : isTrailDayToday
           ? trailDayBodyHtml
           : pastT3
@@ -2174,6 +2184,9 @@
     var pastT3 = isPastT3Cutoff(state.ctx.tripDate);
     var guideCardHtml = '';
     var postAdventureCardHtml = null;
+    var postAdventureCheckinHtml = '';
+    var postAdventureClosingHtml = '';
+    var postAdventureSteadyHtml = '';
 
     // T-3 hub refresh, 2026-09-04 (Airey's direct follow-up: "the
     // guardian hub needs this more than anyone -- they aren't going, but
@@ -2227,18 +2240,13 @@
         // was on the trail); Check-in is genuinely new (see
         // guardianOnlyCheckinCardHtml's own header comment); Closing/
         // Steady State reuse the generic guardian variant unchanged.
-        var postAdventurePhase = computePostAdventurePhase(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
-        if (postAdventurePhase === 'turn') {
-          topGreetingHtml = childLabel + ' did the peak. Now, the pool.';
-          topSublineHtml = 'A real one out there today, the easy part’s still ahead.';
-          postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, null);
-        } else if (postAdventurePhase === 'checkin') {
-          postAdventureCardHtml = guardianOnlyCheckinCardHtml();
-        } else if (postAdventurePhase === 'closing') {
-          postAdventureCardHtml = guardianOnlyClosingCardHtml();
-        } else {
-          postAdventureCardHtml = steadyStateCardHtml(null, true, childLabel, trailDetail && trailDetail.photoUrl);
-        }
+        var pa = computePostAdventureState(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
+        topGreetingHtml = childLabel + ' did the peak. Now, the pool.';
+        topSublineHtml = 'A real one out there today, the easy part’s still ahead.';
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, null);
+        postAdventureCheckinHtml = pa.showCheckin ? guardianOnlyCheckinCardHtml() : '';
+        postAdventureClosingHtml = pa.showClosing ? guardianOnlyClosingCardHtml() : '';
+        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(null, true, childLabel, trailDetail && trailDetail.photoUrl) : '';
       } else if (pastT3) {
         topGreetingHtml = childLabel + '’s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
         topSublineHtml = '';
@@ -2294,6 +2302,12 @@
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       (isUnderway ? underwayHtml : topCardHtml) +
+      // Post-Adventure restack (2026-09-08, same day as the original
+      // build, Airey's direct request): Check-in/Closing/Steady State
+      // stack directly under The Turn's now-pinned hero photo, same
+      // sequence as the other two hubs -- this hub carries no gear-return
+      // card and never has (non-attending guardian, nothing to check in).
+      (showPostAdventure ? (postAdventureCheckinHtml + postAdventureClosingHtml + postAdventureSteadyHtml) : '') +
       // Guide before weather, matching the reordered sequence on the
       // other two hubs (2026-09-05).
       guideCardHtml +
