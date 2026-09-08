@@ -1574,8 +1574,6 @@
       // already recognize.
       html += "And when it's done, everything will hit differently. The pool. The drink. The dinner. The conversation. The bed. You'll return to exactly where you started but it will feel like somewhere new. So will you.";
       html += '</div>';
-      html += '<div class="paf-closing-sub">How did that feel?</div>';
-      html += '<div class="paf-rating" data-field="rating"></div>';
       if (state.answers.adventurePrepUrl) {
         // NEW (Aug 2026): "Finish setting up your adventure" (PRD Section
         // 11's locked guest-facing name and URL for Surface A). Inline-
@@ -1584,11 +1582,17 @@
         // on this card already exists in styles.css. First-draft copy —
         // not yet design-reviewed, same caveat as the matching CTA added
         // to booking-confirmation-email.js.
-        html += '<div style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid rgba(42,71,71,0.12); text-align:center;">';
+        // Moved directly under the tan recap box (2026-09-08): this is the
+        // one thing most guests actually need to do next, so it shouldn't
+        // sit below the optional star rating. The rating question now
+        // follows it instead of the other way around.
+        html += '<div style="margin-bottom:1.8rem; padding-bottom:1.5rem; border-bottom:1px solid rgba(42,71,71,0.12); text-align:center;">';
         html += '<div style="font-size:0.85rem; color:#2A4747; opacity:0.75; margin-bottom:0.75rem;">A few more details whenever you\'re ready: delivery address, waivers, and your gear kit.</div>';
-        html += '<a href="' + esc(state.answers.adventurePrepUrl) + '" style="display:inline-block; background-color:#F58271; color:#FFFFFF; font-weight:600; text-decoration:none; padding:0.85rem 1.75rem; border-radius:8px;">Finish setting up your adventure &rarr;</a>';
+        html += '<a href="' + esc(state.answers.adventurePrepUrl) + '" style="display:inline-block; background-color:#F58271; color:#FFFFFF; font-weight:600; text-decoration:none; padding:0.85rem 1.75rem; border-radius:8px;">Finish setting up your adventure</a>';
         html += '</div>';
       }
+      html += '<div class="paf-closing-sub">How did that feel?</div>';
+      html += '<div class="paf-rating" data-field="rating"></div>';
       root.innerHTML = html;
       var ratingWrap = root.querySelector('[data-field="rating"]');
       for (var i = 1; i <= 5; i++) {
