@@ -286,6 +286,20 @@
     checkinRunningLongerConfirmed: false,
     checkinRunningLongerDisplay: '',
     hasOpenIncident: false,
+    // NEW (Post-Adventure Check-in, 2026-09-08) -- see
+    // claude/psac-post-adventure-phase3-final-spec-2026-09-08.md, the
+    // booker's own 5-field Check-in card (fbSubmitted flips true the
+    // moment submitFeedback succeeds, ahead of the next full context
+    // reload, so the hub can move straight on to the Closing/Steady-
+    // State phase without waiting on a round trip).
+    fbOverall: null,
+    fbTrail: null,
+    fbGear: null,
+    fbBooking: null,
+    fbNote: '',
+    fbSubmitting: false,
+    fbSubmitted: false,
+    fbError: '',
   };
 
   // ---------------------------------------------------------------------
@@ -457,6 +471,73 @@
     var todayUTC = Date.UTC(Number(tm[1]), Number(tm[2]) - 1, Number(tm[3]));
     var diff = Math.round((tripUTC - todayUTC) / 86400000);
     return diff > 0 ? diff : 0;
+  }
+
+  // Post-Adventure Phase 3 sequencing (2026-09-08 final spec, sections
+  // 3-6). Whole-day count SINCE trail day, Pacific calendar dates, same
+  // technique as daysUntilTrip just above -- clamped to 0 so trail day
+  // itself (or a same-day "I'm Back" tap) reads as 0, never negative.
+  function daysSinceTrip(dateStr) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return 0;
+    var todayStr = pacificDateString(new Date());
+    var tm = todayStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    var tripUTC = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var todayUTC = Date.UTC(Number(tm[1]), Number(tm[2]) - 1, Number(tm[3]));
+    var diff = Math.round((todayUTC - tripUTC) / 86400000);
+    return diff > 0 ? diff : 0;
+  }
+
+  // Trip date + 1 calendar day, 9:00am Pacific -- the exact instant
+  // lib/email-templates/trip-plus-one-email.js's own send trigger uses
+  // (see that file), and the boundary The Turn/Check-in split on: same
+  // pacificOffsetMinutes/computeT3CutoffDate technique as this file's own
+  // T-3 cutoff math above, +1 day and 9am instead of -3 days and 10pm.
+  function computeT1SendDate(tripDateStr) {
+    var m = String(tripDateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    var y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    var oneForward = new Date(Date.UTC(y, mo - 1, d) + 1 * 86400000);
+    var cy = oneForward.getUTCFullYear(), cm = oneForward.getUTCMonth(), cd = oneForward.getUTCDate();
+    var guess = new Date(Date.UTC(cy, cm, cd, 9, 0, 0) + 8 * 3600000);
+    var offset = pacificOffsetMinutes(guess);
+    return new Date(Date.UTC(cy, cm, cd, 9, 0, 0) - offset * 60000);
+  }
+
+  function isPastT1SendTime(tripDateStr) {
+    var sendAt = computeT1SendDate(tripDateStr);
+    return !!sendAt && new Date() >= sendAt;
+  }
+
+  // Post-Adventure Phase 3 card sequencing (final spec, section 3):
+  // The Turn -> Check-in -> Closing -> Steady State, pure function of
+  // state, never a stored "has this guest seen this card" flag, same
+  // principle every other phase of this hub already follows.
+  //
+  // FLAGGED FOR AIREY: the source spec (and the Post-Adventure Phase 3
+  // final-spec doc built from it) defines Closing's and Steady State's
+  // trigger conditions as literally identical ("Closing card's own
+  // conditions are met"), which never actually says which one should
+  // render once those shared conditions are true -- there's no stored
+  // "already saw this" flag anywhere in this hub's design to break the
+  // tie. This build's own resolution, consistent with the "pure
+  // function of dates, never a flag" principle: Closing gets a real
+  // window to be seen (starting once gear's back AND the guest has
+  // either already given feedback or CLOSING_MIN_DAYS have passed since
+  // trail day), then Steady State takes over permanently once
+  // CLOSING_WINDOW_DAYS have passed since trail day, whether or not
+  // gear ever actually finished reconciling. A judgment call, not
+  // something the spec itself settled -- worth a direct look.
+  var CLOSING_MIN_DAYS = 4;
+  var CLOSING_WINDOW_DAYS = 14;
+
+  function computePostAdventurePhase(tripDateStr, feedbackSubmitted, gearReturnDone) {
+    if (!isPastT1SendTime(tripDateStr)) return 'turn';
+    if (!feedbackSubmitted) return 'checkin';
+    var since = daysSinceTrip(tripDateStr);
+    if (since >= CLOSING_WINDOW_DAYS) return 'steady';
+    if (gearReturnDone && (feedbackSubmitted || since >= CLOSING_MIN_DAYS)) return 'closing';
+    return 'steady';
   }
 
   // Phase 2.5 Trail Day (2026-09-04) -- expectedReturnAt comes back from
@@ -2109,13 +2190,29 @@
         // gearReturnStatus the gear-return card below already reflects,
         // reusing the gear-free framing already established and audited
         // on Surface B's own showPostAdventure copy for consistency.
+        // SUPERSEDED (Post-Adventure Phase 3 final spec, 2026-09-08):
+        // this used to be the entire post-adventure headline -- a static
+        // two-state branch on gearReturnDone. Replaced by the real
+        // Turn/Check-in/Closing/Steady-State sequence below (see
+        // claude/psac-post-adventure-phase3-final-spec-2026-09-08.md,
+        // sections 3-6, and computePostAdventurePhase above).
+        // gearReturnDone itself is kept -- it still names the same
+        // terminal gear-return states the gear-return card below reads
+        // -- but it no longer drives the headline directly, only the
+        // Closing card's own trigger, per the spec's trigger table.
         var gearReturnDone = gearReturnStatus && (gearReturnStatus.state === 'checked_in_clean' || gearReturnStatus.state === 'charge_applied' || gearReturnStatus.state === 'wrapping_up');
-        if (gearReturnDone) {
-          topGreetingHtml = 'You did it. ' + escapeHtml(status.trailName) + '’s behind you.';
-          topSublineHtml = 'Nice work out there. Here’s your trip, all in one place.';
+        var postAdventurePhase = computePostAdventurePhase(eb.date, !!ap.feedbackSubmitted, gearReturnDone);
+        if (postAdventurePhase === 'turn') {
+          topGreetingHtml = 'The pool hits differently after adventure.';
+          topSublineHtml = escapeHtml(status.trailName) + ' gave you the peak. This is the part where you earn the pool.';
+          postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, null) +
+            '<div class="ap-turn-note">Tomorrow morning we’ll ask how the peak went, takes less than a minute, right here.</div>';
+        } else if (postAdventurePhase === 'checkin') {
+          postAdventureCardHtml = checkinCardHtml(status.trailName);
+        } else if (postAdventurePhase === 'closing') {
+          postAdventureCardHtml = closingCardHtml();
         } else {
-          topGreetingHtml = 'You’ve earned the pool. Your gear’s the one thing left.';
-          topSublineHtml = 'You lived ' + escapeHtml(status.trailName) + '. Here’s what’s next.';
+          postAdventureCardHtml = steadyStateCardHtml(status.trailName, selectedTrailCandidate && selectedTrailCandidate.photoUrl);
         }
       } else if (pastT3) {
         // 2B: Guide unlocked. The trail section below already carries
@@ -2156,11 +2253,13 @@
     // roster yet): topGreetingHtml/topSublineHtml stay the Part 2.1
     // continuity-beat opener set above.
 
-    var topCardHtml = status.allSet
-      ? heroCardHtml('Your Adventure', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, daysToGo)
-      : '<div class="ap-eyebrow">Your Adventure</div>' +
-        '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
-        '<div class="ap-subline">' + topSublineHtml + '</div>';
+    var topCardHtml = postAdventureCardHtml !== null
+      ? postAdventureCardHtml
+      : (status.allSet
+        ? heroCardHtml('Your Adventure', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, daysToGo)
+        : '<div class="ap-eyebrow">Your Adventure</div>' +
+          '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+          '<div class="ap-subline">' + topSublineHtml + '</div>');
 
     // T-3+ weather glance (T-3 hub refresh, 2026-09-04): renders nothing
     // until real forecast data exists -- see weatherCardHtml() above.
@@ -2419,6 +2518,76 @@
             statusEl.innerHTML = '<div class="ap-error">' + escapeHtml((res.body && res.body.message) || 'Something went wrong sending that. Please try again.') + '</div>';
           }
         });
+      });
+    }
+
+    // Post-Adventure Check-in / Closing card wiring (2026-09-08) -- see
+    // checkinCardHtml/closingCardHtml above. Rating taps just update
+    // state and re-render (same pattern the rest of this file uses for
+    // any tap-to-select control, e.g. joining/gearStep toggles); Submit
+    // posts to the new submitFeedback action and flips state.fbSubmitted
+    // optimistically so the hub can move straight into Closing/Steady
+    // State without waiting on the next full context reload.
+    wrap.querySelectorAll('.fb-scale-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var field = btn.getAttribute('data-fb-field');
+        var val = Number(btn.getAttribute('data-fb-value'));
+        state[field] = state[field] === val ? null : val;
+        render();
+      });
+    });
+    var fbNoteField = wrap.querySelector('#fb-note');
+    if (fbNoteField) {
+      fbNoteField.addEventListener('input', function () { state.fbNote = fbNoteField.value; });
+    }
+    var fbSubmitBtn = wrap.querySelector('#fb-submit-btn');
+    if (fbSubmitBtn) {
+      fbSubmitBtn.addEventListener('click', function () {
+        if (!state.fbOverall) {
+          state.fbError = 'An overall rating is required.';
+          render();
+          return;
+        }
+        state.fbSubmitting = true;
+        state.fbError = '';
+        render();
+        apiPost('/api/adventure-prep', {
+          action: 'submitFeedback',
+          token: TOKEN,
+          overallRating: state.fbOverall,
+          trailRating: state.fbTrail,
+          gearRating: state.fbGear,
+          bookingRating: state.fbBooking,
+          note: state.fbNote,
+        }).then(function (res) {
+          state.fbSubmitting = false;
+          if (res.ok && res.body && res.body.ok) {
+            state.fbSubmitted = true;
+            state.ctx.adventurePrep.feedbackSubmitted = true;
+          } else {
+            state.fbError = 'Something went wrong sending that. Please try again.';
+          }
+          render();
+        });
+      });
+    }
+    var clShareBtn = wrap.querySelector('#cl-share-btn');
+    if (clShareBtn) {
+      clShareBtn.addEventListener('click', function () {
+        var shareData = {
+          title: 'Palm Springs Adventure Club',
+          text: 'I just got back from an adventure with Palm Springs Adventure Club, thought you’d like it too.',
+          url: 'https://www.palmspringsadventureclub.com',
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(function () { /* cancelled, nothing to do */ });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareData.url).then(function () {
+            var original = clShareBtn.textContent;
+            clShareBtn.textContent = 'Link Copied';
+            setTimeout(function () { clShareBtn.textContent = original; }, 1500);
+          }).catch(function () { /* clipboard denied, leave button as-is */ });
+        }
       });
     }
 
@@ -3475,6 +3644,85 @@
       '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
       '<div class="ap-hero-subline">' + sublineHtml + '</div>' +
       '</div></div>';
+  }
+
+  // ---------------------------------------------------------------------
+  // Post-Adventure Phase 3 -- Check-in / Closing / Steady State
+  // (claude/psac-post-adventure-phase3-final-spec-2026-09-08.md, sections
+  // 4/6). The Turn itself reuses heroCardHtml above unchanged (it's the
+  // same hero-photo-card treatment, just new copy) -- these three are the
+  // genuinely new card types nothing in this file had before today.
+  // ---------------------------------------------------------------------
+
+  // One 1-5 tap-target row. `field` matches a state.fb* key directly
+  // (fbOverall/fbTrail/fbGear/fbBooking); renderHub's own click wiring
+  // reads data-fb-field/data-fb-value straight off the button rather
+  // than needing a per-field handler.
+  function fbRatingRowHtml(field, label, value, optional) {
+    var btns = '';
+    for (var i = 1; i <= 5; i++) {
+      btns += '<button type="button" class="fb-scale-btn' + (value === i ? ' selected' : '') + '" data-fb-field="' + field + '" data-fb-value="' + i + '">' + i + '</button>';
+    }
+    return '<div class="fb-question">' +
+      '<div class="fb-question-label">' + escapeHtml(label) + (optional ? ' <span class="fb-optional">(optional)</span>' : '') + '</div>' +
+      '<div class="fb-scale">' + btns + '</div>' +
+      '</div>';
+  }
+
+  // Booker's own Check-in card -- the full 5-field set (overall, trail,
+  // gear, booking, plus an optional note), see spec section 4. Renders
+  // its own submit button/status; renderHub wires the rating taps and
+  // the submit click after insertion, same pattern as the gear-issue
+  // escape hatch elsewhere in this file.
+  function checkinCardHtml(trailName) {
+    return '<div class="fb-eyebrow">Peaks to Pools</div>' +
+      '<div class="fb-card">' +
+      '<div class="fb-headline">How was the peak?</div>' +
+      '<div class="fb-sub">A quick word helps us get the next trail right, for you and for the next person who books it.</div>' +
+      '<div class="fb-rule"></div>' +
+      fbRatingRowHtml('fbOverall', 'Overall, how was your adventure?', state.fbOverall, false) +
+      fbRatingRowHtml('fbTrail', 'How was the trail we picked for your group?', state.fbTrail, false) +
+      fbRatingRowHtml('fbGear', 'How was your gear kit?', state.fbGear, false) +
+      fbRatingRowHtml('fbBooking', 'How was getting booked and ready with us?', state.fbBooking, false) +
+      '<div class="fb-note-wrap"><label class="fb-note-label" for="fb-note">Anything else you want to tell us?</label>' +
+      '<textarea id="fb-note" class="fb-note-field" placeholder="Optional">' + escapeHtml(state.fbNote || '') + '</textarea></div>' +
+      (state.fbError ? '<div class="ap-error">' + escapeHtml(state.fbError) + '</div>' : '') +
+      '<button type="button" class="ap-cta-primary" id="fb-submit-btn"' + (state.fbSubmitting ? ' disabled' : '') + '>' + (state.fbSubmitting ? 'Sending…' : 'Submit') + '</button>' +
+      '</div>';
+  }
+
+  // Closing card -- one card, not a sequence: a share request (same for
+  // everyone), then the booker/participant's own second half, a
+  // membership invite (spec section 4). Share uses the Web Share API
+  // where available, falling back to copying the link -- no existing
+  // share pattern in this file to reuse (adventure-form.js's own
+  // copy-to-clipboard helper is scoped to its custom-contact overlay,
+  // not shared code), so this is its own small, self-contained handler.
+  function closingCardHtml() {
+    return '<div class="fb-eyebrow">Peaks to Pools</div>' +
+      '<div class="fb-card cl-card">' +
+      '<div class="fb-headline">You earned the pool.</div>' +
+      '<div class="fb-sub">If today’s worth telling someone about, that means more coming from you than anything we’d write ourselves.</div>' +
+      '<button type="button" class="ap-cta-primary" id="cl-share-btn">Share The Club</button>' +
+      // MEMBERSHIP INVITE HIDDEN (2026-09-08, Airey's direct call): no
+      // land-use access for guided hikes yet and zero current members,
+      // so membership signup has ~no value right now -- same reasoning
+      // as index.html's own "THE CLUB" section, hidden the same day.
+      // Re-enable (drop the membership invite back in below the share
+      // button, restoring the '<div class="fb-rule"></div>' separator
+      // too) once guided-hike land use clears, expected early 2027.
+      // '<div class="fb-rule"></div>' +
+      // '<div class="fb-headline" style="font-size:1.05rem;">Want more days that end at the pool?</div>' +
+      // '<a href="/membership" class="ap-cta-secondary" style="text-decoration:none;">Learn About Membership</a>' +
+      '</div>';
+  }
+
+  // Steady State -- permanent resting state, dusk hero-photo treatment
+  // (same heroCardHtml component as The Turn), never a dead end: always
+  // points back at booking another adventure.
+  function steadyStateCardHtml(trailName, photoUrl) {
+    return heroCardHtml('Peaks to Pools', 'Peak done. Pool earned. Your next peak’s already waiting.', escapeHtml(trailName) + ' was the first one, not the only one.', photoUrl, null, true) +
+      '<a href="/" class="ap-cta-primary" style="text-decoration:none; display:block; max-width:960px;">Start My Adventure</a>';
   }
 
   // `ctaLabel` falsy (null/undefined) renders the card with no CTA button,

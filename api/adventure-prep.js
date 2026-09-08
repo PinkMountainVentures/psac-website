@@ -66,6 +66,7 @@
  *   POST /api/adventure-prep { action: 'markGuideOpened', token }  -- NEW (Phase 2.5 Trail Day, 2026-09-04): fires on every Get Guide tap, first-tap-wins server-side
  *   POST /api/adventure-prep { action: 'confirmTrailReturnRoster', token, presentParticipantIds? }  -- NEW (full roster return + SAR experience, 2026-09-08): backs the "Everyone back from [trail]?" roster-confirm sheet, see lib/trail-checkin-incident-service.js's confirmTrailReturnRoster(). Supersedes the 2026-09-05 single-tap confirmTrailCheckin design.
  *   POST /api/adventure-prep { action: 'reportTrailCheckinIncident', token, category, categoryDetail?, affectedParticipantIds?, personalDescription?, medicalNote?, vehicleDescription?, reportedNewFinishEstimate?, reportedRemainingDistance?, otherNotes? }  -- NEW (full roster return + SAR experience, 2026-09-08): backs the six-option "What's going on?" triage, see lib/trail-checkin-incident-service.js's reportTrailCheckinIncident(). Web only -- SMS inbound stays scoped separately, own future pass.
+ *   POST /api/adventure-prep { action: 'submitFeedback', token, overallRating, trailRating?, gearRating?, bookingRating?, note? }  -- NEW (Post-Adventure Check-in, 2026-09-08): backs the booker's Check-in card, see lib/feedback-service.js's submitFeedback(). reportedByRole is always 'booker' here; participantId is always null (the booker has no booking_participants row of their own).
  */
 
 'use strict';
@@ -498,6 +499,7 @@ async function markGuideOpened(body, res) {
 // single-tap "I'm Back" build from earlier the same day -- see
 // lib/adventure-prep-service.js's own header comment on that.
 const trailCheckinIncidentService = require('../lib/trail-checkin-incident-service');
+const feedbackService = require('../lib/feedback-service');
 
 async function confirmTrailReturnRoster(body, res) {
   const token = body.token;
@@ -551,6 +553,40 @@ async function reportTrailCheckinIncident(body, res) {
   res.status(200).json(result);
 }
 
+// -- submitFeedback, NEW (Post-Adventure Check-in, 2026-09-08) --------
+// Backs the booker's Check-in card (the 5-field set: overall, trail,
+// gear, booking, plus an optional note -- see the Post-Adventure Phase 3
+// spec, section 4). Always reportedByRole 'booker', participantId always
+// null -- the booker has no booking_participants row of their own, same
+// as every other booker-side write in this file. Shares
+// lib/feedback-service.js with every Surface B variant via
+// api/waiver.js's own submitFeedback -- one table, one insert path.
+async function submitFeedback(body, res) {
+  const token = body.token;
+  if (!token) {
+    res.status(400).json({ error: 'missing_token' });
+    return;
+  }
+  const booking = await adventurePrepService.findBookingByToken(token);
+  if (!booking) {
+    res.status(404).json({ error: 'invalid_token' });
+    return;
+  }
+  const result = await feedbackService.submitFeedback(booking.booking_id, {
+    reportedByRole: 'booker',
+    overallRating: body.overallRating,
+    trailRating: body.trailRating,
+    gearRating: body.gearRating,
+    bookingRating: body.bookingRating,
+    note: body.note,
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 const POST_ACTIONS = {
   saveFields,
   confirmRoster,
@@ -563,6 +599,7 @@ const POST_ACTIONS = {
   markGuideOpened,
   confirmTrailReturnRoster,
   reportTrailCheckinIncident,
+  submitFeedback,
 };
 
 module.exports = async function handler(req, res) {

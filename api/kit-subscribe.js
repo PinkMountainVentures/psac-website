@@ -4,12 +4,40 @@
    1. POST /v4/subscribers — create subscriber
    2. POST /v4/forms/{form_id}/subscribers — add to form,
       triggers double opt-in confirmation email
-   3. POST /v4/tags/{tag_id}/subscribers/{id} x3 — apply tags
+   3. POST /v4/tags/{tag_id}/subscribers/{id} x N — apply tags
+      (the 3 base tags below, always applied, PLUS whatever
+      role/interest tags this call's own extraTagIds carries)
 
-   Tags applied:
+   Base tags applied to every subscriber:
      interest:adventure  (22310823)
      status:pre-launch   (22310825)
      source:website      (22310831)
+
+   PARAMETERIZED (Post-Adventure Check-in, 2026-09-08): previously every
+   caller got exactly these 3 tags, no matter who they were -- see
+   claude/psac-post-adventure-phase3-final-spec-2026-09-08.md, section 6.
+   Callers may now pass an `extraTagIds` array of additional numeric Kit
+   tag IDs, applied on top of (never instead of) the 3 base tags above.
+   Airey created these role/interest tags directly in Kit's dashboard,
+   2026-09-08:
+     role:booker              23211380
+     role:participant         23211384
+     role:guardian             23211386  (covers both an attending
+                                          guardian and a non-attending
+                                          guardian_only signer -- the tag
+                                          is about the PERSON's relationship
+                                          to the booking, not whether they
+                                          were on the trail)
+     interest:family-adventure 23211391
+
+   Only the two call sites this Phase 3 build actually needed pass
+   extraTagIds today (waiver-signer-form.js's Confirm Details opt-in, and
+   the new Closing card's guardian newsletter signup) -- adventure-form.js's
+   own pre-booking waitlist call and adventure-prep-form.js (the booker,
+   which has no Kit opt-in anywhere in this build) are both untouched,
+   still getting just the 3 base tags, which is correct: there's no
+   booking yet at waitlist time to derive a role from, and the booker
+   never gets a role tag in this spec.
 
    API key stored in KIT_API_KEY environment variable
    (Vercel + .env.local), never exposed to the client.
@@ -34,11 +62,19 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email } = req.body;
+  const { email, extraTagIds } = req.body;
 
   if (!email || typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'A valid email address is required.' });
   }
+
+  // Additive only, and defensively filtered to real positive integers --
+  // this is the one field on this endpoint a client fully controls, so
+  // it never gets to inject an arbitrary tag ID string into the Kit API
+  // call below.
+  const tagIds = TAG_IDS.concat(
+    Array.isArray(extraTagIds) ? extraTagIds.filter((id) => Number.isInteger(id) && id > 0) : []
+  );
 
   const apiKey = process.env.KIT_API_KEY;
   if (!apiKey) {
@@ -91,9 +127,10 @@ module.exports = async function handler(req, res) {
       console.error('Kit add to form error:', JSON.stringify(formData));
     }
 
-    // Step 3: Apply all three tags
+    // Step 3: Apply every tag (the 3 base tags plus any extraTagIds this
+    // call carried -- see tagIds above)
     await Promise.all(
-      TAG_IDS.map((tagId) =>
+      tagIds.map((tagId) =>
         fetch(`https://api.kit.com/v4/tags/${tagId}/subscribers/${subscriberId}`, {
           method: 'POST',
           headers: {

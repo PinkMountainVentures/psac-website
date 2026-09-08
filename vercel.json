@@ -41,6 +41,10 @@
     {
       "path": "/api/send-gear-out-for-delivery",
       "schedule": "5,20,35,50 * * * *"
+    },
+    {
+      "path": "/api/send-trip-plus-one-email",
+      "schedule": "12,27,42,57 * * * *"
     }
   ],
   "redirects": [

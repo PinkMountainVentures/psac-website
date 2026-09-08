@@ -27,6 +27,7 @@
  *   POST /api/waiver { action: 'saveEmergencyContact', token?, signerToken?, contactName, contactPhone, contactEmail }
  *   POST /api/waiver { action: 'confirmTrailReturnRoster', signerToken, presentParticipantIds? }  -- NEW (full roster return + SAR experience, 2026-09-08): Surface B's half of the "Everyone back from [trail]?" roster-confirm sheet, see lib/trail-checkin-incident-service.js's confirmTrailReturnRoster(). Resolves signerToken via waiverService.resolveSignerForCheckin() to the bookingId Surface A's own adventure-prep.js action also resolves to, so both surfaces write the same roster snapshot.
  *   POST /api/waiver { action: 'reportTrailCheckinIncident', signerToken, category, categoryDetail?, affectedParticipantIds?, personalDescription?, medicalNote?, vehicleDescription?, reportedNewFinishEstimate?, reportedRemainingDistance?, otherNotes? }  -- NEW (full roster return + SAR experience, 2026-09-08): Surface B's half of the six-option "What's going on?" triage, see lib/trail-checkin-incident-service.js's reportTrailCheckinIncident(). reportedByRole is derived server-side from the signer's own role (participant / participant_guardian / guardian_only), never trusted from the client.
+ *   POST /api/waiver { action: 'submitFeedback', signerToken, overallRating, gearRating?, checkinRating?, note? }  -- NEW (Post-Adventure Check-in, 2026-09-08): Surface B's half of the Check-in card (participant/participant_guardian 2-field set, or guardian_only's own "staying in the loop" 2-field set), see lib/feedback-service.js's submitFeedback(). reportedByRole and participantId are both derived server-side from the signer's own role via waiverService.resolveSignerForCheckin(), same as reportTrailCheckinIncident above.
  *   POST /api/waiver { action: 'confirmHeadingOut', signerToken, absentParticipantIds? }  -- NEW (Surface B trail-day arc, 2026-09-08): Surface B's half of the Heading Out roster-confirm sheet, see lib/adventure-prep-service.js's confirmHeadingOutByBookingId(). Idempotent, same as Surface A's own action.
  *   POST /api/waiver { action: 'markGuideOpened', signerToken }  -- NEW (Surface B trail-day arc, 2026-09-08): fires on every Get Guide tap, first-tap-wins server-side, same as Surface A's own action.
  */
@@ -35,6 +36,7 @@
 
 const waiverService = require('../lib/waiver-service');
 const trailCheckinIncidentService = require('../lib/trail-checkin-incident-service');
+const feedbackService = require('../lib/feedback-service');
 const adventurePrepService = require('../lib/adventure-prep-service');
 
 function parseBody(req) {
@@ -212,6 +214,41 @@ async function reportTrailCheckinIncident(body, res) {
   res.status(200).json(result);
 }
 
+// -- submitFeedback, NEW (Post-Adventure Check-in, 2026-09-08) --------
+// Backs every Surface B Check-in variant -- participant and
+// participant_guardian share the same 2-field set (overall + optional
+// gear), guardian_only gets its own genuinely-different 2-field set
+// (overall + optional "staying in the loop" checkinRating) -- see the
+// Post-Adventure Phase 3 spec, sections 4-5. Which fields actually carry
+// a value is left to waiver-signer-form.js's own per-role Check-in card;
+// this just forwards whatever the client sent into
+// lib/feedback-service.js, the same shared table/insert path
+// api/adventure-prep.js's own submitFeedback uses for the booker.
+async function submitFeedback(body, res) {
+  if (!body.signerToken) {
+    res.status(400).json({ error: 'missing_identifier' });
+    return;
+  }
+  const signer = await waiverService.resolveSignerForCheckin(body.signerToken);
+  if (!signer || signer.notFound) {
+    res.status(404).json({ error: 'invalid_signer_token' });
+    return;
+  }
+  const result = await feedbackService.submitFeedback(signer.bookingId, {
+    participantId: signer.participantId,
+    reportedByRole: signer.reportedByRole,
+    overallRating: body.overallRating,
+    gearRating: body.gearRating,
+    checkinRating: body.checkinRating,
+    note: body.note,
+  });
+  if (!result || result.ok === false) {
+    res.status(400).json({ error: 'invalid_request', message: (result && result.error) || '' });
+    return;
+  }
+  res.status(200).json(result);
+}
+
 // -- confirmHeadingOut / markGuideOpened, NEW (Surface B trail-day arc,
 // 2026-09-08) ----------------------------------------------------------
 // Backs Surface B's own Heading Out button and Get Guide tap -- same
@@ -295,6 +332,10 @@ module.exports = async function handler(req, res) {
     }
     if (body.action === 'markGuideOpened') {
       await markGuideOpened(body, res);
+      return;
+    }
+    if (body.action === 'submitFeedback') {
+      await submitFeedback(body, res);
       return;
     }
     res.status(400).json({ error: 'unknown_action' });

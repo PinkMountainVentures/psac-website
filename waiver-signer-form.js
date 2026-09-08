@@ -86,6 +86,18 @@
     checkinRunningLongerConfirmed: false,
     checkinRunningLongerDisplay: '',
     hasOpenIncident: false,
+    // NEW (Post-Adventure Check-in, 2026-09-08) -- see
+    // claude/psac-post-adventure-phase3-final-spec-2026-09-08.md. Shared
+    // across every signer variant's own Check-in card (fbGear unused by
+    // guardian_only, fbCheckin unused by everyone else -- each render
+    // function only reads the fields its own persona's card collects).
+    fbOverall: null,
+    fbGear: null,
+    fbCheckin: null,
+    fbNote: '',
+    fbSubmitting: false,
+    fbSubmitted: false,
+    fbError: '',
   };
 
   // Surface B trail-day arc (2026-09-08) -- same six triage options as
@@ -252,6 +264,60 @@
     var todayUTC = Date.UTC(Number(tm[1]), Number(tm[2]) - 1, Number(tm[3]));
     var diff = Math.round((tripUTC - todayUTC) / 86400000);
     return diff > 0 ? diff : 0;
+  }
+
+  // Post-Adventure Phase 3 sequencing (2026-09-08 final spec, sections
+  // 3-6) -- same technique as adventure-prep-form.js's own copy of
+  // these three helpers, duplicated deliberately (separate client
+  // bundle, no shared import path -- see this file's own header
+  // comment on why daysUntilTrip/pacificDateString are already
+  // duplicated here).
+  function daysSinceTrip(dateStr) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return 0;
+    var todayStr = pacificDateString(new Date());
+    var tm = todayStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    var tripUTC = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var todayUTC = Date.UTC(Number(tm[1]), Number(tm[2]) - 1, Number(tm[3]));
+    var diff = Math.round((todayUTC - tripUTC) / 86400000);
+    return diff > 0 ? diff : 0;
+  }
+
+  function computeT1SendDate(tripDateStr) {
+    var m = String(tripDateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    var y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    var oneForward = new Date(Date.UTC(y, mo - 1, d) + 1 * 86400000);
+    var cy = oneForward.getUTCFullYear(), cm = oneForward.getUTCMonth(), cd = oneForward.getUTCDate();
+    var guess = new Date(Date.UTC(cy, cm, cd, 9, 0, 0) + 8 * 3600000);
+    var offset = pacificOffsetMinutes(guess);
+    return new Date(Date.UTC(cy, cm, cd, 9, 0, 0) - offset * 60000);
+  }
+
+  function isPastT1SendTime(tripDateStr) {
+    var sendAt = computeT1SendDate(tripDateStr);
+    return !!sendAt && new Date() >= sendAt;
+  }
+
+  // Post-Adventure Phase 3 card sequencing -- same
+  // computePostAdventurePhase as adventure-prep-form.js, see that
+  // file's own header comment for the Closing-vs-Steady-State
+  // resolution (CLOSING_MIN_DAYS/CLOSING_WINDOW_DAYS), flagged to Airey
+  // there. `gearReturnDone` is always passed true from this file's own
+  // callers below -- Surface B carries no gear-return state at all
+  // (Airey's direct, pre-existing call: gear return is booker-only,
+  // this surface has always stayed gear-free), so the Closing gate here
+  // is purely the day-since-trip threshold.
+  var CLOSING_MIN_DAYS = 4;
+  var CLOSING_WINDOW_DAYS = 14;
+
+  function computePostAdventurePhase(tripDateStr, feedbackSubmitted, gearReturnDone) {
+    if (!isPastT1SendTime(tripDateStr)) return 'turn';
+    if (!feedbackSubmitted) return 'checkin';
+    var since = daysSinceTrip(tripDateStr);
+    if (since >= CLOSING_WINDOW_DAYS) return 'steady';
+    if (gearReturnDone && (feedbackSubmitted || since >= CLOSING_MIN_DAYS)) return 'closing';
+    return 'steady';
   }
   function joinWithAnd(items) {
     if (items.length === 0) return '';
@@ -440,6 +506,200 @@
       '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
       '<div class="ap-hero-subline">' + sublineHtml + '</div>' +
       '</div></div>';
+  }
+
+  // ---------------------------------------------------------------------
+  // Post-Adventure Phase 3 -- Check-in / Closing / Steady State
+  // (claude/psac-post-adventure-phase3-final-spec-2026-09-08.md, sections
+  // 4-6). Shared across every Surface B signer variant; which copy/CTA
+  // renders is decided by the caller (hubIsGuardian for the attending-
+  // signer hub, or the dedicated guardian_only variants further below).
+  // ---------------------------------------------------------------------
+
+  function fbRatingRowHtml(field, label, value, optional) {
+    var btns = '';
+    for (var i = 1; i <= 5; i++) {
+      btns += '<button type="button" class="fb-scale-btn' + (value === i ? ' selected' : '') + '" data-fb-field="' + field + '" data-fb-value="' + i + '">' + i + '</button>';
+    }
+    return '<div class="fb-question">' +
+      '<div class="fb-question-label">' + escapeHtml(label) + (optional ? ' <span class="fb-optional">(optional)</span>' : '') + '</div>' +
+      '<div class="fb-scale">' + btns + '</div>' +
+      '</div>';
+  }
+
+  // Participant/participant_guardian Check-in -- the 2-field set
+  // (overall + optional gear), see spec section 4. hubIsGuardian picks
+  // between the plain-participant and attending-guardian headline/sub.
+  function checkinCardHtml(trailName, hubIsGuardian, hubChildLabel) {
+    var headline = hubIsGuardian ? 'How did ' + hubChildLabel + ' do out there?' : 'How was ' + escapeHtml(trailName) + '?';
+    var sub = hubIsGuardian
+      ? 'A word from you helps us get the next trail right for the next family too.'
+      : 'You weren’t the one who booked it, but the day was yours too. A quick word helps us get it right for whoever’s next.';
+    return '<div class="fb-eyebrow">Peaks to Pools</div>' +
+      '<div class="fb-card">' +
+      '<div class="fb-headline">' + headline + '</div>' +
+      '<div class="fb-sub">' + sub + '</div>' +
+      '<div class="fb-rule"></div>' +
+      fbRatingRowHtml('fbOverall', hubIsGuardian ? 'Overall, how’d it go?' : 'Overall, how was your day?', state.fbOverall, false) +
+      fbRatingRowHtml('fbGear', 'How was your gear kit?', state.fbGear, true) +
+      '<div class="fb-note-wrap"><label class="fb-note-label" for="fb-note">Anything else you want to tell us?</label>' +
+      '<textarea id="fb-note" class="fb-note-field" placeholder="Optional">' + escapeHtml(state.fbNote || '') + '</textarea></div>' +
+      (state.fbError ? '<div class="ap-error">' + escapeHtml(state.fbError) + '</div>' : '') +
+      '<button type="button" class="ap-cta-primary" id="fb-submit-btn"' + (state.fbSubmitting ? ' disabled' : '') + '>' + (state.fbSubmitting ? 'Sending…' : 'Submit') + '</button>' +
+      '</div>';
+  }
+
+  // Non-attending guardian's OWN Check-in -- genuinely new copy (spec
+  // section 5), never a lighter copy of the attending set: no gear kit
+  // to rate, wasn't on the trail, so the two questions this persona
+  // actually has a real view of are what the day felt like from home.
+  function guardianOnlyCheckinCardHtml() {
+    return '<div class="fb-eyebrow">Peaks to Pools</div>' +
+      '<div class="fb-card">' +
+      '<div class="fb-headline">How did today feel from your end?</div>' +
+      '<div class="fb-sub">You weren’t out there, but the day was yours too, in its own way. A quick word helps us make sure a guardian at home always has what they need.</div>' +
+      '<div class="fb-rule"></div>' +
+      fbRatingRowHtml('fbOverall', 'Overall, how did today go for you?', state.fbOverall, false) +
+      fbRatingRowHtml('fbCheckin', 'How was staying in the loop while they were out there?', state.fbCheckin, true) +
+      '<div class="fb-note-wrap"><label class="fb-note-label" for="fb-note">Anything else you want to tell us?</label>' +
+      '<textarea id="fb-note" class="fb-note-field" placeholder="Optional">' + escapeHtml(state.fbNote || '') + '</textarea></div>' +
+      (state.fbError ? '<div class="ap-error">' + escapeHtml(state.fbError) + '</div>' : '') +
+      '<button type="button" class="ap-cta-primary" id="fb-submit-btn"' + (state.fbSubmitting ? ' disabled' : '') + '>' + (state.fbSubmitting ? 'Sending…' : 'Submit') + '</button>' +
+      '</div>';
+  }
+
+  // Closing card -- share request (everyone) + second half that
+  // differs: membership invite for a plain participant, email-list
+  // invite for every guardian variant (attending or not), per spec
+  // section 4/5.
+  function closingCardHtml(hubIsGuardian) {
+    // MEMBERSHIP INVITE HIDDEN (2026-09-08, Airey's direct call): no
+    // land-use access for guided hikes yet and zero current members, so
+    // membership signup has ~no value right now -- same reasoning as
+    // index.html's own "THE CLUB" section, hidden the same day. The
+    // guardian variant's newsletter invite is unaffected (a plain email
+    // list, not membership) and stays live. Re-enable the participant
+    // branch's membership invite (and its own rule/second-half markup,
+    // matching the guardian branch's shape below) once guided-hike land
+    // use clears, expected early 2027.
+    var secondHalfHtml = hubIsGuardian
+      ? '<div class="fb-rule"></div><div class="fb-headline" style="font-size:1.05rem;">A trail idea or two, sent every once in a while?</div><button type="button" class="ap-cta-secondary" id="cl-newsletter-btn">Get The Newsletter</button>'
+      : '';
+    return '<div class="fb-eyebrow">Peaks to Pools</div>' +
+      '<div class="fb-card cl-card">' +
+      '<div class="fb-headline">You earned the pool.</div>' +
+      '<div class="fb-sub">If today’s worth telling someone about, that means more coming from you than anything we’d write ourselves.</div>' +
+      '<button type="button" class="ap-cta-primary" id="cl-share-btn">Share The Club</button>' +
+      secondHalfHtml +
+      '</div>';
+  }
+
+  // Non-attending guardian's own Closing card -- same email-list invite
+  // as the attending guardian's, no membership invite (spec section 5:
+  // "already generic across every guardian variant... no change needed").
+  function guardianOnlyClosingCardHtml() {
+    return closingCardHtml(true);
+  }
+
+  // Steady State -- permanent resting state, dusk hero-photo treatment.
+  function steadyStateCardHtml(trailName, hubIsGuardian, hubChildLabel, photoUrl) {
+    var headline = hubIsGuardian ? hubChildLabel + '’s next peak is already waiting.' : 'Peak done. Pool earned. Your next peak’s already waiting.';
+    var sub = hubIsGuardian ? 'If your own family’s ever up for a day like that, we’re here.' : escapeHtml(trailName) + ' was the first one, not the only one.';
+    return heroCardHtml('Peaks to Pools', headline, sub, photoUrl, null, true) +
+      '<a href="/" class="ap-cta-primary" style="text-decoration:none; display:block; max-width:960px;">Start My Adventure</a>';
+  }
+
+  // Shared DOM wiring for whichever Post-Adventure card actually
+  // rendered (Check-in's rating taps/submit, or Closing's share/
+  // newsletter buttons) -- called from both renderHub() and
+  // renderGuardianOnlyHub() rather than duplicated per-hub, since the
+  // markup/data-attributes are identical either way (only which fb-*
+  // fields a given persona's Check-in card actually shows differs, and
+  // that's already decided by checkinCardHtml/guardianOnlyCheckinCardHtml
+  // above, not by this wiring).
+  function wireFeedbackCard(wrap) {
+    wrap.querySelectorAll('.fb-scale-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var field = btn.getAttribute('data-fb-field');
+        var val = Number(btn.getAttribute('data-fb-value'));
+        state[field] = state[field] === val ? null : val;
+        render();
+      });
+    });
+    var fbNoteField = wrap.querySelector('#fb-note');
+    if (fbNoteField) {
+      fbNoteField.addEventListener('input', function () { state.fbNote = fbNoteField.value; });
+    }
+    var fbSubmitBtn = wrap.querySelector('#fb-submit-btn');
+    if (fbSubmitBtn) {
+      fbSubmitBtn.addEventListener('click', function () {
+        if (!state.fbOverall) {
+          state.fbError = 'An overall rating is required.';
+          render();
+          return;
+        }
+        state.fbSubmitting = true;
+        state.fbError = '';
+        render();
+        apiPost('/api/waiver', {
+          action: 'submitFeedback',
+          signerToken: SIGNER_TOKEN,
+          overallRating: state.fbOverall,
+          gearRating: state.fbGear,
+          checkinRating: state.fbCheckin,
+          note: state.fbNote,
+        }).then(function (res) {
+          state.fbSubmitting = false;
+          if (res.ok && res.body && res.body.ok) {
+            state.fbSubmitted = true;
+            state.ctx.feedbackSubmitted = true;
+          } else {
+            state.fbError = 'Something went wrong sending that. Please try again.';
+          }
+          render();
+        });
+      });
+    }
+    var clShareBtn = wrap.querySelector('#cl-share-btn');
+    if (clShareBtn) {
+      clShareBtn.addEventListener('click', function () {
+        var shareData = {
+          title: 'Palm Springs Adventure Club',
+          text: 'I just got back from an adventure with Palm Springs Adventure Club, thought you’d like it too.',
+          url: 'https://www.palmspringsadventureclub.com',
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(function () { /* cancelled, nothing to do */ });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareData.url).then(function () {
+            var original = clShareBtn.textContent;
+            clShareBtn.textContent = 'Link Copied';
+            setTimeout(function () { clShareBtn.textContent = original; }, 1500);
+          }).catch(function () { /* clipboard denied, leave button as-is */ });
+        }
+      });
+    }
+    var clNewsletterBtn = wrap.querySelector('#cl-newsletter-btn');
+    if (clNewsletterBtn) {
+      clNewsletterBtn.addEventListener('click', function () {
+        var email = (state.ctx.signer && state.ctx.signer.signerEmail) || '';
+        if (!email) return;
+        clNewsletterBtn.disabled = true;
+        clNewsletterBtn.textContent = 'Signing Up…';
+        // role:guardian (23211386) + interest:family-adventure (23211391)
+        // -- Kit tagging, Post-Adventure Check-in build, 2026-09-08. This
+        // button only ever renders for a guardian variant (closingCardHtml
+        // only wires it when hubIsGuardian, see that function above), so
+        // no role branching is needed here the way Confirm Details' own
+        // opt-in below needs it.
+        apiPost('/api/kit-subscribe', { email: email, extraTagIds: [23211386, 23211391] }).then(function () {
+          clNewsletterBtn.textContent = 'You’re Signed Up';
+        }).catch(function () {
+          clNewsletterBtn.disabled = false;
+          clNewsletterBtn.textContent = 'Get The Newsletter';
+        });
+      });
+    }
   }
 
   // `lean` (new, hub-trail-card-placement-options.html) renders without
@@ -1576,6 +1836,7 @@
     // -----------------------------------------------------------------
     var topGreetingHtml = hubGreeting;
     var topSublineHtml = hubSubline;
+    var postAdventureCardHtml = null;
     var doneCount = [status.detailsDone, status.waiverDone].filter(Boolean).length;
     // Surface B trail-day arc (2026-09-08): hoisted out of the branches
     // below, same "pure function of today's date" pattern Surface A's
@@ -1620,12 +1881,27 @@
         topGreetingHtml = 'Your gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', to the address ' + escapeHtml(ownerName) + ' provided.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
       } else if (showPostAdventure) {
-        // Post-Adventure, gear-free (Surface B trail-day arc, 2026-09-08):
-        // no gear-return card on this surface, Airey's direct call --
-        // only the booker coordinates gear return. Same "always frame
-        // forward" principle as Surface A's own version.
-        topGreetingHtml = 'You did it. ' + escapeHtml(status.trailName) + '’s behind you.';
-        topSublineHtml = 'Nice work out there. Here’s your trip, all in one place.';
+        // Post-Adventure Phase 3 (final spec, 2026-09-08:
+        // claude/psac-post-adventure-phase3-final-spec-2026-09-08.md,
+        // sections 3-6) -- The Turn -> Check-in -> Closing -> Steady
+        // State, replacing the old static two-line headline. Gear-free
+        // throughout, same as before -- see computePostAdventurePhase's
+        // own header comment for why gearReturnDone is always true here.
+        var postAdventurePhase = computePostAdventurePhase(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
+        if (postAdventurePhase === 'turn') {
+          var turnHeadline = hubIsGuardian ? hubChildLabel + ' did the peak. Now, the pool.' : 'The pool hits differently after adventure.';
+          var turnSubline = hubIsGuardian ? 'A real one out there today, the easy part’s still ahead.' : (escapeHtml(ownerName) + ' brought you along for the peak. The pool’s next, for both of you.');
+          topGreetingHtml = turnHeadline;
+          topSublineHtml = turnSubline;
+          postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, status.trailDetail && status.trailDetail.photoUrl, null) +
+            (hubIsGuardian ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how your day went, takes less than a minute, right here.</div>');
+        } else if (postAdventurePhase === 'checkin') {
+          postAdventureCardHtml = checkinCardHtml(status.trailName, hubIsGuardian, hubChildLabel);
+        } else if (postAdventurePhase === 'closing') {
+          postAdventureCardHtml = closingCardHtml(hubIsGuardian);
+        } else {
+          postAdventureCardHtml = steadyStateCardHtml(status.trailName, hubIsGuardian, hubChildLabel, status.trailDetail && status.trailDetail.photoUrl);
+        }
       } else if (pastT3) {
         topGreetingHtml = 'Your guide’s ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(status.trailName) + ' is yours now.';
         topSublineHtml = statLine;
@@ -1645,11 +1921,13 @@
     // else doneCount === 0: topGreetingHtml/topSublineHtml stay the
     // Borrowed Trust opener already built above.
 
-    var topCardHtml = status.allSet
-      ? heroCardHtml('You’re In', topGreetingHtml, topSublineHtml, status.trailDetail && status.trailDetail.photoUrl, daysToGo)
-      : '<div class="ap-eyebrow">You’re In</div>' +
-        '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
-        '<div class="ap-subline">' + topSublineHtml + '</div>';
+    var topCardHtml = postAdventureCardHtml !== null
+      ? postAdventureCardHtml
+      : (status.allSet
+        ? heroCardHtml('You’re In', topGreetingHtml, topSublineHtml, status.trailDetail && status.trailDetail.photoUrl, daysToGo)
+        : '<div class="ap-eyebrow">You’re In</div>' +
+          '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+          '<div class="ap-subline">' + topSublineHtml + '</div>');
 
     // T-3+ weather glance (T-3 hub refresh, 2026-09-04): renders nothing
     // until real forecast data exists -- see weatherCardHtml() above.
@@ -1777,6 +2055,8 @@
     var checkinNoticeLink = wrap.querySelector('#sb-checkin-notice-link');
     if (checkinNoticeLink) checkinNoticeLink.addEventListener('click', openCheckinTriage);
 
+    wireFeedbackCard(wrap);
+
     return wrap;
   }
 
@@ -1893,6 +2173,7 @@
     var topSublineHtml = '';
     var pastT3 = isPastT3Cutoff(state.ctx.tripDate);
     var guideCardHtml = '';
+    var postAdventureCardHtml = null;
 
     // T-3 hub refresh, 2026-09-04 (Airey's direct follow-up: "the
     // guardian hub needs this more than anyone -- they aren't going, but
@@ -1939,13 +2220,25 @@
         topGreetingHtml = childLabel + '’s gear arrives tonight' + (deliveryWin ? ', ' + escapeHtml(deliveryWin) : '') + ', packed and ready for tomorrow.';
         topSublineHtml = 'Inside: a Gregory daypack, Leki trekking poles, two Hydro Flask 32oz bottles, and a first aid kit. Yours to keep after: LMNT electrolytes, Rancho Meladuco Medjool dates, and Blue Lizard mineral sunscreen.';
       } else if (showPostAdventure) {
-        // Post-Adventure, reframed and gear-free (Surface B trail-day
-        // arc, 2026-09-08): same "always frame forward" principle,
-        // third-person-about-the-child throughout, per the resolved
-        // framing principle -- same real information, only the
-        // grammatical subject changes.
-        topGreetingHtml = childLabel + ' made it back from ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + '.';
-        topSublineHtml = 'Nice adventure for ' + childLabel + '. Here’s a recap of the day.';
+        // Post-Adventure Phase 3 (final spec, 2026-09-08, section 5 --
+        // the non-attending guardian's own Phase 3, drafted for the
+        // first time in that spec). The Turn reuses the attending
+        // guardian's own copy as-is (nothing in it claims the guardian
+        // was on the trail); Check-in is genuinely new (see
+        // guardianOnlyCheckinCardHtml's own header comment); Closing/
+        // Steady State reuse the generic guardian variant unchanged.
+        var postAdventurePhase = computePostAdventurePhase(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
+        if (postAdventurePhase === 'turn') {
+          topGreetingHtml = childLabel + ' did the peak. Now, the pool.';
+          topSublineHtml = 'A real one out there today, the easy part’s still ahead.';
+          postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, null);
+        } else if (postAdventurePhase === 'checkin') {
+          postAdventureCardHtml = guardianOnlyCheckinCardHtml();
+        } else if (postAdventurePhase === 'closing') {
+          postAdventureCardHtml = guardianOnlyClosingCardHtml();
+        } else {
+          postAdventureCardHtml = steadyStateCardHtml(null, true, childLabel, trailDetail && trailDetail.photoUrl);
+        }
       } else if (pastT3) {
         topGreetingHtml = childLabel + '’s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
         topSublineHtml = '';
@@ -1970,11 +2263,13 @@
       }
     }
 
-    var topCardHtml = allCertified
-      ? heroCardHtml('You’re In', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, daysToGo)
-      : '<div class="ap-eyebrow">You’re In</div>' +
-        '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
-        '<div class="ap-subline">' + topSublineHtml + '</div>';
+    var topCardHtml = postAdventureCardHtml !== null
+      ? postAdventureCardHtml
+      : (allCertified
+        ? heroCardHtml('You’re In', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, daysToGo)
+        : '<div class="ap-eyebrow">You’re In</div>' +
+          '<div class="ap-greeting">' + topGreetingHtml + '</div>' +
+          '<div class="ap-subline">' + topSublineHtml + '</div>');
 
     // Underway, reframed (Surface B trail-day arc, 2026-09-08): own hero
     // card entirely, same "On The Trail" eyebrow + dimmed treatment the
@@ -2038,6 +2333,8 @@
     if (worriedLink) worriedLink.addEventListener('click', openGuardianCheckinTriage);
     var checkinNoticeLink = wrap.querySelector('#sb-checkin-notice-link');
     if (checkinNoticeLink) checkinNoticeLink.addEventListener('click', openGuardianCheckinTriage);
+
+    wireFeedbackCard(wrap);
 
     return wrap;
   }
@@ -2192,7 +2489,16 @@
         // sees this box unchecked again even if already subscribed --
         // re-subscribing is harmless (Kit dedupes by email).
         if (kitOptIn) {
-          apiPost('/api/kit-subscribe', { email: email }).catch(function () {});
+          // Kit role-tagging (Post-Adventure Check-in build, 2026-09-08):
+          // role:participant (23211384) for a plain attending signer,
+          // role:guardian (23211386) for either guardian variant --
+          // isGuardianOnly/signer.isGuardian is the same pair
+          // lib/waiver-service.js's own resolveSignerForCheckin() reads
+          // server-side to derive reportedByRole, mirrored here since
+          // this call happens before this signer's own submitFeedback,
+          // so there's no server round trip to piggyback the role off of.
+          var kitRoleTag = (state.ctx.isGuardianOnly || (state.ctx.signer && state.ctx.signer.isGuardian)) ? 23211386 : 23211384;
+          apiPost('/api/kit-subscribe', { email: email, extraTagIds: [kitRoleTag] }).catch(function () {});
         }
         goHub();
       });

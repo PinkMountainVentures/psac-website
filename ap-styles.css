@@ -862,3 +862,29 @@ a.ap-cta-primary { text-decoration: none; }
   .ap-card { padding: 1.5rem 1.5rem; }
   .cancel-card { padding: 2.6rem 1.8rem; }
 }
+
+/* ========================================================================
+   Post-Adventure Check-in / Closing (Phase 3 final spec, 2026-09-08)
+   Shared by adventure-prep-form.js (booker, 5-field set) and
+   waiver-signer-form.js (participant/participant_guardian 2-field set,
+   guardian_only's own "staying in the loop" 2-field set). Reuses the
+   .gd-* visual vocabulary's spacing/rule conventions rather than
+   inventing a parallel one -- see .gd-card/.gd-eyebrow/.gd-rule above.
+   ======================================================================== */
+.ap-turn-note { font-size: 0.76rem; color: var(--ap-muted); text-align: center; max-width: 960px; margin: -0.6rem auto 1.1rem; }
+.fb-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mountain-pink); margin-bottom: 0.5rem; max-width: 960px; }
+.fb-card { display: flex; flex-direction: column; background: linear-gradient(120deg, rgba(42,71,71,0.05), rgba(42,71,71,0.015)); border: 1px solid rgba(42,71,71,0.14); border-radius: 12px; padding: 1.2rem 1.2rem 1.3rem; margin-bottom: 1.1rem; max-width: 960px; }
+.fb-headline { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--dark-pine); line-height: 1.25; margin-bottom: 0.35rem; }
+.fb-sub { font-size: 0.82rem; color: var(--ap-muted); line-height: 1.5; margin-bottom: 0.9rem; }
+.fb-rule { height: 1px; background: rgba(42,71,71,0.1); margin: 0.9rem 0; }
+.fb-question { margin-bottom: 1rem; }
+.fb-question-label { font-size: 0.82rem; color: var(--dark-pine); margin-bottom: 0.5rem; }
+.fb-optional { color: var(--ap-muted); font-weight: 400; }
+.fb-scale { display: flex; gap: 0.5rem; }
+.fb-scale-btn { width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 1px solid rgba(42,71,71,0.2); background: #fff; color: var(--dark-pine); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.fb-scale-btn:hover { border-color: var(--desert-green); }
+.fb-scale-btn.selected { background: var(--desert-green); border-color: var(--desert-green); color: #fff; }
+.fb-note-wrap { margin-bottom: 1rem; }
+.fb-note-label { display: block; font-size: 0.82rem; color: var(--dark-pine); margin-bottom: 0.5rem; }
+.fb-note-field { width: 100%; min-height: 5rem; border: 1px solid rgba(42,71,71,0.2); border-radius: 8px; padding: 0.7rem; font-family: inherit; font-size: 0.82rem; color: var(--dark-pine); resize: vertical; box-sizing: border-box; }
+.cl-card .ap-cta-primary { margin-bottom: 0; }

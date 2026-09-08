@@ -335,6 +335,9 @@ CREATE TABLE IF NOT EXISTS experience_bookings (
   -- db/2026-09-05_add_gear_delivery_email_dedup.sql's own comment.
   gear_out_for_delivery_sent_at TIMESTAMPTZ,
   gear_delivered_email_sent_at  TIMESTAMPTZ,
+  -- NEW (Post-Adventure Check-in, 2026-09-08): T+1 "How was it?" email
+  -- dedup -- see db/2026-09-08_add_trip_plus_one_email_dedup.sql.
+  trip_plus_one_booker_email_sent_at TIMESTAMPTZ,
   return_status              TEXT,
   pickup_service_type        TEXT,
   pickup_scheduled_at        TIMESTAMPTZ,
@@ -528,7 +531,11 @@ CREATE TABLE IF NOT EXISTS waiver_signatures (
   opened_at                     TIMESTAMPTZ,
   signed_at                     TIMESTAMPTZ,
   created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  details_confirmed_at          TIMESTAMPTZ
+  details_confirmed_at          TIMESTAMPTZ,
+  -- NEW (Post-Adventure Check-in, 2026-09-08): per-signer T+1 "How was
+  -- it?" email dedup -- see
+  -- db/2026-09-08_add_trip_plus_one_email_dedup.sql.
+  trip_plus_one_email_sent_at   TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_waiver_signatures_booking ON waiver_signatures(booking_id);
@@ -784,6 +791,31 @@ CREATE TABLE IF NOT EXISTS job_locks (
   locked_at  TIMESTAMPTZ,
   locked_by  TEXT
 );
+
+-- ---------- Feedback (Post-Adventure Check-in, 2026-09-08) ----------
+
+-- See claude/psac-post-adventure-phase3-final-spec-2026-09-08.md, section
+-- 6. One row per signer per booking (the booker, plus each participant/
+-- guardian who submits their own Check-in card). Storage only -- no
+-- dashboard, no routing-quality analysis layer, per the Operations UX
+-- PRD's own locked decision. Written via lib/feedback-service.js,
+-- dispatched from both api/adventure-prep.js and api/waiver.js.
+
+CREATE TABLE IF NOT EXISTS feedback (
+  feedback_id       TEXT PRIMARY KEY,   -- FB-XXXXXXXX
+  booking_id        TEXT NOT NULL REFERENCES experience_bookings(booking_id),
+  participant_id    TEXT REFERENCES booking_participants(participant_id), -- null for the booker (no booking_participants row of their own)
+  reported_by_role  TEXT NOT NULL,      -- 'booker' | 'participant' | 'participant_guardian' | 'guardian_only'
+  overall_rating    INTEGER NOT NULL,   -- 1-5, every persona has this
+  trail_rating      INTEGER,            -- booker only ("How was the trail we picked for your group?")
+  gear_rating       INTEGER,            -- booker + attending participant/guardian only, optional ("How was your gear kit?")
+  booking_rating    INTEGER,            -- booker only ("How was getting booked and ready with us?")
+  checkin_rating    INTEGER,            -- guardian_only only ("How was staying in the loop while [child] was out there?"), optional
+  note              TEXT,               -- optional free text, every persona
+  submitted_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_booking ON feedback(booking_id);
 
 -- ============================================================
 -- End of schema.sql
