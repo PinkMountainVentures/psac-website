@@ -580,8 +580,50 @@
   // real trail photo is showing. Wired once in wireFeedbackCard below
   // (shared by both hubs, same as #cl-share-btn), so no per-hub copy of
   // the click handler is needed.
-  function turnShareButtonHtml() {
-    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn">Share This View</button>';
+  function turnShareButtonHtml(photoUrl) {
+    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn" data-photo-url="' + escapeHtml(photoUrl || '') + '">Share This View</button>';
+  }
+
+  // Attaches the actual photo to the share, not just a link -- a bare
+  // link/text share only ever offers AirDrop/Mail/Messages-type targets
+  // in the OS share sheet (confirmed against Airey's own screenshot,
+  // 2026-09-09): Instagram/Snapchat/TikTok/etc. only show up as share
+  // targets on a phone when the shared payload includes an actual image
+  // file. There's no standalone "share to Instagram" web API to call
+  // instead -- this (Web Share API level 2's file support, feature-
+  // detected via navigator.canShare) is the real, standard way to get
+  // those apps to appear. Falls back to the original link+text share,
+  // then to copy-link, for any browser/step that doesn't support it --
+  // every fallback preserves the exact pre-2026-09-09 behavior, so
+  // nothing regresses for those cases. Called from wireFeedbackCard
+  // below (shared by both signer hubs), reading the photo URL back off
+  // the button's own data attribute since that wiring isn't in the same
+  // closure scope as either hub's own turnPhotoUrl variable.
+  function shareViewWithPhoto(photoUrl, shareData, btn) {
+    function linkFallback() {
+      if (navigator.share) {
+        navigator.share({ title: shareData.title, text: shareData.text, url: shareData.url }).catch(function () { /* cancelled, nothing to do */ });
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareData.url).then(function () {
+          var original = btn.textContent;
+          btn.textContent = 'Link Copied';
+          setTimeout(function () { btn.textContent = original; }, 1500);
+        }).catch(function () { /* clipboard denied, leave button as-is */ });
+      }
+    }
+    if (!photoUrl || !navigator.share) { linkFallback(); return; }
+    fetch(photoUrl)
+      .then(function (res) { return res.blob(); })
+      .then(function (blob) {
+        var ext = (blob.type.split('/')[1] || 'jpg').split('+')[0];
+        var file = new File([blob], 'palm-springs-adventure-club.' + ext, { type: blob.type || 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: shareData.title, text: shareData.text }).catch(function () { /* cancelled, nothing to do */ });
+        } else {
+          linkFallback();
+        }
+      })
+      .catch(linkFallback);
   }
 
   // Closing card -- share request (everyone) + second half that
@@ -703,20 +745,11 @@
     var thShareBtn = wrap.querySelector('#th-share-btn');
     if (thShareBtn) {
       thShareBtn.addEventListener('click', function () {
-        var shareData = {
+        shareViewWithPhoto(thShareBtn.getAttribute('data-photo-url'), {
           title: 'Palm Springs Adventure Club',
           text: 'Just got back from a hike with Palm Springs Adventure Club. This is the light you climb for.',
           url: 'https://www.palmspringsadventureclub.com',
-        };
-        if (navigator.share) {
-          navigator.share(shareData).catch(function () { /* cancelled, nothing to do */ });
-        } else if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(shareData.url).then(function () {
-            var original = thShareBtn.textContent;
-            thShareBtn.textContent = 'Link Copied';
-            setTimeout(function () { thShareBtn.textContent = original; }, 1500);
-          }).catch(function () { /* clipboard denied, leave button as-is */ });
-        }
+        }, thShareBtn);
       });
     }
     var clNewsletterBtn = wrap.querySelector('#cl-newsletter-btn');
@@ -1940,7 +1973,7 @@
         // hero moment, same fallback as Surface A's own renderHub().
         var turnPhotoUrl = status.trailDetail && (status.trailDetail.photoHeroUrl || status.trailDetail.photoUrl);
         postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, turnPhotoUrl, null) +
-          (turnPhotoUrl ? turnShareButtonHtml() : '') +
+          (turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '') +
           (hubIsGuardian || pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how your day went, takes less than a minute, right here.</div>');
         postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName, hubIsGuardian, hubChildLabel) : '';
         postAdventureClosingHtml = pa.showClosing ? closingCardHtml(hubIsGuardian) : '';
@@ -2284,7 +2317,7 @@
         topSublineHtml = 'A real one out there today, the easy part’s still ahead.';
         var turnPhotoUrl = trailDetail && (trailDetail.photoHeroUrl || trailDetail.photoUrl);
         postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null) +
-          (turnPhotoUrl ? turnShareButtonHtml() : '');
+          (turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '');
         postAdventureCheckinHtml = pa.showCheckin ? guardianOnlyCheckinCardHtml() : '';
         postAdventureClosingHtml = pa.showClosing ? guardianOnlyClosingCardHtml() : '';
         postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(null, true, childLabel, turnPhotoUrl) : '';

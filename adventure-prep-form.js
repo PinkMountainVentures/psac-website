@@ -2235,7 +2235,7 @@
         // fallback steadyStateCardHtml's own call below uses.
         var turnPhotoUrl = selectedTrailCandidate && (selectedTrailCandidate.photoHeroUrl || selectedTrailCandidate.photoUrl);
         postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null) +
-          (turnPhotoUrl ? turnShareButtonHtml() : '') +
+          (turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '') +
           (pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how the peak went, takes less than a minute, right here.</div>');
         postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName) : '';
         postAdventureClosingHtml = pa.showClosing ? closingCardHtml() : '';
@@ -2625,20 +2625,11 @@
     var thShareBtn = wrap.querySelector('#th-share-btn');
     if (thShareBtn) {
       thShareBtn.addEventListener('click', function () {
-        var shareData = {
+        shareViewWithPhoto(thShareBtn.getAttribute('data-photo-url'), {
           title: 'Palm Springs Adventure Club',
           text: 'Just got back from ' + status.trailName + ' with Palm Springs Adventure Club. This is the light you climb for.',
           url: 'https://www.palmspringsadventureclub.com',
-        };
-        if (navigator.share) {
-          navigator.share(shareData).catch(function () { /* cancelled, nothing to do */ });
-        } else if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(shareData.url).then(function () {
-            var original = thShareBtn.textContent;
-            thShareBtn.textContent = 'Link Copied';
-            setTimeout(function () { thShareBtn.textContent = original; }, 1500);
-          }).catch(function () { /* clipboard denied, leave button as-is */ });
-        }
+        }, thShareBtn);
       });
     }
 
@@ -3751,8 +3742,49 @@
   // renderHub -- kept as its own small handler rather than a shared
   // helper, matching this file's existing convention of one inline
   // handler per share button.
-  function turnShareButtonHtml() {
-    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn">Share This View</button>';
+  function turnShareButtonHtml(photoUrl) {
+    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn" data-photo-url="' + escapeHtml(photoUrl || '') + '">Share This View</button>';
+  }
+
+  // Attaches the actual photo to the share, not just a link -- a bare
+  // link/text share only ever offers AirDrop/Mail/Messages-type targets
+  // in the OS share sheet (confirmed against Airey's own screenshot,
+  // 2026-09-09): Instagram/Snapchat/TikTok/etc. only show up as share
+  // targets on a phone when the shared payload includes an actual image
+  // file. There's no standalone "share to Instagram" web API to call
+  // instead -- this (Web Share API level 2's file support, feature-
+  // detected via navigator.canShare) is the real, standard way to get
+  // those apps to appear. Falls back to the original link+text share,
+  // then to copy-link, for any browser/step that doesn't support it
+  // (desktop Firefox has no navigator.share at all; some navigator.share
+  // implementations exist without file support; the blob fetch can fail
+  // for reasons outside our control) -- every fallback preserves the
+  // exact pre-2026-09-09 behavior, so nothing regresses for those cases.
+  function shareViewWithPhoto(photoUrl, shareData, btn) {
+    function linkFallback() {
+      if (navigator.share) {
+        navigator.share({ title: shareData.title, text: shareData.text, url: shareData.url }).catch(function () { /* cancelled, nothing to do */ });
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareData.url).then(function () {
+          var original = btn.textContent;
+          btn.textContent = 'Link Copied';
+          setTimeout(function () { btn.textContent = original; }, 1500);
+        }).catch(function () { /* clipboard denied, leave button as-is */ });
+      }
+    }
+    if (!photoUrl || !navigator.share) { linkFallback(); return; }
+    fetch(photoUrl)
+      .then(function (res) { return res.blob(); })
+      .then(function (blob) {
+        var ext = (blob.type.split('/')[1] || 'jpg').split('+')[0];
+        var file = new File([blob], 'palm-springs-adventure-club.' + ext, { type: blob.type || 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: shareData.title, text: shareData.text }).catch(function () { /* cancelled, nothing to do */ });
+        } else {
+          linkFallback();
+        }
+      })
+      .catch(linkFallback);
   }
 
   // Closing card -- one card, not a sequence: a share request (same for
