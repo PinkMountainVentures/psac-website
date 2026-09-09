@@ -65,6 +65,10 @@ const checkGearAvailabilityHandler = require('./check-gear-availability');
 // Trails & Parks dashboard (Ops App Redesign, 2026-09-03) — same in-process
 // reuse pattern, own real TRAILS_PARKS_SHARED_SECRET, injected below.
 const manageTrailsParksHandler = require('./manage-trails-parks');
+
+// NEW (2026-09-09, blackout-dates build): same reuse pattern, own real
+// BLACKOUT_DATES_SHARED_SECRET, injected below.
+const manageBlackoutDatesHandler = require('./manage-blackout-dates');
 // People view (Ops App Redesign, 2026-09-04) -- pure reads, no shared
 // secret needed (same posture as getBookingDetail/listAllBookings below).
 const peopleService = require('../lib/people-service');
@@ -123,6 +127,12 @@ const TRAILS_PARKS_ACTIONS = [
   'trailsList', 'trailsGet', 'trailsSuggestNextId', 'trailsCreate', 'trailsUpdate', 'trailsDelete', 'trailsUploadPhoto',
   'parksList', 'parksGet', 'parksListNames', 'parksNameMismatches', 'parksCreate', 'parksUpdate', 'parksDelete',
 ];
+
+// NEW (2026-09-09, blackout-dates build): api/manage-blackout-dates.js is
+// the same kind of small, self-validating dispatcher -- forwards straight
+// through with no inner-action remapping, same as TRAILS_PARKS_ACTIONS
+// just above.
+const BLACKOUT_DATES_ACTIONS = ['blackoutList', 'blackoutCreate', 'blackoutDelete'];
 
 const GEAR_OPS_PROXY_ACTIONS = {
   // api/manage-gear-units.js
@@ -326,6 +336,21 @@ module.exports = async function handler(req, res) {
         method: 'POST',
         body: Object.assign({}, body, {
           secret: process.env.TRAILS_PARKS_SHARED_SECRET,
+          staffEmail: session.email,
+        }),
+      }, innerRes);
+      res.status(result.statusCode).json(result.body);
+      return;
+    }
+
+    // Availability / blackout-dates page (2026-09-09): same forward-
+    // straight-through posture as Trails & Parks just above.
+    if (BLACKOUT_DATES_ACTIONS.indexOf(action) !== -1) {
+      const { res: innerRes, result } = captureResponse();
+      await manageBlackoutDatesHandler({
+        method: 'POST',
+        body: Object.assign({}, body, {
+          secret: process.env.BLACKOUT_DATES_SHARED_SECRET,
           staffEmail: session.email,
         }),
       }, innerRes);

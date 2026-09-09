@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Availability | PSAC Ops</title>
+<!--
+  ops-availability.html
+
+  NEW (2026-09-09). Airey's request: a way to block the booking flow's
+  date picker on dates he's out of town and can't fulfill gear rental
+  operations (delivery, checkout packing, or return check-in/pickup around
+  a trail day -- not just the trail day itself). Three locked design
+  decisions (from the design discussion this build closes out):
+    1. Blocked dates are exact dates Airey types himself here -- no
+       auto-expansion with a delivery/return buffer.
+    2. Managed via this small dedicated ops page, not direct DB edits.
+    3. Adding a blackout window scans existing bookings and raises an Ops
+       Alert for any already-booked date caught inside it.
+
+  Structurally the same flat add/list/delete pattern as ops-gear-
+  units.html (no in-place editing) -- Wired to /api/ops-proxy ->
+  api/manage-blackout-dates.js. See lib/blackout-dates-service.js and
+  db/2026-09-09_add_booking_blackout_dates.sql for the full backend.
+-->
+<link rel="stylesheet" href="ops-shell.css">
+<style>
+  .ops-select, .ops-input { width:100%; padding:0.65rem 0.8rem; border:1px solid var(--ops-border); border-radius:5px; font-size:0.85rem; color:var(--ops-text); background:white; margin-bottom:0.9rem; }
+  .ops-form-row label { display:block; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--ops-text-mid); margin-bottom:0.35rem; }
+  .ops-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .ops-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.4rem 1.6rem; margin-top:0.4rem; margin-bottom:1.4rem; }
+  .ops-panel-title { font-size:0.95rem; font-weight:700; margin-bottom:0.9rem; color:var(--dark-pine); }
+  .ops-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.5rem; }
+  .ops-btn-small { background:white; border:1px solid var(--ops-border); color:var(--ops-text); border-radius:4px; padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; }
+  .ops-btn-small:hover { border-color:var(--mountain-pink); }
+
+  .add-blackout-toggle-row { margin-bottom:1rem; }
+  .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
+  .ops-table td { padding:0.55rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
+
+  .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
+  .ops-warning-banner { background:rgba(154,91,30,0.12); color:#9A5B1E; border:1px solid rgba(154,91,30,0.35); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; line-height:1.5; }
+  .ops-warning-banner ul { margin:0.4rem 0 0; padding-left:1.2rem; }
+
+  @media (max-width: 760px) {
+    .ops-form-grid { grid-template-columns:1fr; }
+    .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-gate">Checking sign-in…</div>
+
+<div id="app-shell" class="hidden">
+  <div class="ops-app">
+    <div class="ops-sidebar" id="ops-sidebar"></div>
+    <div class="ops-main">
+      <div class="ops-topbar">
+        <div>
+          <div class="ops-title" id="ops-title"></div>
+          <div class="ops-subtitle" id="ops-subtitle"></div>
+        </div>
+        <div class="ops-user"><span id="user-email"></span><button class="ops-signout" id="signout-btn">Sign out</button></div>
+      </div>
+      <div id="ops-search-container"></div>
+
+      <div id="banner-container"></div>
+
+      <div class="add-blackout-toggle-row">
+        <button class="ops-btn-secondary" id="add-blackout-toggle-btn">+ Add Blackout Dates</button>
+      </div>
+      <div class="ops-panel hidden" id="add-blackout-panel">
+        <div class="ops-panel-title" style="font-size:0.85rem;">Add Blackout Dates</div>
+        <div class="ops-form-grid">
+          <div class="ops-form-row"><label>Start date</label><input class="ops-input" id="add-start-date" type="date"></div>
+          <div class="ops-form-row"><label>End date</label><input class="ops-input" id="add-end-date" type="date"></div>
+        </div>
+        <div class="ops-form-row"><label>Note (optional — why you're out, for your own reference)</label><input class="ops-input" id="add-note" placeholder="e.g. Out of state, family trip"></div>
+        <div class="ops-panel-footer">
+          <button class="ops-btn-secondary" id="add-blackout-cancel">Cancel</button>
+          <button class="ops-btn" id="add-blackout-submit">Add Blackout Dates</button>
+        </div>
+      </div>
+
+      <div id="blackout-list"><div class="ops-empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="ops-shell.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var opsCall = OpsShell.opsCall;
+  var escapeHtml = OpsShell.escapeHtml;
+
+  function showBanner(kind, html) {
+    var cls = kind === 'success' ? 'ops-success-banner' : (kind === 'warning' ? 'ops-warning-banner' : 'ops-error-banner');
+    document.getElementById('banner-container').innerHTML = '<div class="' + cls + '">' + html + '</div>';
+  }
+
+  function formatDateRange(startDate, endDate) {
+    return startDate === endDate ? escapeHtml(startDate) : (escapeHtml(startDate) + ' – ' + escapeHtml(endDate));
+  }
+
+  function renderBlackoutDates(rows) {
+    var container = document.getElementById('blackout-list');
+    if (!rows.length) { container.innerHTML = '<div class="ops-empty">No blackout dates on the calendar.</div>'; return; }
+
+    var html = '<table class="ops-table"><thead><tr><th>Dates</th><th>Note</th><th>Added by</th><th>Added</th><th>Actions</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      html += '<tr>'
+        + '<td>' + formatDateRange(r.startDate, r.endDate) + '</td>'
+        + '<td>' + (r.note ? escapeHtml(r.note) : '—') + '</td>'
+        + '<td>' + (r.createdBy ? escapeHtml(r.createdBy) : '—') + '</td>'
+        + '<td>' + (r.createdAt ? escapeHtml(r.createdAt.slice(0, 10)) : '—') + '</td>'
+        + '<td><button class="ops-btn-small" data-action="delete" data-id="' + escapeHtml(r.blackoutId) + '" data-range="' + escapeHtml(formatDateRange(r.startDate, r.endDate)) + '">Delete</button></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('button[data-action="delete"]').forEach(function (btn) {
+      btn.addEventListener('click', function () { handleDelete(btn.getAttribute('data-id'), btn.getAttribute('data-range')); });
+    });
+  }
+
+  function loadBlackoutDates() {
+    document.getElementById('blackout-list').innerHTML = '<div class="ops-empty">Loading…</div>';
+    opsCall('blackoutList', {}).then(function (result) {
+      if (!result.ok) { document.getElementById('blackout-list').innerHTML = '<div class="ops-empty">Could not load blackout dates.</div>'; return; }
+      renderBlackoutDates(result.data.blackoutDates || []);
+    });
+  }
+
+  function handleDelete(blackoutId, rangeLabel) {
+    if (!window.confirm('Remove the blackout for ' + rangeLabel + '? Those dates will reopen on the booking calendar.')) return;
+    opsCall('blackoutDelete', { blackoutId: blackoutId }).then(function (result) {
+      if (!result.ok) { showBanner('error', escapeHtml((result.data && result.data.error) || 'Could not remove that blackout.')); return; }
+      showBanner('success', 'Blackout for ' + escapeHtml(rangeLabel) + ' removed. Those dates are open again.');
+      loadBlackoutDates();
+    });
+  }
+
+  function submitAddBlackout() {
+    var startDate = document.getElementById('add-start-date').value;
+    var endDate = document.getElementById('add-end-date').value;
+    var note = document.getElementById('add-note').value.trim();
+    if (!startDate || !endDate) { showBanner('error', 'Start and end dates are both required.'); return; }
+    if (endDate < startDate) { showBanner('error', 'End date must be on or after the start date.'); return; }
+
+    document.getElementById('add-blackout-submit').disabled = true;
+    opsCall('blackoutCreate', { startDate: startDate, endDate: endDate, note: note }).then(function (result) {
+      document.getElementById('add-blackout-submit').disabled = false;
+      if (!result.ok) { showBanner('error', escapeHtml((result.data && result.data.error) || 'Could not add those blackout dates.')); return; }
+
+      var conflicts = (result.data && result.data.conflicts) || [];
+      var rangeLabel = formatDateRange(startDate, endDate);
+      if (conflicts.length) {
+        var items = conflicts.map(function (c) {
+          return '<li>#' + escapeHtml(c.bookingId) + ' — ' + escapeHtml(c.date) + (c.contactName ? ' (' + escapeHtml(c.contactName) + ')' : '') + '</li>';
+        }).join('');
+        showBanner('warning',
+          '<strong>Blackout added for ' + rangeLabel + '.</strong> '
+          + conflicts.length + ' existing booking' + (conflicts.length === 1 ? '' : 's') + ' already fall' + (conflicts.length === 1 ? 's' : '') + ' inside this window — '
+          + 'an Ops Alert was raised for each so you can reschedule or resolve them:<ul>' + items + '</ul>');
+      } else {
+        showBanner('success', 'Blackout added for ' + rangeLabel + '. No existing bookings conflict.');
+      }
+
+      document.getElementById('add-start-date').value = '';
+      document.getElementById('add-end-date').value = '';
+      document.getElementById('add-note').value = '';
+      document.getElementById('add-blackout-panel').classList.add('hidden');
+      loadBlackoutDates();
+    });
+  }
+
+  function onReady() {
+    document.getElementById('add-blackout-toggle-btn').addEventListener('click', function () {
+      document.getElementById('add-blackout-panel').classList.toggle('hidden');
+    });
+    document.getElementById('add-blackout-cancel').addEventListener('click', function () {
+      document.getElementById('add-blackout-panel').classList.add('hidden');
+    });
+    document.getElementById('add-blackout-submit').addEventListener('click', submitAddBlackout);
+    loadBlackoutDates();
+  }
+
+  OpsShell.boot({
+    activeHref: 'ops-availability.html',
+    title: 'Availability',
+    subtitle: 'Block dates on the booking calendar when you’re out of town and can’t fulfill gear rental operations. Adding a range checks existing bookings and raises an Ops Alert for any conflict.',
+    onReady: onReady,
+  });
+})();
+</script>
+</body>
+</html>

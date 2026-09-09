@@ -34,6 +34,7 @@ var OpsShell = (function () {
     { href: 'ops-gear-units.html', label: 'Gear Units' },
     { href: 'ops-trails.html', label: 'Trails' },
     { href: 'ops-parks.html', label: 'Parks' },
+    { href: 'ops-availability.html', label: 'Availability' },
     { href: 'ops-gear-checkin.html', label: 'Return Check-In' },
     { href: 'ops-reconciliation-review.html', label: 'Reconciliation Review' },
   ];

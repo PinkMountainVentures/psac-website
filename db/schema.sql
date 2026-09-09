@@ -817,6 +817,21 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 CREATE INDEX IF NOT EXISTS idx_feedback_booking ON feedback(booking_id);
 
+-- ---------- Booking Blackout Dates (2026-09-09) ----------
+-- See db/2026-09-09_add_booking_blackout_dates.sql for the full reasoning
+-- on this table and its three locked design decisions.
+
+CREATE TABLE IF NOT EXISTS booking_blackout_dates (
+  blackout_id   BIGSERIAL PRIMARY KEY,
+  start_date    DATE NOT NULL,
+  end_date      DATE NOT NULL,
+  note          TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_booking_blackout_dates_range ON booking_blackout_dates(start_date, end_date);
+
 -- ============================================================
 -- End of schema.sql
 -- ============================================================
