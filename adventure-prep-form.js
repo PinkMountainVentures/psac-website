@@ -2234,8 +2234,7 @@
         // back to it when a trail has no hero photo curated yet -- same
         // fallback steadyStateCardHtml's own call below uses.
         var turnPhotoUrl = selectedTrailCandidate && (selectedTrailCandidate.photoHeroUrl || selectedTrailCandidate.photoUrl);
-        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null) +
-          (turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '') +
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null, undefined, turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '') +
           (pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how the peak went, takes less than a minute, right here.</div>');
         postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName) : '';
         postAdventureClosingHtml = pa.showClosing ? closingCardHtml() : '';
@@ -2624,12 +2623,13 @@
     // #cl-share-btn just above, own button/id (see turnShareButtonHtml).
     var thShareBtn = wrap.querySelector('#th-share-btn');
     if (thShareBtn) {
+      var thShareToast = wrap.querySelector('#th-share-toast');
       thShareBtn.addEventListener('click', function () {
         shareViewWithPhoto(thShareBtn.getAttribute('data-photo-url'), {
           title: 'Palm Springs Adventure Club',
           text: 'Just got back from ' + status.trailName + ' with Palm Springs Adventure Club. This is the light you climb for.',
           url: 'https://www.palmspringsadventureclub.com',
-        }, thShareBtn);
+        }, thShareToast);
       });
     }
 
@@ -3663,7 +3663,7 @@
   // sublineHtml are passed through as already-safe HTML, matching how
   // topGreetingHtml/topSublineHtml are built and inserted everywhere else
   // in this file.
-  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays, dimmed) {
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays, dimmed, overlayHtml) {
     // Trail-day countdown badge (T-3 hub refresh, 2026-09-04): only
     // rendered when a caller passes a real number -- pre-T3 callers pass
     // null/undefined and get no badge at all, matching this hub's usual
@@ -3678,9 +3678,16 @@
     // reuses this exact same card/photo treatment, just read as "later in
     // the day" via a darker overlay -- see .ap-hero-card.dimmed in
     // ap-styles.css.
+    // `overlayHtml` (Golden Hour share button, 2026-09-09): optional,
+    // absolutely-positioned markup rendered directly on the photo, as a
+    // sibling of .ap-hero-card-inner rather than nested inside it, so it
+    // resolves its own position against .ap-hero-card the same way the
+    // countdown badge above already does. Every existing caller omits
+    // it and renders exactly as before.
     return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + (dimmed ? ' dimmed' : '') + '"' +
       (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
       badgeHtml +
+      (overlayHtml || '') +
       '<div class="ap-hero-card-inner">' +
       '<div class="ap-hero-eyebrow">' + escapeHtml(eyebrowText) + '</div>' +
       '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
@@ -3743,7 +3750,24 @@
   // helper, matching this file's existing convention of one inline
   // handler per share button.
   function turnShareButtonHtml(photoUrl) {
-    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn" data-photo-url="' + escapeHtml(photoUrl || '') + '">Share This View</button>';
+    // On-photo circular icon button (2026-09-09, replacing the original
+    // plain-text link below the card, per Airey's own call that a text
+    // link read as an afterthought) -- same top-right corner the
+    // countdown badge above uses on other hero cards, universal "share"
+    // glyph (box + arrow out the top) rather than a text label, so it
+    // reads as an action sitting on the photo itself, the way Instagram/
+    // TikTok's own share icons sit on their media. The toast div next to
+    // it is only ever shown by the clipboard-copy fallback in
+    // shareViewWithPhoto below (real navigator.share opens its own native
+    // sheet and needs no on-page confirmation).
+    return '<button type="button" class="ap-hero-share-btn" id="th-share-btn" data-photo-url="' + escapeHtml(photoUrl || '') + '" aria-label="Share this view" title="Share this view">' +
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+      '<path d="M12 3v12" stroke="white" stroke-width="2" stroke-linecap="round"/>' +
+      '<path d="M7 8l5-5 5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>' +
+      '</button>' +
+      '<div class="ap-hero-share-toast" id="th-share-toast">Link Copied</div>';
   }
 
   // Attaches the actual photo to the share, not just a link -- a bare
@@ -3760,16 +3784,16 @@
   // implementations exist without file support; the blob fetch can fail
   // for reasons outside our control) -- every fallback preserves the
   // exact pre-2026-09-09 behavior, so nothing regresses for those cases.
-  function shareViewWithPhoto(photoUrl, shareData, btn) {
+  function shareViewWithPhoto(photoUrl, shareData, toastEl) {
     function linkFallback() {
       if (navigator.share) {
         navigator.share({ title: shareData.title, text: shareData.text, url: shareData.url }).catch(function () { /* cancelled, nothing to do */ });
       } else if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(shareData.url).then(function () {
-          var original = btn.textContent;
-          btn.textContent = 'Link Copied';
-          setTimeout(function () { btn.textContent = original; }, 1500);
-        }).catch(function () { /* clipboard denied, leave button as-is */ });
+          if (!toastEl) return;
+          toastEl.classList.add('is-visible');
+          setTimeout(function () { toastEl.classList.remove('is-visible'); }, 1500);
+        }).catch(function () { /* clipboard denied, nothing to do */ });
       }
     }
     if (!photoUrl || !navigator.share) { linkFallback(); return; }

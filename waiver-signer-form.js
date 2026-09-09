@@ -490,7 +490,7 @@
   // sublineHtml are passed through as already-safe HTML, matching how
   // topGreetingHtml/topSublineHtml are built and inserted everywhere else
   // in this file.
-  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays, dimmed) {
+  function heroCardHtml(eyebrowText, headlineHtml, sublineHtml, photoUrl, countdownDays, dimmed, overlayHtml) {
     // Trail-day countdown badge (T-3 hub refresh, 2026-09-04): only
     // rendered when a caller passes a real number -- pre-T3 callers pass
     // null/undefined and get no badge at all.
@@ -504,9 +504,15 @@
     // treatment Surface A's own heroCardHtml already carries, see
     // .ap-hero-card.dimmed in ap-styles.css (shared file, no new CSS
     // needed here).
+    // `overlayHtml` (Golden Hour share button, 2026-09-09) -- optional,
+    // absolutely-positioned markup on the photo itself, sibling to
+    // .ap-hero-card-inner so it resolves position against .ap-hero-card
+    // the same way the countdown badge above does. Every existing
+    // caller omits it and renders exactly as before.
     return '<div class="ap-hero-card' + (photoUrl ? '' : ' no-photo') + (dimmed ? ' dimmed' : '') + '"' +
       (photoUrl ? ' style="background-image:url(\'' + photoUrl + '\');"' : '') + '>' +
       badgeHtml +
+      (overlayHtml || '') +
       '<div class="ap-hero-card-inner">' +
       '<div class="ap-hero-eyebrow">' + escapeHtml(eyebrowText) + '</div>' +
       '<div class="ap-hero-headline">' + headlineHtml + '</div>' +
@@ -581,7 +587,24 @@
   // (shared by both hubs, same as #cl-share-btn), so no per-hub copy of
   // the click handler is needed.
   function turnShareButtonHtml(photoUrl) {
-    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn" data-photo-url="' + escapeHtml(photoUrl || '') + '">Share This View</button>';
+    // On-photo circular icon button (2026-09-09, replacing the original
+    // plain-text link below the card, per Airey's own call that a text
+    // link read as an afterthought) -- same top-right corner the
+    // countdown badge above uses on other hero cards, universal "share"
+    // glyph (box + arrow out the top) rather than a text label, so it
+    // reads as an action sitting on the photo itself, the way Instagram/
+    // TikTok's own share icons sit on their media. The toast div next to
+    // it is only ever shown by the clipboard-copy fallback in
+    // shareViewWithPhoto below (real navigator.share opens its own native
+    // sheet and needs no on-page confirmation).
+    return '<button type="button" class="ap-hero-share-btn" id="th-share-btn" data-photo-url="' + escapeHtml(photoUrl || '') + '" aria-label="Share this view" title="Share this view">' +
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+      '<path d="M12 3v12" stroke="white" stroke-width="2" stroke-linecap="round"/>' +
+      '<path d="M7 8l5-5 5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>' +
+      '</button>' +
+      '<div class="ap-hero-share-toast" id="th-share-toast">Link Copied</div>';
   }
 
   // Attaches the actual photo to the share, not just a link -- a bare
@@ -599,16 +622,16 @@
   // below (shared by both signer hubs), reading the photo URL back off
   // the button's own data attribute since that wiring isn't in the same
   // closure scope as either hub's own turnPhotoUrl variable.
-  function shareViewWithPhoto(photoUrl, shareData, btn) {
+  function shareViewWithPhoto(photoUrl, shareData, toastEl) {
     function linkFallback() {
       if (navigator.share) {
         navigator.share({ title: shareData.title, text: shareData.text, url: shareData.url }).catch(function () { /* cancelled, nothing to do */ });
       } else if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(shareData.url).then(function () {
-          var original = btn.textContent;
-          btn.textContent = 'Link Copied';
-          setTimeout(function () { btn.textContent = original; }, 1500);
-        }).catch(function () { /* clipboard denied, leave button as-is */ });
+          if (!toastEl) return;
+          toastEl.classList.add('is-visible');
+          setTimeout(function () { toastEl.classList.remove('is-visible'); }, 1500);
+        }).catch(function () { /* clipboard denied, nothing to do */ });
       }
     }
     if (!photoUrl || !navigator.share) { linkFallback(); return; }
@@ -744,12 +767,13 @@
     // renderGuardianOnlyHub().
     var thShareBtn = wrap.querySelector('#th-share-btn');
     if (thShareBtn) {
+      var thShareToast = wrap.querySelector('#th-share-toast');
       thShareBtn.addEventListener('click', function () {
         shareViewWithPhoto(thShareBtn.getAttribute('data-photo-url'), {
           title: 'Palm Springs Adventure Club',
           text: 'Just got back from a hike with Palm Springs Adventure Club. This is the light you climb for.',
           url: 'https://www.palmspringsadventureclub.com',
-        }, thShareBtn);
+        }, thShareToast);
       });
     }
     var clNewsletterBtn = wrap.querySelector('#cl-newsletter-btn');
@@ -1972,8 +1996,7 @@
         // curated photoHeroUrl slot over the legacy photoUrl for this
         // hero moment, same fallback as Surface A's own renderHub().
         var turnPhotoUrl = status.trailDetail && (status.trailDetail.photoHeroUrl || status.trailDetail.photoUrl);
-        postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, turnPhotoUrl, null) +
-          (turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '') +
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, turnPhotoUrl, null, undefined, turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '') +
           (hubIsGuardian || pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how your day went, takes less than a minute, right here.</div>');
         postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName, hubIsGuardian, hubChildLabel) : '';
         postAdventureClosingHtml = pa.showClosing ? closingCardHtml(hubIsGuardian) : '';
@@ -2316,8 +2339,7 @@
         topGreetingHtml = childLabel + ' did the peak. Now, the pool.';
         topSublineHtml = 'A real one out there today, the easy part’s still ahead.';
         var turnPhotoUrl = trailDetail && (trailDetail.photoHeroUrl || trailDetail.photoUrl);
-        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null) +
-          (turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '');
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null, undefined, turnPhotoUrl ? turnShareButtonHtml(turnPhotoUrl) : '');
         postAdventureCheckinHtml = pa.showCheckin ? guardianOnlyCheckinCardHtml() : '';
         postAdventureClosingHtml = pa.showClosing ? guardianOnlyClosingCardHtml() : '';
         postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(null, true, childLabel, turnPhotoUrl) : '';
