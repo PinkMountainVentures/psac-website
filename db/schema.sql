@@ -198,6 +198,13 @@ CREATE TABLE IF NOT EXISTS trails (
   garmin_connect_link     TEXT,
   gpx_file_location       TEXT,
   photo_references        TEXT,
+  -- After the Trail: Golden Hour photo infrastructure (2026-09-09,
+  -- db/2026-09-09_add_trail_photo_slots.sql). Same convention as
+  -- photo_references above -- single-photo TEXT slots, not arrays.
+  photo_hero_url          TEXT,
+  photo_trailhead_url     TEXT,
+  photo_overlook_url      TEXT,
+  photo_detail_url        TEXT,
   known_hazards           TEXT,
   cell_coverage           TEXT,
   emergency_egress_notes  TEXT,

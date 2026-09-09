@@ -574,6 +574,16 @@
       '</div>';
   }
 
+  // Golden Hour share action (After the Trail photo infrastructure,
+  // 2026-09-09): a lightweight "share this view" action tucked under The
+  // Turn's own hero-photo card on both signer hubs, rendered only once a
+  // real trail photo is showing. Wired once in wireFeedbackCard below
+  // (shared by both hubs, same as #cl-share-btn), so no per-hub copy of
+  // the click handler is needed.
+  function turnShareButtonHtml() {
+    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn">Share This View</button>';
+  }
+
   // Closing card -- share request (everyone) + second half that
   // differs: membership invite for a plain participant, email-list
   // invite for every guardian variant (attending or not), per spec
@@ -681,6 +691,30 @@
             var original = clShareBtn.textContent;
             clShareBtn.textContent = 'Link Copied';
             setTimeout(function () { clShareBtn.textContent = original; }, 1500);
+          }).catch(function () { /* clipboard denied, leave button as-is */ });
+        }
+      });
+    }
+    // Golden Hour share action (2026-09-09) -- same handler shape as
+    // #cl-share-btn just above, own button/id (see turnShareButtonHtml).
+    // Shared across both signer hubs the same way #cl-share-btn already
+    // is, since wireFeedbackCard is called from both renderHub() and
+    // renderGuardianOnlyHub().
+    var thShareBtn = wrap.querySelector('#th-share-btn');
+    if (thShareBtn) {
+      thShareBtn.addEventListener('click', function () {
+        var shareData = {
+          title: 'Palm Springs Adventure Club',
+          text: 'Just got back from a hike with Palm Springs Adventure Club. This is the light you climb for.',
+          url: 'https://www.palmspringsadventureclub.com',
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(function () { /* cancelled, nothing to do */ });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareData.url).then(function () {
+            var original = thShareBtn.textContent;
+            thShareBtn.textContent = 'Link Copied';
+            setTimeout(function () { thShareBtn.textContent = original; }, 1500);
           }).catch(function () { /* clipboard denied, leave button as-is */ });
         }
       });
@@ -1901,11 +1935,16 @@
         var turnSubline = hubIsGuardian ? 'A real one out there today, the easy part’s still ahead.' : (escapeHtml(ownerName) + ' brought you along for the peak. The pool’s next, for both of you.');
         topGreetingHtml = turnHeadline;
         topSublineHtml = turnSubline;
-        postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, status.trailDetail && status.trailDetail.photoUrl, null) +
+        // Golden Hour photo infrastructure (2026-09-09): prefer the new
+        // curated photoHeroUrl slot over the legacy photoUrl for this
+        // hero moment, same fallback as Surface A's own renderHub().
+        var turnPhotoUrl = status.trailDetail && (status.trailDetail.photoHeroUrl || status.trailDetail.photoUrl);
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', turnHeadline, turnSubline, turnPhotoUrl, null) +
+          (turnPhotoUrl ? turnShareButtonHtml() : '') +
           (hubIsGuardian || pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how your day went, takes less than a minute, right here.</div>');
         postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName, hubIsGuardian, hubChildLabel) : '';
         postAdventureClosingHtml = pa.showClosing ? closingCardHtml(hubIsGuardian) : '';
-        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(status.trailName, hubIsGuardian, hubChildLabel, status.trailDetail && status.trailDetail.photoUrl) : '';
+        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(status.trailName, hubIsGuardian, hubChildLabel, turnPhotoUrl) : '';
       } else if (pastT3) {
         topGreetingHtml = 'Your guide’s ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(status.trailName) + ' is yours now.';
         topSublineHtml = statLine;
@@ -2243,10 +2282,12 @@
         var pa = computePostAdventureState(state.ctx.tripDate, !!state.ctx.feedbackSubmitted, true);
         topGreetingHtml = childLabel + ' did the peak. Now, the pool.';
         topSublineHtml = 'A real one out there today, the easy part’s still ahead.';
-        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, trailDetail && trailDetail.photoUrl, null);
+        var turnPhotoUrl = trailDetail && (trailDetail.photoHeroUrl || trailDetail.photoUrl);
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null) +
+          (turnPhotoUrl ? turnShareButtonHtml() : '');
         postAdventureCheckinHtml = pa.showCheckin ? guardianOnlyCheckinCardHtml() : '';
         postAdventureClosingHtml = pa.showClosing ? guardianOnlyClosingCardHtml() : '';
-        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(null, true, childLabel, trailDetail && trailDetail.photoUrl) : '';
+        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(null, true, childLabel, turnPhotoUrl) : '';
       } else if (pastT3) {
         topGreetingHtml = childLabel + '’s trail guide is ready. Turn-by-turn navigation, waypoints, everything for ' + escapeHtml(trailDetail ? trailDetail.trailName : 'the trail') + ', so you both know exactly what the day looks like.';
         topSublineHtml = '';

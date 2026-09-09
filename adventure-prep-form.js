@@ -2228,11 +2228,18 @@
         var pa = computePostAdventureState(eb.date, !!ap.feedbackSubmitted, gearReturnDone);
         topGreetingHtml = 'The pool hits differently after adventure.';
         topSublineHtml = escapeHtml(status.trailName) + ' gave you the peak. This is the part where you earn the pool.';
-        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, selectedTrailCandidate && selectedTrailCandidate.photoUrl, null) +
+        // Golden Hour photo infrastructure (2026-09-09): prefer the new
+        // curated photoHeroUrl slot over the legacy first-URL-wins
+        // photoReferences photo for this specific hero moment, falling
+        // back to it when a trail has no hero photo curated yet -- same
+        // fallback steadyStateCardHtml's own call below uses.
+        var turnPhotoUrl = selectedTrailCandidate && (selectedTrailCandidate.photoHeroUrl || selectedTrailCandidate.photoUrl);
+        postAdventureCardHtml = heroCardHtml('Peaks to Pools', topGreetingHtml, topSublineHtml, turnPhotoUrl, null) +
+          (turnPhotoUrl ? turnShareButtonHtml() : '') +
           (pa.pastTurnWindow ? '' : '<div class="ap-turn-note">Tomorrow morning we’ll ask how the peak went, takes less than a minute, right here.</div>');
         postAdventureCheckinHtml = pa.showCheckin ? checkinCardHtml(status.trailName) : '';
         postAdventureClosingHtml = pa.showClosing ? closingCardHtml() : '';
-        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(status.trailName, selectedTrailCandidate && selectedTrailCandidate.photoUrl) : '';
+        postAdventureSteadyHtml = pa.showSteady ? steadyStateCardHtml(status.trailName, turnPhotoUrl) : '';
       } else if (pastT3) {
         // 2B: Guide unlocked. The trail section below already carries
         // its own Get Guide button once pastT3, so this doesn't repeat
@@ -2609,6 +2616,27 @@
             var original = clShareBtn.textContent;
             clShareBtn.textContent = 'Link Copied';
             setTimeout(function () { clShareBtn.textContent = original; }, 1500);
+          }).catch(function () { /* clipboard denied, leave button as-is */ });
+        }
+      });
+    }
+    // Golden Hour share action (2026-09-09) -- same handler shape as
+    // #cl-share-btn just above, own button/id (see turnShareButtonHtml).
+    var thShareBtn = wrap.querySelector('#th-share-btn');
+    if (thShareBtn) {
+      thShareBtn.addEventListener('click', function () {
+        var shareData = {
+          title: 'Palm Springs Adventure Club',
+          text: 'Just got back from ' + status.trailName + ' with Palm Springs Adventure Club. This is the light you climb for.',
+          url: 'https://www.palmspringsadventureclub.com',
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(function () { /* cancelled, nothing to do */ });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareData.url).then(function () {
+            var original = thShareBtn.textContent;
+            thShareBtn.textContent = 'Link Copied';
+            setTimeout(function () { thShareBtn.textContent = original; }, 1500);
           }).catch(function () { /* clipboard denied, leave button as-is */ });
         }
       });
@@ -3712,6 +3740,19 @@
       (state.fbError ? '<div class="ap-error">' + escapeHtml(state.fbError) + '</div>' : '') +
       '<button type="button" class="ap-cta-primary" id="fb-submit-btn"' + (state.fbSubmitting ? ' disabled' : '') + '>' + (state.fbSubmitting ? 'Sending…' : 'Submit') + '</button>' +
       '</div>';
+  }
+
+  // Golden Hour share action (After the Trail photo infrastructure,
+  // 2026-09-09): a lightweight "share this view" action tucked under The
+  // Turn's own hero-photo card, rendered only once a real trail photo is
+  // showing (see turnPhotoUrl in renderHub's own showPostAdventure
+  // branch). Same Web-Share-API-plus-clipboard-fallback pattern as
+  // closingCardHtml's own #cl-share-btn below, wired the same way in
+  // renderHub -- kept as its own small handler rather than a shared
+  // helper, matching this file's existing convention of one inline
+  // handler per share button.
+  function turnShareButtonHtml() {
+    return '<button type="button" class="ap-cta-secondary ap-turn-share-btn" id="th-share-btn">Share This View</button>';
   }
 
   // Closing card -- one card, not a sequence: a share request (same for

@@ -290,6 +290,55 @@
             </div>
             <input class="ops-input" id="f-photoReferences" placeholder="Photo URL(s), newline or comma separated" style="margin-top:0.6rem;">
           </div>
+        <!-- Golden Hour photo infrastructure (2026-09-09): four new
+             optional photo slots alongside the required main photo
+             above -- see db/2026-09-09_add_trail_photo_slots.sql. None
+             of these are required content (not in REQUIRED_CONTENT_FIELDS
+             below), so no missing-content pill applies to them. -->
+          <div class="ops-form-row">
+            <label>Golden Hour photo (post-adventure hero, vertical works best)</label>
+            <div class="photo-row">
+              <div>
+                <img class="photo-preview hidden" id="photo-preview-img-hero">
+                <input type="file" accept="image/*" id="photo-file-input-hero">
+                <div id="photo-upload-status-hero" style="font-size:0.75rem; color:var(--ops-text-mid); margin-top:0.3rem;"></div>
+              </div>
+            </div>
+            <input class="ops-input" id="f-photoHeroUrl" placeholder="Photo URL" style="margin-top:0.6rem;">
+          </div>
+          <div class="ops-form-row">
+            <label>Trailhead photo</label>
+            <div class="photo-row">
+              <div>
+                <img class="photo-preview hidden" id="photo-preview-img-trailhead">
+                <input type="file" accept="image/*" id="photo-file-input-trailhead">
+                <div id="photo-upload-status-trailhead" style="font-size:0.75rem; color:var(--ops-text-mid); margin-top:0.3rem;"></div>
+              </div>
+            </div>
+            <input class="ops-input" id="f-photoTrailheadUrl" placeholder="Photo URL" style="margin-top:0.6rem;">
+          </div>
+          <div class="ops-form-row">
+            <label>Overlook / water feature photo</label>
+            <div class="photo-row">
+              <div>
+                <img class="photo-preview hidden" id="photo-preview-img-overlook">
+                <input type="file" accept="image/*" id="photo-file-input-overlook">
+                <div id="photo-upload-status-overlook" style="font-size:0.75rem; color:var(--ops-text-mid); margin-top:0.3rem;"></div>
+              </div>
+            </div>
+            <input class="ops-input" id="f-photoOverlookUrl" placeholder="Photo URL" style="margin-top:0.6rem;">
+          </div>
+          <div class="ops-form-row">
+            <label>Detail / texture photo</label>
+            <div class="photo-row">
+              <div>
+                <img class="photo-preview hidden" id="photo-preview-img-detail">
+                <input type="file" accept="image/*" id="photo-file-input-detail">
+                <div id="photo-upload-status-detail" style="font-size:0.75rem; color:var(--ops-text-mid); margin-top:0.3rem;"></div>
+              </div>
+            </div>
+            <input class="ops-input" id="f-photoDetailUrl" placeholder="Photo URL" style="margin-top:0.6rem;">
+          </div>
         </div>
 
         <div class="ops-panel-footer">
@@ -322,6 +371,19 @@
     'difficulty', 'technicalRating', 'routeType', 'activityType', 'minAgeRec', 'dogFriendly', 'openingDescription',
     'whatMakesItSpecial', 'trailDayTip', 'heatConsiderations', 'waterSourcesOnTrail', 'knownHazards', 'cellCoverage',
     'emergencyEgressNotes', 'ridewithgpsLink', 'stravaLink', 'garminConnectLink', 'gpxFileLocation', 'photoReferences',
+    'photoHeroUrl', 'photoTrailheadUrl', 'photoOverlookUrl', 'photoDetailUrl',
+  ];
+  // Golden Hour photo infrastructure (2026-09-09): the 4 new optional
+  // photo slots above, each with its own file-upload widget (unlike
+  // every other TEXT_FIELDS entry, which is a plain input) -- this list
+  // drives the generic preview-sync and upload-wiring loops below, so
+  // fillForm/clearForm/wirePhotoUpload don't need one hardcoded block
+  // per slot the way the original single photoReferences slot still is.
+  var EXTRA_PHOTO_SLOTS = [
+    { key: 'photoHeroUrl', suffix: 'hero' },
+    { key: 'photoTrailheadUrl', suffix: 'trailhead' },
+    { key: 'photoOverlookUrl', suffix: 'overlook' },
+    { key: 'photoDetailUrl', suffix: 'detail' },
   ];
 
   var opsCall = OpsShell.opsCall;
@@ -492,6 +554,11 @@
     document.getElementById('photo-preview-img').classList.add('hidden');
     document.getElementById('photo-file-input').value = '';
     document.getElementById('photo-upload-status').textContent = '';
+    EXTRA_PHOTO_SLOTS.forEach(function (slot) {
+      document.getElementById('photo-preview-img-' + slot.suffix).classList.add('hidden');
+      document.getElementById('photo-file-input-' + slot.suffix).value = '';
+      document.getElementById('photo-upload-status-' + slot.suffix).textContent = '';
+    });
     refreshContentGapUI();
   }
 
@@ -503,6 +570,11 @@
     var photoUrl = t.photoReferences ? String(t.photoReferences).split(/[\n,;]/)[0].trim() : '';
     if (photoUrl) { document.getElementById('photo-preview-img').src = photoUrl; document.getElementById('photo-preview-img').classList.remove('hidden'); }
     else { document.getElementById('photo-preview-img').classList.add('hidden'); }
+    EXTRA_PHOTO_SLOTS.forEach(function (slot) {
+      var url = t[slot.key] ? String(t[slot.key]).split(/[\n,;]/)[0].trim() : '';
+      var img = document.getElementById('photo-preview-img-' + slot.suffix);
+      if (url) { img.src = url; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
+    });
     refreshContentGapUI();
   }
 
@@ -626,6 +698,38 @@
         });
       };
       reader.readAsDataURL(file);
+    });
+
+    // Golden Hour photo infrastructure (2026-09-09): same upload flow as
+    // the main photo above, looped over the 4 new optional slots instead
+    // of hardcoded once per slot -- each posts its own `slot` value
+    // through so trailsUploadPhoto/uploadTrailPhoto can fold it into the
+    // blob pathname (cosmetic only, see lib/trail-photo-upload.js).
+    EXTRA_PHOTO_SLOTS.forEach(function (slot) {
+      document.getElementById('photo-file-input-' + slot.suffix).addEventListener('change', function (e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        if (!editingTrailId && !document.getElementById('f-trailId').value.trim()) {
+          showBanner('error', 'Set a Trail ID before uploading a photo.');
+          return;
+        }
+        var trailIdForUpload = editingTrailId || document.getElementById('f-trailId').value.trim();
+        var status = document.getElementById('photo-upload-status-' + slot.suffix);
+        status.textContent = 'Uploading…';
+        var reader = new FileReader();
+        reader.onload = function () {
+          opsCall('trailsUploadPhoto', { trailId: trailIdForUpload, dataUrl: reader.result, slot: slot.suffix }).then(function (result) {
+            if (!result.ok) { status.textContent = ''; showBanner('error', (result.data && result.data.error) || 'Upload failed.'); return; }
+            var url = result.data.photoUrl;
+            document.getElementById('f-' + slot.key).value = url;
+            var img = document.getElementById('photo-preview-img-' + slot.suffix);
+            img.src = url;
+            img.classList.remove('hidden');
+            status.textContent = 'Uploaded.';
+          });
+        };
+        reader.readAsDataURL(file);
+      });
     });
   }
 

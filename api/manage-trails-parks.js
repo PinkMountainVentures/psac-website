@@ -80,7 +80,7 @@ module.exports = async function handler(req, res) {
     if (action === 'trailsUploadPhoto') {
       if (!body.trailId || !body.dataUrl) { res.status(400).json({ error: 'bad_request', detail: 'trailId and dataUrl are required' }); return; }
       try {
-        const photoUrl = await uploadTrailPhoto({ dataUrl: body.dataUrl, trailId: body.trailId });
+        const photoUrl = await uploadTrailPhoto({ dataUrl: body.dataUrl, trailId: body.trailId, slot: body.slot });
         res.status(200).json({ ok: true, photoUrl });
       } catch (uploadErr) {
         console.error('trailsUploadPhoto failed', body.trailId, uploadErr);
