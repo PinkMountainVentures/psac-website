@@ -349,9 +349,16 @@
   }
 
   function confirmScan(scannedValue) {
-    // The QR content is a URL (ops-gear-units.html?unit=XXXX) — pull the
-    // unit ID out if it looks like one of our own URLs, otherwise treat
-    // the scanned/typed value as a raw unit ID directly (manual entry).
+    // QR label build (2026-09-10): the QR content is a URL
+    // (ops-gear-units.html?unit={qrToken}) — pull that value out if it
+    // looks like one of our own URLs, otherwise treat the scanned/typed
+    // value as a raw unit ID directly (the manual-entry fallback always
+    // sends the human-readable unit ID printed on the label). Either way
+    // this file doesn't need to know which one it got — it just forwards
+    // whatever value it has, and gearService.confirmCheckoutScan()
+    // resolves it server-side by matching unit_id OR qr_token in one
+    // query, so both a scanned qr_token URL and a hand-typed unit ID land
+    // on the exact same unit.
     var unitId = scannedValue;
     var m = /[?&]unit=([^&]+)/.exec(scannedValue);
     if (m) unitId = decodeURIComponent(m[1]);

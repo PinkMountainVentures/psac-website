@@ -142,6 +142,7 @@ const GEAR_OPS_PROXY_ACTIONS = {
   gearUnits_markClean: manageGearUnitsHandler,
   gearUnits_markDeepCleaned: manageGearUnitsHandler,
   gearUnits_markRepaired: manageGearUnitsHandler,
+  gearUnits_getLabel: manageGearUnitsHandler, // QR label build (Section 6)
   // api/allocate-gear-units.js
   gearAllocation_allocate: allocateGearUnitsHandler,
   gearAllocation_get: allocateGearUnitsHandler,
@@ -193,7 +194,7 @@ const GEAR_OPS_ACTION_SECRET_ENV = {
 // handler doesn't read body.action at all.
 const GEAR_OPS_INNER_ACTION = {
   gearUnits_list: 'listUnits', gearUnits_add: 'addUnit', gearUnits_retire: 'retireUnit',
-  gearUnits_markClean: 'markClean', gearUnits_markDeepCleaned: 'markDeepCleaned', gearUnits_markRepaired: 'markRepaired',
+  gearUnits_markClean: 'markClean', gearUnits_markDeepCleaned: 'markDeepCleaned', gearUnits_markRepaired: 'markRepaired', gearUnits_getLabel: 'getUnitLabel',
   gearAllocation_allocate: 'allocate', gearAllocation_get: 'getAllocation',
   gearAllocation_recordShortageResolution: 'recordShortageResolution',
   gearCheckout_getQueue: 'getQueue', gearCheckout_confirmScan: 'confirmScan', gearCheckout_markDelivered: 'markDelivered',

@@ -50,9 +50,37 @@
 
   .ops-success-banner { background:rgba(122,189,145,0.15); color:#2a7a4a; border:1px solid rgba(122,189,145,0.4); border-radius:6px; padding:0.7rem 1rem; margin-bottom:1rem; font-size:0.82rem; }
 
+  /* QR label panel — shown after Add Unit, and by any row's "Print Label" action */
+  #label-panel-container:empty { display:none; }
+  .label-row { display:flex; gap:1.4rem; align-items:flex-start; flex-wrap:wrap; }
+  .label-qr { width:130px; height:130px; flex:none; border:1px solid var(--ops-border); border-radius:6px; padding:8px; background:white; }
+  .label-qr svg { width:100%; height:100%; display:block; }
+  .label-unit-id { font-family:'SFMono-Regular',Consolas,monospace; font-weight:700; font-size:1rem; color:var(--dark-pine); }
+  .label-item-type { font-size:0.82rem; color:var(--ops-text-mid); margin:0.15rem 0 0.9rem; }
+  .label-actions { display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.6rem; }
+  .label-close-btn { position:relative; float:right; background:none; border:none; color:var(--ops-text-mid); font-size:1rem; cursor:pointer; line-height:1; padding:0.2rem; }
+
+  tr.is-highlighted td { background:rgba(245,130,113,0.16) !important; transition:background 1.6s ease; }
+
+  /* Printing a label: everything else on the page is hidden, only the QR
+     + unit ID/item type survive — the actual reason "Print label" exists.
+     A generic size (roughly a large TZe tape label) since the Brother
+     P-touch Cube family (incl. the PT-P910BT this club owns) is a
+     Bluetooth-paired, app-driven printer on most desktops/phones, not a
+     normal OS print queue entry — "Download label image" (below) is the
+     realistic path for it, this print path is a bonus for anyone who
+     does have a printer wired up as a normal driver. */
+  @media print {
+    body * { visibility:hidden; }
+    #label-panel, #label-panel * { visibility:visible; }
+    #label-panel { position:absolute; top:0; left:0; width:2.4in; border:none; padding:0; margin:0; }
+    #label-panel .label-actions, #label-panel .ops-panel-title, #label-panel .ops-helper, #label-panel .label-close-btn { display:none; }
+  }
+
   @media (max-width: 760px) {
     .ops-form-grid { grid-template-columns:1fr; }
     .ops-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .label-row { flex-direction:column; align-items:center; text-align:center; }
   }
 </style>
 </head>
@@ -74,6 +102,7 @@
       <div id="ops-search-container"></div>
 
       <div id="banner-container"></div>
+      <div id="label-panel-container"></div>
 
       <div class="add-unit-toggle-row">
         <button class="ops-btn-secondary" id="add-unit-toggle-btn">+ Add Unit</button>
@@ -175,7 +204,7 @@
         var uses = Number(u.usesSinceDeepClean) || 0;
         var pct = Math.min(100, Math.round((uses / threshold) * 100));
         var statusClass = STATUS_CLASS[u.status] || '';
-        var actions = '';
+        var actions = '<button class="ops-btn-small" data-action="printLabel" data-unit="' + escapeHtml(u.unitId) + '">Print Label</button>';
         if (u.status === 'needs_cleaning') actions += '<button class="ops-btn-small" data-action="markClean" data-unit="' + escapeHtml(u.unitId) + '">Mark Clean</button>';
         if (u.status === 'needs_deep_clean') actions += '<button class="ops-btn-small" data-action="markDeepCleaned" data-unit="' + escapeHtml(u.unitId) + '">Mark Deep-Cleaned</button>';
         // Ops App Redesign (Aug 2026) — Round 2 item 7. Confirmed decision:
@@ -183,7 +212,7 @@
         // Clean/Mark Deep-Cleaned, not routed through Needs Cleaning first.
         if (u.status === 'damaged_pending_repair') actions += '<button class="ops-btn-small" data-action="markRepaired" data-unit="' + escapeHtml(u.unitId) + '">Mark Repaired</button>';
         if (u.status !== 'retired') actions += '<button class="ops-btn-small" data-action="retire" data-unit="' + escapeHtml(u.unitId) + '">Retire</button>';
-        html += '<tr>'
+        html += '<tr data-row-unit="' + escapeHtml(u.unitId) + '">'
           + '<td>' + escapeHtml(u.unitId) + '</td>'
           + '<td><span class="status-tag ' + statusClass + '">' + escapeHtml((u.status || '').replace(/_/g, ' ')) + '</span></td>'
           + '<td><span class="dc-bar"><span class="dc-bar-fill" style="width:' + pct + '%;"></span></span>' + uses + ' / ' + threshold + '</td>'
@@ -205,26 +234,31 @@
     document.getElementById('units-list').innerHTML = '<div class="ops-empty">Loading…</div>';
     opsCall('gearUnits_list', { itemType: itemType }).then(function (result) {
       if (!result.ok) { document.getElementById('units-list').innerHTML = '<div class="ops-empty">Could not load Gear Units.</div>'; return; }
-      renderUnits(result.data.units || []);
+      var units = result.data.units || [];
+      renderUnits(units);
+      // A QR scanned with a plain phone camera (not this app's own
+      // scanner) lands here as ?unit={qrToken} — jump to it once the
+      // real rows exist to jump to.
+      handleDeepLink(units);
     });
   }
 
   function handleAction(action, unitId) {
     if (action === 'markClean') {
       opsCall('gearUnits_markClean', { unitId: unitId }).then(function (result) {
-        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark clean.'); return; }
+        if (!result.ok || !result.data || result.data.ok === false) { showBanner('error', (result.data && result.data.error) || 'Could not mark clean.'); return; }
         showBanner('success', unitId + ' marked clean and available.');
         loadUnits();
       });
     } else if (action === 'markDeepCleaned') {
       opsCall('gearUnits_markDeepCleaned', { unitId: unitId }).then(function (result) {
-        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark deep-cleaned.'); return; }
+        if (!result.ok || !result.data || result.data.ok === false) { showBanner('error', (result.data && result.data.error) || 'Could not mark deep-cleaned.'); return; }
         showBanner('success', unitId + ' marked deep-cleaned, use count reset.');
         loadUnits();
       });
     } else if (action === 'markRepaired') {
       opsCall('gearUnits_markRepaired', { unitId: unitId }).then(function (result) {
-        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not mark repaired.'); return; }
+        if (!result.ok || !result.data || result.data.ok === false) { showBanner('error', (result.data && result.data.error) || 'Could not mark repaired.'); return; }
         showBanner('success', unitId + ' marked repaired and available.');
         loadUnits();
       });
@@ -233,10 +267,110 @@
       if (reason === null) return; // cancelled
       if (!reason.trim()) { showBanner('error', 'A retirement reason is required.'); return; }
       opsCall('gearUnits_retire', { unitId: unitId, retiredReason: reason.trim() }).then(function (result) {
-        if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not retire unit.'); return; }
+        if (!result.ok || !result.data || result.data.ok === false) { showBanner('error', (result.data && result.data.error) || 'Could not retire unit.'); return; }
         showBanner('success', unitId + ' retired.');
         loadUnits();
       });
+    } else if (action === 'printLabel') {
+      opsCall('gearUnits_getLabel', { unitId: unitId }).then(function (result) {
+        if (!result.ok || !result.data || result.data.ok === false) { showBanner('error', (result.data && result.data.error) || 'Could not build a label for this unit.'); return; }
+        renderLabelPanel(result.data.label);
+      });
+    }
+  }
+
+  // -------------------- QR label panel (Section 6) --------------------
+  // Shown two ways: automatically after a successful Add Unit ("a unit
+  // isn't real until it has a label to put on it"), and on demand from
+  // any existing row's Print Label action (a reprint, a lost label, a
+  // unit added before this feature existed). Same panel, same markup,
+  // either way — one place to get the layout right.
+
+  function closeLabelPanel() {
+    document.getElementById('label-panel-container').innerHTML = '';
+  }
+
+  function renderLabelPanel(label) {
+    var itemLabel = ITEM_LABELS[label.itemType] || label.itemType;
+    var html = '<div class="ops-panel" id="label-panel">'
+      + '<button class="label-close-btn" id="label-close-btn" title="Close" aria-label="Close">✕</button>'
+      + '<div class="ops-panel-title" style="font-size:0.85rem;">Printable QR Label</div>'
+      + '<div class="label-row">'
+      + '<div class="label-qr">' + label.qrSvg + '</div>'
+      + '<div>'
+      + '<div class="label-unit-id">' + escapeHtml(label.unitId) + '</div>'
+      + '<div class="label-item-type">' + escapeHtml(itemLabel) + '</div>'
+      + '<div class="label-actions">'
+      + '<button class="ops-btn-secondary" id="label-download-btn">Download label image</button>'
+      + '<button class="ops-btn-secondary" id="label-print-btn">Print (desktop printer)</button>'
+      + '</div>'
+      + '<div class="ops-helper">The Brother P-touch Cube pairs over Bluetooth to its own app (P-touch Design&amp;Print), not a normal print queue — use Download, then import the image there. Print opens the browser\'s print dialog instead, for a printer with a regular driver.</div>'
+      + '</div></div></div>';
+    document.getElementById('label-panel-container').innerHTML = html;
+    document.getElementById('label-close-btn').addEventListener('click', closeLabelPanel);
+    document.getElementById('label-print-btn').addEventListener('click', function () { window.print(); });
+    document.getElementById('label-download-btn').addEventListener('click', function () {
+      composeLabelPng(label.qrSvg, label.unitId, itemLabel, function (dataUrl) {
+        downloadDataUrl(dataUrl, label.unitId + '-label.png');
+      });
+    });
+    document.getElementById('label-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Rasterizes the (vector) QR SVG plus the human-readable unit ID/item
+  // type into one flat PNG, sized generously (print resolution, not
+  // screen resolution) so it stays crisp when imported into the Brother
+  // app and printed small. Plain <canvas> — no library needed for this.
+  function composeLabelPng(svgString, unitId, itemLabel, callback) {
+    var img = new Image();
+    var svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(svgBlob);
+    img.onload = function () {
+      var qrSize = 600, padding = 40, textBlockHeight = 130;
+      var canvas = document.createElement('canvas');
+      canvas.width = qrSize + padding * 2;
+      canvas.height = qrSize + padding * 2 + textBlockHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, padding, padding, qrSize, qrSize);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 52px monospace';
+      ctx.fillText(unitId, canvas.width / 2, qrSize + padding * 2 + 55);
+      ctx.font = '30px sans-serif';
+      ctx.fillText(itemLabel, canvas.width / 2, qrSize + padding * 2 + 100);
+      URL.revokeObjectURL(url);
+      callback(canvas.toDataURL('image/png'));
+    };
+    img.src = url;
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    var a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  // A QR scanned with a phone's plain camera app (not this page's own
+  // scanner — that's the checkout screen's job) opens this page with
+  // ?unit={qrToken}. Once the real list has loaded, find and highlight
+  // that row so the deep link actually goes somewhere, matching a bare
+  // unit_id too (typed into the URL by hand, or an older label).
+  function handleDeepLink(units) {
+    var params = new URLSearchParams(window.location.search);
+    var val = params.get('unit');
+    if (!val) return;
+    var match = units.filter(function (u) { return u.qrToken === val || u.unitId === val; })[0];
+    if (!match) { showBanner('error', 'No unit found for this QR code.'); return; }
+    var row = document.querySelector('tr[data-row-unit="' + match.unitId.replace(/"/g, '') + '"]');
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('is-highlighted');
+      setTimeout(function () { row.classList.remove('is-highlighted'); }, 3000);
     }
   }
 
@@ -250,11 +384,15 @@
     document.getElementById('add-unit-submit').disabled = true;
     opsCall('gearUnits_add', payload).then(function (result) {
       document.getElementById('add-unit-submit').disabled = false;
-      if (!result.ok) { showBanner('error', (result.data && result.data.error) || 'Could not add that unit.'); return; }
+      if (!result.ok || !result.data || result.data.ok === false) { showBanner('error', (result.data && result.data.error) || 'Could not add that unit.'); return; }
       showBanner('success', unitId + ' added to inventory.');
       document.getElementById('add-unit-id').value = '';
       document.getElementById('add-cost-cents').value = '';
       document.getElementById('add-unit-panel').classList.add('hidden');
+      // "A unit isn't real until it has a label to put on it" — show the
+      // printable QR immediately rather than sending staff to go find it
+      // via Print Label right after they just added the thing.
+      if (result.data.label) renderLabelPanel(result.data.label);
       loadUnits();
     });
   }

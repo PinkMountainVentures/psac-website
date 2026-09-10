@@ -15,6 +15,7 @@
 'use strict';
 
 const gearService = require('../lib/gear-service');
+const { buildUnitLabel } = require('../lib/gear-label-service');
 
 const VALID_ITEM_TYPES = ['backpack_standard', 'backpack_plus', 'poles', 'bottle', 'first_aid_kit', 'duffel'];
 
@@ -65,7 +66,40 @@ module.exports = async function handler(req, res) {
         replacementCostCents: body.replacementCostCents != null ? Number(body.replacementCostCents) : undefined,
         acquiredAt: body.acquiredAt || '',
       });
+      // QR label build (Section 6): "a unit isn't real until it has a
+      // label to put on it" (claude/psac-ops-gear-units.html's own design
+      // note) — so a successful add returns the printable label inline,
+      // no second round trip needed before the Add Unit panel can show
+      // it. Label generation failing (it shouldn't — buildUnitLabel only
+      // throws if qr_token is somehow missing) must never take down the
+      // add itself; the unit is already committed at this point.
+      if (result.ok) {
+        try {
+          result.label = await buildUnitLabel({ unitId: result.unitId, itemType: result.itemType, qrToken: result.qrToken });
+        } catch (labelErr) {
+          // eslint-disable-next-line no-console
+          console.error('manage-gear-units: addUnit succeeded but label generation failed', labelErr);
+        }
+      }
       res.status(200).json(result);
+      return;
+    }
+
+    // QR label build (Section 6): reprints for a unit added before this
+    // feature existed, a lost/damaged label, or a second copy for a spare
+    // duffel pocket — any already-added unit, not just a brand-new one.
+    if (action === 'getUnitLabel') {
+      if (!body.unitId) {
+        res.status(400).json({ error: 'bad_request', detail: 'unitId is required' });
+        return;
+      }
+      const unit = await gearService.getUnit({ unitId: body.unitId });
+      if (!unit) {
+        res.status(200).json({ ok: false, error: 'Unit not found' });
+        return;
+      }
+      const label = await buildUnitLabel({ unitId: unit.unitId, itemType: unit.itemType, qrToken: unit.qrToken });
+      res.status(200).json({ ok: true, label });
       return;
     }
 
