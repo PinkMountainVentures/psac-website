@@ -46,6 +46,9 @@ const { requireStaffSession } = require('../lib/ops-session');
 const bookingDetailService = require('../lib/booking-detail-service');
 const opsListService = require('../lib/ops-list-service');
 const allBookingsService = require('../lib/all-bookings-service');
+// NEW (2026-09-10, task #73): paired resolve for a trail_checkin_missing
+// alert's own incident record -- see the resolveOpsAlert branch below.
+const trailCheckinIncidentService = require('../lib/trail-checkin-incident-service');
 const trailSwapService = require('../lib/trail-swap-service');
 const resolveOpsAlertHandler = require('./resolve-ops-alert');
 const applyManualAdjustmentHandler = require('./apply-manual-adjustment');
@@ -94,6 +97,9 @@ const READ_ACTIONS = {
   listOpsAlertsExpanded: () => allBookingsService.listOpsAlertsExpanded({ nowIso: new Date().toISOString() }),
   listStalledBookings: () => allBookingsService.listStalledBookings(),
   listCancellations: () => allBookingsService.listCancellations(),
+  // NEW (2026-09-10, task #73): backs the Ops Alerts Resolve panel's
+  // trail-check-in detail view -- staff-only, never guest-facing.
+  getTrailCheckinIncident: (body) => trailCheckinIncidentService.getOpenIncidentDetail(body.bookingId).then((detail) => ({ incident: detail })),
   // People view (2026-09-04).
   listPeople: () => peopleService.listPeople(),
   getPersonDetail: (body) => peopleService.getPersonDetail({ personId: body.personId }),
@@ -238,6 +244,20 @@ module.exports = async function handler(req, res) {
           resolvedBy: session.email,
         }),
       }, innerRes);
+      // NEW (2026-09-10, task #73): resolveAlert() (lib/hold-clearance-
+      // service.js) only ever writes ops_alerts -- a trail_checkin_missing
+      // alert has a paired trail_checkin_incidents row that would otherwise
+      // silently stay Open forever once the alert itself is resolved
+      // (found on review, see the ops-surfacing proposal doc). The client
+      // sends bookingId + alertType alongside alertId for exactly this
+      // branch; only fires on a successful resolve of that alert type.
+      if (result.statusCode === 200 && body.alertType === 'trail_checkin_missing' && body.bookingId) {
+        await trailCheckinIncidentService.resolveTrailCheckinIncident({
+          bookingId: body.bookingId,
+          resolvedBy: session.email,
+          staffNotes: body.notes || '',
+        });
+      }
       res.status(result.statusCode).json(result.body);
       return;
     }

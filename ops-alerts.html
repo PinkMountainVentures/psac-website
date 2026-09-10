@@ -63,6 +63,15 @@
      text, just with a real guest quote worth reading before resolving. */
   .resolve-quote { background:#FCFCFB; border:1px solid var(--ops-border); border-left:3px solid var(--mountain-pink); border-radius:0 6px 6px 0; padding:0.7rem 0.9rem; font-size:0.82rem; color:var(--ops-text); margin-top:0.8rem; line-height:1.55; }
   .resolve-meta { font-size:0.74rem; color:var(--ops-text-mid); margin-top:0.5rem; display:flex; gap:1.2rem; flex-wrap:wrap; }
+  /* NEW (2026-09-10, task #73): trail check-in incident detail, shown in
+     the Resolve panel in place of the gear-issue quote block. */
+  .incident-tier-flag { display:inline-block; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.22rem 0.55rem; border-radius:4px; margin-top:0.5rem; }
+  .incident-tier-flag.critical { background:var(--sunset-red); color:white; }
+  .incident-tier-flag.urgent { background:#FFF3D6; color:#8a6300; }
+  .incident-grid { display:grid; grid-template-columns:auto 1fr; gap:0.45rem 0.9rem; margin-top:0.9rem; font-size:0.82rem; }
+  .incident-grid dt { color:var(--ops-text-mid); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.03em; padding-top:0.1rem; }
+  .incident-grid dd { margin:0; }
+  .incident-notes-log { white-space:pre-wrap; }
 
   .blocked-note { background:#FFF9EC; border:1.5px solid #E9CB7A; padding:0.9rem 1.1rem; font-size:0.8rem; color:#6b4e00; line-height:1.6; border-radius:6px; }
 </style>
@@ -111,7 +120,7 @@
   // value (e.g. a hand-built/bookmarked URL).
   var filterBookingId = OpsShell.normalizeBookingIdInput(new URLSearchParams(window.location.search).get('bookingId') || '');
 
-  var CATEGORIES = ['All', 'Payment & Hold', 'Bookings & Cancellations', 'Reconciliation', 'Manual Adjustment', 'Custom Tier', 'Gear'];
+  var CATEGORIES = ['All', 'Payment & Hold', 'Bookings & Cancellations', 'Reconciliation', 'Manual Adjustment', 'Custom Tier', 'Gear', 'Trail Check-In'];
   var CATEGORY_BY_SOURCE = {
     payment_hold_failure: 'Payment & Hold',
     stalled_call_today: 'Bookings & Cancellations',
@@ -125,6 +134,10 @@
     // family -- see lib/gear-issue-service.js and lib/all-bookings-
     // service.js's listOpsAlertsExpanded for the read/write side.
     gear_issue: 'Gear',
+    // NEW (2026-09-10, task #73): trail check-in incidents (injury, lost/
+    // separated, heat illness, running-longer, overdue, other) -- see
+    // lib/all-bookings-service.js's listOpsAlertsExpanded for the read side.
+    trail_checkin_incident: 'Trail Check-In',
   };
 
   // First-pass human-readable labels for the payment/hold-failure family's
@@ -175,23 +188,38 @@
     var container = document.getElementById('banner-container');
     if (!critical.length) { container.innerHTML = ''; return; }
     container.innerHTML = '<div class="critical-banner">' + critical.map(function (a) {
-      return '<div class="critical-banner-row"><span>&#9888; #' + escapeHtml(a.bookingId) + ' — ' + escapeHtml(alertTypeLabel(a.alertType))
-        + (a.amount ? ', ' + formatMoney(a.amount) : '') + '. Act today.</span></div>';
+      var line;
+      // NEW (2026-09-10, task #73): a trail check-in Critical (injury,
+      // lost/separated, heat illness, or a 2nd+ running-longer escalation)
+      // used to render through the generic alertTypeLabel/amount template
+      // built for payment alerts -- "#1842 — Trail checkin missing. Act
+      // today," with no trail name, category, or who's affected. For a
+      // SAR-relevant alert that's not cosmetic, it's the banner failing at
+      // its one job, so this gets its own line built from what's actually
+      // known about the incident.
+      if (a.source === 'trail_checkin_incident') {
+        var who = (a.affectedNames && a.affectedNames.length) ? (', ' + a.affectedNames.map(escapeHtml).join(', ')) : '';
+        var where = a.trailName ? (' — ' + escapeHtml(a.trailName)) : '';
+        line = escapeHtml(a.description) + who + where;
+      } else {
+        line = escapeHtml(alertTypeLabel(a.alertType)) + (a.amount ? ', ' + formatMoney(a.amount) : '');
+      }
+      return '<div class="critical-banner-row"><span>&#9888; #' + escapeHtml(a.bookingId) + ' — ' + line + '. Act today.</span></div>';
     }).join('') + '</div>';
   }
 
   function actionCell(row) {
-    if (row.source === 'payment_hold_failure' || row.source === 'gear_issue') {
+    if (row.source === 'payment_hold_failure' || row.source === 'gear_issue' || row.source === 'trail_checkin_incident') {
       if (row.status === 'Resolved') {
         return '<span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(row.resolvedBy || '') + (row.resolvedAt ? (' — ' + escapeHtml(String(row.resolvedAt).slice(0, 10))) : '') + '</span>';
       }
-      // Gear issues get "Review & Resolve" (there's a guest message worth
-      // reading first) -- payment/hold-failure alerts keep the plain
-      // "Resolve" label they've always had. Same button, same handler,
-      // same resolveOpsAlert action either way -- resolveAlert() (lib/
-      // hold-clearance-service.js) updates by alert_id alone, no source
-      // check, so nothing server-side needed to support this.
-      var label = row.source === 'gear_issue' ? 'Review & Resolve' : 'Resolve';
+      // Gear issues and trail check-in incidents both get "Review &
+      // Resolve" (there's real detail worth reading first) -- payment/
+      // hold-failure alerts keep the plain "Resolve" label they've always
+      // had. Same button, same handler, same resolveOpsAlert action either
+      // way -- see the ops-proxy.js resolveOpsAlert branch for the paired
+      // trail_checkin_incidents write this now also triggers.
+      var label = (row.source === 'gear_issue' || row.source === 'trail_checkin_incident') ? 'Review & Resolve' : 'Resolve';
       return '<button class="ops-btn-secondary" data-resolve-alert="' + escapeHtml(row.alertId) + '">' + label + '</button>';
     }
     if (row.source === 'stalled_call_today') return '<a class="ops-link" href="ops-stalled-bookings.html?bookingId=' + encodeURIComponent(row.bookingId) + '">Call script &rarr;</a>';
@@ -203,18 +231,24 @@
   }
 
   function statusTag(row) {
-    if (row.source === 'payment_hold_failure' || row.source === 'gear_issue') return row.status === 'Resolved' ? '<span class="ops-tag resolved">Resolved</span>' : '<span class="ops-tag open">Open</span>';
+    if (row.source === 'payment_hold_failure' || row.source === 'gear_issue' || row.source === 'trail_checkin_incident') return row.status === 'Resolved' ? '<span class="ops-tag resolved">Resolved</span>' : '<span class="ops-tag open">Open</span>';
     if (row.source === 'gear_low_stock') return '<span class="ops-tag standard">Live — auto-clears</span>';
     return '<span class="ops-tag open">Open</span>';
   }
 
   function rowHtml(row) {
     var desc = row.source === 'payment_hold_failure' ? alertTypeLabel(row.alertType) : row.description;
+    if (row.source === 'trail_checkin_incident' && row.trailName) desc += ' \u2014 ' + row.trailName;
     var bookingCell = row.bookingId ? ('#' + escapeHtml(row.bookingId)) : '<span style="color:var(--ops-text-mid);">' + escapeHtml(desc) + (row.availableCount != null ? (' (' + row.availableCount + ' available)') : '') + '</span>';
+    // Trail check-in rows have no dollar amount -- the amount column shows
+    // who's affected instead, same column, different content by source.
+    var amountCell = row.source === 'trail_checkin_incident'
+      ? (row.affectedNames && row.affectedNames.length ? escapeHtml(row.affectedNames.join(', ')) : '\u2014')
+      : formatMoney(row.amount);
     return '<tr>'
       + '<td>' + bookingCell + '</td>'
       + '<td>' + escapeHtml(desc) + '</td>'
-      + '<td>' + formatMoney(row.amount) + '</td>'
+      + '<td>' + amountCell + '</td>'
       + '<td>' + escapeHtml(String(row.createdAt || '').slice(0, 10)) + '</td>'
       + '<td>' + statusTag(row) + '</td>'
       + '<td>' + actionCell(row) + '</td>'
@@ -223,7 +257,7 @@
 
   function tierTable(rows) {
     if (!rows.length) return '<div class="ops-empty">Nothing in this tier right now.</div>';
-    return '<table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Amount</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>'
+    return '<table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Amount / Affected</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>'
       + rows.map(rowHtml).join('') + '</tbody></table>';
   }
 
@@ -261,6 +295,14 @@
 
   function openResolvePanel(alertId) {
     var row = rowsById[alertId];
+    // NEW (2026-09-10, task #73): trail check-in incidents get their own
+    // panel entirely (async-fetched detail, a paired resolve write) rather
+    // than threading a third case through the gear-issue/payment logic
+    // below -- see openTrailCheckinResolvePanel just below this function.
+    if (row && row.source === 'trail_checkin_incident') {
+      openTrailCheckinResolvePanel(alertId, row);
+      return;
+    }
     var isGearIssue = row && row.source === 'gear_issue';
     var container = document.getElementById('resolve-container');
     container.innerHTML = '<div class="resolve-panel">'
@@ -304,6 +346,74 @@
         if (!result.ok) { showError('Could not resolve that alert. Please try again.'); return; }
         container.innerHTML = '';
         loadAlerts();
+      });
+    });
+  }
+
+  // NEW (2026-09-10, task #73). Trail check-in incidents carry real
+  // staff-only detail (medical note, personal description, vehicle
+  // description, the full escalation trail, land-manager contact) the
+  // plain panel above has nowhere to show -- fetched fresh every time the
+  // panel opens rather than trusting the list view's lighter summary (see
+  // lib/trail-checkin-incident-service.js's getOpenIncidentSummaries vs
+  // getOpenIncidentDetail). Resolving here sends bookingId + alertType
+  // alongside alertId so api/ops-proxy.js's resolveOpsAlert branch can
+  // also resolve the paired trail_checkin_incidents row, not just the alert.
+  function openTrailCheckinResolvePanel(alertId, row) {
+    var container = document.getElementById('resolve-container');
+    container.innerHTML = '<div class="resolve-panel">Loading incident details\u2026</div>';
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    OpsShell.opsCall('getTrailCheckinIncident', { bookingId: row.bookingId }).then(function (result) {
+      var incident = result && result.ok ? result.incident : null;
+      if (!incident) {
+        container.innerHTML = '<div class="resolve-panel">This incident was already resolved, or could not be found.'
+          + '<div class="resolve-panel-footer"><button class="ops-btn-secondary" id="resolve-cancel">Close</button></div></div>';
+        document.getElementById('resolve-cancel').addEventListener('click', function () { container.innerHTML = ''; loadAlerts(); });
+        return;
+      }
+
+      var gridRows = [];
+      if (incident.affectedNames && incident.affectedNames.length) gridRows.push(['Affected', escapeHtml(incident.affectedNames.join(', '))]);
+      if (incident.reportedByName || incident.reportedByRole) {
+        gridRows.push(['Reported by', escapeHtml(incident.reportedByName || 'Unknown') + (incident.reportedByRole ? ' (' + escapeHtml(String(incident.reportedByRole).replace(/_/g, ' ')) + ')' : '')]);
+      }
+      if (incident.medicalNote) gridRows.push(['Medical note', escapeHtml(incident.medicalNote)]);
+      if (incident.personalDescription) gridRows.push(['Personal description', escapeHtml(incident.personalDescription)]);
+      if (incident.vehicleDescription) gridRows.push(['Vehicle', escapeHtml(incident.vehicleDescription)]);
+      if (incident.categoryDetail) gridRows.push(['Detail', escapeHtml(incident.categoryDetail)]);
+      if (incident.reportedRemainingDistance) gridRows.push(['Remaining distance (self-reported)', escapeHtml(incident.reportedRemainingDistance)]);
+      if (incident.reportedNewFinishEstimate) gridRows.push(['Revised finish estimate', escapeHtml(String(incident.reportedNewFinishEstimate).slice(0, 16).replace('T', ' '))]);
+      if (incident.revisionCount > 1) gridRows.push(['Revision count', String(incident.revisionCount)]);
+      if (incident.landManagerName) gridRows.push(['Land manager', escapeHtml(incident.landManagerName) + (incident.landManagerPhone ? ' \u2014 ' + escapeHtml(incident.landManagerPhone) : '')]);
+
+      var gridHtml = gridRows.length
+        ? '<dl class="incident-grid">' + gridRows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('') + '</dl>'
+        : '';
+
+      container.innerHTML = '<div class="resolve-panel">'
+        + '<strong>Resolve \u2014 ' + escapeHtml(incident.categoryLabel) + ', #' + escapeHtml(incident.bookingId) + '</strong> '
+        + '<span class="incident-tier-flag ' + escapeHtml(incident.tier) + '">' + escapeHtml(incident.tier) + '</span>'
+        + '<div style="font-size:0.8rem; color:var(--ops-text-mid); margin-top:0.4rem;">'
+        + 'Confirm this is actually handled before resolving \u2014 this doesn\'t dispatch anything, call anyone, or notify the guest on its own, it only records that it\'s been handled.'
+        + (incident.trailName ? ' Trail: ' + escapeHtml(incident.trailName) + '.' : '')
+        + '</div>'
+        + gridHtml
+        + (incident.otherNotes ? '<div class="resolve-quote incident-notes-log">' + escapeHtml(incident.otherNotes) + '</div>' : '')
+        + '<textarea id="resolve-notes" placeholder="Staff notes (optional) \u2014 how this was resolved"></textarea>'
+        + '<div class="resolve-panel-footer">'
+        + '<button class="ops-btn-secondary" id="resolve-cancel">Cancel</button>'
+        + '<button class="ops-btn" id="resolve-confirm">Mark Resolved</button>'
+        + '</div></div>';
+
+      document.getElementById('resolve-cancel').addEventListener('click', function () { container.innerHTML = ''; });
+      document.getElementById('resolve-confirm').addEventListener('click', function () {
+        var notes = document.getElementById('resolve-notes').value;
+        OpsShell.opsCall('resolveOpsAlert', { alertId: alertId, notes: notes, bookingId: row.bookingId, alertType: row.alertType }).then(function (confirmResult) {
+          if (!confirmResult.ok) { showError('Could not resolve that alert. Please try again.'); return; }
+          container.innerHTML = '';
+          loadAlerts();
+        });
       });
     });
   }
