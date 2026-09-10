@@ -2449,15 +2449,26 @@
     return wrap;
   }
 
-  // Certify screen (Part 5) -- replaces a personal liability waiver
-  // entirely for this persona, per the approved copy doc: no scroll-
-  // gated agreement (there's no liability to accept, this person isn't
-  // attending), no emergency contact (not relevant to someone who isn't
-  // on the trail). Just the one real certification action, reusing
-  // saveWaiverSignature exactly as the attending-guardian self-declare
-  // path does (isGuardian + guardianForChildrenParticipantIds), since the
-  // backend already treats that as a complete, valid certification on
-  // its own -- no waiver-specific fields are required server-side.
+  // Certify screen (Part 5) -- FIXED (2026-09-10, live-test finding):
+  // this used to skip the actual waiver/release-of-liability text
+  // entirely, asking only for a typed name confirming the family
+  // relationship. That was a deliberate call from the original copy-pass
+  // proposal ("no scroll-gated agreement, there's no liability to accept,
+  // this person isn't attending") -- correct that THIS guardian has no
+  // personal participation risk of their own, but that reasoning
+  // conflated the guardian's own risk with the MINOR's participation
+  // risk, which still needs a real release, read and agreed to by the
+  // responsible adult on the child's behalf. Now reuses the same
+  // scroll-gated waiver display as the attending-guardian self-declare
+  // path (renderWaiver's renderSign, above) -- same document, same
+  // state.ctx.waiverContent getSignerContext already fetches for every
+  // signer (guardian_only included, see lib/waiver-service.js), same
+  // saveWaiverSignature submission -- just framed for someone agreeing on
+  // a child's behalf rather than for their own participation. No
+  // emergency contact section: unlike the attending path, this persona
+  // has no personal-participation-risk block to attach one to, and the
+  // guardian hub's own "The Day" tile already establishes this guardian
+  // as PSAC's first call if anything comes up.
   function renderGuardianOnlyCertify() {
     var myMinors = (state.ctx.minors || []).filter(function (m) { return m.preAssignedToThisSigner; });
     var childNames = myMinors.map(function (m) { return m.name; }).filter(Boolean);
@@ -2465,18 +2476,53 @@
     var ownerName = state.ctx.ownerName || 'Your trip organizer';
     var alreadyCertified = myMinors.length > 0 && myMinors.every(function (m) { return m.alreadyVerified; });
 
+    if (alreadyCertified) {
+      var doneWrap = h(
+        '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+        '<div class="ap-back-link" id="sb-guardian-back" style="cursor:pointer;">&larr; Back to Adventure Home</div>' +
+        '<div class="ap-eyebrow">' + childLabel + '\u2019s Waiver</div>' +
+        '<div class="ap-q-title">Confirmed.</div>' +
+        '<div class="ap-q-help">You\u2019ve already read and agreed to the waiver on ' + childLabel + '\u2019s behalf, as their parent or legal guardian.</div>' +
+        '<div class="ap-cta-secondary" id="sb-guardian-save-return" style="cursor:pointer;">Back to Adventure Home</div>' +
+        '</div></div>'
+      );
+      doneWrap.querySelector('#sb-guardian-back').addEventListener('click', goHub);
+      doneWrap.querySelector('#sb-guardian-save-return').addEventListener('click', goHub);
+      return doneWrap;
+    }
+
+    var wc = state.ctx.waiverContent || {};
+    var version = wc.version || 'v1.5';
+    var statusTag = wc.statusTag == null ? 'Draft: Pending Final Attorney Review' : wc.statusTag;
+    var bodyHtml = wc.bodyHtml || '<p>Waiver text is not available right now. Reply to whoever invited you and we\u2019ll help you finish this.</p>';
+    var scrolledToEnd = false;
+    var checked = false;
+
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       '<div class="ap-back-link" id="sb-guardian-back" style="cursor:pointer;">&larr; Back to Adventure Home</div>' +
       '<div class="ap-eyebrow">' + childLabel + '\u2019s Waiver</div>' +
-      '<div class="ap-q-title">Confirm you\u2019re ' + childLabel + '\u2019s parent or guardian.</div>' +
-      '<div class="ap-q-help">' + escapeHtml(ownerName) + ' named you as the person responsible for ' + childLabel + ' on this adventure. This confirms it on our end, so ' + childLabel + '\u2019s on record with a real adult accountable for them, not just a name on someone else\u2019s roster.</div>' +
+      '<div class="ap-q-title">Read and sign on ' + childLabel + '\u2019s behalf.</div>' +
+      '<div class="ap-q-help">' + escapeHtml(ownerName) + ' named you as the person responsible for ' + childLabel + ' on this adventure. Scroll through the full agreement below, then confirm at the bottom as ' + childLabel + '\u2019s parent or legal guardian.</div>' +
       '<div class="ap-card">' +
+      '<div class="ap-waiver-scroll" id="sb-guardian-waiver-scroll">' +
+      '<div class="doc-title"><div class="doc-name">PALM SPRINGS ADVENTURE CLUB</div>' +
+      '<div class="doc-sub">Participant Agreement and Acknowledgment of Risk</div>' +
+      '<div class="doc-version">Version ' + escapeHtml(String(version).replace(/^v/i, '')) + '</div></div>' +
+      (statusTag ? '<div class="ap-draft-tag">' + escapeHtml(statusTag) + '</div>' : '') +
+      bodyHtml +
+      '<p style="font-style:italic; color:var(--ap-muted); font-size:0.68rem;">[Signed electronically as the name you type below, on behalf of ' + childLabel + ', with a timestamped record kept on file, upon tapping \u201cConfirm.\u201d]</p>' +
+      '</div>' +
+      '<div class="ap-scroll-hint" id="sb-guardian-scroll-hint">&#8595; Scroll to review the full agreement</div>' +
+      '<div class="ap-agree-row disabled" id="sb-guardian-agree-row">' +
+      '<div class="ap-agree-box" id="sb-guardian-agree-box"></div>' +
+      '<div class="ap-agree-text">I have read and agree to the Palm Springs Adventure Club waiver and release of liability, as ' + childLabel + '\u2019s parent or legal guardian.</div>' +
+      '</div>' +
       '<div class="ap-field-label">Type your full legal name to confirm</div>' +
       '<input class="ap-field-input" type="text" id="sb-guardian-name" placeholder="Full legal name" value="' + escapeHtml(state.waiverName) + '">' +
       '<div id="sb-guardian-certify-error" class="ap-error"></div>' +
       '</div>' +
-      '<button type="button" class="ap-cta-primary" id="sb-guardian-certify-cta"' + (alreadyCertified ? ' disabled' : '') + '>' + (alreadyCertified ? 'Confirmed' : 'Confirm') + '</button>' +
+      '<button type="button" class="ap-cta-primary" id="sb-guardian-certify-cta" disabled>Confirm</button>' +
       '<div class="ap-cta-secondary" id="sb-guardian-save-return" style="cursor:pointer;">Back to Adventure Home</div>' +
       '</div></div>'
     );
@@ -2484,40 +2530,73 @@
     wrap.querySelector('#sb-guardian-back').addEventListener('click', goHub);
     wrap.querySelector('#sb-guardian-save-return').addEventListener('click', goHub);
 
+    var scrollBox = wrap.querySelector('#sb-guardian-waiver-scroll');
+    var hint = wrap.querySelector('#sb-guardian-scroll-hint');
+    var agreeRow = wrap.querySelector('#sb-guardian-agree-row');
+    var agreeBox = wrap.querySelector('#sb-guardian-agree-box');
     var nameInput = wrap.querySelector('#sb-guardian-name');
     var cta = wrap.querySelector('#sb-guardian-certify-cta');
-    if (!alreadyCertified) {
-      cta.addEventListener('click', function () {
-        var name = (nameInput.value || '').trim();
-        if (!name) {
-          wrap.querySelector('#sb-guardian-certify-error').textContent = 'Enter your full legal name to confirm.';
+
+    // Same scroll-gated pattern as renderWaiver's renderSign above,
+    // including the same detached-node zero-height fallback -- this runs
+    // synchronously from render(), before root.appendChild(frag) attaches
+    // it, so scrollHeight/clientHeight both read 0 until the next tick.
+    scrollBox.addEventListener('scroll', function () {
+      if (scrolledToEnd) return;
+      if (scrollBox.scrollTop + scrollBox.clientHeight >= scrollBox.scrollHeight - 6) {
+        scrolledToEnd = true;
+        agreeRow.classList.remove('disabled');
+        hint.textContent = 'You\u2019ve reviewed the full agreement. Tap the checkbox to confirm.';
+        hint.classList.add('done');
+      }
+    });
+    setTimeout(function () {
+      if (scrolledToEnd) return;
+      if (scrollBox.scrollHeight <= scrollBox.clientHeight + 6) {
+        scrolledToEnd = true;
+        agreeRow.classList.remove('disabled');
+        hint.textContent = 'You\u2019ve reviewed the full agreement. Tap the checkbox to confirm.';
+        hint.classList.add('done');
+      }
+    }, 0);
+    agreeRow.addEventListener('click', function () {
+      if (!scrolledToEnd) return;
+      checked = !checked;
+      agreeBox.classList.toggle('checked', checked);
+      agreeBox.innerHTML = checked ? '&check;' : '';
+      cta.disabled = !checked;
+    });
+
+    cta.addEventListener('click', function () {
+      var name = (nameInput.value || '').trim();
+      if (!name) {
+        wrap.querySelector('#sb-guardian-certify-error').textContent = 'Enter your full legal name to confirm.';
+        return;
+      }
+      state.waiverName = name;
+      cta.disabled = true;
+      var minorIds = myMinors.map(function (m) { return m.participantId; });
+      var participantsCovered = [name].concat(childNames);
+      apiPost('/api/waiver', {
+        action: 'saveWaiverSignature',
+        signerToken: SIGNER_TOKEN,
+        signerName: name,
+        isGuardian: true,
+        guardianForChildrenParticipantIds: minorIds,
+        participantsCovered: participantsCovered,
+      }).then(function (res) {
+        if (!res.ok) {
+          cta.disabled = false;
+          wrap.querySelector('#sb-guardian-certify-error').textContent = 'Something went wrong saving your confirmation, try again.';
           return;
         }
-        state.waiverName = name;
-        cta.disabled = true;
-        var minorIds = myMinors.map(function (m) { return m.participantId; });
-        var participantsCovered = [name].concat(childNames);
-        apiPost('/api/waiver', {
-          action: 'saveWaiverSignature',
-          signerToken: SIGNER_TOKEN,
-          signerName: name,
-          isGuardian: true,
-          guardianForChildrenParticipantIds: minorIds,
-          participantsCovered: participantsCovered,
-        }).then(function (res) {
-          if (!res.ok) {
-            cta.disabled = false;
-            wrap.querySelector('#sb-guardian-certify-error').textContent = 'Something went wrong saving your confirmation, try again.';
-            return;
-          }
-          state.ctx.minors = (state.ctx.minors || []).map(function (m) {
-            return minorIds.indexOf(m.participantId) !== -1 ? Object.assign({}, m, { alreadyVerified: true }) : m;
-          });
-          state.ctx.signer = Object.assign({}, state.ctx.signer, { status: 'signed', guardianForChildrenParticipantIds: minorIds });
-          goHub();
+        state.ctx.minors = (state.ctx.minors || []).map(function (m) {
+          return minorIds.indexOf(m.participantId) !== -1 ? Object.assign({}, m, { alreadyVerified: true }) : m;
         });
+        state.ctx.signer = Object.assign({}, state.ctx.signer, { status: 'signed', guardianForChildrenParticipantIds: minorIds });
+        goHub();
       });
-    }
+    });
 
     return wrap;
   }
