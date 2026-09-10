@@ -339,6 +339,14 @@
       var html = '<div class="paf-q"><span class="paf-req">*</span> Who\'s coming?</div>';
       html += '<div class="paf-sub">How many people, including you?</div>';
       html += '<select class="paf-headcount-select" data-field="headcount"></select>';
+      // Booking Flow Copy Handoff (Sinek/Godin/Miller pass, 2026-09-10),
+      // item 1: makes the existing 18+/guardian-waiver rule explicit
+      // rather than leaving it implicit. Placed here, outside the
+      // (initially hidden) roster div, so it's visible for every group
+      // size the moment this card renders, including a solo booker
+      // traveling with just one minor -- not gated behind picking a
+      // headcount first.
+      html += '<div class="paf-guardian-callout">Bringing anyone under 18? They\'re always welcome. A legal guardian just needs to sign a waiver for them before gear delivery, so we always have a real adult accountable for each kid. <span class="paf-guardian-callout-fineprint">(Booking has to be done by someone 18+.)</span></div>';
       html += '<div class="paf-roster" data-field="roster" style="display:none;">' +
         '<div class="paf-roster-sub">Tell us a little about who\'s coming, including name, age range, and fitness level.</div>' +
         '<div class="paf-roster-rows" data-field="roster_rows"></div>' +
@@ -1108,7 +1116,13 @@
       });
 
       var html = '<div class="paf-q"><span class="paf-req">*</span> Who needs a gear kit?</div>';
-      html += '<div class="paf-sub">Every booking includes at least one. Everyone 14 and up gets their own: ' +
+      // Booking Flow Copy Handoff (Sinek/Godin/Miller pass, 2026-09-10),
+      // item 2: adds the desert-specific why before the item list, and
+      // softens "everyone 14 and up gets their own" from a stated fact to
+      // "we recommend," matching the actual toggle behavior below (a
+      // default, not a lock). Closing line unchanged, it's the relief
+      // beat, not filler.
+      html += '<div class="paf-sub">Every booking includes at least one gear kit. We recommend everyone 14 and up gets their own so everyone can carry enough water, electrolytes, and snacks for an adventure in the desert. Each kit includes: ' +
         BASE_GEAR_COPY + '. Everything you need for the trail. Nothing for you to source.</div>';
       html += '<button type="button" class="paf-kit-disclosure" data-field="disclosure">What\'s inside a gear kit? <span data-field="disclosure-icon">+</span></button>';
       html += '<div class="paf-kit-details" data-field="details" style="display:none;">' +
@@ -1195,6 +1209,11 @@
     var c = cardShell('kit', true);
     c.render = function (root) {
       var html = '<div class="paf-q">Almost there. How should we reach you?</div>';
+      // Booking Flow Copy Handoff (Sinek/Godin/Miller pass, 2026-09-10),
+      // item 3: states the two real reasons we're asking (pre-trip
+      // delivery coordination, a real contact channel on trail day)
+      // instead of a vague, company-centered line.
+      html += '<div class="paf-sub">So we have a fast way to reach you, before your trail day and if anything comes up while you\'re on the trail.</div>';
       html += '<input type="text" class="paf-text-input" data-field="contact_name" placeholder="Name" value="' + esc(state.answers.contact_name) + '" style="margin-bottom:0.9rem;">';
       html += '<input type="email" class="paf-text-input" data-field="contact_email" placeholder="Email *" value="' + esc(state.answers.contact_email) + '" style="margin-bottom:0.9rem;">';
       html += '<input type="tel" class="paf-text-input" data-field="contact_phone" placeholder="Phone *" value="' + esc(state.answers.contact_phone) + '">';
