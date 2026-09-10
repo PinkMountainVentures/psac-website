@@ -45,6 +45,14 @@
     {
       "path": "/api/send-trip-plus-one-email",
       "schedule": "12,27,42,57 * * * *"
+    },
+    {
+      "path": "/api/send-gear-on-its-way",
+      "schedule": "*/15 1,2,3,4 * * *"
+    },
+    {
+      "path": "/api/send-trail-day-message",
+      "schedule": "*/15 14,15,16,17 * * *"
     }
   ],
   "redirects": [

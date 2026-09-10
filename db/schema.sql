@@ -307,6 +307,12 @@ CREATE TABLE IF NOT EXISTS experience_bookings (
   phone_fallback_due         BOOLEAN,
   reconciled_at              TIMESTAMPTZ,
   reconciled_amount_cents    INTEGER,
+  -- NEW (2026-09-10) -- dedup markers for the two new crons that wire up
+  -- the previously-unwired gear-on-its-way (T-1 evening) and trail-day
+  -- (T-0 morning) messages. See
+  -- db/2026-09-10_add_gear_on_its_way_and_trail_day_dedup.sql.
+  gear_on_its_way_sent_at    TIMESTAMPTZ,
+  trail_day_message_sent_at  TIMESTAMPTZ,
   gear_shortfall_cents       INTEGER,
   shortfall_charge_id        TEXT,
   shortfall_charged_amount_cents INTEGER,

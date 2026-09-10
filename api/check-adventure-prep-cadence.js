@@ -70,13 +70,18 @@
 'use strict';
 
 const cadenceService = require('../lib/cadence-service');
+const waiverService = require('../lib/waiver-service');
 const { determineCadenceStage } = require('../lib/cadence');
 const { sendEmail } = require('../lib/send-email');
 const { renderAdventurePrepT7NudgeEmail } = require('../lib/email-templates/adventure-prep-t7-nudge-email');
 const { renderStallReminderEmail } = require('../lib/email-templates/adventure-prep-stall-reminder-email');
+const { renderSignerWaiverReminderEmail, subjectFor: signerReminderSubjectFor } = require('../lib/email-templates/signer-waiver-reminder-email');
+const { sendStallReminderActionNeededSms } = require('../lib/send-adventure-prep-stall-reminder-sms');
+const { sendSignerWaiverReminderSms } = require('../lib/send-signer-waiver-reminder-sms');
 const { getSiteUrl } = require('../lib/site-url');
 
 const ADVENTURE_PREP_BASE_URL = `${getSiteUrl()}/complete-adventure-prep`;
+const SIGN_WAIVER_BASE_URL = `${getSiteUrl()}/sign-waiver`;
 
 function checkCronAuth(req) {
   // BUG FIX (payment-review, Aug 2026, Medium #44): 'Bearer ' + undefined
@@ -98,6 +103,47 @@ function formatTripDate(isoDateStr) {
 
 function adventurePrepLinkFor(token) {
   return `${ADVENTURE_PREP_BASE_URL}?token=${encodeURIComponent(token || '')}`;
+}
+
+function signerUrlFor(signerToken) {
+  return `${SIGN_WAIVER_BASE_URL}?token=${encodeURIComponent(signerToken || '')}`;
+}
+
+/**
+ * NEW (Sept 2026 SMS build): the per-signer equivalent of this booking's
+ * own unified stall reminder -- one email (both stages) plus one SMS
+ * (t3 'action_needed' only, per Airey's "hard deadlines only" scope
+ * call) to every non-owner signer who still hasn't signed, reminding
+ * them of the one thing only they can do. Piggybacks on the SAME
+ * booking_cadence_log marker the caller already recorded for this stage
+ * (recordStageSent runs before this is ever reached), so this never
+ * double-sends on a retried/duplicate tick any more than the booker's
+ * own send does.
+ */
+async function sendSignerReminders({ bookingId, ownerName, tripDateFormatted, variant, logoUrl }) {
+  const signers = await waiverService.getIncompleteSignersForReminder(bookingId);
+  const results = [];
+  for (const signer of signers) {
+    const signerUrl = signerUrlFor(signer.signerToken);
+    if (signer.signerEmail) {
+      const html = renderSignerWaiverReminderEmail({
+        logoUrl, signerName: signer.signerName, ownerName, tripDateFormatted, signerUrl, variant,
+      });
+      await sendEmail({ to: signer.signerEmail, subject: signerReminderSubjectFor(variant), html });
+    }
+    let smsResult = { status: 'skipped', reason: 'sms not sent at this stage' };
+    if (variant === 'action_needed') {
+      smsResult = await sendSignerWaiverReminderSms({
+        signerPhone: signer.signerPhone,
+        smsConsent: signer.smsConsent,
+        ownerName,
+        tripDateFormatted,
+        signerUrl,
+      });
+    }
+    results.push({ signatureId: signer.signatureId, emailSent: !!signer.signerEmail, sms: smsResult.status });
+  }
+  return results;
 }
 
 async function processOneBooking(bookingSummary, now) {
@@ -179,6 +225,9 @@ async function processOneBooking(bookingSummary, now) {
     if (ctx.contactEmail) {
       await sendEmail({ to: ctx.contactEmail, subject: 'Still a few things needed before your trail day', html });
     }
+    // NEW (Sept 2026 SMS build): per-signer email reminder, no SMS at
+    // this stage -- see sendSignerReminders' own header.
+    await sendSignerReminders({ bookingId: ctx.bookingId, ownerName: ctx.contactName, tripDateFormatted, variant: 'reminder', logoUrl });
     return { bookingId: ctx.bookingId, outcome: 'sent', stage, isCompressed };
   }
 
@@ -198,6 +247,19 @@ async function processOneBooking(bookingSummary, now) {
     if (ctx.contactEmail) {
       await sendEmail({ to: ctx.contactEmail, subject: 'Action needed by 10pm tonight to keep your reservation', html });
     }
+    // NEW (Sept 2026 SMS build): the booker's own SMS counterpart, T-3
+    // morning only, per Airey's "hard deadlines only" scope call.
+    await sendStallReminderActionNeededSms({
+      phone: ctx.contactPhone,
+      smsConsent: ctx.smsConsent,
+      tripDateFormatted,
+      adventurePrepLink,
+      tracks: { assignedAtMissing, waiverIncomplete, addressMissing },
+    });
+    // NEW (Sept 2026 SMS build): per-signer email + SMS reminder -- the
+    // Surface B equivalent of the booker's own T-3 action-needed send,
+    // for every signer who still has their own action to take.
+    await sendSignerReminders({ bookingId: ctx.bookingId, ownerName: ctx.contactName, tripDateFormatted, variant: 'action_needed', logoUrl });
     return { bookingId: ctx.bookingId, outcome: 'sent', stage: 't3', isCompressed };
   }
 

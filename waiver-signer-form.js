@@ -1401,7 +1401,7 @@
       wrapRL.querySelector('#sb-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
       wrapRL.querySelector('#sb-triage-tohub2').addEventListener('click', goHub);
       wrapRL.querySelector('#sb-checkin-rwgps-link').addEventListener('click', function () {
-        window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
+        window.open(state.ctx.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
       });
       Array.prototype.forEach.call(wrapRL.querySelectorAll('#sb-checkin-remaining .ap-window-opt'), function (el) {
         el.addEventListener('click', function () {
@@ -2124,7 +2124,7 @@
     // markGuideOpened call shouldn't block or error out opening the
     // actual guide.
     function openGuide() {
-      window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
+      window.open(state.ctx.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
       if (!state.ctx.guideFirstOpenedAt) {
         state.ctx.guideFirstOpenedAt = new Date().toISOString();
         apiPost('/api/waiver', { action: 'markGuideOpened', signerToken: SIGNER_TOKEN }).catch(function () {});
@@ -2422,7 +2422,7 @@
     });
     var guardianGuideBtn = wrap.querySelector('#sb-guardian-get-guide');
     if (guardianGuideBtn) guardianGuideBtn.addEventListener('click', function () {
-      window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
+      window.open(state.ctx.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
     });
     var guardianHowtoBtn = wrap.querySelector('#sb-guardian-guide-howto');
     if (guardianHowtoBtn) guardianHowtoBtn.addEventListener('click', function () { state.step = 'ridewithgpsInfo'; render(); });
@@ -3129,7 +3129,7 @@
     wrap.querySelector('#sb-rwgps-back').addEventListener('click', goHub);
     wrap.querySelector('#sb-rwgps-back-2').addEventListener('click', goHub);
     wrap.querySelector('#sb-rwgps-open').addEventListener('click', function () {
-      window.open((state.ctx.rideWithGpsExperienceAccess) || 'https://ridewithgps.com/', '_blank');
+      window.open(state.ctx.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
     });
     return wrap;
   }

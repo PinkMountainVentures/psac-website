@@ -2430,7 +2430,7 @@
     // reload. Fire-and-forget: a failed markGuideOpened call shouldn't
     // block or error out opening the actual guide.
     function openGuide() {
-      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || ap.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
       if (!ap.guideFirstOpenedAt) {
         ap.guideFirstOpenedAt = new Date().toISOString();
         apiPost('/api/adventure-prep', { action: 'markGuideOpened', token: TOKEN }).catch(function () {});
@@ -5299,7 +5299,7 @@
     wrap.querySelector('#ap-back-to-hub').addEventListener('click', function () { state.step = 'hub'; render(); });
     var guideBtn = wrap.querySelector('#ap-get-guide');
     if (guideBtn) guideBtn.addEventListener('click', function () {
-      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || ap.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
     });
     return wrap;
   }
@@ -5333,7 +5333,7 @@
     wrap.querySelector('#ap-rwgps-back').addEventListener('click', function () { state.step = 'hub'; render(); });
     wrap.querySelector('#ap-rwgps-back-2').addEventListener('click', function () { state.step = 'hub'; render(); });
     wrap.querySelector('#ap-rwgps-open').addEventListener('click', function () {
-      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+      window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || ap.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
     });
     return wrap;
   }
@@ -5788,7 +5788,7 @@
       wrapRL.querySelector('#ap-triage-reselect').addEventListener('click', function () { state.checkinCategory = null; render(); });
       wrapRL.querySelector('#ap-triage-tohub2').addEventListener('click', goHub);
       wrapRL.querySelector('#ap-checkin-rwgps-link').addEventListener('click', function () {
-        window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || 'https://ridewithgps.com/', '_blank');
+        window.open((ap.rideWithGpsExperienceAccess && ap.rideWithGpsExperienceAccess.url) || ap.ridewithgpsLink || 'https://ridewithgps.com/', '_blank');
       });
       Array.prototype.forEach.call(wrapRL.querySelectorAll('#ap-checkin-remaining .ap-window-opt'), function (el) {
         el.addEventListener('click', function () {

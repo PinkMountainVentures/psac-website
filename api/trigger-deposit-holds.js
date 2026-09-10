@@ -50,6 +50,7 @@ const gearService = require('../lib/gear-service');
 const holdClearanceService = require('../lib/hold-clearance-service');
 const { sendEmail } = require('../lib/send-email');
 const { renderDepositHoldFailedEmail } = require('../lib/email-templates/deposit-hold-failed-email');
+const { sendDepositHoldFailedSms } = require('../lib/send-deposit-hold-failed-sms');
 const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = require('../lib/cadence');
 const { getSiteUrl } = require('../lib/site-url');
 
@@ -150,6 +151,23 @@ async function processOneBooking(booking, now) {
     });
     await sendEmail({ to: booking.contactEmail, subject: 'Action needed within 2 hours, your gear hold didn’t go through', html });
   }
+
+  // NEW (Sept 2026 SMS build): the SMS counterpart to the email above,
+  // gated on this booking's own contact.smsConsent/contactPhone (now
+  // returned by holdClearanceService.listBookingsForTripDate). One of
+  // only two touchpoints given an SMS variant this round, per Airey's
+  // "hard deadlines only" scope call -- this is a genuinely time-boxed,
+  // hours-not-days send, exactly the shape this project's SMS channel is
+  // for. A send failure here never blocks anything else in this handler,
+  // same posture as the email above (lib/send-sms.js's own header).
+  await sendDepositHoldFailedSms({
+    phone: booking.contactPhone,
+    smsConsent: booking.smsConsent,
+    tripDateFormatted: formatTripDate(booking.tripDate),
+    deadlineTimeFormatted: formatDeadlineTime(now),
+    updatePaymentLink: `${getSiteUrl()}/update-payment-method?bookingId=`
+      + encodeURIComponent(booking.bookingId) + '&token=' + encodeURIComponent(booking.adventurePrepToken || ''),
+  });
 
   return { bookingId: booking.bookingId, outcome: holdResult.status, alertId: alert && alert.alertId };
 }
