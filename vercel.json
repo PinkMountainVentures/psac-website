@@ -57,6 +57,11 @@
       "source": "/membership",
       "destination": "/",
       "permanent": false
+    },
+    {
+      "source": "/u/:token",
+      "destination": "/ops-gear-units.html?unit=:token",
+      "permanent": false
     }
   ],
   "headers": [
