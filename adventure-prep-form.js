@@ -845,6 +845,7 @@
       case 'trailReturnRoster': frag = renderTrailReturnRosterSheet(); break;
       case 'trailCheckinTriage': frag = renderTrailCheckinTriage(); break;
       case 'waiverDetail': frag = renderWaiverDetail(); break;
+      case 'updateCard': frag = renderUpdateCard(); break;
       default: frag = renderHub();
     }
     root.appendChild(frag);
@@ -1092,6 +1093,38 @@
   // salmon accents) so every icon on the hub reads as one consistent set.
   var ALERT_ICON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#2A4747" stroke-width="1.4"/><path d="M12 7.6v6" stroke="#F58271" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1.15" fill="#F58271"/></svg>';
   var LOCK_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="5.5" y="10.3" width="13" height="10.2" rx="2" stroke="#2A4747" stroke-width="1.4"/><path d="M8.2 10.3V7.7a3.8 3.8 0 0 1 7.6 0v2.6" stroke="#2A4747" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="15.1" r="1.2" fill="#F58271"/><path d="M12 16.3v1.5" stroke="#F58271" stroke-width="1.3" stroke-linecap="round"/></svg>';
+
+  // Payment/card-capture consolidation (2026-09-11), items 4 + 5. One
+  // shared builder for the Hub's deposit-hold status, covering all three
+  // states a booking can actually be in:
+  //   - no hold attempted yet (depositStatus null/'scheduled_t1') -- the
+  //     existing quiet note, now with a real "Update your card" entry
+  //     point (item 4: this used to have no link at all).
+  //   - a hold that failed / needs 3DS action / had no card on file at
+  //     all (depositStatus 'failed'/'requires_action'/'unavailable') --
+  //     a real "Action Needed" alert, using the exact same .ap-alert/
+  //     ALERT_ICON_SVG treatment the waiver-lock alert above already
+  //     uses (item 5: the Hub used to go completely silent here -- the
+  //     email/SMS pair were the only place a guest could learn anything
+  //     was wrong).
+  //   - anything else (held / released / captured / not_applicable /
+  //     skipped) -- nothing to show, the deposit story is settled.
+  // Both call sites below (renderHub's main note and renderPlanning's
+  // gear-confirmation recap) share this so the copy and the entry point
+  // never drift apart between the two places it can appear.
+  function buildDepositStatusHtml(eb, depositAmount) {
+    var depositStatus = eb.depositStatus || '';
+    if (depositStatus === 'failed' || depositStatus === 'requires_action' || depositStatus === 'unavailable') {
+      var actionBody = depositStatus === 'requires_action'
+        ? 'Your card needs one more verification step before we can place it.'
+        : 'The card on file didn’t go through.';
+      return '<div class="ap-alert"><div class="ap-alert-icon">' + ALERT_ICON_SVG + '</div><div class="ap-alert-text"><b>Action needed: your $' + depositAmount + ' refundable gear deposit hold couldn’t be placed.</b><br>' + actionBody + ' Please update your payment method as soon as you can — an unresolved hold can affect your gear delivery. <span id="ap-deposit-update-card" style="cursor:pointer;text-decoration:underline;font-weight:600;">Update your card &rarr;</span></div></div>';
+    }
+    if (!depositStatus || depositStatus === 'scheduled_t1') {
+      return '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens. <span id="ap-deposit-update-card" style="cursor:pointer;text-decoration:underline;">Update your card</span> if it’s changed.</div>';
+    }
+    return '';
+  }
 
   function renderMessage(title, body) {
     root.innerHTML = '';
@@ -2339,8 +2372,7 @@
     // (held/failed/unavailable/requires_action/skipped), so "not yet at
     // scheduled_t1" is the correct signal to stop promising something
     // that already happened (or was already attempted).
-    var depositHoldAttempted = !!eb.depositStatus && eb.depositStatus !== 'scheduled_t1';
-    var depositNoteHtml = depositHoldAttempted ? '' : '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>';
+    var depositNoteHtml = buildDepositStatusHtml(eb, depositAmount);
 
     // T-3+ embedded Adventure Summary receipt (Airey's direct request,
     // round 3, 2026-09-04): the full renderSummary() card, not a tile
@@ -2415,6 +2447,8 @@
         if (t && t.onClick) t.onClick();
       });
     });
+    var depositUpdateCardLink = wrap.querySelector('#ap-deposit-update-card');
+    if (depositUpdateCardLink) depositUpdateCardLink.addEventListener('click', function () { state.step = 'updateCard'; render(); });
     var prepToggle = wrap.querySelector('#ap-prep-toggle');
     if (prepToggle) prepToggle.addEventListener('click', function () {
       prepToggle.classList.toggle('is-open');
@@ -4811,12 +4845,14 @@
         pickupRowsHtml +
         '</div>' +
         '</div>' +
-        (eb.depositStatus && eb.depositStatus !== 'scheduled_t1' ? '' : '<div class="ap-deposit-note">One more thing: a <b>$' + depositAmount + ' refundable gear deposit hold</b> gets placed on your card the day before your adventure day (the day your gear arrives). We’ll let you know right before it happens.</div>') +
+        buildDepositStatusHtml(eb, depositAmount) +
         '<button type="button" class="ap-cta-primary" id="ap-continue-waivers">Continue to Waivers</button>' +
         '<div class="ap-cta-secondary" id="ap-return-hub" style="cursor:pointer;">Save &amp; return to Adventure Home</div>';
       contentEl.querySelector('#ap-flow-back').addEventListener('click', goHub);
       contentEl.querySelector('#ap-continue-waivers').addEventListener('click', function () { state.gearStep = 0; state.step = 'waiver'; render(); });
       contentEl.querySelector('#ap-return-hub').addEventListener('click', goHub);
+      var depositUpdateCardLink = contentEl.querySelector('#ap-deposit-update-card');
+      if (depositUpdateCardLink) depositUpdateCardLink.addEventListener('click', function () { state.step = 'updateCard'; render(); });
     }
 
     if (state.gearStep === 0) renderKitScreen();
@@ -5337,6 +5373,185 @@
     });
     return wrap;
   }
+
+  // ---------------------------------------------------------------------
+  // Payment/card-capture consolidation (2026-09-11): guest-facing "Update
+  // Card" screen, folded into the Hub itself rather than staying the
+  // standalone update-payment-method.html page — every other guest
+  // touchpoint links back to the Hub, this is the one that's being fixed
+  // to match. Reused, unchanged: the SetupIntent / Payment Element /
+  // save-as-default Stripe mechanics from that original page. New here:
+  // the name field is prefilled from the guestName the backend already
+  // computes (api/create-payment-update-session.js), and — the most
+  // important part — a session opened to recover a FAILED hold chains an
+  // immediate retry after the card save succeeds (api/save-updated-
+  // payment-method.js's own holdRetry field), instead of showing a
+  // "saved" message that may not have actually fixed anything. See
+  // claude/psac-payment-card-capture-consolidation-proposal-2026-09-11.md.
+  // ---------------------------------------------------------------------
+
+  function renderUpdateCard() {
+    var wrap = h(
+      '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
+      '<div class="ap-back-link" id="ap-updatecard-back" style="cursor:pointer;">&larr; Adventure Home</div>' +
+      '<div class="ap-eyebrow">Payment Method</div>' +
+      '<div id="ap-updatecard-content"></div>' +
+      '</div></div>'
+    );
+    var contentEl = wrap.querySelector('#ap-updatecard-content');
+    function goHub() { state.step = 'hub'; render(); }
+    wrap.querySelector('#ap-updatecard-back').addEventListener('click', goHub);
+
+    function renderLoadingState() {
+      contentEl.innerHTML = '<div class="transition-wrap"><div class="transition-spinner"></div>' +
+        '<div class="transition-line">Loading your payment update&hellip;</div></div>';
+    }
+
+    function renderErrorState(message) {
+      contentEl.innerHTML =
+        '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 0.8rem;color:var(--dark-pine);">We hit a snag.</h2>' +
+        '<p class="ap-sub" style="margin:0 0 1.4rem;">' + escapeHtml(message || 'This link may have expired or already been used. Please reply to the email you received, or reach us at reservations@palmspringsadventureclub.com and we’ll get it sorted directly.') + '</p>' +
+        '<div class="ap-cta-secondary" id="ap-updatecard-error-back" style="cursor:pointer;">&larr; Back to Adventure Home</div>';
+      var backLink = contentEl.querySelector('#ap-updatecard-error-back');
+      if (backLink) backLink.addEventListener('click', goHub);
+    }
+
+    // Reflects a just-completed retry outcome back onto the local hub
+    // state, the same "mirror the server write into state.ctx" posture
+    // saveFields() already uses — so the guest sees the real, current
+    // status immediately on returning to the Hub instead of a stale
+    // 'failed' until their next full page load.
+    function applyHoldRetryToLocalState(holdRetry) {
+      if (!holdRetry || !state.ctx || !state.ctx.experienceBooking) return;
+      var statusMap = { succeeded: 'held', requires_action: 'requires_action', failed: 'failed' };
+      var mapped = statusMap[holdRetry.status];
+      if (mapped) state.ctx.experienceBooking.depositStatus = mapped;
+    }
+
+    function renderOutcomeState(saveBody) {
+      var reason = saveBody.reason;
+      var holdRetry = saveBody.holdRetry;
+      applyHoldRetryToLocalState(holdRetry);
+
+      var title, body, showTryDifferentCard;
+      if (reason !== 'deposit_hold_failed_recovery') {
+        // Pre-hold case — nothing to retry yet, T-1 will use whatever's
+        // on file when it runs.
+        title = 'You’re all set.';
+        body = 'Your new card is saved. We’ll use it for your gear deposit hold the day before your adventure — no need to do anything else here.';
+        showTryDifferentCard = false;
+      } else if (holdRetry && holdRetry.status === 'succeeded') {
+        title = 'Your gear deposit hold is confirmed.';
+        body = 'Your new card worked — the hold is placed and your adventure is fully on track. Nothing else to do here.';
+        showTryDifferentCard = false;
+      } else if (holdRetry && holdRetry.status === 'requires_action') {
+        title = 'Almost there — one more step.';
+        body = 'Your card was saved, but it needs an extra verification step before we can place the hold. Please reply to your booking email or reach us at reservations@palmspringsadventureclub.com so we can help you finish it.';
+        showTryDifferentCard = false;
+      } else {
+        title = 'That card didn’t go through either.';
+        body = 'Your card was saved, but the deposit hold still couldn’t be placed' + (holdRetry && holdRetry.error ? (' (' + escapeHtml(holdRetry.error) + ')') : '') + '. Try a different card below, or reply to your booking email and we’ll help directly.';
+        showTryDifferentCard = true;
+      }
+
+      contentEl.innerHTML =
+        '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 0.8rem;color:var(--dark-pine);">' + escapeHtml(title) + '</h2>' +
+        '<p class="ap-sub" style="margin:0 0 1.4rem;">' + body + '</p>' +
+        (showTryDifferentCard
+          ? '<button type="button" class="ap-cta-primary" id="ap-updatecard-retry">Try a Different Card</button><div class="ap-cta-secondary" id="ap-updatecard-done" style="cursor:pointer;margin-top:0.9rem;">&larr; Back to Adventure Home</div>'
+          : '<button type="button" class="ap-cta-primary" id="ap-updatecard-done">Back to Adventure Home</button>');
+
+      var doneBtn = contentEl.querySelector('#ap-updatecard-done');
+      if (doneBtn) doneBtn.addEventListener('click', goHub);
+      var retryBtn = contentEl.querySelector('#ap-updatecard-retry');
+      if (retryBtn) retryBtn.addEventListener('click', function () { renderLoadingState(); loadSession(); });
+    }
+
+    function renderFormState(session) {
+      contentEl.innerHTML =
+        '<h2 style="font-family:\'Cormorant Garamond\',serif;font-weight:600;font-size:1.5rem;margin:0 0 0.8rem;color:var(--dark-pine);">Update your <em>payment method.</em></h2>' +
+        '<p class="ap-sub" style="margin:0 0 1.4rem;">Add a new card below. Once saved, we’ll use it for your gear deposit hold.</p>' +
+        '<div class="ap-card">' +
+        '<form id="ap-updatecard-form">' +
+        '<div id="ap-payment-element"></div>' +
+        '<button type="submit" class="ap-cta-primary" id="ap-updatecard-submit" style="margin-top:1.2rem;">Save Payment Method</button>' +
+        '<div class="ap-error" id="ap-updatecard-status" style="display:none;"></div>' +
+        '</form>' +
+        '</div>';
+
+      var stripe = window.Stripe ? window.Stripe(session.publishableKey) : null;
+      if (!stripe) { renderErrorState('This page isn’t fully configured yet. Please reply to the email you received and we’ll take care of it directly.'); return; }
+      var elements = stripe.elements({ clientSecret: session.clientSecret });
+      // Also found: the update-card screen asks for a name it already
+      // has (v4 finding) — prefill from the already-computed guestName
+      // instead of asking the guest to retype it. Kept editable, not
+      // hidden: the cardholder can legitimately differ from the account
+      // holder (a parent booking on their own card).
+      var paymentElement = elements.create('payment', {
+        defaultValues: { billingDetails: { name: session.guestName || '' } },
+      });
+      paymentElement.mount('#ap-payment-element');
+
+      var formEl = contentEl.querySelector('#ap-updatecard-form');
+      var submitBtn = contentEl.querySelector('#ap-updatecard-submit');
+      var statusEl = contentEl.querySelector('#ap-updatecard-status');
+
+      formEl.addEventListener('submit', function (e) {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+
+        stripe.confirmSetup({ elements: elements, redirect: 'if_required' }).then(function (result) {
+          if (result.error) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = result.error.message || 'Something went wrong saving your card. Please try again.';
+            submitBtn.disabled = false;
+            return;
+          }
+          var setupIntentId = result.setupIntent && result.setupIntent.id;
+          if (!setupIntentId) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Something went wrong saving your card. Please try again.';
+            submitBtn.disabled = false;
+            return;
+          }
+          return apiPost('/api/save-updated-payment-method', { bookingId: session.bookingId, token: TOKEN, setupIntentId: setupIntentId }).then(function (saveResult) {
+            if (!saveResult.ok || !saveResult.body || !saveResult.body.ok) {
+              statusEl.style.display = 'block';
+              statusEl.textContent = 'Your card was saved with Stripe, but we couldn’t finish updating your booking. Please reply to the email you received so we can confirm it directly.';
+              submitBtn.disabled = false;
+              return;
+            }
+            renderOutcomeState(saveResult.body);
+          });
+        }).catch(function () {
+          statusEl.style.display = 'block';
+          statusEl.textContent = 'Something went wrong. Please try again, or reply to your booking email.';
+          submitBtn.disabled = false;
+        });
+      });
+    }
+
+    function loadSession() {
+      var bookingId = (state.ctx.experienceBooking && state.ctx.experienceBooking.bookingId) || state.ctx.bookingId;
+      apiPost('/api/create-payment-update-session', { bookingId: bookingId, token: TOKEN }).then(function (result) {
+        if (!result.ok || !result.body || !result.body.clientSecret) { renderErrorState(); return; }
+        if (!result.body.publishableKey) { renderErrorState('This page isn’t fully configured yet. Please reply to the email you received and we’ll take care of it directly.'); return; }
+        renderFormState({
+          clientSecret: result.body.clientSecret,
+          publishableKey: result.body.publishableKey,
+          guestName: result.body.guestName || '',
+          bookingId: bookingId,
+        });
+      }).catch(function () { renderErrorState(); });
+    }
+
+    renderLoadingState();
+    loadSession();
+    return wrap;
+  }
+
 
   // ---------------------------------------------------------------------
   // Phase 2.5 Trail Day -- Heading Out roster-confirm sheet (claude/

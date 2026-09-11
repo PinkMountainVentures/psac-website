@@ -60,6 +60,14 @@ const { query } = require('../lib/db');
 const { sendEmail } = require('../lib/send-email');
 const { renderDepositHoldHeadsUpEmail } = require('../lib/email-templates/deposit-hold-heads-up-email');
 const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = require('../lib/cadence');
+const { getSiteUrl } = require('../lib/site-url');
+
+// WIRED (payment/card-capture consolidation, 2026-09-11): same link-back-
+// to-Hub pattern every other guest touchpoint already uses (booking
+// confirmation, T-7 reminder, trail-day message, gear-on-its-way -- see
+// api/check-adventure-prep-cadence.js's own ADVENTURE_PREP_BASE_URL) --
+// never a standalone page.
+const ADVENTURE_PREP_BASE_URL = `${getSiteUrl()}/complete-adventure-prep`;
 
 // Deposit-per-kit — see api/create-deposit-hold.js's own TIERS table, the
 // actual charge logic this mirrors. Kept as a separate copy rather than a
@@ -92,7 +100,7 @@ function checkCronAuth(req) {
 async function listBookingsDueForHeadsUp(tripDate) {
   const rows = await query(
     `SELECT eb.booking_id, eb.contact_email, eb.contact_name, eb.tier, eb.gear_kit_count,
-            ap.confirmed_kit_count
+            eb.adventure_prep_token, ap.confirmed_kit_count
      FROM experience_bookings eb
      LEFT JOIN adventure_prep ap ON ap.booking_id = eb.booking_id
      WHERE eb.date = $1
@@ -109,6 +117,7 @@ async function listBookingsDueForHeadsUp(tripDate) {
       contactName: r.contact_name,
       tier: r.tier || '',
       gearKitCount: hasConfirmedCount ? r.confirmed_kit_count : r.gear_kit_count,
+      adventurePrepToken: r.adventure_prep_token || '',
     };
   });
 }
@@ -174,11 +183,22 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
+      // WIRED (payment/card-capture consolidation, 2026-09-11): omit
+      // the CTA entirely if a booking somehow has no token on file
+      // (shouldn't happen -- every booking mints one at save-booking
+      // time -- but the template's own cardUpdateUrl param is already
+      // optional for exactly this defensive case) rather than link to a
+      // broken/unauthenticated Hub URL.
+      const cardUpdateUrl = b.adventurePrepToken
+        ? `${ADVENTURE_PREP_BASE_URL}?token=${encodeURIComponent(b.adventurePrepToken)}`
+        : undefined;
+
       try {
         const html = renderDepositHoldHeadsUpEmail({
           logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
           depositAmount,
           kitCount,
+          cardUpdateUrl,
         });
         await sendEmail({ to: b.contactEmail, subject: 'Your gear deposit hold is coming', html });
         await markHeadsUpSent(b.bookingId);

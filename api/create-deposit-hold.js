@@ -40,6 +40,7 @@
 // coincidence, a decision made explicitly for this feature.
 var bookingService = require('../lib/booking-service');
 var gearService = require('../lib/gear-service');
+var { resolveChargeableCustomer } = require('../lib/stripe-charge-service');
 
 var TIERS = {
   trail: { name: 'Trail Guide Experience', gear: 65 },
@@ -216,52 +217,27 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Look up the main PaymentIntent on Stripe's side rather than trust a
-    // stored customer/payment method id directly — same "never trust a
-    // stale or client-adjacent value" posture used for the dollar amount
-    // above.
-    var mainRes = await fetch('https://api.stripe.com/v1/payment_intents/' + encodeURIComponent(mainPaymentIntentId), {
-      headers: { 'Authorization': stripeAuthHeader() }
-    });
-    var mainData = await mainRes.json();
-    if (!mainRes.ok) {
-      console.error('Stripe error retrieving main PaymentIntent:', mainData);
+    // Resolves which Stripe Customer/payment method to charge, preferring
+    // the Customer's CURRENT default payment method (set by api/save-
+    // updated-payment-method.js whenever a guest updates their card) over
+    // whatever's frozen on the original main PaymentIntent — see lib/
+    // stripe-charge-service.js's own header for the full "why" (payment/
+    // card-capture consolidation, 2026-09-11, item 6: this used to be
+    // hand-rolled here and, identically, in api/charge-gear-shortfall.js).
+    var chargeable = await resolveChargeableCustomer(mainPaymentIntentId);
+    if (!chargeable.ok) {
+      console.error('Stripe error retrieving main PaymentIntent:', chargeable.error);
       res.status(502).json({ error: 'Could not verify the original payment.' });
       return;
     }
+    var mainData = chargeable.mainPaymentIntent;
     if (mainData.status !== 'succeeded' && mainData.status !== 'processing') {
       res.status(400).json({ error: 'Original payment has not completed.' });
       return;
     }
 
-    var customerId = mainData.customer;
-    var paymentMethodId = mainData.payment_method;
-
-    // BUG FIX (independent bug pass, Aug 2026): prefer the Stripe Customer's
-    // CURRENT default payment method over the one frozen on the original
-    // main PaymentIntent. Without this, a guest who fixes a failed hold via
-    // the "update payment method" page (api/save-updated-payment-method.js,
-    // which sets invoice_settings.default_payment_method on the Customer)
-    // had that fix silently ignored: a retry of this endpoint kept charging
-    // the same, already-declined card off mainData.payment_method, and the
-    // booking got auto-cancelled at noon anyway despite the guest doing
-    // everything asked. Falls back to the original PaymentIntent's payment
-    // method if the Customer has no default set yet (the normal
-    // first-attempt case, where nobody's had to update anything) or if this
-    // lookup itself fails — never hard-fails the hold attempt over it.
-    if (customerId) {
-      try {
-        var customerRes = await fetch('https://api.stripe.com/v1/customers/' + encodeURIComponent(customerId), {
-          headers: { 'Authorization': stripeAuthHeader() }
-        });
-        var customerData = await customerRes.json();
-        if (customerRes.ok && customerData && customerData.invoice_settings && customerData.invoice_settings.default_payment_method) {
-          paymentMethodId = customerData.invoice_settings.default_payment_method;
-        }
-      } catch (custErr) {
-        console.error('create-deposit-hold: Customer default-payment-method lookup failed, falling back to the main PaymentIntent\'s payment method', custErr);
-      }
-    }
+    var customerId = chargeable.customerId;
+    var paymentMethodId = chargeable.paymentMethodId;
 
     if (!customerId || !paymentMethodId) {
       // No saved customer/payment method (e.g. Customer creation failed

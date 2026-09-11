@@ -35,6 +35,7 @@
 'use strict';
 
 const gearService = require('../lib/gear-service');
+const { resolveChargeableCustomer } = require('../lib/stripe-charge-service');
 const { sendEmail } = require('../lib/send-email');
 const { summarizeItems } = require('../lib/gear-item-summary');
 const { renderDepositCaptureExceedingHoldEmail } = require('../lib/email-templates/deposit-capture-exceeding-hold-email');
@@ -59,12 +60,6 @@ function parseBody(req) {
 
 function stripeAuthHeader() {
   return 'Basic ' + Buffer.from(process.env.STRIPE_SECRET_KEY + ':').toString('base64');
-}
-
-async function stripeGet(path) {
-  const res = await fetch('https://api.stripe.com/v1/' + path, { headers: { Authorization: stripeAuthHeader() } });
-  const data = await res.json();
-  return { ok: res.ok, data };
 }
 
 async function stripePost(path, params, idempotencyKey) {
@@ -202,36 +197,25 @@ module.exports = async function handler(req, res) {
       res.status(500).json({ error: 'engineering_error', detail: 'booking has no main PaymentIntent on file' });
       return;
     }
-    const mainRes = await stripeGet('payment_intents/' + encodeURIComponent(ctx.mainPaymentIntentId));
-    if (!mainRes.ok) {
+    // Customer/payment-method resolution (preferring the Customer's
+    // current default payment method over whatever's frozen on the main
+    // PaymentIntent) now lives in lib/stripe-charge-service.js — see that
+    // file's header (payment/card-capture consolidation, 2026-09-11, item
+    // 6). This used to be hand-rolled here and, identically, in api/
+    // create-deposit-hold.js.
+    const chargeable = await resolveChargeableCustomer(ctx.mainPaymentIntentId);
+    if (!chargeable.ok) {
       // BUG FIX (payment-review, Aug 2026, High #18): this used to return a
       // raw 502 with no recordFailure call, unlike every other failure
       // branch in this function — no Ops Alert, no claim release, no guest
       // email, for a real failure to look up the very PaymentIntent this
       // whole charge depends on.
-      await recordFailure(ctx, requestedAmountCents, 'Could not retrieve the main PaymentIntent from Stripe (' + JSON.stringify((mainRes.data && mainRes.data.error) || {}) + ').');
+      await recordFailure(ctx, requestedAmountCents, 'Could not retrieve the main PaymentIntent from Stripe (' + JSON.stringify(chargeable.error || {}) + ').');
       res.status(502).json({ error: 'stripe_error', detail: 'Could not retrieve the main PaymentIntent.' });
       return;
     }
-    const customerId = mainRes.data.customer;
-    let paymentMethodId = mainRes.data.payment_method;
-
-    // Same "prefer the Customer's current default payment method" fix
-    // already established in api/create-deposit-hold.js — a guest who
-    // updated their card after a failed hold shouldn't have that fix
-    // silently ignored here.
-    if (customerId) {
-      try {
-        const customerRes = await fetch('https://api.stripe.com/v1/customers/' + encodeURIComponent(customerId), { headers: { Authorization: stripeAuthHeader() } });
-        const customerData = await customerRes.json();
-        if (customerRes.ok && customerData && customerData.invoice_settings && customerData.invoice_settings.default_payment_method) {
-          paymentMethodId = customerData.invoice_settings.default_payment_method;
-        }
-      } catch (custErr) {
-        // eslint-disable-next-line no-console
-        console.error('charge-gear-shortfall: Customer default-payment-method lookup failed, falling back to the main PaymentIntent\'s payment method', custErr);
-      }
-    }
+    const customerId = chargeable.customerId;
+    const paymentMethodId = chargeable.paymentMethodId;
 
     // chargeableItems is now computed earlier (see High #18 note above);
     // itemsLabel/conditionNote still only needed from here down.

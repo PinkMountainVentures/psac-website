@@ -16,11 +16,25 @@
  * failed hold. The email's "reply to this email" fallback still works
  * regardless if this assumption turns out wrong.
  *
- * This endpoint never re-attempts the hold itself — Section 6's own
- * design keeps hold placement inside api/create-deposit-hold.js /
- * api/trigger-deposit-holds.js, called again the next dispatch-day morning
- * or by staff directly; this endpoint's only job is making sure that next
- * attempt has a working card to charge.
+ * UPDATED (payment/card-capture consolidation, 2026-09-11, item 2): this
+ * endpoint used to stop at "make sure the next attempt has a working
+ * card" — but there was no next attempt: api/trigger-deposit-holds.js's
+ * `due` filter permanently excludes any booking once depositStatus moves
+ * off 'scheduled_t1', and no manual retry existed either. A guest who
+ * updated their card exactly as asked still got auto-cancelled at noon
+ * with no hold ever retried. Fix: when the reason this session was
+ * authorized is `deposit_hold_failed_recovery` (see
+ * lib/payment-update-service.js's allow-list), immediately re-invoke
+ * api/create-deposit-hold.js in-process against this same booking, the
+ * same synthetic req/res technique api/apply-manual-adjustment.js already
+ * uses for kit_count_correction's resize call. create-deposit-hold.js's
+ * own idempotency key already varies with paymentMethodId, so a genuinely
+ * different (just-saved) card gets its own key and is genuinely retried,
+ * not blocked by Stripe's cached response for the old declined card. For
+ * every other reason (e.g. `deposit_hold_not_yet_attempted`, the pre-hold
+ * "upcoming" case), there is nothing to place yet — the hold is
+ * deliberately deferred to T-1, so this endpoint's job stays exactly what
+ * it always was: save the card.
  *
  * MIGRATED (Task 18, 2026-08-31): I/O rewritten against Postgres — see
  * lib/payment-update-service.js (booking/token lookup, card-update audit
@@ -35,6 +49,10 @@
 const { paymentUpdateGetBookingForToken, recordCardUpdated } = require('../lib/payment-update-service');
 const { recordOpsAlert, findOpenAlert } = require('../lib/gear-service');
 const { resolveAlert } = require('../lib/hold-clearance-service');
+// Same in-process handler-call technique api/apply-manual-adjustment.js
+// already uses for kit_count_correction's resize call (see that file's
+// own captureResponse() + resizeDepositHoldForCorrection precedent).
+const createDepositHoldHandler = require('./create-deposit-hold');
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
@@ -61,6 +79,45 @@ async function stripePost(path, form, idempotencyKey) {
     body: new URLSearchParams(form).toString(),
   });
   return res.json();
+}
+
+// Synthetic req/res so api/create-deposit-hold.js's exported handler can
+// be called in-process, the same pattern api/apply-manual-adjustment.js
+// uses for its own resizeDepositHoldForCorrection() call.
+function captureResponse() {
+  const result = { statusCode: 200, body: null };
+  const res = {
+    status(code) { result.statusCode = code; return this; },
+    json(body) { result.body = body; return this; },
+  };
+  return { res, result };
+}
+
+// Re-invokes create-deposit-hold.js against this booking right after a
+// successful card save, only when this session was authorized because an
+// existing hold had already failed — there's a card to actually retry
+// charging. Never throws: a failure here is reported back in the
+// response's holdRetry field, it doesn't undo the card save that already
+// succeeded.
+async function retryDepositHoldAfterCardUpdate(bookingId) {
+  try {
+    const { res: innerRes, result } = captureResponse();
+    await createDepositHoldHandler({
+      method: 'POST',
+      body: { bookingId, secret: process.env.DEPOSIT_HOLD_SHARED_SECRET, purpose: 'initial' },
+    }, innerRes);
+    const body = result.body || {};
+    return {
+      attempted: true,
+      status: body.status || null,
+      error: body.error || null,
+      paymentIntentId: body.paymentIntentId || null,
+    };
+  } catch (retryErr) {
+    // eslint-disable-next-line no-console
+    console.error('save-updated-payment-method: hold retry threw', bookingId, retryErr);
+    return { attempted: true, status: null, error: retryErr.message, paymentIntentId: null };
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -190,7 +247,9 @@ module.exports = async function handler(req, res) {
         await resolveAlert({
           alertId: alertLookup.alertId,
           resolvedBy: 'system (guest updated payment method)',
-          notes: 'Guest updated their card via the self-service payment-method-update link. The next scheduled hold attempt (or a manual retry) should now have a working card to charge.',
+          notes: ctx.reason === 'deposit_hold_failed_recovery'
+            ? 'Guest updated their card via the self-service payment-method-update link. The hold was re-attempted immediately against the new card (see holdRetry on this response, or this booking status, for the outcome).'
+            : 'Guest updated their card via the self-service payment-method-update link. The next scheduled hold attempt should now have a working card to charge.',
         });
       }
     } catch (resolveErr) {
@@ -198,7 +257,18 @@ module.exports = async function handler(req, res) {
       console.error('save-updated-payment-method: card updated but failed to check/resolve an open deposit_hold_failed alert', bookingId, resolveErr);
     }
 
-    res.status(200).json({ ok: true, paymentMethodId });
+    // BUG FIX (payment/card-capture consolidation, 2026-09-11, item 2 —
+    // see the header comment): only a `deposit_hold_failed_recovery`
+    // session has an actual failed hold to retry. The pre-hold
+    // (`deposit_hold_not_yet_attempted`) case deliberately leaves hold
+    // placement to the T-1 cron — nothing to do here beyond the card save
+    // that already happened above.
+    let holdRetry = null;
+    if (ctx.reason === 'deposit_hold_failed_recovery') {
+      holdRetry = await retryDepositHoldAfterCardUpdate(bookingId);
+    }
+
+    res.status(200).json({ ok: true, paymentMethodId, reason: ctx.reason || null, holdRetry });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('save-updated-payment-method failed', err);

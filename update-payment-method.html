@@ -7,6 +7,14 @@
 <!--
   update-payment-method.html
 
+  SUPERSEDED (payment/card-capture consolidation, 2026-09-11): both
+  deposit-hold emails/SMS (heads-up and failed) now link to the Adventure
+  Hub instead (adventure-prep-form.js's 'updateCard' screen), which also
+  chains an immediate hold retry on a failed-recovery session -- this
+  page never did. Left in place, unmodified and still fully functional,
+  only so any already-sent email carrying the old link (from before this
+  deploy) keeps working. Do not link to this page from anything new.
+
   Standalone, no-build-tool guest page (matches adventure-form.js's own
   convention: vanilla JS, no framework, no bundler). Reached from the
   deposit-hold-failed email's "UPDATE PAYMENT METHOD" button

@@ -55,6 +55,16 @@ const { pacificDateString, addDaysToDateString, pacificClockTimeReached } = requ
 const { getSiteUrl } = require('../lib/site-url');
 
 const CREATE_DEPOSIT_HOLD_ENDPOINT = `${getSiteUrl()}/api/create-deposit-hold`;
+// WIRED (payment/card-capture consolidation, 2026-09-11): this used to
+// link straight to the standalone update-payment-method.html page -- the
+// one guest touchpoint in the whole codebase that skipped the Hub (see
+// claude/psac-payment-card-capture-consolidation-proposal-2026-09-11.md's
+// link-pattern comparison table). Same ADVENTURE_PREP_BASE_URL pattern
+// api/check-adventure-prep-cadence.js and api/send-deposit-hold-heads-
+// up.js already use. adventure-prep-form.js's Hub only ever reads
+// `token` from the URL (never bookingId) -- see its own `var TOKEN =
+// qs.get('token')` -- so the link only needs the token.
+const ADVENTURE_PREP_BASE_URL = `${getSiteUrl()}/complete-adventure-prep`;
 
 function checkCronAuth(req) {
   // BUG FIX (payment-review, Aug 2026, Medium #44): fail closed if
@@ -133,21 +143,30 @@ async function processOneBooking(booking, now) {
 
   if (booking.contactEmail) {
     // RESOLVED, Aug 2026 build-review follow-up: this used to be a guessed
-    // URL with no page behind it. api/update-payment-method.js (the guest
-    // page) + api/create-payment-update-session.js + api/save-updated-
-    // payment-method.js now implement this for real — see those files'
-    // headers for the Stripe Customer Portal check (not configured on this
-    // account) and the flagged assumption about how api/create-deposit-
-    // hold.js reads "the card on file." Reuses the booking's own
-    // adventurePrepToken (same low-stakes guest-auth pattern as Surface A)
-    // rather than minting a new token type.
+    // URL with no page behind it. api/create-payment-update-session.js +
+    // api/save-updated-payment-method.js implement the real Stripe-side
+    // mechanics — see those files' headers for the Stripe Customer Portal
+    // check (not configured on this account) and the flagged assumption
+    // about how api/create-deposit-hold.js reads "the card on file."
+    // Reuses the booking's own adventurePrepToken (same low-stakes
+    // guest-auth pattern as Surface A) rather than minting a new token
+    // type.
+    //
+    // UPDATED (payment/card-capture consolidation, 2026-09-11): the link
+    // itself now points at the Adventure Hub (adventure-prep-form.js's
+    // 'updateCard' screen), not the old standalone update-payment-
+    // method.html page — this was the one guest touchpoint that skipped
+    // the Hub. Once there, this same guest-updated card is also
+    // immediately re-tried against the hold that just failed
+    // (api/save-updated-payment-method.js's holdRetry chain), instead of
+    // leaving that to a cron that, by design, never revisits a failed
+    // booking (see this file's own `due` filter above).
     const html = renderDepositHoldFailedEmail({
       logoUrl: process.env.BOOKING_CONFIRMATION_LOGO_URL || 'https://palmspringsadventureclub.com/images/psac-logo-email-header.png',
       guestName: booking.contactName,
       tripDateFormatted: formatTripDate(booking.tripDate),
       deadlineTimeFormatted: formatDeadlineTime(now),
-      updatePaymentLink: `${getSiteUrl()}/update-payment-method?bookingId=`
-        + encodeURIComponent(booking.bookingId) + '&token=' + encodeURIComponent(booking.adventurePrepToken || ''),
+      updatePaymentLink: `${ADVENTURE_PREP_BASE_URL}?token=${encodeURIComponent(booking.adventurePrepToken || '')}`,
     });
     await sendEmail({ to: booking.contactEmail, subject: 'Action needed within 2 hours, your gear hold didn’t go through', html });
   }
@@ -165,8 +184,7 @@ async function processOneBooking(booking, now) {
     smsConsent: booking.smsConsent,
     tripDateFormatted: formatTripDate(booking.tripDate),
     deadlineTimeFormatted: formatDeadlineTime(now),
-    updatePaymentLink: `${getSiteUrl()}/update-payment-method?bookingId=`
-      + encodeURIComponent(booking.bookingId) + '&token=' + encodeURIComponent(booking.adventurePrepToken || ''),
+    updatePaymentLink: `${ADVENTURE_PREP_BASE_URL}?token=${encodeURIComponent(booking.adventurePrepToken || '')}`,
   });
 
   return { bookingId: booking.bookingId, outcome: holdResult.status, alertId: alert && alert.alertId };

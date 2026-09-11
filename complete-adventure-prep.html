@@ -7,6 +7,14 @@
 <title>Finish setting up your adventure | Palm Springs Adventure Club</title>
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/ap-styles.css">
+<!-- Payment/card-capture consolidation (2026-09-11): the card-update
+     screen now lives inside this SPA (adventure-prep-form.js's
+     renderUpdateCard(), state.step === 'updateCard') instead of the old
+     standalone update-payment-method.html page, so Stripe.js needs to be
+     available here too -- same plain <script> tag every other Stripe-
+     using page on this site already loads (index.html, adventure-form.js's
+     own checkout page, update-payment-method.html, etc). -->
+<script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
 
