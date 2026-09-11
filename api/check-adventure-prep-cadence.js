@@ -128,6 +128,11 @@ async function sendSignerReminders({ bookingId, ownerName, tripDateFormatted, va
     if (signer.signerEmail) {
       const html = renderSignerWaiverReminderEmail({
         logoUrl, signerName: signer.signerName, ownerName, tripDateFormatted, signerUrl, variant,
+        // NEW (2026-09-10 email/SMS audit follow-up): personalize for a
+        // known attending guardian -- getIncompleteSignersForReminder now
+        // resolves this the same way the invite email always has.
+        isAttendingGuardian: signer.isAttendingGuardian,
+        guardianForChildNames: signer.guardianForChildNames,
       });
       await sendEmail({ to: signer.signerEmail, subject: signerReminderSubjectFor(variant), html });
     }
@@ -139,6 +144,8 @@ async function sendSignerReminders({ bookingId, ownerName, tripDateFormatted, va
         ownerName,
         tripDateFormatted,
         signerUrl,
+        isAttendingGuardian: signer.isAttendingGuardian,
+        guardianForChildNames: signer.guardianForChildNames,
       });
     }
     results.push({ signatureId: signer.signatureId, emailSent: !!signer.signerEmail, sms: smsResult.status });

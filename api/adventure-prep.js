@@ -78,7 +78,7 @@ const { getKitAdjustContextByToken, setPendingKitChange } = require('../lib/fina
 const { isBeforeT3Cutoff } = require('../lib/t3-cutoff');
 const { getSiteUrl } = require('../lib/site-url');
 const { sendEmail } = require('../lib/send-email');
-const { renderSignerWaiverInviteEmail } = require('../lib/email-templates/signer-waiver-invite-email');
+const { renderSignerWaiverInviteEmail, subjectFor: signerInviteSubjectFor } = require('../lib/email-templates/signer-waiver-invite-email');
 
 const SITE_URL = getSiteUrl();
 const MAX_KIT_COUNT = 20; // matches lib/finalize-kit-change.js's own clamp
@@ -332,7 +332,7 @@ async function sendSignerLinks(body, res) {
         return { ...signer, emailStatus: 'skipped_no_email' };
       }
       const signerUrl = `${SITE_URL}/sign-waiver?token=${encodeURIComponent(signer.signerToken)}`;
-      const html = renderSignerWaiverInviteEmail({
+      const emailTokens = {
         logoUrl,
         signerName: signer.name,
         ownerName: result.ownerName,
@@ -344,10 +344,16 @@ async function sendSignerLinks(body, res) {
         // getSignerContext already does for the hub.
         isAttendingGuardian: signer.isAttendingGuardian,
         guardianForChildNames: signer.guardianForChildNames,
-      });
+      };
+      const html = renderSignerWaiverInviteEmail(emailTokens);
+      // UPDATED (2026-09-10 email/SMS audit follow-up): this subject line
+      // was still hardcoded generic ("...quick waiver needed") even after
+      // the 2026-09-03 copy pass split the body/headline by guardian
+      // status -- the audit caught the mismatch. Now sourced from the
+      // template's own subjectFor, which reads the same tokens.
       const sendResult = await sendEmail({
         to: signer.email,
-        subject: `${result.ownerName || 'Someone'} added you to an adventure, quick waiver needed`,
+        subject: signerInviteSubjectFor(emailTokens),
         html,
       });
       return { ...signer, emailStatus: sendResult.status };

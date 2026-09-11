@@ -99,12 +99,33 @@ function signerHubLinkFor(signerToken) {
   return `${SIGN_WAIVER_BASE_URL}?token=${encodeURIComponent(signerToken || '')}`;
 }
 
+// NEW (2026-09-10 email/SMS audit follow-up): the tribal entry-fee
+// reminder fragment drafted in psac-copy-drafts.md section 12, never
+// implemented here until now. Fails safe on purpose -- a trail with
+// entry_fee_required = false, or a park value that doesn't match either
+// mapped canyon (a future non-Agua-Caliente trail, or a data gap), gets
+// no fragment at all rather than a wrong or generic one. Per that
+// section's own closing note: "if the trail library later expands to
+// include fee-free land ... all four fragments need a guard on whether
+// the assigned trail actually requires a fee at all" -- entry_fee_required
+// IS that guard, already a real column on trails.
+function entryFeeFragmentFor(park, entryFeeRequired) {
+  if (!entryFeeRequired) return '';
+  if (park === 'Indian Canyons') {
+    return 'Bring a card or cash for the \$12 tribal entry fee at the drive-up tollbooth, or skip the line with a ticket bought in advance. Arrive early, the canyon can reach capacity.';
+  }
+  if (park === 'Tahquitz Canyon') {
+    return 'Bring a card or cash for the \$15 tribal entry fee at the walk-up tollbooth, or skip the line with a ticket bought in advance. Arrive early, the canyon can reach capacity.';
+  }
+  return '';
+}
+
 async function listBookingsDueForTrailDayMessage(tripDate) {
   const rows = await query(
     `SELECT eb.booking_id, eb.contact_email, eb.contact_name, eb.contact_phone, eb.sms_consent,
             eb.time_preference, eb.adventure_prep_token,
             ap.property_type, ap.delivery_note, ap.return_note, ap.selected_trail_id,
-            t.trail_name, t.trailhead_name, t.trail_day_tip
+            t.trail_name, t.trailhead_name, t.trail_day_tip, t.park, t.entry_fee_required
      FROM experience_bookings eb
      LEFT JOIN adventure_prep ap ON ap.booking_id = eb.booking_id
      LEFT JOIN trails t ON t.trail_id = ap.selected_trail_id
@@ -125,6 +146,7 @@ async function listBookingsDueForTrailDayMessage(tripDate) {
     tripTip: r.trail_day_tip || '',
     pickupArrangement: buildPickupArrangement(r.property_type, r.return_note || r.delivery_note),
     hubLink: bookerHubLinkFor(r.adventure_prep_token),
+    entryFeeFragment: entryFeeFragmentFor(r.park, r.entry_fee_required),
   }));
 }
 
@@ -150,6 +172,7 @@ async function sendSignerTrailDayMessages(booking) {
           tripTip: booking.tripTip,
           pickupArrangement: booking.pickupArrangement,
           hubLink: signerHubLink,
+          entryFeeFragment: booking.entryFeeFragment,
         });
         await sendEmail({ to: signer.signerEmail, subject: 'Today\'s the day', html });
         emailOutcome = 'sent';
@@ -211,6 +234,7 @@ module.exports = async function handler(req, res) {
           tripTip: b.tripTip,
           pickupArrangement: b.pickupArrangement,
           hubLink: b.hubLink,
+          entryFeeFragment: b.entryFeeFragment,
         });
         await sendEmail({ to: b.contactEmail, subject: 'Today\'s the day', html });
 

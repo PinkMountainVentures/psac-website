@@ -313,6 +313,9 @@ CREATE TABLE IF NOT EXISTS experience_bookings (
   -- db/2026-09-10_add_gear_on_its_way_and_trail_day_dedup.sql.
   gear_on_its_way_sent_at    TIMESTAMPTZ,
   trail_day_message_sent_at  TIMESTAMPTZ,
+  -- NEW (2026-09-11) -- dedup marker for api/send-return-instructions.js.
+  -- See db/2026-09-11_add_return_instructions_dedup.sql.
+  return_instructions_sent_at TIMESTAMPTZ,
   gear_shortfall_cents       INTEGER,
   shortfall_charge_id        TEXT,
   shortfall_charged_amount_cents INTEGER,
