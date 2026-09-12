@@ -1097,7 +1097,18 @@ select.paf-roster-input {
 .paf-nav-next:disabled { opacity: 0.35; cursor: not-allowed; }
 
 @media (max-width: 600px) {
-    .paf-roster-row { flex-wrap: wrap; }
+    /* BUG FIX (Airey's live-test report, 2026-09-12): each .paf-roster-row
+       wraps to two lines on mobile (name full-width, then age + fitness
+       side by side) -- on desktop the three fields sit on one line so
+       whose age/fitness is whose is never in question, but stacked two
+       lines deep with only a 10px margin between people, the age/fitness
+       pair for one person reads as though it could belong to the name
+       either just above or just below it. A visible rule between rows
+       (not on the very last one, so the roster doesn't end on a stray
+       line) makes each person's own 3-field group unambiguous without
+       touching the desktop layout, which doesn't have this problem. */
+    .paf-roster-row { flex-wrap: wrap; padding-bottom: 0.9rem; margin-bottom: 0.9rem; border-bottom: 1px solid rgba(42,71,71,0.15); }
+    .paf-roster-row:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 10px; }
     .paf-roster-name { flex: 1 1 100%; }
     .paf-roster-age { flex: 1 1 32%; width: auto; }
     .paf-roster-fit { flex: 1 1 48%; }

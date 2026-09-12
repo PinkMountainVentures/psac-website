@@ -134,7 +134,9 @@ module.exports = async function handler(req, res) {
         newTrailName: body.newTrailName || newTrailId,
         overviewBlurb: body.overviewBlurb || '',
         entryFeeFragment: body.entryFeeFragment || '',
-        adventurePrepLink: body.adventurePrepLink || `${getSiteUrl()}/complete-adventure-prep`,
+        adventurePrepLink: body.adventurePrepLink || (applyResult.adventurePrepToken
+          ? `${getSiteUrl()}/complete-adventure-prep?token=${encodeURIComponent(applyResult.adventurePrepToken)}`
+          : `${getSiteUrl()}/complete-adventure-prep`),
         t3DateFormatted: formatDate(tripT3DateStr) || 'your trail day',
       });
       const emailResult = await sendEmail({ to: applyResult.contactEmail, subject: "We've updated your trail", html });

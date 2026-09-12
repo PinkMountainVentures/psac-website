@@ -1001,7 +1001,7 @@
       isParticipating: participating,
       ownerParticipantId: participating ? (state.ownerParticipantId || null) : null,
       roster: state.roster
-        .filter(function (p) { return p.participantId !== state.ownerParticipantId; })
+        .filter(function (p) { return p.participantId !== state.ownerParticipantId && p.roleOnBooking !== 'guardian_only'; })
         .map(function (p) {
           var entry = { participantId: p.participantId, name: p.name, age: p.age, fitness: p.fitness, email: p.email, isParticipating: true };
           // NEW (guardian-assignment UI, 2026-09-02): attaches the
@@ -1218,7 +1218,14 @@
   // rental restricted to age 14+ ... matches Section 6A of the waiver
   // draft" — 14-17 IS allowed a kit, only Under 14 is not).
   function isGearEligible(person) {
-    return (person.age || person.ageRange || '') !== 'Under 14';
+    // BUG FIX (Airey's live-test report, 2026-09-12): a non-attending
+    // guardian_only row (someone who only exists to sign a minor's
+    // waiver, never actually on the trail) isn't a gear candidate at
+    // all -- excluding it here means every kitCount/eligibleCount that
+    // already reads through this function (hub tile, gear screen,
+    // deposit calc) stops counting them for free.
+    return (person.age || person.ageRange || '') !== 'Under 14'
+      && person.roleOnBooking !== 'guardian_only';
   }
 
   /**
@@ -1273,7 +1280,7 @@
   function waiverSigners() {
     var signatures = state.ctx.waiverSignatures || [];
     return state.roster
-      .filter(function (p) { return p.isParticipating !== false; })
+      .filter(function (p) { return p.isParticipating !== false && p.roleOnBooking !== 'guardian_only'; })
       .map(function (p) {
         var isOwner = p.roleOnBooking === 'owner';
         var isMinor = !!MINOR_BUCKETS[p.age];
@@ -2172,7 +2179,7 @@
     var doneCount = doneFlags.filter(Boolean).length;
     var groupPendingState = status.trailSelected && status.gearDone && bookerWaiverDone && !status.waiversDone;
 
-    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + '. You could have spent ' + formatTripDate(eb.date) + ' by the pool. You picked the trail instead. Here’s everything left before you’re on it.';
+    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + '. You keep looking at those ridgelines over your sunglasses. ' + formatTripDate(eb.date) + ' is when you finally find out what’s up there. Here’s everything left before you’re on it.';
     var topSublineHtml = '';
     // Phase 2.5 Trail Day (2026-09-04): hoisted out of the branches below
     // so the wrap-order construction further down can tell whether
@@ -2847,7 +2854,17 @@
     // positional array index (see this file's header comment, point 1).
     function renderWhoIsYou() {
       var el = wrap.querySelector('#ap-whoisyou-opts');
-      el.innerHTML = state.roster.map(function (p) {
+      // BUG FIX (Airey's direct request, 2026-09-12): only someone 18+ can
+      // actually book with PSAC, so the booker identifying "which one of
+      // these is you" can only ever be one of the adults on the roster --
+      // this used to list every roster row, minors included, letting the
+      // booker select a minor as themselves. Filters through the same
+      // MINOR_BUCKETS map every other adult/minor split in this file
+      // already uses (computeParticipatingAdultSigners, minorsNeedingGuardian,
+      // etc.), not a new age check invented for this one screen.
+      el.innerHTML = state.roster.filter(function (p) {
+        return !MINOR_BUCKETS[p.age];
+      }).map(function (p) {
         var age = p.age || p.ageRange || '';
         var label = (p.name || 'Unnamed') + ' · ' + age + (p.fitness ? ' · ' + p.fitness : '');
         return '<button type="button" class="paf-option-btn' + (state.ownerParticipantId === p.participantId ? ' is-selected' : '') + '" data-participant-id="' + escapeHtml(p.participantId) + '">' + escapeHtml(label) + '</button>';
@@ -4469,7 +4486,17 @@
       }
       function drawRows() {
         var kitSelectedCount = state.roster.filter(function (p) { return isGearEligible(p) && p.gearKit !== false; }).length;
-        contentEl.querySelector('#ap-kit-rows').innerHTML = state.roster.map(function (p, i) {
+        // BUG FIX (Airey's live-test report, 2026-09-12): a non-attending
+        // guardian_only row (a parent/guardian signing a minor's waiver,
+        // not themselves on the trail) used to render here as a full
+        // gear-kit row with its own Yes/No toggle -- isGearEligible()
+        // now excludes them from eligibility, but this list still needs
+        // to skip them entirely rather than show them as a real row.
+        contentEl.querySelector('#ap-kit-rows').innerHTML = state.roster
+          .map(function (p, i) { return { p: p, i: i }; })
+          .filter(function (x) { return x.p.roleOnBooking !== 'guardian_only'; })
+          .map(function (x) {
+          var p = x.p, i = x.i;
           var age = p.age || p.ageRange || '';
           var eligible = isGearEligible(p);
           var hasKit = eligible && p.gearKit !== false;
@@ -4797,7 +4824,14 @@
       var depositAmount = computeDepositAmount();
       var hotel = isHotelPath();
 
-      var rosterRowsHtml = state.roster.map(function (p) {
+      // BUG FIX (Airey's live-test report, 2026-09-12): a non-attending
+      // guardian_only row isn't a gear candidate (see isGearEligible's own
+      // comment) and shouldn't get a recap line here at all -- excluded
+      // before mapping rather than folded into the "Not included" branch,
+      // which is reserved for real participants who are just too young.
+      var rosterRowsHtml = state.roster
+        .filter(function (p) { return p.roleOnBooking !== 'guardian_only'; })
+        .map(function (p) {
         var eligible = isGearEligible(p);
         var status;
         if (!eligible) {
@@ -5012,7 +5046,17 @@
       // in guest copy). Rephrased.
       var statusTag = wc.statusTag == null ? 'Draft: Pending Final Attorney Review' : wc.statusTag;
       var bodyHtml = wc.bodyHtml || '<p>Waiver text is not available right now. Reply to your confirmation email and we’ll help you finish this.</p>';
-      var minors = state.roster.filter(function (p) { return MINOR_BUCKETS[p.age || p.ageRange]; });
+      // BUG FIX (Airey's live-test report, 2026-09-12): only a minor
+      // actually assigned to THIS signer (guardianPersonId === their own
+      // personId, set in the Attendees flow's guardian-assignment step)
+      // belongs here -- this used to list every minor on the roster,
+      // letting the booker claim a child whose real guardian was
+      // declared as someone else, or claim one before anyone was ever
+      // assigned to them at all.
+      var ownerPersonId = (state.roster.filter(function (r) { return r.participantId === state.ownerParticipantId; })[0] || {}).personId;
+      var minors = state.roster.filter(function (p) {
+        return MINOR_BUCKETS[p.age || p.ageRange] && !!ownerPersonId && p.guardianPersonId === ownerPersonId;
+      });
       var scrolledToEnd = false;
       var checked = false;
 
@@ -5202,6 +5246,20 @@
               status: 'signed',
               signerName: state.waiverName,
               participantsCoveredJson: JSON.stringify(participantsCovered),
+            });
+            // BUG FIX (Airey's live-test report, 2026-09-12): mirror the
+            // guardian certification the server just recorded (
+            // applyGuardianCertification set guardian_verified_at for
+            // every covered minor) onto state.roster locally, same
+            // "don't wait for a reload" reasoning as the owner-signature
+            // mirror just above -- otherwise a just-signed child's
+            // waiver still reads as not done on the hub/Waivers list
+            // until a full page reload re-fetches the roster.
+            var signedAt = new Date().toISOString();
+            state.roster.forEach(function (p) {
+              if (state.guardianForChildrenParticipantIds.indexOf(p.participantId) !== -1) {
+                p.guardianVerifiedAt = signedAt;
+              }
             });
             renderConfirmation();
           });
