@@ -25,18 +25,18 @@ var OpsShell = (function () {
   var NAV_ITEMS = [
     { href: 'ops-all-bookings.html', label: 'All Bookings', pinned: true },
     { href: 'ops-alerts.html', label: 'Ops Alerts', pinned: true },
-    { href: 'ops-people.html', label: 'People' },
-    { href: 'ops-trail-swap-requests.html', label: 'Trail Swap Requests' },
-    { href: 'ops-stalled-bookings.html', label: 'Stalled Bookings' },
-    { href: 'ops-cancellations.html', label: 'Cancellations' },
-    { href: 'ops-manual-adjustment.html', label: 'Manual Adjustment' },
-    { href: 'ops-gear-checkout.html', label: 'Gear Assembly & Checkout' },
-    { href: 'ops-gear-units.html', label: 'Gear Units' },
-    { href: 'ops-trails.html', label: 'Trails' },
-    { href: 'ops-parks.html', label: 'Parks' },
-    { href: 'ops-availability.html', label: 'Availability' },
-    { href: 'ops-gear-checkin.html', label: 'Return Check-In' },
-    { href: 'ops-reconciliation-review.html', label: 'Reconciliation Review' },
+    { href: 'ops-people.html', label: 'People', group: 'Reports' },
+    { href: 'ops-stalled-bookings.html', label: 'Stalled Bookings', group: 'Reports' },
+    { href: 'ops-cancellations.html', label: 'Cancellations', group: 'Reports' },
+    { href: 'ops-trail-swap-requests.html', label: 'Trail Swap Requests', group: 'Actions' },
+    { href: 'ops-manual-adjustment.html', label: 'Manual Adjustment', group: 'Actions' },
+    { href: 'ops-gear-checkout.html', label: 'Gear Assembly & Checkout', group: 'Actions' },
+    { href: 'ops-gear-units.html', label: 'Gear Units', group: 'Actions' },
+    { href: 'ops-trails.html', label: 'Trails', group: 'Actions' },
+    { href: 'ops-parks.html', label: 'Parks', group: 'Actions' },
+    { href: 'ops-availability.html', label: 'Availability', group: 'Actions' },
+    { href: 'ops-gear-checkin.html', label: 'Return Check-In', group: 'Actions' },
+    { href: 'ops-reconciliation-review.html', label: 'Reconciliation Review', group: 'Actions' },
   ];
 
   var LOADING_TIMEOUT_MS = 12000;
@@ -93,8 +93,13 @@ var OpsShell = (function () {
 
   function sidebarHtml(activeHref) {
     var html = '<div class="ops-sidebar-brand">PSAC Ops</div>';
+    var lastGroup = null;
     NAV_ITEMS.forEach(function (item, i) {
       var cls = 'ops-nav-item' + (item.href === activeHref ? ' is-active' : '') + (item.pinned ? ' is-pinned-hub' : '');
+      if (item.group && item.group !== lastGroup) {
+        html += '<div class="ops-nav-group-label">' + escapeHtml(item.group) + '</div>';
+        lastGroup = item.group;
+      }
       html += '<a class="' + cls + '" href="' + item.href + '">' + escapeHtml(item.label) + '</a>';
       if (i === 1) html += '<div class="ops-nav-divider"></div>'; // divider after the two pinned hubs
     });
