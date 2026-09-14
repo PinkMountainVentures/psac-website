@@ -280,7 +280,7 @@
     var container = document.getElementById('recent-log');
     if (!filtered.length) { container.innerHTML = '<div class="ops-empty">No change log entries match these filters.</div>'; return; }
     var rows = filtered.map(function (e) {
-      return '<tr><td>#' + escapeHtml(e.bookingId) + '</td><td><span class="ops-tag">' + escapeHtml(e.changeType) + '</span></td>'
+      return '<tr><td><a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(e.bookingId) + '">#' + escapeHtml(e.bookingId) + '</a></td><td><span class="ops-tag">' + escapeHtml(e.changeType) + '</span></td>'
         + '<td>' + escapeHtml(e.staffNotes || '') + '</td><td>' + escapeHtml(e.timestamp || '') + '</td></tr>';
     }).join('');
     container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Type</th><th>Notes</th><th>When</th></tr></thead><tbody>' + rows + '</tbody></table>';

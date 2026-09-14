@@ -480,12 +480,13 @@
 
   function loadTrails() {
     var q = document.getElementById('filter-trail').value.trim();
-    document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('trailsList', { q: q }).then(function (result) {
-      if (!result.ok) { document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Could not load Trails.</div>'; return; }
-      allTrails = result.data.trails || [];
-      populateParkFilterOptions();
-      applyFiltersAndRender();
+    OpsShell.withLoadingState(document.getElementById('trails-list'), function () {
+      return opsCall('trailsList', { q: q }).then(function (result) {
+        if (!result.ok) { document.getElementById('trails-list').innerHTML = '<div class="ops-empty">Could not load Trails.</div>'; return; }
+        allTrails = result.data.trails || [];
+        populateParkFilterOptions();
+        applyFiltersAndRender();
+      });
     });
   }
 

@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="ops-shell.css">
 <style>
   .ops-app { max-width:1100px; }
+  .table-scroll-wrap { overflow-x:auto; border-radius:8px; -webkit-overflow-scrolling:touch; }
   .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
@@ -33,6 +34,10 @@
   .ops-tag.callnow { background:var(--sunset-red); color:white; }
   .ops-tag.nudged { background:#FFF3D6; color:#8a6300; }
   .track-chip { display:inline-block; font-size:0.66rem; background:#E7ECEE; color:#3E4A50; padding:0.15rem 0.45rem; border-radius:4px; margin-right:0.25rem; }
+  .ops-tag.contacted { background:var(--desert-green); color:white; }
+  .filter-bar { display:flex; gap:0.6rem; align-items:flex-end; margin-bottom:1.1rem; flex-wrap:wrap; }
+  .filter-field { display:flex; flex-direction:column; gap:0.3rem; }
+  .filter-field label { font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); }
   .script-panel { border:1px solid var(--ops-border); border-radius:8px; padding:1.2rem 1.4rem; margin-top:1rem; white-space:pre-line; font-size:0.86rem; line-height:1.7; }
   .script-panel-footer { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.9rem; }
 </style>
@@ -52,6 +57,24 @@
       <div class="ops-subtitle" id="ops-subtitle"></div>
       <div id="ops-search-container"></div>
       <div id="error-banner" class="ops-error-banner hidden"></div>
+      <div class="filter-bar">
+        <div class="filter-field">
+          <label>Cadence tier</label>
+          <select class="ops-select" id="filter-cadence" style="margin-bottom:0;">
+            <option value="">All</option>
+            <option value="nudged">Nudged</option>
+            <option value="call_today">Call Today</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Status</label>
+          <select class="ops-select" id="filter-status" style="margin-bottom:0;">
+            <option value="">All</option>
+            <option value="needs_contact">Needs Contact</option>
+            <option value="contacted">Contacted</option>
+          </select>
+        </div>
+      </div>
       <div id="table-container"></div>
       <div id="script-container"></div>
     </div>
@@ -84,20 +107,23 @@
 
   function renderRows(list) {
     var container = document.getElementById('table-container');
-    if (!list.length) { container.innerHTML = '<div class="ops-empty">No stalled bookings right now.</div>'; return; }
+    if (!list.length) { container.innerHTML = '<div class="ops-empty">No stalled bookings match this filter.</div>'; return; }
     var rows = list.map(function (b) {
       var stageTag = b.stage === 'call_today' ? '<span class="ops-tag callnow">Call today</span>' : '<span class="ops-tag nudged">Nudged</span>';
       var tracks = (b.outstandingTracks || []).map(function (t) { return '<span class="track-chip">' + escapeHtml(TRACK_LABELS[t] || t) + '</span>'; }).join('');
-      var calledInfo = b.calledAt ? ('<div class="ops-helper">Called ' + escapeHtml(String(b.calledAt).slice(0, 10)) + (b.calledBy ? (' by ' + escapeHtml(b.calledBy)) : '') + '</div>') : '';
+      var statusCell = b.calledAt
+        ? ('<span class="ops-tag contacted">Contacted</span><div class="ops-helper">' + escapeHtml(String(b.calledAt).slice(0, 10)) + (b.calledBy ? (' by ' + escapeHtml(b.calledBy)) : '') + '</div>')
+        : stageTag;
       return '<tr>'
-        + '<td>#' + escapeHtml(b.bookingId) + '<br><span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(b.contactName) + '</span></td>'
+        + '<td><a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(b.bookingId) + '">#' + escapeHtml(b.bookingId) + '</a><br><span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(b.contactName) + '</span></td>'
         + '<td>' + escapeHtml(String(b.tripDate || '').slice(0, 10)) + '</td>'
         + '<td>' + stageTag + '</td>'
         + '<td>' + tracks + '</td>'
-        + '<td><button class="ops-btn-secondary" data-call-script="' + escapeHtml(b.bookingId) + '">Call script &rarr;</button>' + calledInfo + '</td>'
+        + '<td>' + statusCell + '</td>'
+        + '<td><button class="ops-btn-secondary" data-call-script="' + escapeHtml(b.bookingId) + '">Call script &rarr;</button></td>'
         + '</tr>';
     }).join('');
-    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Trail Day</th><th>Stage</th><th>Outstanding</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    container.innerHTML = '<div class="table-scroll-wrap"><table class="ops-table"><thead><tr><th>Booking</th><th>Trail Day</th><th>Stage</th><th>Outstanding</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 
     container.querySelectorAll('[data-call-script]').forEach(function (btn) {
       btn.addEventListener('click', function () { openScript(btn.getAttribute('data-call-script')); });
@@ -123,14 +149,23 @@
     });
   }
 
+  function applyFiltersAndRender() {
+    var cadence = document.getElementById('filter-cadence').value;
+    var status = document.getElementById('filter-status').value;
+    var list = filterBookingId ? allBookings.filter(function (b) { return String(b.bookingId) === String(filterBookingId); }) : allBookings;
+    if (cadence) list = list.filter(function (b) { return b.stage === cadence; });
+    if (status === 'contacted') list = list.filter(function (b) { return !!b.calledAt; });
+    if (status === 'needs_contact') list = list.filter(function (b) { return !b.calledAt; });
+    renderRows(list);
+  }
+
   function loadBookings() {
     var container = document.getElementById('table-container');
     OpsShell.withLoadingState(container, function () {
       return OpsShell.opsCall('listStalledBookings', {}).then(function (result) {
         if (!result.ok) { document.getElementById('error-banner').classList.remove('hidden'); document.getElementById('error-banner').textContent = 'Could not load Stalled Bookings.'; throw new Error('load failed'); }
         allBookings = result.data.bookings || [];
-        var list = filterBookingId ? allBookings.filter(function (b) { return String(b.bookingId) === String(filterBookingId); }) : allBookings;
-        renderRows(list);
+        applyFiltersAndRender();
       });
     });
   }
@@ -139,7 +174,11 @@
     activeHref: 'ops-stalled-bookings.html',
     title: 'Stalled Bookings',
     subtitle: "Bookings that haven't finished Adventure Prep — nudge stage and call-today stage in one queue.",
-    onReady: function () { loadBookings(); },
+    onReady: function () {
+      loadBookings();
+      document.getElementById('filter-cadence').addEventListener('change', applyFiltersAndRender);
+      document.getElementById('filter-status').addEventListener('change', applyFiltersAndRender);
+    },
   });
 })();
 </script>

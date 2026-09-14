@@ -180,7 +180,7 @@
         var bookings = result.data.bookings || [];
         if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No delivered bookings for this trail day.</div>'; return; }
         var rows = bookings.map(function (b) {
-          return '<tr><td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + (b.bookingStatus === 'cancelled_post_delivery' ? ' <span class="ops-tag" style="background:rgba(231,111,81,0.15); color:#a8341c;">Cancelled, gear still out</span>' : '') + '</td>'
+          return '<tr><td><a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(b.bookingId) + '">#' + escapeHtml(b.bookingId) + '</a> — ' + escapeHtml(b.contactName || '') + (b.bookingStatus === 'cancelled_post_delivery' ? ' <span class="ops-tag" style="background:rgba(231,111,81,0.15); color:#a8341c;">Cancelled, gear still out</span>' : '') + '</td>'
             + '<td>Delivered ' + escapeHtml(b.gearDeliveredAt || '') + '</td>'
             + '<td>' + pickupPlanTag(b) + '</td>'
             + '<td>' + returnStatusTag(b.returnStatus) + '</td>'

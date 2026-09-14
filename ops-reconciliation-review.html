@@ -121,7 +121,7 @@
         if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">Nothing pending review right now.</div>'; return; }
         var rows = bookings.map(function (b) {
           var statusLabel = b.depositStatus === 'shortfall_charged' ? 'Shortfall charged' : 'Pending review';
-          return '<tr><td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
+          return '<tr><td><a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(b.bookingId) + '">#' + escapeHtml(b.bookingId) + '</a> — ' + escapeHtml(b.contactName || '') + '</td>'
             + '<td>' + escapeHtml(b.tripDate || '') + '</td>'
             + '<td>' + statusLabel + '</td>'
             + '<td>$' + centsToDollars(b.gearShortfallCents) + '</td>'
@@ -139,11 +139,12 @@
     currentBookingId = bookingId;
     document.getElementById('queue-view').classList.add('hidden');
     document.getElementById('detail-view').classList.remove('hidden');
-    document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('gearReconcile_getContext', { bookingId: bookingId }).then(function (result) {
-      if (!result.ok || result.data.notFound) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load this booking.</div>'; return; }
-      currentCtx = result.data;
-      renderDetail();
+    OpsShell.withLoadingState(document.getElementById('detail-content'), function () {
+      return opsCall('gearReconcile_getContext', { bookingId: bookingId }).then(function (result) {
+        if (!result.ok || result.data.notFound) { document.getElementById('detail-content').innerHTML = '<div class="ops-empty">Could not load this booking.</div>'; return; }
+        currentCtx = result.data;
+        renderDetail();
+      });
     });
   }
 

@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="ops-shell.css">
 <style>
   .ops-app { max-width:1100px; }
+  .table-scroll-wrap { overflow-x:auto; border-radius:8px; -webkit-overflow-scrolling:touch; }
   .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
@@ -69,7 +70,7 @@
     var rows = list.map(function (c) {
       var reasons = (c.cancellationReasons || []).map(function (r) { return '<span class="ops-tag reason">' + escapeHtml(OpsShell.cancellationReasonLabel(r)) + '</span>'; }).join('');
       return '<tr>'
-        + '<td>#' + escapeHtml(c.bookingId) + '</td>'
+        + '<td><a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(c.bookingId) + '">#' + escapeHtml(c.bookingId) + '</a></td>'
         + '<td>' + escapeHtml(c.contactName) + '<br><span style="color:var(--ops-text-mid); font-size:0.76rem;">' + escapeHtml(c.contactEmail) + '</span></td>'
         + '<td>' + escapeHtml(String(c.tripDate || '').slice(0, 10)) + '</td>'
         + '<td>' + escapeHtml(String(c.cancelledAt || '').slice(0, 10)) + '</td>'
@@ -77,7 +78,7 @@
         + '<td>' + (c.refundAmount !== '' && c.refundAmount != null ? ('$' + Number(c.refundAmount).toFixed(2)) : '—') + '</td>'
         + '</tr>';
     }).join('');
-    container.innerHTML = '<table class="ops-table"><thead><tr><th>Booking</th><th>Guest</th><th>Trail Day</th><th>Cancelled</th><th>Reason(s)</th><th>Refund</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    container.innerHTML = '<div class="table-scroll-wrap"><table class="ops-table"><thead><tr><th>Booking</th><th>Guest</th><th>Trail Day</th><th>Cancelled</th><th>Reason(s)</th><th>Refund</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
   function applyFilter() {

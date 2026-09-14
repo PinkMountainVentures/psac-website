@@ -163,7 +163,7 @@
         if (!bookings.length) { document.getElementById('queue-list').innerHTML = '<div class="ops-empty">No active bookings for this trip date.</div>'; return; }
         var rows = bookings.map(function (b) {
           return '<tr>'
-            + '<td>#' + escapeHtml(b.bookingId) + ' — ' + escapeHtml(b.contactName || '') + '</td>'
+            + '<td><a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(b.bookingId) + '">#' + escapeHtml(b.bookingId) + '</a> — ' + escapeHtml(b.contactName || '') + '</td>'
             + '<td>' + escapeHtml(b.tier || '') + '</td>'
             + '<td>' + escapeHtml(b.gearKitCount || '') + '</td>'
             + '<td>' + (b.gearDeliveredAt ? 'Delivered' : 'Pending') + '</td>'

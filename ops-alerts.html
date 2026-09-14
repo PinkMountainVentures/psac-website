@@ -41,6 +41,7 @@
   .tier-section.awareness { opacity:0.85; }
   .tier-section.awareness .tier-heading { color:var(--ops-text-mid); }
 
+  .table-scroll-wrap { overflow-x:auto; border-radius:8px; -webkit-overflow-scrolling:touch; }
   .ops-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
   .ops-table th { text-align:left; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ops-text-mid); padding:0.6rem 0.8rem; border-bottom:2px solid var(--ops-border); }
   .ops-table td { padding:0.7rem 0.8rem; border-bottom:1px solid var(--ops-border); vertical-align:middle; }
@@ -239,7 +240,7 @@
   function rowHtml(row) {
     var desc = row.source === 'payment_hold_failure' ? alertTypeLabel(row.alertType) : row.description;
     if (row.source === 'trail_checkin_incident' && row.trailName) desc += ' \u2014 ' + row.trailName;
-    var bookingCell = row.bookingId ? ('#' + escapeHtml(row.bookingId)) : '<span style="color:var(--ops-text-mid);">' + escapeHtml(desc) + (row.availableCount != null ? (' (' + row.availableCount + ' available)') : '') + '</span>';
+    var bookingCell = row.bookingId ? ('<a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(row.bookingId) + '">#' + escapeHtml(row.bookingId) + '</a>') : '<span style="color:var(--ops-text-mid);">' + escapeHtml(desc) + (row.availableCount != null ? (' (' + row.availableCount + ' available)') : '') + '</span>';
     // Trail check-in rows have no dollar amount -- the amount column shows
     // who's affected instead, same column, different content by source.
     var amountCell = row.source === 'trail_checkin_incident'
@@ -257,8 +258,8 @@
 
   function tierTable(rows) {
     if (!rows.length) return '<div class="ops-empty">Nothing in this tier right now.</div>';
-    return '<table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Amount / Affected</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>'
-      + rows.map(rowHtml).join('') + '</tbody></table>';
+    return '<div class="table-scroll-wrap"><table class="ops-table"><thead><tr><th>Booking</th><th>Alert</th><th>Amount / Affected</th><th>Created</th><th>Status</th><th></th></tr></thead><tbody>'
+      + rows.map(rowHtml).join('') + '</tbody></table></div>';
   }
 
   function render(data) {

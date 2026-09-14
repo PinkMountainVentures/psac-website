@@ -128,10 +128,11 @@
   }
 
   function loadBlackoutDates() {
-    document.getElementById('blackout-list').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('blackoutList', {}).then(function (result) {
-      if (!result.ok) { document.getElementById('blackout-list').innerHTML = '<div class="ops-empty">Could not load blackout dates.</div>'; return; }
-      renderBlackoutDates(result.data.blackoutDates || []);
+    OpsShell.withLoadingState(document.getElementById('blackout-list'), function () {
+      return opsCall('blackoutList', {}).then(function (result) {
+        if (!result.ok) { document.getElementById('blackout-list').innerHTML = '<div class="ops-empty">Could not load blackout dates.</div>'; return; }
+        renderBlackoutDates(result.data.blackoutDates || []);
+      });
     });
   }
 

@@ -215,10 +215,11 @@
 
   function loadParks() {
     var q = document.getElementById('filter-park').value.trim();
-    document.getElementById('parks-list').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('parksList', { q: q }).then(function (result) {
-      if (!result.ok) { document.getElementById('parks-list').innerHTML = '<div class="ops-empty">Could not load Parks.</div>'; return; }
-      renderParks(result.data.parks || []);
+    OpsShell.withLoadingState(document.getElementById('parks-list'), function () {
+      return opsCall('parksList', { q: q }).then(function (result) {
+        if (!result.ok) { document.getElementById('parks-list').innerHTML = '<div class="ops-empty">Could not load Parks.</div>'; return; }
+        renderParks(result.data.parks || []);
+      });
     });
   }
 

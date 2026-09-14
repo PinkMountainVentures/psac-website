@@ -144,6 +144,19 @@
           </select>
         </div>
         <div class="ops-form-row" style="max-width:280px; margin-bottom:0;">
+          <label>Filter by status</label>
+          <select class="ops-select" id="filter-status" style="margin-bottom:0;">
+            <option value="">All statuses</option>
+            <option value="available">Available</option>
+            <option value="allocated">Allocated</option>
+            <option value="checked_out">Checked Out</option>
+            <option value="needs_cleaning">Needs Cleaning</option>
+            <option value="needs_deep_clean">Needs Deep Clean</option>
+            <option value="damaged_pending_repair">Damaged, Pending Repair</option>
+            <option value="retired">Retired</option>
+          </select>
+        </div>
+        <div class="ops-form-row" style="max-width:280px; margin-bottom:0;">
           <label>Jump to item type</label>
           <select class="ops-select" id="jump-item-type" style="margin-bottom:0;">
             <option value="">Jump to…</option>
@@ -216,7 +229,7 @@
           + '<td>' + escapeHtml(u.unitId) + '</td>'
           + '<td><span class="status-tag ' + statusClass + '">' + escapeHtml((u.status || '').replace(/_/g, ' ')) + '</span></td>'
           + '<td><span class="dc-bar"><span class="dc-bar-fill" style="width:' + pct + '%;"></span></span>' + uses + ' / ' + threshold + '</td>'
-          + '<td>' + (u.currentBookingId ? '#' + escapeHtml(u.currentBookingId) : '—') + '</td>'
+          + '<td>' + (u.currentBookingId ? ('<a class="ops-link" href="ops-booking-detail.html?bookingId=' + encodeURIComponent(u.currentBookingId) + '">#' + escapeHtml(u.currentBookingId) + '</a>') : '—') + '</td>'
           + '<td>' + (actions || '&mdash;') + '</td>'
           + '</tr>';
       });
@@ -231,15 +244,21 @@
 
   function loadUnits() {
     var itemType = document.getElementById('filter-item-type').value;
-    document.getElementById('units-list').innerHTML = '<div class="ops-empty">Loading…</div>';
-    opsCall('gearUnits_list', { itemType: itemType }).then(function (result) {
-      if (!result.ok) { document.getElementById('units-list').innerHTML = '<div class="ops-empty">Could not load Gear Units.</div>'; return; }
-      var units = result.data.units || [];
-      renderUnits(units);
-      // A QR scanned with a plain phone camera (not this app's own
-      // scanner) lands here as ?unit={qrToken} — jump to it once the
-      // real rows exist to jump to.
-      handleDeepLink(units);
+    var status = document.getElementById('filter-status').value;
+    OpsShell.withLoadingState(document.getElementById('units-list'), function () {
+      return opsCall('gearUnits_list', { itemType: itemType }).then(function (result) {
+        if (!result.ok) { document.getElementById('units-list').innerHTML = '<div class="ops-empty">Could not load Gear Units.</div>'; return; }
+        var units = result.data.units || [];
+        // Status filter composes with item type (AND, not replace) —
+        // applied client-side since the page already fetches every
+        // matching unit's status.
+        if (status) units = units.filter(function (u) { return u.status === status; });
+        renderUnits(units);
+        // A QR scanned with a plain phone camera (not this app's own
+        // scanner) lands here as ?unit={qrToken} — jump to it once the
+        // real rows exist to jump to.
+        handleDeepLink(units);
+      });
     });
   }
 
@@ -406,6 +425,7 @@
     });
     document.getElementById('add-unit-submit').addEventListener('click', submitAddUnit);
     document.getElementById('filter-item-type').addEventListener('change', loadUnits);
+    document.getElementById('filter-status').addEventListener('change', loadUnits);
     document.getElementById('jump-item-type').addEventListener('change', function (e) {
       var itemType = e.target.value;
       if (!itemType) return;
