@@ -31,12 +31,12 @@ var OpsShell = (function () {
     { href: 'ops-trail-swap-requests.html', label: 'Trail Swap Requests', group: 'Actions' },
     { href: 'ops-manual-adjustment.html', label: 'Manual Adjustment', group: 'Actions' },
     { href: 'ops-gear-checkout.html', label: 'Gear Assembly & Checkout', group: 'Actions' },
-    { href: 'ops-gear-units.html', label: 'Gear Units', group: 'Actions' },
-    { href: 'ops-trails.html', label: 'Trails', group: 'Actions' },
-    { href: 'ops-parks.html', label: 'Parks', group: 'Actions' },
-    { href: 'ops-availability.html', label: 'Availability', group: 'Actions' },
     { href: 'ops-gear-checkin.html', label: 'Return Check-In', group: 'Actions' },
     { href: 'ops-reconciliation-review.html', label: 'Reconciliation Review', group: 'Actions' },
+    { href: 'ops-gear-units.html', label: 'Gear Units', group: 'Assets' },
+    { href: 'ops-trails.html', label: 'Trails', group: 'Assets' },
+    { href: 'ops-parks.html', label: 'Parks', group: 'Assets' },
+    { href: 'ops-availability.html', label: 'Availability', group: 'Assets' },
   ];
 
   var LOADING_TIMEOUT_MS = 12000;
