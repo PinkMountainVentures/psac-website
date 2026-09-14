@@ -1827,6 +1827,46 @@
     var firstName = (signer.signerName || '').split(' ')[0] || 'there';
     var status = computeStatus();
 
+    // NEW (Surface B new-tiles build, 2026-09-14): "Who's Going" roster
+    // tile copy (section 1). Mirrors renderGuardianOnlyHub's own
+    // whosGoingSub join logic, adapted per Airey's decided default
+    // (2026-09-14): minors are count-only, never named, no exceptions.
+    // This signer is filtered out of the adult list -- the tile is about
+    // who else is on the trip, not the reader themselves.
+    var signerParticipantIdForRoster = (state.ctx.signer && state.ctx.signer.participantId) || null;
+    var otherAdultNamesForRoster = (state.ctx.attendingAdults || [])
+      .filter(function (a) { return a.participantId !== signerParticipantIdForRoster; })
+      .map(function (a) { return a.name; })
+      .filter(Boolean);
+    function joinNamesOxford(names) {
+      if (names.length <= 1) return names.join('');
+      if (names.length === 2) return names[0] + ' and ' + names[1];
+      return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
+    }
+    var minorsCountForRoster = (state.ctx.minors || []).length;
+    var whosGoingRosterSub = (otherAdultNamesForRoster.length > 1
+        ? escapeHtml(joinNamesOxford(otherAdultNamesForRoster)) + ' are headed out with you.'
+        : 'Just you and ' + escapeHtml(otherAdultNamesForRoster[0] || ownerName) + ' on this one.')
+      + (minorsCountForRoster ? ' Plus ' + minorsCountForRoster + ' kid' + (minorsCountForRoster === 1 ? '' : 's') + '.' : '');
+
+    // NEW (Surface B new-tiles build, 2026-09-14): "The Day" copy (section
+    // 3) -- date/time preference, meeting point, expected return, same
+    // graceful degradation as renderGuardianOnlyHub's own theDaySub
+    // (missing pieces just drop out of the sentence), but a different
+    // field order per the approved copy ("Meeting at..." before "Back by
+    // around..."), and with no "you’re our first call" line -- this
+    // reader is on the trail themselves, that line doesn't apply. Reused
+    // twice below: once for the standalone card (shown until a real
+    // trail photo exists), once folded into the hero card's own subline
+    // once that photo is live (section 3b).
+    var theDayTimePref = state.ctx.timePreference || '';
+    var theDayDateLine = tripDate + (theDayTimePref ? ', ' + escapeHtml(theDayTimePref) : '') + '.';
+    var theDayTrailheadLine = (status.trailDetail && status.trailDetail.trailheadLocation) ? ' Meeting at ' + escapeHtml(status.trailDetail.trailheadLocation) + '.' : '';
+    var theDayStartHour = guardianDayStartHour(state.ctx.timePreference);
+    var theDayDurationHours = status.trailDetail && status.trailDetail.estTimeEasyPaceHours;
+    var theDayBackLine = (theDayStartHour != null && theDayDurationHours) ? ' Back by around ' + formatHourOfDay(theDayStartHour + theDayDurationHours) + '.' : '';
+    var theDaySub = theDayDateLine + theDayTrailheadLine + theDayBackLine;
+
     // Icons: Style B ("Line, salmon accent"), matching
     // adventure-prep-form.js's hub tiles for the 3 shared concepts
     // (Your Trail / Your Waiver / Adventure Summary), 2026-09-02.
@@ -1847,10 +1887,27 @@
         status.detailsDone ? 'Saved' : 'Your email & phone, so we can reach you',
         status.detailsDone ? 'Done' : 'Not done',
         { onClick: function () { state.step = 'confirmDetails'; render(); } }),
+      // NEW (Surface B new-tiles build, 2026-09-14, section 1): "Who's
+      // Going" -- the roster/group-visibility gap Airey's live-test
+      // feedback named directly ("can't really click into ... roster
+      // details ... they should be able to see summaries"). Always
+      // view-only, same as the equivalent tile on the non-attending
+      // guardian's own hub (renderGuardianOnlyHub, below).
+      tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8.2" r="2.6" stroke="#2A4747" stroke-width="1.3"/><path d="M4.2 18.4c0-3 2.1-5.1 4.8-5.1s4.8 2.1 4.8 5.1" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><circle cx="16.6" cy="9" r="2" stroke="#F58271" stroke-width="1.2"/><path d="M14.3 18.4c0-2.4 1-4.3 3.4-4.7" stroke="#F58271" stroke-width="1.2" stroke-linecap="round"/></svg>', 'Who’s Going',
+        whosGoingRosterSub,
+        null,
+        { readonly: true }),
+      // BUG FIX (scoping doc 5b, claude/psac-surface-b-summary-
+      // drilldowns-scoping-2026-09-14.md): this tile used to render at
+      // full opacity with a pointer cursor even before a trail was
+      // assigned, since it was only ever marked readonly (view-only tag),
+      // never locked -- the CSS that dims/disables a tile keys off the
+      // locked class, so tapping it before assignment silently did
+      // nothing. Now marked locked whenever there's nothing to show yet.
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="#2A4747" stroke-width="1.4"/><path d="M12 3.3v1.6" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><path d="M12 12l3-5-1 5.6z" fill="#F58271"/><path d="M12 12l-3 5 1-5.6z" fill="#2A4747"/><circle cx="12" cy="12" r="1" fill="#2A4747"/></svg>', 'Your Trail',
         status.trailAssigned ? status.trailName : 'Not yet assigned',
         null,
-        { readonly: true, onClick: status.trailAssigned ? function () { state.step = 'trail'; render(); } : null }),
+        { readonly: true, locked: !status.trailAssigned, onClick: status.trailAssigned ? function () { state.step = 'trail'; render(); } : null }),
       tile('<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8.3 8.2c0-2.4 1.7-4.3 3.7-4.3s3.7 1.9 3.7 4.3" stroke="#2A4747" stroke-width="1.3" stroke-linecap="round"/><rect x="5.8" y="8.2" width="12.4" height="12" rx="3" stroke="#2A4747" stroke-width="1.4"/><path d="M9 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><path d="M15 8.2v2.6" stroke="#2A4747" stroke-width="1.2" stroke-linecap="round"/><rect x="9" y="13.4" width="6" height="4.4" rx="1.2" stroke="#F58271" stroke-width="1.2"/></svg>', 'Your Gear',
         'See what’s in your kit',
         null,
@@ -1917,14 +1974,21 @@
     var hubIsGuardian = hubGuardianMinors.length > 0;
     var hubChildNames = hubGuardianMinors.map(function (m) { return m.name; }).filter(Boolean);
     var hubChildLabel = hubChildNames.length ? escapeHtml(hubChildNames.join(', ')) : 'them';
+    // REWRITTEN (Surface B copy refresh, 2026-09-14, Part 3): the old
+    // greeting/subline/intro-banner trio never actually said what Palm
+    // Springs Adventure Club IS (self-guided, one trail, gear delivered)
+    // to a reader seeing this for the first time -- see claude/psac-
+    // surface-b-copy-refresh-proposal-2026-09-14.md's own diagnosis.
+    // hubIntroText's separate banner is retired entirely: that same
+    // information now lands once, in the subline, instead of twice in
+    // two different boxes (its old screen slot is reused below for "The
+    // Day", the new-tiles build's section 3a).
     var hubGreeting = hubIsGuardian
-      ? 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' invited you and ' + hubChildLabel + ' along on their adventure day.'
-      : 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' invited you along on their adventure day.';
+      ? 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' is bringing you and ' + hubChildLabel + ' along on ' + tripDate + '.'
+      : 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' is bringing you along on ' + tripDate + '.';
     var hubSubline = hubIsGuardian
-      ? 'A few things need your attention before the trail day arrives, most of them take a minute, plus confirming you’re ' + hubChildLabel + '’s guardian for the day.'
-      : 'A few things need your attention before the trail day arrives, and most of them take a minute.';
-    var hubIntroText = (hubIsGuardian ? 'You both get placed' : 'You get placed') +
-      ' on a trail that fits the group, not a generic route, with gear at your door the night before you go. ' + escapeHtml(ownerName) + ' picked Palm Springs Adventure Club because it’s the easiest way to have a great adventure on the trails around Palm Springs.';
+      ? 'A self-guided trail, placed for this group, ' + hubChildLabel + ' included, with gear delivered the night before. Below: your own signature, and confirming you’re ' + hubChildLabel + '’s guardian for the day.'
+      : 'A self-guided trail, placed for this group, with a full gear kit delivered the night before. A few things below are yours to finish, most take a minute.';
     // -----------------------------------------------------------------
     // Phase 1/2 escalating top card (hub-lifecycle-alerts-proposal.md,
     // 2026-09-03). Same "pure function of current state" rule and the
@@ -1945,6 +2009,14 @@
     // check-in state, not on whether this signer's own prep steps are
     // done.
     var isTrailDayToday = false;
+    // NEW (Surface B new-tiles build, 2026-09-14, section 3b): flips
+    // true only inside the plain "climax" branch below, once a real
+    // trail photo exists -- read afterward, both by the banner-slot
+    // condition above (theDayCardHtml's replacement) and nowhere else,
+    // since every other branch already shows its own specific,
+    // timely subline (trip tip, delivery info, guide-ready message)
+    // that this build doesn't touch.
+    var theDayHeroTakeover = false;
     var todayStrForTripCheck = pacificDateString(new Date());
     var tripDateMatchForTripCheck = String(state.ctx.tripDate || '').match(/^\d{4}-\d{2}-\d{2}/);
     var tripDateStrForTripCheck = tripDateMatchForTripCheck ? tripDateMatchForTripCheck[0] : '';
@@ -2009,7 +2081,15 @@
         topGreetingHtml = hubIsGuardian
           ? hubChildLabel + '’s ready, and so are you. The trail is ready and the adventure will be fun!'
           : 'You’re in. ' + escapeHtml(ownerName) + '’s adventure is set. The trail is ready for you.';
-        topSublineHtml = statLine;
+        // NEW (Surface B new-tiles build, 2026-09-14, section 3b): once
+        // the hero card is about to render with a real trail photo, its
+        // own subline absorbs "The Day"'s meeting-time/trailhead/return
+        // content instead of the plain statLine, so the standalone card
+        // above can retire without that information disappearing.
+        theDayHeroTakeover = !!(status.trailDetail && status.trailDetail.photoUrl);
+        topSublineHtml = theDayHeroTakeover
+          ? escapeHtml(status.trailName) + ' · ' + theDaySub
+          : statLine;
       }
     } else if (doneCount === 1) {
       topGreetingHtml = status.detailsDone
@@ -2068,7 +2148,7 @@
     var wrap = h(
       '<div class="container"><div class="ap-shell" style="padding-top:0;">' +
       (isTrailDayToday ? '' : topCardHtml) +
-      (isTrailDayToday || showPostAdventure ? '' : '<div class="ap-intro-banner"><div class="ap-intro-banner-text">' + hubIntroText + '</div></div>') +
+      (isTrailDayToday || showPostAdventure || theDayHeroTakeover ? '' : '<div class="ap-intro-banner"><div class="ap-tiles-label" style="margin-bottom:0.35rem;">The Day</div><div class="ap-intro-banner-text">' + theDaySub + '</div></div>') +
       (showPostAdventure
         // Post-Adventure, gear-free (Surface B trail-day arc, 2026-09-08;
         // restacked 2026-09-08 same day, per Airey's direct request --
@@ -2274,7 +2354,11 @@
     // day throughout per Airey's own correction (low task count here
     // doesn't mean low informational need).
     // -----------------------------------------------------------------
-    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '’s guardian for their adventure day.';
+    // REWRITTEN (Surface B copy refresh, 2026-09-14, Part 4): "for their
+    // adventure day" was vaguer than just naming the date, which this
+    // screen already has and states nowhere else in this greeting -- see
+    // claude/psac-surface-b-copy-refresh-proposal-2026-09-14.md Part 4.
+    var topGreetingHtml = 'Hi ' + escapeHtml(firstName) + ', ' + escapeHtml(ownerName) + ' named you as ' + childLabel + '’s guardian for ' + formatTripDate(state.ctx.tripDate) + '.';
     var topSublineHtml = '';
     var pastT3 = isPastT3Cutoff(state.ctx.tripDate);
     var guideCardHtml = '';
@@ -3027,6 +3111,18 @@
         .map(function (pid) { return confirmMinorsById[pid] ? confirmMinorsById[pid].name : null; })
         .filter(Boolean);
       var isGuardianConfirmation = confirmChildNames.length > 0;
+      // NEW (Surface B new-tiles build, 2026-09-14): bare "X of Y
+      // signed" status, no names, no action -- see
+      // claude/psac-surface-b-new-tiles-copy-proposal-2026-09-14.md
+      // section 2. groupWaiverStatus is computed server-side in
+      // getSignerContext (lib/waiver-service.js), mirroring the exact
+      // same "required signers" definition
+      // recomputeAllWaiversComplete() and Surface A's own waiverSigners()
+      // hub-tile sublabel already use.
+      var groupWaiverStatus = state.ctx.groupWaiverStatus;
+      var groupWaiverLineHtml = (groupWaiverStatus && groupWaiverStatus.total > 0)
+        ? '<div class="ap-helper" style="display:block;">' + groupWaiverStatus.signed + ' of ' + groupWaiverStatus.total + ' in your group have signed.</div>'
+        : '';
       var confirmTitle = isGuardianConfirmation
         ? escapeHtml(confirmChildNames.join(', ')) + ' is going to have a great adventure!'
         : 'You\u2019re in. ' + escapeHtml(state.ctx.ownerName || 'Your trip organizer') + '\u2019s going to be glad to have you out there.';
@@ -3042,6 +3138,7 @@
         '<div class="ap-recap-line"><span>Waiver Signed By</span><b>' + escapeHtml(state.waiverName || '') + '</b></div>' +
         '<div class="ap-recap-line"><span>Emergency Contact</span><b>' + ecLine + '</b></div>' +
         '</div>' +
+        groupWaiverLineHtml +
         '<button type="button" class="ap-cta-primary" id="sb-return-hub">Return to Adventure Home</button>';
       contentEl.querySelector('#sb-flow-back').addEventListener('click', goHub);
       contentEl.querySelector('#sb-return-hub').addEventListener('click', goHub);
