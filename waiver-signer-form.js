@@ -2492,8 +2492,19 @@
       // other two hubs (2026-09-05).
       guideCardHtml +
       weatherHtml +
-      (isUnderway ? '' : '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '’s day itself is self-guided, without one of our own people along, so here’s everything about it: who’s going, where, when, and what to do if you need to reach us.</div></div>') +
-      '<div class="ap-tiles-label">The day</div>' +
+      // BUG FIX (Surface B tile-audit, 2026-09-14): the banner used to
+      // promise "what to do if you need to reach us" with nothing on
+      // screen actually saying what that is -- the header's real
+      // Questions button (sign-waiver.html, wired to api/send-help-
+      // message.js) is the actual answer, but nothing here pointed to
+      // it. Now says so explicitly instead of leaving the promise
+      // unresolved. Also retitles the tile group below: it used to read
+      // "THE DAY", confusing since one of the four tiles in it is ALSO
+      // separately titled "The Day" -- "Get ready" now matches the
+      // label renderHub() already uses for its own equivalent tile
+      // group, so the two hubs read consistently.
+      (isUnderway ? '' : '<div class="ap-intro-banner"><div class="ap-intro-banner-text">Palm Springs Adventure Club plans the trail, gathers the group, and gets the gear to the door. ' + childLabel + '’s day itself is self-guided, without one of our own people along, so here’s everything about it: who’s going, where, when, and what to do if you need to reach us. Questions before then? Use Questions at the top of this page, we reply to the email on the booking.</div></div>') +
+      '<div class="ap-tiles-label">Get ready</div>' +
       '<div class="ap-tiles" id="sb-guardian-hub-tiles">' + tilesHtml + '</div>' +
       '</div></div>'
     );
