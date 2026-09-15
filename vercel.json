@@ -4,11 +4,11 @@
   "crons": [
     {
       "path": "/api/process-t3-cutoff",
-      "schedule": "*/15 * * * *"
+      "schedule": "0,15,30,45 4,5,6 * * *"
     },
     {
       "path": "/api/check-adventure-prep-cadence",
-      "schedule": "7,22,37,52 * * * *"
+      "schedule": "7,22,37,52 15,16,17,18 * * *"
     },
     {
       "path": "/api/trigger-deposit-holds",
@@ -24,7 +24,7 @@
     },
     {
       "path": "/api/process-pending-kit-changes",
-      "schedule": "10,25,40,55 * * * *"
+      "schedule": "10,40 * * * *"
     },
     {
       "path": "/api/renew-deposit-hold",
@@ -40,11 +40,11 @@
     },
     {
       "path": "/api/send-gear-out-for-delivery",
-      "schedule": "5,20,35,50 * * * *"
+      "schedule": "5,20,35,50 21,22,23,0,1,2,3 * * *"
     },
     {
       "path": "/api/send-trip-plus-one-email",
-      "schedule": "12,27,42,57 * * * *"
+      "schedule": "12,27,42,57 15,16,17,18 * * *"
     },
     {
       "path": "/api/send-gear-on-its-way",
